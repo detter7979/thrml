@@ -1,0 +1,239 @@
+import { NextResponse } from "next/server"
+
+import { buildSupportConfirmationEmail, buildSupportInternalAlertEmail } from "@/lib/emails/support"
+import { sendEmail } from "@/lib/emails/send"
+import { applyMemoryRateLimit, requestIp } from "@/lib/security"
+import { deriveSupportPriority, SUPPORT_SUBJECTS, type SupportSubject } from "@/lib/support"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { createClient } from "@/lib/supabase/server"
+
+type ValidationErrors = {
+  name?: string
+  email?: string
+  subject?: string
+  message?: string
+  booking_id?: string
+}
+
+type ValidSupportPayload = {
+  name: string
+  email: string
+  subject: SupportSubject
+  message: string
+  booking_id: string | null
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+function validateSupportPayload(payload: unknown): { data?: ValidSupportPayload; errors?: ValidationErrors } {
+  const errors: ValidationErrors = {}
+  const body = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {}
+
+  const name = asTrimmedString(body.name)
+  const email = asTrimmedString(body.email)
+  const subject = asTrimmedString(body.subject)
+  const message = asTrimmedString(body.message)
+  const bookingIdRaw = body.booking_id ?? body.bookingId
+  const bookingId = typeof bookingIdRaw === "string" ? bookingIdRaw.trim() : ""
+
+  if (name.length < 2) errors.name = "Name must be at least 2 characters."
+  if (!EMAIL_REGEX.test(email)) errors.email = "Enter a valid email address."
+  if (!SUPPORT_SUBJECTS.includes(subject as SupportSubject)) {
+    errors.subject = "Select a valid topic."
+  }
+  if (message.length < 20) {
+    errors.message = "Message must be at least 20 characters."
+  } else if (message.length > 500) {
+    errors.message = "Message cannot exceed 500 characters."
+  }
+  if (bookingId && !UUID_REGEX.test(bookingId)) {
+    errors.booking_id = "Booking reference must be a valid UUID."
+  }
+
+  if (Object.keys(errors).length > 0) return { errors }
+
+  return {
+    data: {
+      name,
+      email,
+      subject: subject as SupportSubject,
+      message,
+      booking_id: bookingId || null,
+    },
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const ip = requestIp(req)
+    const limit = applyMemoryRateLimit({
+      key: `api:support:${ip}`,
+      max: 5,
+      windowMs: 10 * 60_000,
+    })
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many support submissions. Please wait a few minutes before trying again." },
+        { status: 429 }
+      )
+    }
+
+    const body = await req.json().catch(() => null)
+    const validation = validateSupportPayload(body)
+    if (validation.errors) {
+      return NextResponse.json({ errors: validation.errors }, { status: 400 })
+    }
+
+    const { name, email, subject, message, booking_id } = validation.data as ValidSupportPayload
+
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const supabaseAdmin = createAdminClient()
+    let validatedBookingId: string | null = booking_id
+
+    if (validatedBookingId && user?.id) {
+      const { data: ownedBooking, error: bookingOwnershipError } = await supabaseAdmin
+        .from("bookings")
+        .select("id")
+        .eq("id", validatedBookingId)
+        .or(`guest_id.eq.${user.id},host_id.eq.${user.id}`)
+        .maybeSingle()
+
+      if (bookingOwnershipError) {
+        console.error("[api/support] booking ownership check failed", {
+          userId: user.id,
+          bookingId: validatedBookingId,
+          error: bookingOwnershipError.message,
+        })
+        validatedBookingId = null
+      } else if (!ownedBooking) {
+        validatedBookingId = null
+      }
+    }
+
+    const priority = deriveSupportPriority(subject)
+
+    const insertPayload = {
+      user_id: user?.id ?? null,
+      name,
+      email,
+      subject,
+      booking_id: validatedBookingId ?? null,
+      message,
+      priority,
+    }
+
+    let ticketNumber = "Pending"
+    let savedPriority = priority
+    let submittedAt: string | null = new Date().toISOString()
+
+    const { data, error } = await supabaseAdmin
+      .from("support_requests")
+      .insert(insertPayload)
+      .select("ticket_number, priority, created_at")
+      .single()
+
+    if (error?.code === "42703") {
+      // Fallback for environments where support_requests doesn't yet include one of these selected columns.
+      const { error: fallbackError } = await supabaseAdmin.from("support_requests").insert(insertPayload)
+      if (fallbackError) {
+        console.error("[api/support] support insert fallback failed", {
+          error: fallbackError.message,
+        })
+        return NextResponse.json(
+          { error: "Unable to submit your request right now. Please try again." },
+          { status: 500 }
+        )
+      }
+      ticketNumber = `TRM-${Date.now().toString().slice(-6)}`
+    } else if (error || !data) {
+      console.error("[api/support] support insert failed", {
+        error: error?.message ?? "Unknown insert error",
+      })
+      return NextResponse.json({ error: "Unable to submit your request right now. Please try again." }, { status: 500 })
+    } else {
+      ticketNumber = typeof data.ticket_number === "string" ? data.ticket_number : "Pending"
+      savedPriority = (data.priority as "urgent" | "high" | "normal") ?? priority
+      submittedAt = typeof data.created_at === "string" ? data.created_at : submittedAt
+    }
+
+    const confirmationEmail = buildSupportConfirmationEmail({
+      name,
+      ticketNumber,
+      subject,
+      bookingId: validatedBookingId,
+      message,
+      priority: savedPriority,
+    })
+
+    const internalEmail = buildSupportInternalAlertEmail({
+      ticketNumber,
+      priority: savedPriority,
+      subject,
+      submittedAt,
+      name,
+      email,
+      userId: user?.id ?? null,
+      bookingId: validatedBookingId,
+      message,
+    })
+
+    const supportRecipient = process.env.SUPPORT_EMAIL?.trim()
+    const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev"
+    const confirmationRecipient =
+      process.env.NODE_ENV === "production" ? email : (process.env.RESEND_TEST_TO_EMAIL?.trim() ?? email)
+
+    const [confirmationResult, internalResult] = await Promise.all([
+      sendEmail({
+        from: fromAddress,
+        to: confirmationRecipient,
+        subject: confirmationEmail.subject,
+        html: confirmationEmail.html,
+        text: confirmationEmail.text,
+        userId: user?.id ?? null,
+      }),
+      supportRecipient
+        ? sendEmail({
+            from: fromAddress,
+            to: supportRecipient,
+            subject: internalEmail.subject,
+            html: internalEmail.html,
+            text: internalEmail.text,
+          })
+        : Promise.resolve({ sent: false, error: "SUPPORT_EMAIL not configured" }),
+    ])
+
+    if (!confirmationResult.sent) {
+      console.error("[api/support] confirmation email failed", {
+        ticketNumber,
+        error: confirmationResult.error ?? "Unknown confirmation email error",
+      })
+    }
+
+    if (!internalResult.sent) {
+      console.error("[api/support] internal support email failed", {
+        ticketNumber,
+        error: internalResult.error ?? "Unknown internal email error",
+      })
+    }
+
+    return NextResponse.json({
+      message: "Ticket submitted",
+      ticket_number: ticketNumber,
+      priority: savedPriority,
+    })
+  } catch (error) {
+    console.error("[api/support] unexpected error", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    })
+    return NextResponse.json({ error: "Unable to submit your request right now. Please try again." }, { status: 500 })
+  }
+}

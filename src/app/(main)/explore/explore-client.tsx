@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
-  ArrowLeft,
   Layers,
   List,
   Map as MapIcon,
@@ -1173,8 +1172,8 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
   }
   return (
     <div className={viewMode === "list" ? "min-h-[calc(100svh-88px)] bg-[#F7F3EE]" : "h-[calc(100svh-88px)] overflow-hidden bg-[#F7F3EE]"}>
-      <div className="sticky top-0 z-[140] border-b border-[#D9CEC1] bg-[#EAE1D4]/95 backdrop-blur">
-          <div className="relative z-[150] flex items-center justify-between gap-3 px-4 py-3 md:px-6">
+      <div className="sticky top-0 z-20 border-b border-[#D9CEC1] bg-[#EAE1D4]/95 backdrop-blur">
+          <div className="relative z-20 flex items-center justify-between gap-3 px-4 py-3 md:px-6">
           <div className="no-scrollbar flex items-center gap-2 overflow-x-auto whitespace-nowrap pl-1 pr-4">
             <Popover
               open={openFilter === "service"}
@@ -1199,7 +1198,7 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
                   {serviceChipLabel()}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="z-[220] w-72 border-[#E8DED3] p-3">
+              <PopoverContent align="start" className="z-30 w-72 border-[#E8DED3] p-3">
                 <div className="max-h-64 space-y-1 overflow-y-auto">
                   {serviceTypeOptions.map((serviceType) => {
                     const active = serviceDraft.includes(serviceType.id)
@@ -1263,7 +1262,7 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
               </PopoverTrigger>
               <PopoverContent
                 align="start"
-                className="z-[220] w-72 rounded-lg border-[#E1D5C7] p-3 shadow-none"
+                className="z-30 w-72 rounded-lg border-[#E1D5C7] p-3 shadow-none"
               >
                 <div className="relative h-8">
                   <div className="absolute top-1/2 right-0 left-0 h-1.5 -translate-y-1/2 rounded-full bg-[#E6DDD3]" />
@@ -1353,7 +1352,7 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
                   {distanceLabel()}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="z-[220] w-48 border-[#E8DED3] p-3">
+              <PopoverContent align="start" className="z-30 w-48 border-[#E8DED3] p-3">
                 {[1, 2, 5, 10, 25, 50, DISTANCE_ANY].map((value) => (
                   <label key={value} className="mb-1 flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-[#FAF6F1]">
                     <input
@@ -1556,10 +1555,10 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
                   <button
                     type="button"
                     onClick={() => setViewMode("list")}
-                    className="fixed top-24 left-4 z-40 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#2C2420] shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
+                    className="fixed top-[72px] left-1/2 z-40 inline-flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full border border-[#E5DDD6] bg-white px-5 py-2.5 text-sm font-semibold text-[#2C2420] shadow-[0_2px_12px_rgba(0,0,0,0.15)]"
                   >
-                    <ArrowLeft className="size-4" />
-                    List
+                    <List className="size-4" />
+                    <span>← List view</span>
                   </button>
                   <div
                     ref={mobileMapCardsRef}

@@ -213,7 +213,7 @@ export function Navbar() {
                   <span className={`text-sm ${desktopLinkColor}`}>{userName?.split(" ")[0] ?? "Account"}</span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="z-40">
                 <DropdownMenuLabel>{userName ?? "Member"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

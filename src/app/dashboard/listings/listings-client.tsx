@@ -3,14 +3,14 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Check, Copy } from "lucide-react"
+import { Check, ChevronDown, ChevronUp, Copy } from "lucide-react"
 
 import { CancelModal } from "@/components/booking/CancelModal"
 import { RatingSummary } from "@/components/reviews/RatingSummary"
 import { ReviewCard } from "@/components/reviews/ReviewCard"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { formatMoney, getPolicyTimeline, type ListingCancellationPolicy } from "@/lib/cancellations"
+import { formatMoney, type ListingCancellationPolicy } from "@/lib/cancellations"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 type ListingRow = {
@@ -174,6 +174,7 @@ export function DashboardListingsClient({
   const [saveErrorByBooking, setSaveErrorByBooking] = useState<Record<string, string | null>>({})
   const [sendingByBookingId, setSendingByBookingId] = useState<string | null>(null)
   const [resentConfirmationByBooking, setResentConfirmationByBooking] = useState<Record<string, string>>({})
+  const [expandedAccessByBooking, setExpandedAccessByBooking] = useState<Record<string, boolean>>({})
 
   const visiblePendingRequests = useMemo(
     () => pendingRequests.filter((request) => !dismissedRequestIds.includes(request.id)),
@@ -520,7 +521,6 @@ export function DashboardListingsClient({
 
       <div className="space-y-3">
         {listings.map((listing) => {
-          const timeline = getPolicyTimeline(listing.cancellation_policy)
           const isExpanded = expandedListingId === listing.id
           const activeTab = activeTabs[listing.id] ?? "upcoming"
           const openListing = () => router.push(`/listing/${listing.id}`)
@@ -541,7 +541,7 @@ export function DashboardListingsClient({
           return (
             <article
               key={listing.id}
-              className="rounded-2xl bg-white p-4 shadow-sm"
+              className="w-full overflow-hidden rounded-2xl bg-white p-5 shadow-sm"
             >
               <div
                 role="button"
@@ -589,20 +589,17 @@ export function DashboardListingsClient({
 
               {isExpanded ? (
                 <div
-                  className="mt-4 grid cursor-default gap-4 rounded-xl border border-[#ECE2D6] bg-[#FBF8F4] p-4 md:grid-cols-2"
+                  className="mt-4 grid w-full cursor-default gap-5 overflow-hidden rounded-xl border border-[#ECE2D6] bg-[#FBF8F4] p-5 md:grid-cols-2"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div>
-                      <p className="text-xs uppercase tracking-wide text-[#8A7B6D]">Cancellation settings</p>
-                      <p className="text-sm text-[#1A1410]">
-                        Current policy: <strong>{listing.cancellation_policy}</strong>
+                      <p className="mb-2 text-xs uppercase tracking-wide text-[#8A7B6D]">Cancellation settings</p>
+                      <p className="leading-relaxed text-sm text-[#1A1410]">
+                        <span className="inline-flex rounded-full border border-[#E9DFD3] bg-white px-2.5 py-1 text-xs text-[#5D4E43]">
+                          Cancellation: {listing.cancellation_policy}
+                        </span>
                       </p>
-                      <div className="mt-2 rounded-lg border border-[#E9DFD3] bg-white p-3 text-sm text-[#5D4E43]">
-                        <p>72h+ before: {timeline.over72h}</p>
-                        <p>24-72h: {timeline.between24And72h}</p>
-                        <p>&lt;24h: {timeline.under24h}</p>
-                      </div>
                       {listing.active_booking_count === 0 ? (
                         <Link
                           href={`/dashboard/listings/${listing.id}/edit`}
@@ -614,7 +611,7 @@ export function DashboardListingsClient({
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex gap-2 text-xs">
                       {[
                         { key: "upcoming", label: `Upcoming (${listing.upcoming_bookings.length})` },
@@ -647,12 +644,12 @@ export function DashboardListingsClient({
                           const showAccessCode =
                             booking.status === "confirmed" && isCodeAccessType(listing.access_type)
                           return (
-                            <div key={booking.id} className="rounded-lg border border-[#E9DFD3] bg-white p-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className={`min-w-0 flex-1 ${showAccessCode ? "flex min-h-[74px] flex-col justify-between" : ""}`}>
+                            <div key={booking.id} className="max-w-full overflow-hidden rounded-lg border border-[#E9DFD3] bg-white p-3 box-border">
+                              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                <div className={`min-w-0 max-w-full flex-1 ${showAccessCode ? "flex min-h-[74px] flex-col justify-between" : ""}`}>
                                   <div>
                                     <p className="text-sm font-medium text-[#1A1410]">{booking.guest_name ?? "Guest"}</p>
-                                    <p className="text-xs text-[#6D5E51]">
+                                    <p className="text-xs leading-relaxed text-[#6D5E51]">
                                       {sessionLabel(booking.session_date, booking.start_time, booking.end_time)}
                                     </p>
                                     <div className="mt-1">
@@ -686,60 +683,80 @@ export function DashboardListingsClient({
                                   </div>
                                 </div>
                                 {showAccessCode ? (
-                                  <div className="w-full max-w-[280px] shrink-0 rounded-lg border border-[#F1D4BA] bg-[#FFF4E8] p-2">
-                                    <p className="text-[10px] uppercase tracking-[0.16em] text-[#C75B3A]">Access</p>
-                                    <div className="mt-1 flex items-center justify-between gap-2">
-                                      <p className="font-mono text-sm tracking-[0.2em] text-[#C75B3A]">
-                                        {showCodeByBooking[booking.id]
-                                          ? codeByBooking[booking.id] ?? booking.access_code ?? "Pending"
-                                          : "••••"}
-                                      </p>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setShowCodeByBooking((current) => ({
-                                            ...current,
-                                            [booking.id]: !current[booking.id],
-                                          }))
-                                        }
-                                        className="text-xs text-[#8C5336] underline"
-                                      >
-                                        {showCodeByBooking[booking.id] ? "Hide" : "Reveal"}
-                                      </button>
-                                    </div>
-                                    {booking.access_code ? (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          booking.access_code
-                                            ? void copyAccessCode(booking.id, booking.access_code)
-                                            : undefined
-                                        }
-                                        className="mt-1 inline-flex items-center gap-1 rounded-md border border-[#E8BE9A] bg-[#FFF9F3] px-2 py-1 text-xs text-[#C75B3A] hover:bg-[#FFF1E5]"
-                                      >
-                                        {copiedBookingId === booking.id ? (
-                                          <>
-                                            <Check className="size-3.5" />
-                                            Copied
-                                          </>
+                                  <div className="w-full max-w-full shrink-0 rounded-lg border border-[#F1D4BA] bg-[#FFF4E8] p-3 box-border md:max-w-[320px]">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setExpandedAccessByBooking((current) => ({
+                                          ...current,
+                                          [booking.id]: !current[booking.id],
+                                        }))
+                                      }
+                                      className="flex w-full items-center justify-between gap-2 text-left"
+                                    >
+                                      <p className="text-sm font-medium text-[#1A1410]">🔐 Access details</p>
+                                      <span className="inline-flex items-center gap-1 text-xs font-medium text-[#8C5336]">
+                                        Edit
+                                        {expandedAccessByBooking[booking.id] ? (
+                                          <ChevronUp className="size-3.5" />
                                         ) : (
-                                          <>
-                                            <Copy className="size-3.5" />
-                                            Copy
-                                          </>
+                                          <ChevronDown className="size-3.5" />
                                         )}
-                                      </button>
-                                    ) : null}
-                                    <div className="mt-2 space-y-1">
-                                      <p className="text-[11px] font-medium text-[#6A5848]">Access code for this booking</p>
-                                      <p className="text-[11px] text-[#6A5848]">
-                                        Overrides the default for this session only.
-                                      </p>
-                                      <p className="text-xs text-[#6A5848]">{relativeTime(booking.access_code_sent_at)}</p>
-                                      {resentConfirmationByBooking[booking.id] ? (
-                                        <p className="text-xs text-emerald-700">{resentConfirmationByBooking[booking.id]}</p>
-                                      ) : null}
-                                      <div className="flex gap-2">
+                                      </span>
+                                    </button>
+                                    {expandedAccessByBooking[booking.id] ? (
+                                      <div className="mt-3 space-y-2 border-t border-[#E8BE9A] pt-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <p className="text-xs text-[#6A5848]">Current code</p>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setShowCodeByBooking((current) => ({
+                                                ...current,
+                                                [booking.id]: !current[booking.id],
+                                              }))
+                                            }
+                                            className="text-xs text-[#8C5336] underline"
+                                          >
+                                            {showCodeByBooking[booking.id] ? "Hide" : "Reveal"}
+                                          </button>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2 rounded-md bg-[#FFF9F3] p-2">
+                                          <p className="font-mono text-sm tracking-[0.2em] text-[#C75B3A]">
+                                            {showCodeByBooking[booking.id]
+                                              ? codeByBooking[booking.id] ?? booking.access_code ?? "Pending"
+                                              : "••••"}
+                                          </p>
+                                          {booking.access_code ? (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                booking.access_code
+                                                  ? void copyAccessCode(booking.id, booking.access_code)
+                                                  : undefined
+                                              }
+                                              className="inline-flex items-center gap-1 rounded-md border border-[#E8BE9A] bg-white px-2 py-1 text-xs text-[#C75B3A]"
+                                            >
+                                              {copiedBookingId === booking.id ? (
+                                                <>
+                                                  <Check className="size-3.5" />
+                                                  Copied
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Copy className="size-3.5" />
+                                                  Copy
+                                                </>
+                                              )}
+                                            </button>
+                                          ) : null}
+                                        </div>
+                                        <p className="text-xs leading-relaxed text-[#6A5848]">
+                                          Access code for this booking only. {relativeTime(booking.access_code_sent_at)}
+                                        </p>
+                                        {resentConfirmationByBooking[booking.id] ? (
+                                          <p className="text-xs text-emerald-700">{resentConfirmationByBooking[booking.id]}</p>
+                                        ) : null}
                                         <input
                                           value={codeByBooking[booking.id] ?? booking.access_code ?? ""}
                                           maxLength={20}
@@ -749,34 +766,23 @@ export function DashboardListingsClient({
                                               [booking.id]: event.target.value.slice(0, 20),
                                             }))
                                           }
-                                          placeholder="Update code"
-                                          className="h-8 min-w-0 flex-1 rounded-md border border-[#E5DDD6] px-2 text-xs font-mono"
+                                          placeholder="Update code input field"
+                                          className="h-8 w-full min-w-0 rounded-md border border-[#E5DDD6] px-2 text-xs font-mono"
                                         />
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-8"
-                                          disabled={
-                                            (codeByBooking[booking.id] ?? "").trim() ===
-                                              (savedCodeByBooking[booking.id] ?? "").trim() ||
-                                            saveStateByBooking[booking.id] === "saving"
-                                          }
-                                          onClick={() => void saveAccessCodeForBooking(booking.id)}
-                                        >
-                                          {saveStateByBooking[booking.id] === "saving" ? "Saving..." : "Save code"}
-                                        </Button>
-                                      </div>
-                                      {saveStateByBooking[booking.id] === "saved" ? (
-                                        <p className="text-xs text-emerald-700">✓ Saved</p>
-                                      ) : null}
-                                      {saveStateByBooking[booking.id] === "error" ? (
-                                        <p className="text-xs text-rose-700">
-                                          {saveErrorByBooking[booking.id] ?? "Save failed. Please try again."}
-                                        </p>
-                                      ) : null}
-                                      {!booking.access_code_sent_at ? (
-                                        <div className="flex items-center gap-2">
-                                          <p className="text-xs text-[#6A5848]">Code saved. Send to guest now?</p>
+                                        <div className="flex flex-wrap gap-2">
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8"
+                                            disabled={
+                                              (codeByBooking[booking.id] ?? "").trim() ===
+                                                (savedCodeByBooking[booking.id] ?? "").trim() ||
+                                              saveStateByBooking[booking.id] === "saving"
+                                            }
+                                            onClick={() => void saveAccessCodeForBooking(booking.id)}
+                                          >
+                                            {saveStateByBooking[booking.id] === "saving" ? "Saving..." : "Save code"}
+                                          </Button>
                                           <Button
                                             size="sm"
                                             variant="outline"
@@ -787,18 +793,16 @@ export function DashboardListingsClient({
                                             {sendingByBookingId === booking.id ? "Sending..." : "Send to guest"}
                                           </Button>
                                         </div>
-                                      ) : (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-8"
-                                          disabled={sendingByBookingId === booking.id || !(codeByBooking[booking.id] ?? "").trim()}
-                                          onClick={() => void sendAccessCodeToGuest(booking.id)}
-                                        >
-                                          {sendingByBookingId === booking.id ? "Sending..." : "Resend to guest"}
-                                        </Button>
-                                      )}
-                                    </div>
+                                        {saveStateByBooking[booking.id] === "saved" ? (
+                                          <p className="text-xs text-emerald-700">✓ Saved</p>
+                                        ) : null}
+                                        {saveStateByBooking[booking.id] === "error" ? (
+                                          <p className="text-xs text-rose-700">
+                                            {saveErrorByBooking[booking.id] ?? "Save failed. Please try again."}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 ) : null}
                               </div>

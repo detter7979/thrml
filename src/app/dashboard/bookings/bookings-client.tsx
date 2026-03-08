@@ -3,11 +3,26 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Calendar, CalendarDays, Check, Copy, Handshake, KeyRound, List, Lock, MapPin, Smartphone, Star, User } from "lucide-react"
+import {
+  Calendar,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Handshake,
+  KeyRound,
+  List,
+  Lock,
+  MapPin,
+  Smartphone,
+  Star,
+  User,
+} from "lucide-react"
 
 import { CancelModal } from "@/components/booking/CancelModal"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ACCESS_TYPES, resolveInstructions } from "@/lib/constants/access-types"
 
 type BookingStatus = "pending" | "pending_host" | "confirmed" | "cancelled" | "completed" | "declined" | string
@@ -242,6 +257,37 @@ function downloadIcs(booking: BookingRecord) {
   URL.revokeObjectURL(url)
 }
 
+function bookingIcsDataUri(booking: BookingRecord) {
+  if (!booking.session_date || !booking.start_time || !booking.end_time) return null
+  const start = new Date(`${booking.session_date}T${booking.start_time}`)
+  const end = new Date(`${booking.session_date}T${booking.end_time}`)
+  const toIcs = (value: Date) =>
+    value.toISOString().replace(/[-:]/g, "").replace(".000", "")
+  const title = booking.listings?.title ?? "Thrml session"
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "BEGIN:VEVENT",
+    `DTSTART:${toIcs(start)}`,
+    `DTEND:${toIcs(end)}`,
+    `SUMMARY:${title}`,
+    "DESCRIPTION:Thermal booking",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\n")
+  return `data:text/calendar;charset=utf8,${encodeURIComponent(ics)}`
+}
+
+function mapsLinkFor(address: string) {
+  if (typeof navigator === "undefined") {
+    return `https://maps.google.com/?q=${encodeURIComponent(address)}`
+  }
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+  return isIOS
+    ? `maps://maps.apple.com/?q=${encodeURIComponent(address)}`
+    : `https://maps.google.com/?q=${encodeURIComponent(address)}`
+}
+
 function BookingSkeleton() {
   return (
     <div className="rounded-3xl bg-white p-4 shadow-[0_8px_30px_rgba(26,20,16,0.06)] md:p-5">
@@ -276,6 +322,8 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
   const [loadError, setLoadError] = useState<string | null>(null)
   const [openingConversationId, setOpeningConversationId] = useState<string | null>(null)
   const [copiedBookingId, setCopiedBookingId] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [houseRulesExpandedByBooking, setHouseRulesExpandedByBooking] = useState<Record<string, boolean>>({})
 
   async function loadBookings() {
     setLoading(true)
@@ -309,6 +357,15 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
     const timeout = window.setTimeout(() => setToastMessage(null), 2800)
     return () => window.clearTimeout(timeout)
   }, [searchParams])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const media = window.matchMedia("(max-width: 767px)")
+    const sync = () => setIsMobile(media.matches)
+    sync()
+    media.addEventListener("change", sync)
+    return () => media.removeEventListener("change", sync)
+  }, [])
 
   const grouped = useMemo(() => {
     const now = new Date()
@@ -552,7 +609,15 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                       </div>
 
                       <div className="space-y-1.5">
-                        <h3 className="font-serif text-[20px] leading-tight">{booking.listings?.title ?? "Thrml session"}</h3>
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="flex-1 font-serif text-[20px] leading-tight">
+                            {booking.listings?.title ?? "Thrml session"}
+                          </h3>
+                          <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} shrink-0`}>
+                            {serviceEmoji(booking.listings?.service_type ?? null)}{" "}
+                            {serviceName(booking.listings?.service_type ?? null)}
+                          </span>
+                        </div>
                         <p className="text-sm text-[#7C6B5E]">with {booking.host?.full_name ?? "Thrml host"}</p>
                         <p className="text-sm font-semibold">{formatDateTime(booking)}</p>
                         {booking.status === "pending_host" && confirmationDeadlineLabel ? (
@@ -568,17 +633,12 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                       </div>
 
                       <div className="flex flex-col items-start gap-2 md:h-full md:items-end">
-                        <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                          <span className={serviceTypePill(booking.listings?.service_type ?? null)}>
-                            {serviceEmoji(booking.listings?.service_type ?? null)} {serviceName(booking.listings?.service_type ?? null)}
+                        {isToday(booking.session_date) ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">
+                            <span className="size-1.5 animate-pulse rounded-full bg-[#C75B3A]" />
+                            Today
                           </span>
-                          {isToday(booking.session_date) ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">
-                              <span className="size-1.5 animate-pulse rounded-full bg-[#C75B3A]" />
-                              Today
-                            </span>
-                          ) : null}
-                        </div>
+                        ) : null}
 
                         {activeTab === "completed" ? (
                           <>
@@ -632,7 +692,13 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                           <>
                             <div className="md:mt-auto">
                               <Button
-                                onClick={() => setExpandedId((prev) => (prev === booking.id ? null : booking.id))}
+                                onClick={() => {
+                                  if (isMobile) {
+                                    setMobileOpenId(booking.id)
+                                    return
+                                  }
+                                  setExpandedId((prev) => (prev === booking.id ? null : booking.id))
+                                }}
                                 className="rounded-xl bg-[#C75B3A] text-white hover:bg-[#b44f31]"
                               >
                                 View details
@@ -824,53 +890,174 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                     ) : null}
 
                     {activeTab === "upcoming" ? (
-                      <div className="mt-3 md:hidden">
-                        <Sheet open={mobileOpenId === booking.id} onOpenChange={(open) => setMobileOpenId(open ? booking.id : null)}>
-                          <SheetTrigger asChild>
-                            <Button variant="outline" className="w-full">View details</Button>
-                          </SheetTrigger>
-                          <SheetContent side="bottom" className="max-h-[88vh] overflow-y-auto rounded-t-3xl">
-                            <SheetHeader>
-                              <SheetTitle>{booking.listings?.title ?? "Thrml session"}</SheetTitle>
-                            </SheetHeader>
-                            <div className="space-y-4 px-4 pb-6 text-sm">
-                              <p>{canShowAddress ? booking.listings?.location_address ?? booking.listings?.location : "Address unlocks after payment."}</p>
-                              {showAccessDetails ? (
-                                hasSentAccessDetails ? (
-                                  <div className="w-full rounded-lg border border-[#E9DFD3] bg-[#FCFAF7] p-2">
-                                    <p className="text-sm font-medium">How to get in</p>
-                                    {accessTypeMeta.supportsCode && booking.access_code ? (
-                                      <div className="mt-1 rounded bg-[#F5EFE9] p-2">
-                                        <div className="flex items-center justify-between gap-2">
-                                          <p className="font-mono text-sm tracking-[0.2em] text-[#5D4D41]">{booking.access_code}</p>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              booking.access_code
-                                                ? void copyAccessCode(booking.id, booking.access_code)
-                                                : undefined
-                                            }
-                                            className="inline-flex items-center gap-1 rounded-md border border-[#E8BE9A] bg-[#FFF9F3] px-2 py-1 text-xs text-[#C75B3A]"
-                                          >
-                                            {copiedBookingId === booking.id ? "Copied!" : "Copy"}
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                ) : (
-                                  <div className="rounded-lg border border-[#E9DFD3] bg-[#F8F4EF] p-2 text-xs text-[#6A5848]">
-                                    🔐 Access details will be sent {timingLabel(booking.listings?.access_code_send_timing)}.
-                                  </div>
-                                )
-                              ) : null}
-                              <Button className="w-full" variant="outline" onClick={() => downloadIcs(booking)}>
-                                Add to Calendar
-                              </Button>
+                      <Sheet
+                        open={mobileOpenId === booking.id}
+                        onOpenChange={(open) => setMobileOpenId(open ? booking.id : null)}
+                      >
+                        <SheetContent
+                          side="bottom"
+                          showCloseButton={false}
+                          className="z-40 max-h-[90vh] overflow-y-auto rounded-t-[24px] border-0 bg-white p-0 data-[state=closed]:duration-300 data-[state=open]:duration-300 ease-out"
+                        >
+                          <div className="mx-auto mt-3 h-1 w-10 rounded-full bg-[#E5DDD6]" />
+                          <SheetHeader className="pb-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <SheetTitle className="text-[18px] font-semibold">
+                                  {booking.listings?.title ?? "Thrml session"}
+                                </SheetTitle>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  <span className={serviceTypePill(booking.listings?.service_type ?? null)}>
+                                    {serviceEmoji(booking.listings?.service_type ?? null)}{" "}
+                                    {serviceName(booking.listings?.service_type ?? null)}
+                                  </span>
+                                  <span className={`rounded-full px-2.5 py-1 text-xs capitalize ${statusPill(booking.status)}`}>
+                                    {booking.status}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                          </SheetContent>
-                        </Sheet>
-                      </div>
+                          </SheetHeader>
+                          <div className="px-4 pb-6 text-sm">
+                            <section className="space-y-2">
+                              <p>📅 Date: {booking.session_date ? new Date(`${booking.session_date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
+                              <p>⏰ Time: {formatDateTime(booking).split(" · ")[1] ?? "TBD"}</p>
+                              <p>👥 Guests: {booking.guest_count ?? 1} person{Number(booking.guest_count ?? 1) === 1 ? "" : "s"}</p>
+                              <p>⏱ Duration: {Math.round(Number(booking.duration_hours ?? 1) * 60)} minutes</p>
+                            </section>
+                            <div className="my-4 border-t border-[#F0E8E0]" />
+                            <section className="space-y-2">
+                              <p>
+                                📍{" "}
+                                {canShowAddress
+                                  ? booking.listings?.location_address ?? booking.listings?.location ?? "Location unavailable"
+                                  : [booking.listings?.city, booking.listings?.state].filter(Boolean).join(", ") || "Location shared after confirmation"}
+                              </p>
+                              {booking.status === "confirmed" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const destination =
+                                      booking.listings?.location_address ??
+                                      booking.listings?.location ??
+                                      [booking.listings?.city, booking.listings?.state].filter(Boolean).join(", ")
+                                    if (!destination) return
+                                    window.open(mapsLinkFor(destination), "_blank")
+                                  }}
+                                  className="text-sm font-medium text-[#8B4513] underline"
+                                >
+                                  Get directions →
+                                </button>
+                              ) : null}
+                            </section>
+                            <div className="my-4 border-t border-[#F0E8E0]" />
+                            <section>
+                              {bookingIcsDataUri(booking) ? (
+                                <a
+                                  href={bookingIcsDataUri(booking) ?? undefined}
+                                  download="thermal-booking.ics"
+                                  className="inline-flex rounded-xl border border-[#E5DDD6] px-3 py-2 font-medium"
+                                >
+                                  📆 Add to calendar
+                                </a>
+                              ) : (
+                                <Button variant="outline" onClick={() => downloadIcs(booking)}>
+                                  📆 Add to calendar
+                                </Button>
+                              )}
+                            </section>
+                            <div className="my-4 border-t border-[#F0E8E0]" />
+                            <section className="space-y-2">
+                              <p className="font-medium">🔐 Access details</p>
+                              {showAccessDetails && hasSentAccessDetails && booking.access_code ? (
+                                <div className="rounded-lg border border-[#E9DFD3] bg-[#FCFAF7] p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="font-mono text-lg tracking-[0.15em] text-[#5D4D41]">{booking.access_code}</p>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        booking.access_code
+                                          ? void copyAccessCode(booking.id, booking.access_code)
+                                          : undefined
+                                      }
+                                      className="inline-flex items-center gap-1 rounded-md border border-[#E8BE9A] bg-[#FFF9F3] px-2 py-1 text-xs text-[#C75B3A]"
+                                    >
+                                      {copiedBookingId === booking.id ? "Copied!" : "Copy"}
+                                    </button>
+                                  </div>
+                                  <p className="mt-2 text-sm leading-relaxed text-[#5E4E42]">
+                                    {resolveInstructions(booking.listings?.access_instructions ?? "", {
+                                      code: booking.access_code ?? "",
+                                      date: booking.session_date ?? "",
+                                      time: booking.start_time ?? "",
+                                      guestName: "there",
+                                      duration: formatDuration(booking.duration_hours),
+                                    })}
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-[#6A5848]">
+                                  Access details will be sent {timingLabel(booking.listings?.access_code_send_timing)}.
+                                </p>
+                              )}
+                            </section>
+                            <div className="my-4 border-t border-[#F0E8E0]" />
+                            <section className="space-y-1">
+                              <p>Subtotal: ${subtotal.toFixed(0)}</p>
+                              <p>Service fee: ${serviceFee.toFixed(0)}</p>
+                              <p className="border-t border-dashed pt-2 font-semibold">Total: ${total.toFixed(0)}</p>
+                              <p className="text-[#6D5E51]">Payment method: Not available</p>
+                            </section>
+                            <div className="my-4 border-t border-[#F0E8E0]" />
+                            <section>
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-1 text-sm font-medium"
+                                onClick={() =>
+                                  setHouseRulesExpandedByBooking((current) => ({
+                                    ...current,
+                                    [booking.id]: !current[booking.id],
+                                  }))
+                                }
+                              >
+                                House rules
+                                {houseRulesExpandedByBooking[booking.id] ? (
+                                  <ChevronUp className="size-4" />
+                                ) : (
+                                  <ChevronDown className="size-4" />
+                                )}
+                              </button>
+                              {houseRulesExpandedByBooking[booking.id] ? (
+                                <p className="mt-2 text-sm leading-relaxed text-[#6D5E51]">
+                                  House rules are not currently available in this booking payload.
+                                </p>
+                              ) : null}
+                            </section>
+                            <div className="my-4 border-t border-[#F0E8E0]" />
+                            <section>
+                              <p className="text-sm text-[#6D5E51]">
+                                Cancellation policy: {cancellation.open ? "Standard · Free cancellation until 24h before session" : "Standard · Non-refundable window"}
+                              </p>
+                            </section>
+                            <div className="sticky bottom-0 mt-4 flex gap-2 border-t border-[#F0E8E0] bg-white py-3">
+                              {cancellation.open ? (
+                                <Button
+                                  variant="outline"
+                                  className="flex-1"
+                                  onClick={() => void cancelBooking(booking.id, "guest_cancelled_request")}
+                                >
+                                  Cancel booking
+                                </Button>
+                              ) : null}
+                              {booking.status === "completed" && !booking.review_submitted ? (
+                                <Button asChild className="flex-1 bg-[#C75B3A] text-white hover:bg-[#b44f31]">
+                                  <Link href={`/review/${booking.id}?from=dashboard`}>Leave a review</Link>
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </SheetContent>
+                      </Sheet>
                     ) : null}
 
                   </article>

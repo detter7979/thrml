@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { CalendarDays, ChevronLeft, Heart, Home, Landmark, MessageCircle, PlusCircle, Settings, Sparkles, User } from "lucide-react"
+import { usePathname } from "next/navigation"
+import { CalendarDays, Heart, Home, Landmark, MessageCircle, PlusCircle, Settings, Sparkles, User } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -27,7 +27,6 @@ export function DashboardShell({
   children: ReactNode
 }) {
   const pathname = usePathname()
-  const router = useRouter()
   const [fullNameValue, setFullNameValue] = useState(fullName)
   const [avatarUrlValue, setAvatarUrlValue] = useState(avatarUrl)
   const [savedCount, setSavedCount] = useState(0)
@@ -412,7 +411,26 @@ export function DashboardShell({
           )}
         </nav>
 
-        <div className="p-4">
+        <div className="px-4 pb-1">
+          <div className="mb-3 border-t border-[#EEE4D9] pt-3">
+            <div className="space-y-1">
+              <Link
+                href="/explore"
+                className="block text-sm text-[#6D5E51] transition hover:text-[#2C2420]"
+              >
+                ← Back to explore
+              </Link>
+              <Link
+                href="/"
+                className="block text-sm text-[#6D5E51] transition hover:text-[#2C2420]"
+              >
+                🏠 Home
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 pt-2">
           <Button asChild className="h-11 w-full rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]">
             <Link href="/dashboard/listings/new">
               <PlusCircle className="mr-2 size-4" />
@@ -423,29 +441,15 @@ export function DashboardShell({
       </aside>
 
       <div className="sticky top-0 z-50 border-b border-[#E7DED3] bg-white md:hidden" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center px-3">
-          <button
-            type="button"
-            onClick={() => {
-              if (window.history.length > 1) {
-                router.back()
-                return
-              }
-              router.push("/explore")
-            }}
-            className="inline-flex min-h-[44px] min-w-[44px] items-center gap-1 rounded-md px-2 text-sm font-medium text-[#2C2420]"
-          >
-            <ChevronLeft className="size-5" />
-            Dashboard
-          </button>
-          <Link href="/" className="justify-self-center font-serif text-2xl lowercase text-[#1A1410]">
+        <div className="flex h-14 items-center justify-between px-4">
+          <Link href="/" className="font-serif text-2xl lowercase text-[#1A1410]">
             thrml
           </Link>
-          <Link href="/dashboard/account" className="justify-self-end">
-            <Avatar size="sm">
-              <AvatarImage src={avatarUrlValue ?? undefined} alt={fullNameValue} />
-              <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
+          <Link
+            href="/explore"
+            className="text-sm font-medium text-[#8B4513]"
+          >
+            Explore →
           </Link>
         </div>
       </div>

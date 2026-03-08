@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 import Image from "next/image"
-import { CheckCircle2, Loader2, MapPin } from "lucide-react"
+import { CheckCircle2, ChevronDown, Loader2, MapPin } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { ListingGrid } from "@/components/listings/ListingGrid"
@@ -221,7 +221,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-warm-50">
-      <section className="relative bg-[#1A1410] pt-24 md:min-h-[100svh] md:pt-0">
+      <section className="relative bg-[#1A1410] pt-24 pb-8 md:min-h-[100svh] md:pt-0 md:pb-0">
         <div className="absolute inset-0 hidden md:block">
           <Image
             src={heroImage.url}
@@ -317,7 +317,7 @@ export default function Home() {
           <div />
         </div>
 
-        <div className="px-4 pt-2 pb-10 md:hidden">
+        <div className="pt-2 pb-10 md:hidden">
           <p className="hero-anim-in hero-delay-0 mb-5 text-xs tracking-[0.24em] text-[#C75B3A]">
             PRIVATE WELLNESS · ON DEMAND
           </p>
@@ -330,7 +330,7 @@ export default function Home() {
             Book private saunas, cold plunges, float tanks and more — hosted by people in your city.
           </p>
 
-          <div className="hero-anim-scale hero-delay-750 mt-6 w-full rounded-2xl bg-white p-4 shadow-[0_8px_40px_rgba(0,0,0,0.3)]">
+          <div className="hero-anim-scale hero-delay-750 mt-6 mx-5 w-[calc(100%-40px)] rounded-[20px] bg-white px-4 pt-4 pb-5 shadow-[0_8px_40px_rgba(0,0,0,0.3)]">
             <div className="flex h-12 w-full items-center gap-2 rounded-xl border border-[#E5DDD6] bg-white px-3">
               <button
                 type="button"
@@ -348,7 +348,7 @@ export default function Home() {
                 className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 text-[16px] text-[#1A1410] outline-none"
               />
             </div>
-            <div className="mt-3 space-y-3">
+            <div className="mt-2.5 space-y-2.5">
               <Select value={heroServiceType} onValueChange={setHeroServiceType}>
                 <SelectTrigger className="h-12 w-full rounded-xl border border-[#E5DDD6] bg-white px-3 text-[16px] text-[#5F5148] shadow-none focus-visible:ring-0">
                   <SelectValue placeholder="All services" />
@@ -363,19 +363,27 @@ export default function Home() {
                 </SelectContent>
               </Select>
               <Button
-                className="h-[52px] w-full rounded-[14px] bg-[#8B4513] text-[16px] font-semibold text-white hover:bg-[#7a3d11]"
+                className="mx-auto block h-12 w-[calc(100%-32px)] rounded-[12px] bg-[#8B4513] text-[15px] font-semibold text-white hover:bg-[#7a3d11]"
                 onClick={handleFindSpace}
               >
                 Find a space
               </Button>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
+            className="mx-auto mt-4 inline-flex w-full items-center justify-center gap-1 text-center text-[12px] tracking-[0.08em] text-white/85"
+          >
+            <span>Explore spaces</span>
+            <ChevronDown className="size-3.5" />
+          </button>
         </div>
 
         <button
           type="button"
           onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
-          className={`absolute bottom-6 left-1/2 z-20 -translate-x-1/2 text-center text-white transition-opacity duration-300 ${
+          className={`absolute bottom-6 left-1/2 z-20 hidden -translate-x-1/2 text-center text-white transition-opacity duration-300 md:block ${
             showScrollCue ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
         >

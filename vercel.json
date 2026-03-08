@@ -6,11 +6,11 @@
     },
     {
       "path": "/api/cron/send-messages",
-      "schedule": "0 * * * *"
+      "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/expire-booked-slots",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 10 * * *"
     }
   ]
 }

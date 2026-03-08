@@ -885,7 +885,7 @@ export function DashboardListingsClient({
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-w-none max-sm:translate-x-0 max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:data-[state=closed]:translate-y-full max-sm:data-[state=open]:translate-y-0 transition-transform duration-300 ease-out">
           <DialogHeader>
             <DialogTitle>Confirm this booking?</DialogTitle>
           </DialogHeader>
@@ -930,7 +930,7 @@ export function DashboardListingsClient({
           if (!open) setDecliningRequest(null)
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-w-none max-sm:translate-x-0 max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:data-[state=closed]:translate-y-full max-sm:data-[state=open]:translate-y-0 transition-transform duration-300 ease-out">
           <DialogHeader>
             <DialogTitle>Decline this booking request?</DialogTitle>
           </DialogHeader>

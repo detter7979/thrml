@@ -55,6 +55,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           : "guest"
       }
       hasListings={Boolean((listingCount ?? 0) > 0)}
+      activeListingsCount={Number(listingCount ?? 0)}
     >
       {children}
     </DashboardShell>

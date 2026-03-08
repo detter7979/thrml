@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarDays, Heart, Home, Landmark, MessageCircle, PlusCircle, Search, Settings, Sparkles, User } from "lucide-react"
+import { CalendarDays, Heart, Home, Landmark, MessageCircle, PlusCircle, Settings, Sparkles, User } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -18,12 +18,14 @@ export function DashboardShell({
   avatarUrl,
   uiIntent,
   hasListings,
+  activeListingsCount,
   children,
 }: {
   fullName: string
   avatarUrl: string | null
   uiIntent: UiIntent
   hasListings: boolean
+  activeListingsCount: number
   children: ReactNode
 }) {
   const pathname = usePathname()
@@ -32,7 +34,7 @@ export function DashboardShell({
   const [savedCount, setSavedCount] = useState(0)
   const [upcomingBookingsCount, setUpcomingBookingsCount] = useState(0)
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0)
-  const hostingEnabled = hasListings || uiIntent === "host" || uiIntent === "both"
+  const isHost = hasListings || uiIntent === "host" || uiIntent === "both"
   const normalizeName = (value: unknown) => (typeof value === "string" && value.trim().length > 0 ? value.trim() : null)
   const getProfileNameOverride = () => {
     try {
@@ -43,34 +45,37 @@ export function DashboardShell({
   }
   const isNavItemActive = (href: string) =>
     href === "/dashboard" ? pathname === "/dashboard" : pathname === href || pathname.startsWith(`${href}/`)
-  const baseItems = [
-    { href: "/dashboard", label: "Overview", icon: Home },
-    { href: "/dashboard/bookings", label: "My Bookings", icon: CalendarDays },
-    { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-    { href: "/dashboard/saved", label: "Saved Spaces", icon: Heart },
-    { href: "/dashboard/account", label: "Account", icon: Settings },
-  ]
-  const hostingItems = [
-    { href: "/dashboard/profile", label: "Profile", icon: Home },
-    { href: "/dashboard/listings", label: "My Listings", icon: Sparkles },
-    { href: "/dashboard/earnings", label: "Earnings", icon: Landmark },
-    { href: "/dashboard/host/templates", label: "Message Templates", icon: MessageCircle },
-  ]
-  const mobileItems = hostingEnabled
+  const desktopItems = isHost
     ? [
-        { href: "/explore", label: "Explore", icon: Search },
+        { href: "/dashboard", label: "Overview", icon: Home },
+        { href: "/dashboard/listings", label: "Listings", icon: Sparkles },
         { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
         { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-        { href: "/dashboard", label: "Dashboard", icon: Home },
+        { href: "/dashboard/earnings", label: "Earnings", icon: Landmark },
+      ]
+    : [
+        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
+        { href: "/dashboard/saved", label: "Saved spaces", icon: Heart },
+      ]
+  const mobileItems = isHost
+    ? [
+        { href: "/dashboard/listings", label: "Listings", icon: Sparkles },
+        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
+        { href: "/dashboard/earnings", label: "Earnings", icon: Landmark },
         { href: "/dashboard/account", label: "Account", icon: User },
       ]
     : [
-        { href: "/", label: "Home", icon: Home },
-        { href: "/explore", label: "Explore", icon: Search },
         { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
         { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
+        { href: "/dashboard/saved", label: "Saved", icon: Heart },
         { href: "/dashboard/account", label: "Account", icon: User },
       ]
+  const mobileHeaderTitle = isHost ? "Your spaces" : "Your bookings"
+  const mobileHeaderSubtitle = isHost
+    ? `${activeListingsCount} active listing${activeListingsCount === 1 ? "" : "s"}`
+    : `${upcomingBookingsCount} upcoming session${upcomingBookingsCount === 1 ? "" : "s"}`
 
   const initials = fullNameValue
     .split(" ")
@@ -356,7 +361,7 @@ export function DashboardShell({
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
-          {baseItems.map((item) => {
+          {desktopItems.map((item) => {
             const Icon = item.icon
             const active = isNavItemActive(item.href)
             return (
@@ -390,75 +395,63 @@ export function DashboardShell({
               </Link>
             )
           })}
-          {hostingEnabled ? (
-            <div className="mt-4 space-y-1">
-              <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-[#9B8B7E]">Hosting</p>
-              {hostingItems.map((item) => {
-                const Icon = item.icon
-                const active = isNavItemActive(item.href)
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
-                      active ? "bg-[#FFF2EA] text-[#C75B3A]" : "text-[#5D4E42] hover:bg-[#F8F3ED]"
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    {item.label}
-                  </Link>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="mx-2 mt-4 rounded-xl bg-[#FCF7F1] p-3 text-xs text-[#766759]">
-              <p className="font-medium text-[#5D4E42]">Thinking about hosting?</p>
-              <p className="mt-1">Create a space when you&apos;re ready. We&apos;ll unlock hosting tools automatically.</p>
-            </div>
-          )}
+          <div className="mx-3 my-3 border-t border-[#EEE4D9]" />
+          <Link
+            href="/dashboard/account"
+            className={cn(
+              "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+              isNavItemActive("/dashboard/account") ? "bg-[#FFF2EA] text-[#C75B3A]" : "text-[#5D4E42] hover:bg-[#F8F3ED]"
+            )}
+          >
+            <Settings className="size-4" />
+            Account
+          </Link>
         </nav>
 
         <div className="px-4 pb-1">
           <div className="mb-3 border-t border-[#EEE4D9] pt-3">
-            <div className="space-y-1">
+            <div className="space-y-1 text-sm">
+              {!isHost ? (
+                <Link
+                  href="/dashboard/listings/new"
+                  className="block font-medium text-[#8B4513] transition hover:text-[#6F3410]"
+                >
+                  🏠 Become a host
+                </Link>
+              ) : null}
               <Link
                 href="/explore"
-                className="block text-sm text-[#6D5E51] transition hover:text-[#2C2420]"
+                className="block text-[#6D5E51] transition hover:text-[#2C2420]"
               >
                 ← Back to explore
-              </Link>
-              <Link
-                href="/"
-                className="block text-sm text-[#6D5E51] transition hover:text-[#2C2420]"
-              >
-                🏠 Home
               </Link>
             </div>
           </div>
         </div>
 
-        <div className="p-4 pt-2">
-          <Button asChild className="h-11 w-full rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]">
-            <Link href="/dashboard/listings/new">
-              <PlusCircle className="mr-2 size-4" />
-              {hostingEnabled ? "List a new space" : "Start hosting"}
-            </Link>
-          </Button>
-        </div>
+        {isHost ? (
+          <div className="p-4 pt-2">
+            <Button asChild className="h-11 w-full rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]">
+              <Link href="/dashboard/listings/new">
+                <PlusCircle className="mr-2 size-4" />
+                List a new space
+              </Link>
+            </Button>
+          </div>
+        ) : null}
       </aside>
 
       <div className="sticky top-0 z-50 border-b border-[#E7DED3] bg-white md:hidden" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="flex h-14 items-center justify-between px-4">
-          <Link href="/" className="font-serif text-2xl lowercase text-[#1A1410]">
-            thrml
-          </Link>
-          <Link
-            href="/explore"
-            className="text-sm font-medium text-[#8B4513]"
-          >
-            Explore →
-          </Link>
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="font-serif text-2xl lowercase text-[#1A1410]">
+              thrml
+            </Link>
+            <span className="text-right">
+              <span className="block text-sm font-medium text-[#1A1410]">{mobileHeaderTitle}</span>
+              <span className="block text-xs text-[#7A6A5D]">{mobileHeaderSubtitle}</span>
+            </span>
+          </div>
         </div>
       </div>
 

@@ -263,7 +263,7 @@ export default async function DashboardListingsPage() {
   return (
     <div className="space-y-5 px-4 py-6 md:px-8 md:py-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="hidden md:block">
           <h1 className="font-serif text-3xl text-[#1A1410]">My Spaces</h1>
           <p className="text-sm text-[#7A6A5D]">
             {activeCount} active · {draftCount} draft

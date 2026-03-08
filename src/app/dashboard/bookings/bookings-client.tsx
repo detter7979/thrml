@@ -466,7 +466,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
     <div className="min-h-screen bg-[#F7F3EE] text-[#1A1410]">
       <div className="mx-auto max-w-6xl px-4 py-8 md:px-8">
         <header className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div>
+          <div className="hidden md:block">
             <h1 className="font-serif text-4xl">Your Rituals</h1>
             <p className="mt-2 text-sm text-[#6C5B4F]">
               {counts.upcoming} upcoming · {counts.completed} completed

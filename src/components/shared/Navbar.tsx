@@ -140,6 +140,11 @@ export function Navbar() {
                   : null,
           }
         : legacyProfile
+      const profileRecord = profile as Record<string, unknown> | null
+      const isHostFlag = profileRecord?.is_host === true
+      const hostStatusActive = profileRecord?.host_status === "active"
+      const uiIntent =
+        typeof profileRecord?.ui_intent === "string" ? profileRecord.ui_intent : null
       setUserName(profileNameOverride ?? profile?.full_name ?? fallbackName)
       setAvatarUrl(normalizeAvatarUrl(profile?.avatar_url))
       const { count: listingCount } = await supabase
@@ -148,11 +153,11 @@ export function Navbar() {
         .eq("host_id", user.id)
         .eq("is_active", true)
       setIsHost(
-        profile?.is_host === true ||
-          profile?.host_status === "active" ||
+        isHostFlag ||
+          hostStatusActive ||
           Boolean((listingCount ?? 0) > 0) ||
-          profile?.ui_intent === "host" ||
-          profile?.ui_intent === "both"
+          uiIntent === "host" ||
+          uiIntent === "both"
       )
 
       const refreshUnread = async () => {

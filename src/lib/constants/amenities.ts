@@ -45,7 +45,7 @@ export const AMENITIES_BY_SERVICE_TYPE: Record<string, string[]> = {
     "Herbal tea",
     "Zero gravity chairs",
   ],
-  contrast_therapy: [
+  hot_tub: [
     "Towels provided",
     "Robe provided",
     "Shower access",
@@ -65,7 +65,7 @@ export const AMENITIES_BY_SERVICE_TYPE: Record<string, string[]> = {
     "Ocean views",
     "Canyon views",
   ],
-  infrared_light: [
+  infrared: [
     "Towels provided",
     "Robe provided",
     "Shower access",

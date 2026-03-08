@@ -32,16 +32,22 @@ import {
   getCancellationPolicy,
 } from "@/lib/constants/cancellation-policies"
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
+import { SERVICE_TYPES } from "@/lib/constants/service-types"
 import { createClient } from "@/lib/supabase/client"
 import { getPricePerPerson } from "@/lib/pricing"
-import { FALLBACK_SERVICE_TYPES, type ServiceTypeId } from "@/lib/service-types"
+import type { ServiceTypeId } from "@/lib/service-types"
 
 const saunaTypes = ["Finnish", "Infrared", "Steam", "Barrel", "Wood-Fired"] as const
 const cancellationPolicies = ["flexible", "moderate", "strict"] as const
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const
 
-const serviceTypeOptions = FALLBACK_SERVICE_TYPES
-const FIXED_SESSION_SERVICES = new Set(["cryotherapy", "infrared_light"])
+const serviceTypeOptions = SERVICE_TYPES.map((serviceType) => ({
+  id: serviceType.value,
+  display_name: serviceType.label,
+  icon: serviceType.emoji,
+  tagline: serviceType.description,
+}))
+const FIXED_SESSION_SERVICES = new Set(["cold_plunge", "infrared", "float_tank", "pemf", "halotherapy", "hyperbaric"])
 
 const serviceAttributeFieldConfig: Record<
   string,
@@ -57,9 +63,11 @@ const serviceAttributeFieldConfig: Record<
     { key: "chiller_type", label: "Chiller type", type: "text" },
     { key: "vessel", label: "Tub material / vessel", type: "text" },
   ],
-  cryotherapy: [
-    { key: "min_temp", label: "Min temp (F)", type: "number" },
-    { key: "machine_type", label: "Machine type", type: "text" },
+  hot_tub: [
+    { key: "capacity", label: "Capacity", type: "number" },
+    { key: "temperature", label: "Temperature (F)", type: "number" },
+    { key: "jets", label: "Jets", type: "text", placeholder: "Hydro, air, mixed..." },
+    { key: "cover_included", label: "Cover included", type: "text", placeholder: "Yes/No" },
   ],
   float_tank: [
     { key: "vessel_type", label: "Vessel type", type: "text", placeholder: "Pod or Pool" },

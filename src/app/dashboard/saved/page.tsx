@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { FALLBACK_SERVICE_TYPES } from "@/lib/service-types"
+import { getServiceType, SERVICE_TYPES } from "@/lib/constants/service-types"
 
 type SavedRow = {
   listing_id: string
@@ -35,7 +35,7 @@ type SavedListing = {
 }
 
 function serviceMeta(serviceType: string | null | undefined) {
-  return FALLBACK_SERVICE_TYPES.find((item) => item.id === serviceType)
+  return getServiceType(serviceType ?? "")
 }
 
 export default function DashboardSavedPage() {
@@ -93,8 +93,8 @@ export default function DashboardSavedPage() {
             title: listing.title ?? "Thrml space",
             location: listing.location_city ?? "Location shared after booking",
             serviceTypeId: listing.service_type ?? "sauna",
-            serviceTypeName: service?.display_name ?? "Sauna",
-            serviceTypeIcon: service?.icon ?? "🔥",
+            serviceTypeName: service?.label ?? "Sauna",
+            serviceTypeIcon: service?.emoji ?? "🔥",
             bookingModel:
               listing.session_type === "fixed_session" || listing.fixed_session_price
                 ? "fixed_session"
@@ -148,9 +148,9 @@ export default function DashboardSavedPage() {
 
   const filterOptions = [
     { id: "all", label: "All" },
-    ...FALLBACK_SERVICE_TYPES.map((item) => ({
-      id: item.id,
-      label: item.display_name,
+    ...SERVICE_TYPES.map((item) => ({
+      id: item.value,
+      label: item.label,
     })),
   ]
 

@@ -18,15 +18,16 @@ export const SPEC_CONFIG: Record<string, SpecField[]> = {
     { key: "vessel", label: "Vessel" },
     { key: "min_temp_f", label: "Min temp", unit: "°F" },
   ],
-  infrared_light: [
+  infrared: [
     { key: "wavelength_nm", label: "Wavelength", unit: "nm" },
     { key: "panel_type", label: "Panel type" },
     { key: "session_length_minutes", label: "Session length", unit: "min" },
   ],
-  contrast_therapy: [
-    { key: "sauna_type", label: "Sauna type" },
-    { key: "cold_plunge_temp_f", label: "Cold plunge temp", unit: "°F" },
-    { key: "num_rounds_suggested", label: "Suggested rounds" },
+  hot_tub: [
+    { key: "capacity", label: "Capacity", unit: "persons" },
+    { key: "temperature", label: "Temperature", unit: "°F" },
+    { key: "jets", label: "Jets" },
+    { key: "cover_included", label: "Cover included" },
   ],
   float_tank: [
     { key: "tank_type", label: "Tank type" },

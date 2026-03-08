@@ -1,15 +1,14 @@
-export const SERVICE_TYPE_IDS = [
-  "sauna",
-  "cold_plunge",
-  "infrared_light",
-  "cryotherapy",
-  "float_tank",
-  "contrast_therapy",
-  "pemf",
-  "hyperbaric",
-] as const
+import {
+  SERVICE_TYPES as CANONICAL_SERVICE_TYPES,
+  getServiceType as getCanonicalServiceType,
+  type ServiceType,
+} from "@/lib/constants/service-types"
 
-export type ServiceTypeId = (typeof SERVICE_TYPE_IDS)[number]
+export const SERVICE_TYPE_IDS = CANONICAL_SERVICE_TYPES.map(
+  (serviceType) => serviceType.value
+) as readonly ServiceType[]
+
+export type ServiceTypeId = ServiceType
 
 export type BookingModel = "hourly" | "fixed_session"
 
@@ -22,77 +21,42 @@ export type ServiceTypeMeta = {
   health_disclaimer: string | null
 }
 
-export const FALLBACK_SERVICE_TYPES: ServiceTypeMeta[] = [
-  {
-    id: "sauna",
-    display_name: "Sauna",
-    icon: "🔥",
-    tagline: "Heat recovery",
-    booking_model: "hourly",
-    health_disclaimer: null,
-  },
-  {
-    id: "cold_plunge",
-    display_name: "Cold Plunge",
-    icon: "🧊",
-    tagline: "Boosts recovery",
-    booking_model: "fixed_session",
-    health_disclaimer: null,
-  },
-  {
-    id: "infrared_light",
-    display_name: "Infrared Light",
-    icon: "🔴",
-    tagline: "Cellular support",
-    booking_model: "fixed_session",
-    health_disclaimer: null,
-  },
-  {
-    id: "cryotherapy",
-    display_name: "Cryotherapy",
-    icon: "❄️",
-    tagline: "Fast cold session",
-    booking_model: "fixed_session",
-    health_disclaimer: null,
-  },
-  {
-    id: "float_tank",
-    display_name: "Float Tank",
-    icon: "🛁",
-    tagline: "Deep nervous-system reset",
-    booking_model: "fixed_session",
-    health_disclaimer: null,
-  },
-  {
-    id: "contrast_therapy",
-    display_name: "Contrast Therapy",
-    icon: "♨️",
-    tagline: "Heat + cold protocol",
-    booking_model: "hourly",
-    health_disclaimer: null,
-  },
-  {
-    id: "pemf",
-    display_name: "PEMF",
-    icon: "⚡",
-    tagline: "Electromagnetic recovery",
-    booking_model: "fixed_session",
-    health_disclaimer: null,
-  },
-  {
-    id: "hyperbaric",
-    display_name: "Hyperbaric",
-    icon: "🫧",
-    tagline: "Oxygen optimization",
-    booking_model: "fixed_session",
-    health_disclaimer: null,
-  },
-]
+const BOOKING_MODEL_BY_SERVICE_TYPE: Record<ServiceType, BookingModel> = {
+  sauna: "hourly",
+  cold_plunge: "fixed_session",
+  hot_tub: "hourly",
+  infrared: "fixed_session",
+  float_tank: "fixed_session",
+  pemf: "fixed_session",
+  halotherapy: "fixed_session",
+  hyperbaric: "fixed_session",
+}
+
+export const FALLBACK_SERVICE_TYPES: ServiceTypeMeta[] = CANONICAL_SERVICE_TYPES.map((serviceType) => ({
+  id: serviceType.value,
+  display_name: serviceType.label,
+  icon: serviceType.emoji,
+  tagline: serviceType.description,
+  booking_model: BOOKING_MODEL_BY_SERVICE_TYPE[serviceType.value],
+  health_disclaimer: null,
+}))
 
 export function isServiceTypeId(value: string): value is ServiceTypeId {
   return SERVICE_TYPE_IDS.includes(value as ServiceTypeId)
 }
 
 export function getFallbackServiceType(id: string) {
-  return FALLBACK_SERVICE_TYPES.find((item) => item.id === id)
+  return FALLBACK_SERVICE_TYPES.find((item) => item.id === id) ??
+    (() => {
+      const canonical = getCanonicalServiceType(id)
+      if (!canonical) return undefined
+      return {
+        id: canonical.value,
+        display_name: canonical.label,
+        icon: canonical.emoji,
+        tagline: canonical.description,
+        booking_model: BOOKING_MODEL_BY_SERVICE_TYPE[canonical.value],
+        health_disclaimer: null,
+      } satisfies ServiceTypeMeta
+    })()
 }

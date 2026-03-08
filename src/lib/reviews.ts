@@ -1,3 +1,5 @@
+import { getServiceType } from "@/lib/constants/service-types"
+ 
 import { sendHostNewReviewEmail } from "@/lib/emails"
 
 export const SUB_RATING_KEYS = ["cleanliness", "accuracy", "communication", "value"] as const
@@ -44,15 +46,7 @@ export function normalizePhotoUrls(value: unknown, max = 3): string[] {
 
 export function extractServiceIcon(serviceType: string | null) {
   const key = (serviceType ?? "sauna").toLowerCase()
-  if (key === "cold_plunge") return "🧊"
-  if (key === "float_tank") return "🛁"
-  if (key === "cryotherapy") return "❄️"
-  if (key === "infrared_light") return "🔴"
-  if (key === "contrast_therapy") return "♨️"
-  if (key === "pemf") return "⚡"
-  if (key === "hyperbaric") return "🫧"
-  if (key === "halotherapy") return "🌬️"
-  return "🔥"
+  return getServiceType(key)?.emoji ?? "🔥"
 }
 
 export function formatSessionDate(date: string | null) {

@@ -1,5 +1,6 @@
 import * as React from "react"
 import { sendPostSessionReviewRequestEmail } from "@/lib/emails"
+import { formatServiceType } from "@/lib/constants/service-types"
 
 type ReviewRequestEmailProps = {
   guestName: string
@@ -19,9 +20,7 @@ function firstName(name: string) {
 }
 
 function titleCaseService(serviceType: string) {
-  return serviceType
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+  return formatServiceType(serviceType)
 }
 
 function formatSessionDate(value: string) {

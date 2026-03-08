@@ -1088,9 +1088,9 @@ export function ListingDetailClient({
     {
       sauna: "About this sauna",
       cold_plunge: "About this cold plunge",
-      infrared_light: "About this space",
+      hot_tub: "About this hot tub",
+      infrared: "About this space",
       float_tank: "About this float tank",
-      contrast_therapy: "About this space",
       hyperbaric: "About this chamber",
       pemf: "About this session",
       halotherapy: "About this salt room",

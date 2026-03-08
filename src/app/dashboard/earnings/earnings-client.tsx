@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 import { StripeConnectBanner } from "@/components/host/StripeConnectBanner"
+import { formatServiceType, getServiceType } from "@/lib/constants/service-types"
 
 type EarningRow = {
   id: string
@@ -45,21 +46,8 @@ type PerListingRating = {
 
 type SortOption = "most_earned" | "most_booked" | "highest_rated"
 
-const SERVICE_ICON_BY_TYPE: Record<string, string> = {
-  sauna: "🔥",
-  cold_plunge: "🧊",
-  infrared_light: "🔴",
-  cryotherapy: "❄️",
-  float_tank: "🛁",
-  contrast_therapy: "♨️",
-  pemf: "⚡",
-  hyperbaric: "🫧",
-}
-
 function serviceLabel(value: string) {
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+  return formatServiceType(value)
 }
 
 function formatMoney(value: number) {
@@ -408,7 +396,7 @@ export function EarningsClient({
                           <td className="px-4 py-3">
                             <p className="font-medium">{row.listingTitle}</p>
                             <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#F3ECE3] px-2 py-0.5 text-xs text-[#6D5E51]">
-                              <span>{SERVICE_ICON_BY_TYPE[row.serviceType] ?? "✨"}</span>
+                              <span>{getServiceType(row.serviceType)?.emoji ?? "✨"}</span>
                               <span>{serviceLabel(row.serviceType)}</span>
                             </span>
                           </td>

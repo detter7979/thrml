@@ -51,27 +51,31 @@ export async function getServiceTypes(): Promise<ServiceTypeMeta[]> {
     return FALLBACK_SERVICE_TYPES
   }
 
-  const mapped: ServiceTypeMeta[] = []
+  const rowsById = new Map<string, Record<string, unknown>>()
   for (const row of data as Record<string, unknown>[]) {
     const rawId = typeof row.id === "string" ? row.id : ""
     if (!isServiceTypeId(rawId)) continue
+    rowsById.set(rawId, row)
+  }
 
-    const fallback = getFallbackServiceType(rawId)
-    mapped.push({
-      id: rawId,
+  const mapped = FALLBACK_SERVICE_TYPES.map((fallback) => {
+    const row = rowsById.get(fallback.id)
+    if (!row) return fallback
+    return {
+      id: fallback.id,
       display_name:
-        typeof row.display_name === "string" ? row.display_name : fallback?.display_name ?? rawId,
-      icon: typeof row.icon === "string" ? row.icon : fallback?.icon ?? "✨",
+        typeof row.display_name === "string" ? row.display_name : fallback.display_name,
+      icon: typeof row.icon === "string" ? row.icon : fallback.icon,
       tagline:
-        typeof row.tagline === "string" ? row.tagline : fallback?.tagline ?? "Wellness service",
+        typeof row.tagline === "string" ? row.tagline : fallback.tagline,
       booking_model:
         row.booking_model === "fixed_session" || row.booking_model === "hourly"
           ? row.booking_model
-          : (fallback?.booking_model ?? "hourly"),
+          : fallback.booking_model,
       health_disclaimer:
-        typeof row.health_disclaimer === "string" ? row.health_disclaimer : fallback?.health_disclaimer ?? null,
+        typeof row.health_disclaimer === "string" ? row.health_disclaimer : fallback.health_disclaimer,
     })
-  }
+  })
 
   return mapped.length ? mapped : FALLBACK_SERVICE_TYPES
 }

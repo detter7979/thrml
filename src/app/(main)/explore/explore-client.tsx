@@ -30,9 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { formatServiceType, getServiceType, SERVICE_TYPES } from "@/lib/constants/service-types"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
-import type { ServiceTypeMeta } from "@/lib/service-types"
 
 type ViewMode = "split" | "list" | "map"
 type SortKey =
@@ -110,10 +110,9 @@ const NEARBY_FALLBACK_MILES = 150
 const SERVICE_COLORS: Record<string, string> = {
   sauna: "#E85D3A",
   cold_plunge: "#3A8BC7",
-  infrared_light: "#C75B8A",
-  cryotherapy: "#3AC7C0",
+  hot_tub: "#B27A4A",
+  infrared: "#C75B8A",
   float_tank: "#5B7AC7",
-  contrast_therapy: "#8B5BC7",
   pemf: "#C7A83A",
   hyperbaric: "#3AC76B",
   halotherapy: "#C7C73A",
@@ -274,15 +273,7 @@ function isAvailableToday(value: unknown) {
 }
 
 function serviceEmoji(type: string) {
-  if (type === "cold_plunge") return "🧊"
-  if (type === "infrared_light") return "💡"
-  if (type === "cryotherapy") return "❄️"
-  if (type === "float_tank") return "🛁"
-  if (type === "contrast_therapy") return "♨️"
-  if (type === "pemf") return "⚡"
-  if (type === "hyperbaric") return "🫧"
-  if (type === "halotherapy") return "🌬️"
-  return "🔥"
+  return getServiceType(type)?.emoji ?? "🔥"
 }
 
 function sortListings(items: ListingResult[], sort: SortKey) {
@@ -305,7 +296,7 @@ function sortListings(items: ListingResult[], sort: SortKey) {
   return clone
 }
 
-export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[] }) {
+export function ExploreClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const mapRef = useRef<MapRef | null>(null)
@@ -387,12 +378,14 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
   const [sheetDrag, setSheetDrag] = useState(0)
   const [dragStartY, setDragStartY] = useState<number | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
-  const [serviceTypeOptions, setServiceTypeOptions] = useState<ServiceOption[]>(
-    serviceTypes.map((item) => ({
-      id: item.id,
-      display_name: item.display_name,
-      icon: item.icon,
-    }))
+  const serviceTypeOptions = useMemo<ServiceOption[]>(
+    () =>
+      SERVICE_TYPES.map((serviceType) => ({
+        id: serviceType.value,
+        display_name: serviceType.label,
+        icon: serviceType.emoji,
+      })),
+    []
   )
   const [serviceDraft, setServiceDraft] = useState<string[]>(initialFilters.serviceTypes)
 
@@ -564,28 +557,6 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
   ])
 
   useEffect(() => {
-    const supabase = createClient()
-    async function loadServiceTypes() {
-      const { data } = await supabase
-        .from("service_types")
-        .select("id, display_name, icon")
-        .order("display_name", { ascending: true })
-      if (Array.isArray(data) && data.length) {
-        const normalized = data
-          .map((row) => ({
-            id: typeof row.id === "string" ? row.id : "",
-            display_name:
-              typeof row.display_name === "string" ? row.display_name : String(row.id ?? ""),
-            icon: typeof row.icon === "string" ? row.icon : serviceEmoji(String(row.id ?? "")),
-          }))
-          .filter((item) => item.id)
-        if (normalized.length) setServiceTypeOptions(normalized)
-      }
-    }
-    void loadServiceTypes()
-  }, [])
-
-  useEffect(() => {
     const zoom = distanceToZoom(filters.distanceMiles)
     mapRef.current?.flyTo({
       center: [searchCenter.lng, searchCenter.lat],
@@ -728,10 +699,10 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
                 id: String(row.id ?? crypto.randomUUID()),
                 title: typeof row.title === "string" ? row.title : "Thrml listing",
                 serviceType,
-                serviceLabel: meta?.display_name ?? serviceType.replace(/_/g, " "),
+                serviceLabel: meta?.display_name ?? formatServiceType(serviceType),
                 serviceIcon: meta?.icon ?? serviceEmoji(serviceType),
                 sessionType:
-                  row.session_type === "fixed_session" || serviceType === "cryotherapy" || serviceType === "infrared_light"
+                  row.session_type === "fixed_session" || serviceType === "infrared"
                     ? "fixed_session"
                     : "hourly",
                 lat,

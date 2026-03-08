@@ -24,6 +24,7 @@ import { CancelModal } from "@/components/booking/CancelModal"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ACCESS_TYPES, resolveInstructions } from "@/lib/constants/access-types"
+import { formatServiceType, getServiceType } from "@/lib/constants/service-types"
 
 type BookingStatus = "pending" | "pending_host" | "confirmed" | "cancelled" | "completed" | "declined" | string
 type ViewMode = "list" | "calendar"
@@ -82,20 +83,12 @@ type BookingRecord = {
 
 function serviceEmoji(serviceType: string | null) {
   const key = (serviceType ?? "sauna").toLowerCase()
-  if (key === "cold_plunge") return "🧊"
-  if (key === "float_tank") return "🛁"
-  if (key === "cryotherapy") return "❄️"
-  if (key === "infrared_light") return "🔴"
-  if (key === "contrast_therapy") return "♨️"
-  if (key === "pemf") return "⚡"
-  if (key === "hyperbaric") return "🫧"
-  if (key === "halotherapy") return "🌬️"
-  return "🔥"
+  return getServiceType(key)?.emoji ?? "🔥"
 }
 
 function serviceName(serviceType: string | null) {
   const key = (serviceType ?? "sauna").toLowerCase()
-  return key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+  return formatServiceType(key)
 }
 
 const ACCESS_ICON_MAP = {
@@ -220,8 +213,9 @@ function serviceTypePill(serviceType: string | null) {
   const base = "rounded-full px-3 py-1 text-xs"
   const key = (serviceType ?? "sauna").toLowerCase()
   if (key === "cold_plunge") return `${base} bg-sky-100 text-sky-700`
-  if (key === "infrared_light") return `${base} bg-rose-100 text-rose-700`
+  if (key === "infrared") return `${base} bg-rose-100 text-rose-700`
   if (key === "float_tank") return `${base} bg-indigo-100 text-indigo-700`
+  if (key === "hot_tub") return `${base} bg-[#F3ECE3] text-[#6D5E51]`
   return `${base} bg-[#FDEBDD] text-[#C75B3A]`
 }
 

@@ -38,6 +38,7 @@ import {
   type CodeSendTimingKey,
 } from "@/lib/constants/access-types"
 import { resolveHouseRules } from "@/lib/constants/default-house-rules"
+import { SERVICE_TYPES } from "@/lib/constants/service-types"
 
 type ListingEditModel = {
   id: string
@@ -553,10 +554,9 @@ export function EditListingClient({
             </div>
             <div className="space-y-2">
               <Label>Service Type</Label>
-              <Input
+              <Select
                 value={form.serviceType}
-                onChange={(event) => {
-                  const nextServiceType = event.target.value
+                onValueChange={(nextServiceType) => {
                   const nextValidAmenities =
                     AMENITIES_BY_SERVICE_TYPE[nextServiceType] ?? AMENITIES_BY_SERVICE_TYPE.general
                   setForm((current) => ({
@@ -565,7 +565,18 @@ export function EditListingClient({
                     amenities: current.amenities.filter((amenity) => nextValidAmenities.includes(amenity)),
                   }))
                 }}
-              />
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SERVICE_TYPES.map((serviceType) => (
+                    <SelectItem key={serviceType.value} value={serviceType.value}>
+                      {serviceType.emoji} {serviceType.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Location</Label>

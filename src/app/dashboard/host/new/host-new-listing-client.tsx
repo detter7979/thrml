@@ -78,7 +78,7 @@ const serviceAttributeFieldConfig: Record<
 
 function bookingModelForService(serviceType: string) {
   if (FIXED_SESSION_SERVICES.has(serviceType)) return "fixed_session"
-  return serviceTypeOptions.find((item) => item.id === serviceType)?.booking_model ?? "hourly"
+  return "hourly"
 }
 
 const availabilitySchema = z

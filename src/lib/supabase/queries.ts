@@ -74,7 +74,7 @@ export async function getServiceTypes(): Promise<ServiceTypeMeta[]> {
           : fallback.booking_model,
       health_disclaimer:
         typeof row.health_disclaimer === "string" ? row.health_disclaimer : fallback.health_disclaimer,
-    })
+    }
   })
 
   return mapped.length ? mapped : FALLBACK_SERVICE_TYPES

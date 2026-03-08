@@ -28,7 +28,7 @@ export function Navbar() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [loggedIn, setLoggedIn] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
-  const [hostingEnabled, setHostingEnabled] = useState(false)
+  const [isHost, setIsHost] = useState(false)
 
   function normalizeAvatarUrl(value: unknown) {
     return typeof value === "string" && value.trim().length > 0 ? value : null
@@ -71,16 +71,52 @@ export function Navbar() {
       }
       setLoggedIn(true)
       const fallbackName = normalizeName(user.user_metadata.full_name) ?? user.email ?? "Member"
-      const { data: profileById } = await supabase
-        .from("profiles")
-        .select("full_name, avatar_url, ui_intent")
-        .eq("id", user.id)
-        .maybeSingle()
-      const { data: profileByUserId, error: profileByUserIdError } = await supabase
-        .from("profiles")
-        .select("full_name, avatar_url, ui_intent")
-        .eq("user_id", user.id)
-        .maybeSingle()
+      const profileSelectPrimary = "full_name, avatar_url, ui_intent, is_host, host_status"
+      const profileSelectFallback = "full_name, avatar_url, ui_intent"
+      const loadProfileById = async () => {
+        const primary = await supabase
+          .from("profiles")
+          .select(profileSelectPrimary)
+          .eq("id", user.id)
+          .maybeSingle()
+        if (
+          !primary.error ||
+          !primary.error.message?.includes("column profiles.is_host does not exist")
+        ) {
+          return primary
+        }
+        return supabase
+          .from("profiles")
+          .select(profileSelectFallback)
+          .eq("id", user.id)
+          .maybeSingle()
+      }
+      const loadProfileByUserId = async () => {
+        const primary = await supabase
+          .from("profiles")
+          .select(profileSelectPrimary)
+          .eq("user_id", user.id)
+          .maybeSingle()
+        if (
+          !primary.error ||
+          !(
+            primary.error.message?.includes("column profiles.user_id does not exist") ||
+            primary.error.message?.includes("column profiles.is_host does not exist")
+          )
+        ) {
+          return primary
+        }
+        if (primary.error.message?.includes("column profiles.user_id does not exist")) {
+          return { data: null, error: primary.error }
+        }
+        return supabase
+          .from("profiles")
+          .select(profileSelectFallback)
+          .eq("user_id", user.id)
+          .maybeSingle()
+      }
+      const [{ data: profileById }, { data: profileByUserId, error: profileByUserIdError }] =
+        await Promise.all([loadProfileById(), loadProfileByUserId()])
       const isMissingUserIdColumn = Boolean(profileByUserIdError?.message?.includes("column profiles.user_id does not exist"))
       const legacyProfile = isMissingUserIdColumn ? null : profileByUserId
       const profile = profileById
@@ -90,6 +126,18 @@ export function Navbar() {
             full_name: normalizeName(profileById.full_name) ?? normalizeName(legacyProfile?.full_name),
             avatar_url: normalizeAvatarUrl(profileById.avatar_url) ?? normalizeAvatarUrl(legacyProfile?.avatar_url),
             ui_intent: profileById.ui_intent ?? legacyProfile?.ui_intent ?? null,
+            is_host:
+              typeof (profileById as Record<string, unknown>).is_host === "boolean"
+                ? ((profileById as Record<string, unknown>).is_host as boolean)
+                : typeof (legacyProfile as Record<string, unknown> | null)?.is_host === "boolean"
+                  ? ((legacyProfile as Record<string, unknown>).is_host as boolean)
+                  : null,
+            host_status:
+              typeof (profileById as Record<string, unknown>).host_status === "string"
+                ? ((profileById as Record<string, unknown>).host_status as string)
+                : typeof (legacyProfile as Record<string, unknown> | null)?.host_status === "string"
+                  ? ((legacyProfile as Record<string, unknown>).host_status as string)
+                  : null,
           }
         : legacyProfile
       setUserName(profileNameOverride ?? profile?.full_name ?? fallbackName)
@@ -98,8 +146,11 @@ export function Navbar() {
         .from("listings")
         .select("*", { count: "exact", head: true })
         .eq("host_id", user.id)
-      setHostingEnabled(
-        Boolean((listingCount ?? 0) > 0) ||
+        .eq("is_active", true)
+      setIsHost(
+        profile?.is_host === true ||
+          profile?.host_status === "active" ||
+          Boolean((listingCount ?? 0) > 0) ||
           profile?.ui_intent === "host" ||
           profile?.ui_intent === "both"
       )
@@ -173,7 +224,7 @@ export function Navbar() {
     setLoggedIn(false)
     setUserName(null)
     setAvatarUrl(null)
-    setHostingEnabled(false)
+    setIsHost(false)
     window.location.assign("/")
   }
 
@@ -217,10 +268,13 @@ export function Navbar() {
                 <DropdownMenuLabel>{userName ?? "Member"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard">Dashboard</Link>
+                  <Link href="/dashboard/account">Profile</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/bookings">My Bookings</Link>
+                  <Link href="/dashboard/bookings">My bookings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/saved">Saved spaces</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard/messages" className="flex items-center justify-between gap-2">
@@ -234,32 +288,25 @@ export function Navbar() {
                     ) : null}
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/saved">Saved Spaces</Link>
-                </DropdownMenuItem>
-                {hostingEnabled ? (
+                <DropdownMenuSeparator />
+                {isHost ? (
                   <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Hosting</DropdownMenuLabel>
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard/listings">My Listings</Link>
+                      <Link href="/dashboard">Host dashboard</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard/listings">My listings</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link href="/dashboard/earnings">Earnings</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild className="text-[#C75B3A]">
-                      <Link href="/dashboard/listings/new">List a new space</Link>
-                    </DropdownMenuItem>
                   </>
                 ) : (
-                  <DropdownMenuItem asChild className="text-[#C75B3A]">
-                    <Link href="/dashboard/listings/new">Start hosting</Link>
+                  <DropdownMenuItem asChild className="text-[#8B4513] font-medium">
+                    <Link href="/dashboard/listings/new">Become a host</Link>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/account">Account settings</Link>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -270,7 +317,7 @@ export function Navbar() {
                 variant="ghost"
                 className={`rounded-full border border-current/25 px-5 hover:bg-white/10 ${desktopLinkColor}`}
               >
-                <Link href="/dashboard/listings/new">List your space</Link>
+                <Link href="/dashboard/listings/new">Become a host</Link>
               </Button>
               <Link href="/login" className={`text-sm ${desktopLinkColor}`}>
                 Log in
@@ -304,8 +351,9 @@ export function Navbar() {
                 <Link href="/explore">Explore</Link>
                 {loggedIn ? (
                   <>
-                    <Link href="/dashboard">Overview</Link>
+                    <Link href="/dashboard/account">Profile</Link>
                     <Link href="/dashboard/bookings">My bookings</Link>
+                    <Link href="/dashboard/saved">Saved spaces</Link>
                     <Link href="/dashboard/messages" className="flex items-center gap-2">
                       Messages
                       {unreadCount > 0 ? (
@@ -316,23 +364,36 @@ export function Navbar() {
                         )
                       ) : null}
                     </Link>
-                    <Link href="/dashboard/listings">My listings</Link>
-                    <Link href="/dashboard/earnings">Earnings</Link>
-                    <Link href="/dashboard/listings/new" className="text-[#FFAB90]">
-                      List a new space
-                    </Link>
+                    {isHost ? (
+                      <>
+                        <div className="my-1 border-t border-[#3A3029]" />
+                        <Link href="/dashboard">Host dashboard</Link>
+                        <Link href="/dashboard/listings">My listings</Link>
+                        <Link href="/dashboard/earnings">Earnings</Link>
+                      </>
+                    ) : (
+                      <>
+                        <div className="my-1 border-t border-[#3A3029]" />
+                        <Link href="/dashboard/listings/new" className="text-[#FFAB90] font-medium">
+                          Become a host
+                        </Link>
+                      </>
+                    )}
+                    <div className="my-1 border-t border-[#3A3029]" />
                     <button type="button" className="text-left" onClick={handleSignOut}>
                       Sign out
                     </button>
                   </>
                 ) : (
                   <>
-                    <Link href="/dashboard/bookings">Your rituals</Link>
-                    <Link href="/dashboard/listings/new">List your space</Link>
                     <Link href="/login">Log in</Link>
                     <Button asChild className="mt-2 rounded-full bg-[#C75B3A] text-white hover:bg-[#B45033]">
                       <Link href="/signup">Sign up</Link>
                     </Button>
+                    <div className="my-1 border-t border-[#3A3029]" />
+                    <Link href="/dashboard/listings/new" className="text-[#FFAB90] font-medium">
+                      Become a host
+                    </Link>
                   </>
                 )}
               </div>

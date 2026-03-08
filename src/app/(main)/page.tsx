@@ -221,7 +221,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-warm-50">
-      <section className="relative min-h-[100svh] bg-[#1A1410] pt-24 md:pt-0">
+      <section className="relative bg-[#1A1410] pt-24 md:min-h-[100svh] md:pt-0">
         <div className="absolute inset-0 hidden md:block">
           <Image
             src={heroImage.url}
@@ -246,7 +246,7 @@ export default function Home() {
         <div
           className="absolute inset-0 md:hidden"
           style={{
-            backgroundImage: `linear-gradient(rgba(26,20,16,0.72), rgba(26,20,16,0.72)), url('${heroImage.url}')`,
+            backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 100%), url('${heroImage.url}')`,
             backgroundSize: "cover",
             backgroundPosition: heroImage.objectPosition,
           }}
@@ -317,11 +317,11 @@ export default function Home() {
           <div />
         </div>
 
-        <div className="px-6 pb-14 md:hidden">
+        <div className="px-4 pt-2 pb-10 md:hidden">
           <p className="hero-anim-in hero-delay-0 mb-5 text-xs tracking-[0.24em] text-[#C75B3A]">
             PRIVATE WELLNESS · ON DEMAND
           </p>
-          <h1 className="font-serif text-[44px] leading-[0.98] text-[#F5EFE8]">
+          <h1 className="font-serif text-[clamp(22px,6vw,32px)] leading-[1.2] font-bold text-[#F5EFE8]">
             <span className="hero-anim-in hero-delay-150 block">
               Discover private wellness spaces near you.
             </span>
@@ -330,14 +330,14 @@ export default function Home() {
             Book private saunas, cold plunges, float tanks and more — hosted by people in your city.
           </p>
 
-          <div className="hero-anim-scale hero-delay-750 mt-8 w-full rounded-[28px] bg-white p-2 shadow-[0_8px_40px_rgba(0,0,0,0.3)]">
-            <div className="flex items-center gap-2">
+          <div className="hero-anim-scale hero-delay-750 mt-6 w-full rounded-2xl bg-white p-4 shadow-[0_8px_40px_rgba(0,0,0,0.3)]">
+            <div className="flex h-12 w-full items-center gap-2 rounded-xl border border-[#E5DDD6] bg-white px-3">
               <button
                 type="button"
                 aria-label="Use my location"
                 title="Use my location"
                 onClick={handleLocateMe}
-                className="ml-1 rounded-full p-1 text-[#8D7B6F] hover:bg-[#F4EFE9]"
+                className="rounded-full p-1 text-[#8D7B6F] hover:bg-[#F4EFE9]"
               >
                 <MapPin className="size-4 shrink-0" />
               </button>
@@ -345,12 +345,12 @@ export default function Home() {
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
                 placeholder="Seattle, Ballard"
-                className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#1A1410] outline-none"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 text-[16px] text-[#1A1410] outline-none"
               />
             </div>
-            <div className="mt-2 flex items-center gap-2 border-t border-[#F0EBE6] pt-2">
+            <div className="mt-3 space-y-3">
               <Select value={heroServiceType} onValueChange={setHeroServiceType}>
-                <SelectTrigger className="h-9 min-w-0 flex-1 border-0 bg-transparent px-2 text-sm text-[#5F5148] shadow-none focus-visible:ring-0">
+                <SelectTrigger className="h-12 w-full rounded-xl border border-[#E5DDD6] bg-white px-3 text-[16px] text-[#5F5148] shadow-none focus-visible:ring-0">
                   <SelectValue placeholder="All services" />
                 </SelectTrigger>
                 <SelectContent align="start">
@@ -363,7 +363,7 @@ export default function Home() {
                 </SelectContent>
               </Select>
               <Button
-                className="rounded-full bg-[#C75B3A] px-4 text-white hover:bg-[#B45033]"
+                className="h-[52px] w-full rounded-[14px] bg-[#8B4513] text-[16px] font-semibold text-white hover:bg-[#7a3d11]"
                 onClick={handleFindSpace}
               >
                 Find a space

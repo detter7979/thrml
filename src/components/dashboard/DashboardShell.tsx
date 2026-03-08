@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarDays, Heart, Home, Landmark, MessageCircle, PlusCircle, Settings, Sparkles, User } from "lucide-react"
+import { CalendarDays, Heart, Home, Landmark, MessageCircle, PlusCircle, Search, Settings, Sparkles, User } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -56,13 +56,21 @@ export function DashboardShell({
     { href: "/dashboard/earnings", label: "Earnings", icon: Landmark },
     { href: "/dashboard/host/templates", label: "Message Templates", icon: MessageCircle },
   ]
-  const mobileItems = [
-    { href: "/dashboard", label: "Overview", icon: Home },
-    { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
-    { href: "/dashboard/listings", label: "Listings", icon: Sparkles },
-    { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-    { href: "/dashboard/account", label: "Account", icon: User },
-  ]
+  const mobileItems = hostingEnabled
+    ? [
+        { href: "/explore", label: "Explore", icon: Search },
+        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
+        { href: "/dashboard", label: "Dashboard", icon: Home },
+        { href: "/dashboard/account", label: "Account", icon: User },
+      ]
+    : [
+        { href: "/", label: "Home", icon: Home },
+        { href: "/explore", label: "Explore", icon: Search },
+        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
+        { href: "/dashboard/account", label: "Account", icon: User },
+      ]
 
   const initials = fullNameValue
     .split(" ")

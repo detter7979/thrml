@@ -1172,9 +1172,11 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
   }
   return (
     <div className={viewMode === "list" ? "min-h-[calc(100svh-88px)] bg-[#F7F3EE]" : "h-[calc(100svh-88px)] overflow-hidden bg-[#F7F3EE]"}>
-      <div className="sticky top-0 z-20 border-b border-[#D9CEC1] bg-[#EAE1D4]/95 backdrop-blur">
-          <div className="relative z-20 flex items-center justify-between gap-3 px-4 py-3 md:px-6">
-          <div className="no-scrollbar flex items-center gap-2 overflow-x-auto whitespace-nowrap pl-1 pr-4">
+      <div className="sticky top-0 z-30 border-b border-[#F0E8E0] bg-[#FAF7F4]">
+          <div className="relative z-30 px-4 py-3 md:px-6">
+          <div className="flex items-center gap-2 md:hidden">
+            <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">
+              <div className="flex w-max items-center gap-2 whitespace-nowrap pl-1">
             <Popover
               open={openFilter === "service"}
               onOpenChange={(open) => {
@@ -1402,6 +1404,27 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
                 × Clear filters ({activeFilterCount})
               </button>
             ) : null}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === "map" ? "list" : "map")}
+              className="shrink-0 whitespace-nowrap rounded-lg border border-[#E5DDD6] bg-white px-2.5 py-1.5 text-[13px] font-medium text-[#2C2420]"
+            >
+              <span className="inline-flex items-center gap-1">
+                {viewMode === "map" ? (
+                  <>
+                    <List className="size-3.5" />
+                    List
+                  </>
+                ) : (
+                  <>
+                    <MapIcon className="size-3.5" />
+                    Map
+                  </>
+                )}
+              </span>
+            </button>
           </div>
 
           <div className="hidden items-center gap-3 md:flex">
@@ -1552,14 +1575,6 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
               {mapPanel}
               {isMobile ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("list")}
-                    className="fixed top-[72px] left-1/2 z-40 inline-flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full border border-[#E5DDD6] bg-white px-5 py-2.5 text-sm font-semibold text-[#2C2420] shadow-[0_2px_12px_rgba(0,0,0,0.15)]"
-                  >
-                    <List className="size-4" />
-                    <span>← List view</span>
-                  </button>
                   <div
                     ref={mobileMapCardsRef}
                     className="no-scrollbar pointer-events-auto fixed right-0 bottom-0 left-0 z-40 flex snap-x snap-mandatory gap-3 overflow-x-auto bg-transparent p-4"
@@ -1666,16 +1681,6 @@ export function ExploreClient({ serviceTypes }: { serviceTypes: ServiceTypeMeta[
             </div>
           ) : null}
 
-          {isMobile && viewMode === "list" ? (
-            <button
-              type="button"
-              className="fixed bottom-6 left-1/2 z-40 inline-flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full bg-[#2C2420] px-6 py-3 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
-              onClick={() => setViewMode("map")}
-            >
-              <MapIcon className="size-4" />
-              Map view
-            </button>
-          ) : null}
         </>
       ) : null}
     </div>

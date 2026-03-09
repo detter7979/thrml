@@ -139,66 +139,76 @@ async function getActiveListings(userId: string): Promise<ListingSummary[]> {
 
 async function getUpcomingBookings(userId: string, limit = 3): Promise<UpcomingBooking[]> {
   const supabase = await createClient()
-  const today = new Date()
+  const now = new Date()
+  const fetchLimit = Math.max(limit * 5, 20)
+  const today = now
   const localDateIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
   const { data } = await supabase
     .from("bookings")
-    .select("id, listing_id, guest_id, session_date, start_time, status")
+    .select(`
+      id,
+      listing_id,
+      guest_id,
+      session_date,
+      start_time,
+      status,
+      guest:profiles!bookings_guest_id_fkey(
+        full_name,
+        avatar_url
+      ),
+      listing:listings(
+        title,
+        listing_photos(url, order_index)
+      )
+    `)
     .eq("host_id", userId)
-    .eq("status", "confirmed")
+    .in("status", ["confirmed", "pending_host"])
     .gte("session_date", localDateIso)
     .order("session_date", { ascending: true })
-    .limit(limit)
+    .order("start_time", { ascending: true })
+    .limit(fetchLimit)
 
   const rows = data ?? []
   if (!rows.length) return []
 
-  const listingIds = Array.from(
-    new Set(rows.map((row) => (typeof row.listing_id === "string" ? row.listing_id : null)).filter(Boolean))
-  ) as string[]
-  const guestIds = Array.from(
-    new Set(rows.map((row) => (typeof row.guest_id === "string" ? row.guest_id : null)).filter(Boolean))
-  ) as string[]
+  const normalized = rows
+    .map((row) => {
+      const listingId = typeof row.listing_id === "string" ? row.listing_id : null
+      const sessionDate = asNonEmptyString(row.session_date)
+      const startTime = asNonEmptyString(row.start_time)
+      const startsAt = sessionDate ? new Date(`${sessionDate}T${startTime ?? "00:00:00"}`) : null
+      const listing = Array.isArray(row.listing) ? row.listing[0] : row.listing
+      const listingTitle = asNonEmptyString(listing?.title) ?? "Listing"
+      const listingPhotos = Array.isArray(listing?.listing_photos) ? listing.listing_photos : []
+      const listingThumbnail =
+        listingPhotos
+          .slice()
+          .sort((a, b) => {
+            const aIndex = typeof a.order_index === "number" ? a.order_index : Number.POSITIVE_INFINITY
+            const bIndex = typeof b.order_index === "number" ? b.order_index : Number.POSITIVE_INFINITY
+            return aIndex - bIndex
+          })
+          .map((photo) => asNonEmptyString(photo.url))
+          .find(Boolean) ?? null
+      const guest = Array.isArray(row.guest) ? row.guest[0] : row.guest
 
-  const [{ data: listings }, { data: photos }, { data: guests }] = await Promise.all([
-    listingIds.length
-      ? supabase.from("listings").select("id, title").in("id", listingIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; title: string | null }> }),
-    listingIds.length
-      ? supabase.from("listing_photos").select("listing_id, url, order_index").in("listing_id", listingIds)
-      : Promise.resolve({ data: [] as Array<{ listing_id: string; url: string; order_index: number | null }> }),
-    guestIds.length
-      ? supabase.from("profiles").select("id, full_name").in("id", guestIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
-  ])
+      return {
+        id: typeof row.id === "string" ? row.id : "",
+        listingId,
+        listingTitle,
+        listingThumbnail,
+        guestName: asNonEmptyString(guest?.full_name) ?? "Guest",
+        sessionDate,
+        startTime,
+        status: asNonEmptyString(row.status) ?? "confirmed",
+        startsAtMs: startsAt && !Number.isNaN(startsAt.getTime()) ? startsAt.getTime() : Number.POSITIVE_INFINITY,
+      }
+    })
+    .filter((booking) => booking.startsAtMs >= now.getTime())
+    .sort((a, b) => a.startsAtMs - b.startsAtMs)
+    .slice(0, limit)
 
-  const listingMap = new Map(
-    (listings ?? []).map((row) => [row.id as string, asNonEmptyString(row.title) ?? "Listing"])
-  )
-  const guestMap = new Map((guests ?? []).map((row) => [row.id as string, asNonEmptyString(row.full_name) ?? "Guest"]))
-
-  const thumbnailByListing = new Map<string, string>()
-  for (const row of photos ?? []) {
-    const listingId = typeof row.listing_id === "string" ? row.listing_id : null
-    const url = asNonEmptyString(row.url)
-    if (!listingId || !url || thumbnailByListing.has(listingId)) continue
-    thumbnailByListing.set(listingId, url)
-  }
-
-  return rows.map((row) => {
-    const listingId = typeof row.listing_id === "string" ? row.listing_id : null
-    const guestId = typeof row.guest_id === "string" ? row.guest_id : null
-    return {
-      id: typeof row.id === "string" ? row.id : "",
-      listingId,
-      listingTitle: listingId ? listingMap.get(listingId) ?? "Listing" : "Listing",
-      listingThumbnail: listingId ? thumbnailByListing.get(listingId) ?? null : null,
-      guestName: guestId ? guestMap.get(guestId) ?? "Guest" : "Guest",
-      sessionDate: asNonEmptyString(row.session_date),
-      startTime: asNonEmptyString(row.start_time),
-      status: asNonEmptyString(row.status) ?? "confirmed",
-    }
-  })
+  return normalized.map(({ startsAtMs: _startsAtMs, ...booking }) => booking)
 }
 
 async function getRecentConversations(

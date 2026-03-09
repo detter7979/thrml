@@ -317,7 +317,7 @@ export default function Home() {
           <div />
         </div>
 
-        <div className="pt-2 pb-10 md:hidden">
+        <div className="px-5 pt-2 pb-10 md:hidden">
           <p className="hero-anim-in hero-delay-0 mb-5 text-xs tracking-[0.24em] text-[#C75B3A]">
             PRIVATE WELLNESS · ON DEMAND
           </p>
@@ -330,7 +330,7 @@ export default function Home() {
             Book private saunas, cold plunges, float tanks and more — hosted by people in your city.
           </p>
 
-          <div className="hero-anim-scale hero-delay-750 mt-6 mx-5 w-[calc(100%-40px)] rounded-[20px] bg-white px-4 pt-4 pb-5 shadow-[0_8px_40px_rgba(0,0,0,0.3)]">
+          <div className="hero-anim-scale hero-delay-750 mt-6 w-full rounded-[20px] bg-white px-4 pt-4 pb-5 shadow-[0_8px_40px_rgba(0,0,0,0.3)]">
             <div className="flex h-12 w-full items-center gap-2 rounded-xl border border-[#E5DDD6] bg-white px-3">
               <button
                 type="button"

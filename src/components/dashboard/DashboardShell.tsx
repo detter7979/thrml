@@ -2,7 +2,19 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarDays, Heart, Home, Landmark, MessageCircle, PlusCircle, Settings, Sparkles, User } from "lucide-react"
+import {
+  CalendarDays,
+  Heart,
+  Home,
+  Landmark,
+  LayoutGrid,
+  MessageCircle,
+  PlusCircle,
+  Settings,
+  Sparkles,
+  User,
+  UserCircle,
+} from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -45,26 +57,29 @@ export function DashboardShell({
   }
   const isNavItemActive = (href: string) =>
     href === "/dashboard" ? pathname === "/dashboard" : pathname === href || pathname.startsWith(`${href}/`)
-  const desktopItems = isHost
-    ? [
-        { href: "/dashboard", label: "Overview", icon: Home },
-        { href: "/dashboard/listings", label: "Listings", icon: Sparkles },
-        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
-        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-        { href: "/dashboard/earnings", label: "Earnings", icon: Landmark },
-      ]
-    : [
-        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
-        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-        { href: "/dashboard/saved", label: "Saved spaces", icon: Heart },
-      ]
+  const hostDesktopPrimaryItems = [
+    { href: "/dashboard", label: "Overview", icon: Home },
+    { href: "/dashboard/messages", label: "Inbox", icon: MessageCircle },
+    { href: "/dashboard/listings", label: "Listings", icon: Sparkles },
+    { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+  ]
+  const hostDesktopSecondaryItems = [
+    { href: "/dashboard/earnings", label: "Earnings", icon: Landmark },
+    { href: "/dashboard/account", label: "Account", icon: Settings },
+  ]
+  const guestDesktopItems = [
+    { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+    { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
+    { href: "/dashboard/saved", label: "Saved spaces", icon: Heart },
+  ]
+  const desktopItems = isHost ? hostDesktopPrimaryItems : guestDesktopItems
   const mobileItems = isHost
     ? [
-        { href: "/dashboard/listings", label: "Listings", icon: Sparkles },
-        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
-        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-        { href: "/dashboard/earnings", label: "Earnings", icon: Landmark },
-        { href: "/dashboard/account", label: "Account", icon: User },
+        { href: "/dashboard", label: "HOME", icon: Home },
+        { href: "/dashboard/messages", label: "INBOX", icon: MessageCircle },
+        { href: "/dashboard/listings", label: "LISTINGS", icon: LayoutGrid },
+        { href: "/dashboard/bookings", label: "BOOKINGS", icon: CalendarDays },
+        { href: "/dashboard/account", label: "PROFILE", icon: UserCircle },
       ]
     : [
         { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
@@ -72,7 +87,7 @@ export function DashboardShell({
         { href: "/dashboard/saved", label: "Saved", icon: Heart },
         { href: "/dashboard/account", label: "Account", icon: User },
       ]
-  const mobileHeaderTitle = isHost ? "Your spaces" : "Your bookings"
+  const mobileHeaderTitle = isHost ? "Host home" : "Your bookings"
   const mobileHeaderSubtitle = isHost
     ? `${activeListingsCount} active listing${activeListingsCount === 1 ? "" : "s"}`
     : `${upcomingBookingsCount} upcoming session${upcomingBookingsCount === 1 ? "" : "s"}`
@@ -395,17 +410,44 @@ export function DashboardShell({
               </Link>
             )
           })}
-          <div className="mx-3 my-3 border-t border-[#EEE4D9]" />
-          <Link
-            href="/dashboard/account"
-            className={cn(
-              "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
-              isNavItemActive("/dashboard/account") ? "bg-[#FFF2EA] text-[#C75B3A]" : "text-[#5D4E42] hover:bg-[#F8F3ED]"
-            )}
-          >
-            <Settings className="size-4" />
-            Account
-          </Link>
+          {isHost ? (
+            <>
+              <div className="mx-3 my-3 border-t border-[#EEE4D9]" />
+              {hostDesktopSecondaryItems.map((item) => {
+                const Icon = item.icon
+                const active = isNavItemActive(item.href)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+                      active ? "bg-[#FFF2EA] text-[#C75B3A]" : "text-[#5D4E42] hover:bg-[#F8F3ED]"
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    {item.label}
+                  </Link>
+                )
+              })}
+            </>
+          ) : (
+            <>
+              <div className="mx-3 my-3 border-t border-[#EEE4D9]" />
+              <Link
+                href="/dashboard/account"
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+                  isNavItemActive("/dashboard/account")
+                    ? "bg-[#FFF2EA] text-[#C75B3A]"
+                    : "text-[#5D4E42] hover:bg-[#F8F3ED]"
+                )}
+              >
+                <Settings className="size-4" />
+                Account
+              </Link>
+            </>
+          )}
         </nav>
 
         <div className="px-4 pb-1">
@@ -458,7 +500,7 @@ export function DashboardShell({
       <main className="pb-24 md:pb-0">{children}</main>
 
       <nav
-        className="fixed right-0 bottom-0 left-0 z-50 border-t border-[#E5DDD6] bg-white md:hidden"
+        className="fixed right-0 bottom-0 left-0 z-50 border-t border-[#F0E8E0] bg-white md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex h-16">
@@ -470,12 +512,12 @@ export function DashboardShell({
               key={item.href}
               href={item.href}
               className={cn(
-                "flex min-h-[44px] flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-medium",
+                "flex min-h-[44px] flex-1 flex-col items-center justify-center gap-1 py-1 text-[11px] font-medium",
                 active ? "text-[#8B4513]" : "text-[#9CA3AF]"
               )}
             >
               <div className="relative">
-                <Icon className="size-6" />
+                <Icon className="size-5" />
                 {item.href === "/dashboard/messages" && unreadMessagesCount > 0 ? (
                   <span className="absolute -top-2 -right-2 rounded-full bg-[#C75B3A] px-1 text-[9px] leading-4 text-white">
                     {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}

@@ -157,20 +157,30 @@ export function MessageThread({
   return (
     <section className="flex h-[calc(100vh-130px)] flex-col">
       <header className="border-b border-[#E7DED3] bg-white px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Avatar size="default">
-            <AvatarImage src={otherParty?.avatar_url ?? undefined} alt={otherName} />
-            <AvatarFallback>{initials || "M"}</AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="font-medium text-[#1A1410]">{otherName}</p>
-            <Link
-              href={booking?.id ? `/dashboard/bookings` : "#"}
-              className="text-xs text-[#7A6A5D] underline-offset-2 hover:underline"
-            >
-              Booking: {booking?.session_date ?? "Date TBD"} · {listing?.title ?? "Listing"}
-            </Link>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Avatar size="default">
+              <AvatarImage src={otherParty?.avatar_url ?? undefined} alt={otherName} />
+              <AvatarFallback>{initials || "M"}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium text-[#1A1410]">{otherName}</p>
+              <Link
+                href={booking?.id ? `/dashboard/bookings` : "#"}
+                className="text-xs text-[#7A6A5D] underline-offset-2 hover:underline"
+              >
+                Booking: {booking?.session_date ?? "Date TBD"} · {listing?.title ?? "Listing"}
+              </Link>
+            </div>
           </div>
+          {conversation?.host_id === currentUserId ? (
+            <Link
+              href="/dashboard/host/templates"
+              className="shrink-0 rounded-full border border-[#E5DDD6] px-3 py-1.5 text-xs font-medium text-[#5A4B40] transition-colors hover:bg-[#FAF6F1]"
+            >
+              Message templates
+            </Link>
+          ) : null}
         </div>
         <p className="mt-3 rounded-md border border-[#E6DDD3] bg-[#FCF8F3] px-3 py-2 text-xs text-[#6C5B4F]">
           Thrml never asks you to pay outside the platform. Report any requests to do so.

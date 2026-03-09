@@ -1145,9 +1145,9 @@ export function ExploreClient() {
     <div className={viewMode === "list" ? "min-h-[calc(100svh-88px)] bg-[#F7F3EE]" : "h-[calc(100svh-88px)] overflow-hidden bg-[#F7F3EE]"}>
       <div className="sticky top-0 z-30 border-b border-[#F0E8E0] bg-[#FAF7F4]">
           <div className="relative z-30 px-4 py-3 md:px-6">
-          <div className="flex items-center gap-2 md:hidden">
-            <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">
-              <div className="flex w-max items-center gap-2 whitespace-nowrap pl-1">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto md:overflow-visible">
+              <div className="flex w-max items-center gap-2 whitespace-nowrap pl-1 md:w-full md:flex-wrap md:gap-2.5 md:whitespace-normal md:pl-0">
             <Popover
               open={openFilter === "service"}
               onOpenChange={(open) => {
@@ -1380,7 +1380,7 @@ export function ExploreClient() {
             <button
               type="button"
               onClick={() => setViewMode(viewMode === "map" ? "list" : "map")}
-              className="shrink-0 whitespace-nowrap rounded-lg border border-[#E5DDD6] bg-white px-2.5 py-1.5 text-[13px] font-medium text-[#2C2420]"
+              className="shrink-0 whitespace-nowrap rounded-lg border border-[#E5DDD6] bg-white px-2.5 py-1.5 text-[13px] font-medium text-[#2C2420] md:hidden"
             >
               <span className="inline-flex items-center gap-1">
                 {viewMode === "map" ? (

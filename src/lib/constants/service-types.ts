@@ -41,7 +41,7 @@ export const SERVICE_TYPES: {
   {
     value: "float_tank",
     label: "Float Tank",
-    emoji: "🛶",
+    emoji: "🪷",
     description: "Sensory deprivation float tank",
   },
   {

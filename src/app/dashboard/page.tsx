@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 
+import { GuestOverviewPage } from "@/components/dashboard/GuestOverviewPage"
 import { HostOverviewPage } from "@/components/dashboard/HostOverviewPage"
 import { createClient } from "@/lib/supabase/server"
 
@@ -22,9 +23,10 @@ export default async function DashboardOverviewPage() {
   const isHost =
     Boolean((listingCount ?? 0) > 0) || profile?.ui_intent === "host" || profile?.ui_intent === "both"
 
-  if (!isHost) {
-    redirect("/dashboard/bookings")
+  if (isHost) {
+    return <HostOverviewPage userId={user.id} />
   }
 
-  return <HostOverviewPage userId={user.id} />
+  const canHost = profile?.ui_intent === "both"
+  return <GuestOverviewPage canHost={canHost} />
 }

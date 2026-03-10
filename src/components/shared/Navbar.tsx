@@ -286,13 +286,13 @@ export function Navbar() {
                 <DropdownMenuLabel>{userName ?? "Member"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/account" onClick={closeUserMenu}>
-                    Profile
+                  <Link href="/dashboard" onClick={closeUserMenu}>
+                    Overview
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard/bookings" onClick={closeUserMenu}>
-                    My bookings
+                    Bookings
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
@@ -316,17 +316,17 @@ export function Navbar() {
                     ) : null}
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/account" onClick={closeUserMenu}>
+                    Account
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {isHost ? (
                   <>
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard" onClick={closeUserMenu}>
-                        Host dashboard
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
                       <Link href="/dashboard/listings" onClick={closeUserMenu}>
-                        My listings
+                        Listings
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
@@ -396,11 +396,11 @@ export function Navbar() {
                 </Link>
                 {loggedIn ? (
                   <>
-                    <Link href="/dashboard/account" onClick={closeMobileNav}>
-                      Profile
+                    <Link href="/dashboard" onClick={closeMobileNav}>
+                      Overview
                     </Link>
                     <Link href="/dashboard/bookings" onClick={closeMobileNav}>
-                      My bookings
+                      Bookings
                     </Link>
                     <Link href="/dashboard/saved" onClick={closeMobileNav}>
                       Saved spaces
@@ -415,14 +415,14 @@ export function Navbar() {
                         )
                       ) : null}
                     </Link>
+                    <Link href="/dashboard/account" onClick={closeMobileNav}>
+                      Account
+                    </Link>
                     {isHost ? (
                       <>
                         <div className="my-1 border-t border-[#3A3029]" />
-                        <Link href="/dashboard" onClick={closeMobileNav}>
-                          Host dashboard
-                        </Link>
                         <Link href="/dashboard/listings" onClick={closeMobileNav}>
-                          My listings
+                          Listings
                         </Link>
                         <Link href="/dashboard/earnings" onClick={closeMobileNav}>
                           Earnings

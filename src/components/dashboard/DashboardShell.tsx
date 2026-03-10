@@ -59,7 +59,7 @@ export function DashboardShell({
     href === "/dashboard" ? pathname === "/dashboard" : pathname === href || pathname.startsWith(`${href}/`)
   const hostDesktopPrimaryItems = [
     { href: "/dashboard", label: "Overview", icon: Home },
-    { href: "/dashboard/messages", label: "Inbox", icon: MessageCircle },
+    { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
     { href: "/dashboard/listings", label: "Listings", icon: Sparkles },
     { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
   ]
@@ -68,6 +68,7 @@ export function DashboardShell({
     { href: "/dashboard/account", label: "Account", icon: Settings },
   ]
   const guestDesktopItems = [
+    { href: "/dashboard", label: "Overview", icon: Home },
     { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
     { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
     { href: "/dashboard/saved", label: "Saved spaces", icon: Heart },
@@ -75,19 +76,21 @@ export function DashboardShell({
   const desktopItems = isHost ? hostDesktopPrimaryItems : guestDesktopItems
   const mobileItems = isHost
     ? [
-        { href: "/dashboard", label: "HOME", icon: Home },
-        { href: "/dashboard/messages", label: "INBOX", icon: MessageCircle },
-        { href: "/dashboard/listings", label: "LISTINGS", icon: LayoutGrid },
-        { href: "/dashboard/bookings", label: "BOOKINGS", icon: CalendarDays },
-        { href: "/dashboard/account", label: "PROFILE", icon: UserCircle },
+        { href: "/dashboard", label: "Overview", icon: Home },
+        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
+        { href: "/dashboard/listings", label: "Listings", icon: LayoutGrid },
+        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+        { href: "/dashboard/account", label: "Account", icon: UserCircle },
       ]
     : [
+        { href: "/dashboard", label: "Overview", icon: Home },
         { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
         { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-        { href: "/dashboard/saved", label: "Saved", icon: Heart },
+        { href: "/dashboard/saved", label: "Saved spaces", icon: Heart },
         { href: "/dashboard/account", label: "Account", icon: User },
       ]
-  const mobileHeaderTitle = isHost ? "Host home" : "Your bookings"
+  const isOverviewPage = pathname === "/dashboard"
+  const mobileHeaderTitle = isOverviewPage ? "Overview" : isHost ? "Host dashboard" : "Guest dashboard"
   const mobileHeaderSubtitle = isHost
     ? `${activeListingsCount} active listing${activeListingsCount === 1 ? "" : "s"}`
     : `${upcomingBookingsCount} upcoming session${upcomingBookingsCount === 1 ? "" : "s"}`

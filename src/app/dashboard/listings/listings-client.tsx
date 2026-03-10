@@ -565,7 +565,7 @@ export function DashboardListingsClient({
           return (
             <article
               key={listing.id}
-              className="group w-full overflow-hidden rounded-2xl bg-white p-5 shadow-sm"
+              className="w-full overflow-hidden rounded-2xl bg-white p-5 shadow-sm"
             >
               <div
                 role="button"
@@ -605,10 +605,10 @@ export function DashboardListingsClient({
                       void setListingActiveState(listing.id, shouldActivate)
                     }}
                     disabled={listingActionLoadingId === listing.id}
-                    className={`rounded-lg border px-2.5 py-1.5 text-xs transition-all md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto md:group-focus-within:opacity-100 md:group-focus-within:pointer-events-auto ${
+                    className={`rounded-lg border px-3 py-2 text-sm ${
                       listing.is_active
-                        ? "border-rose-100 text-rose-500 hover:bg-rose-50"
-                        : "border-emerald-100 text-emerald-600 hover:bg-emerald-50"
+                        ? "border-rose-200 text-rose-700 hover:bg-rose-50"
+                        : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                     } disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     {listingActionLoadingId === listing.id

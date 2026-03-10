@@ -19,6 +19,7 @@ import {
   isServiceTypeId,
   type ServiceTypeMeta,
 } from "@/lib/service-types"
+import { SERVICE_TYPES, type ServiceType } from "@/lib/constants/service-types"
 
 type ListingApiRow = {
   id: string
@@ -28,11 +29,24 @@ type ListingApiRow = {
   sauna_type?: string | null
   service_attributes?: Record<string, unknown> | null
   price_solo: number | null
+  fixed_session_price: number | null
+  session_type?: string | null
   listing_photos?: { url?: string | null }[]
   listing_ratings?: { avg_overall?: number | null; review_count?: number | null }[] | null
 }
 
 const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const TRENDING_SERVICE_TYPES: ServiceType[] = ["sauna", "cold_plunge", "hot_tub"]
+type TrendingServiceType = (typeof TRENDING_SERVICE_TYPES)[number]
+const TRENDING_TAGLINES: Record<TrendingServiceType, string> = {
+  sauna: "Traditional heat therapy · Relax & recover",
+  cold_plunge: "Cold immersion · Boosts recovery",
+  hot_tub: "Warm soak · Unwind & decompress",
+}
+
+function formatTrendingPrice(value: number) {
+  return Number.isInteger(value) ? `${value}` : value.toFixed(2).replace(/\.00$/, "")
+}
 
 export default function Home() {
   const router = useRouter()
@@ -138,6 +152,42 @@ export default function Home() {
         }
       })
   }, [filter, listings, location, serviceTypeMap])
+
+  const trendingCategories = useMemo(() => {
+    const serviceTypeMetaMap = new Map(SERVICE_TYPES.map((serviceType) => [serviceType.value, serviceType]))
+
+    return TRENDING_SERVICE_TYPES.map((serviceType) => {
+      let minPrice: number | null = null
+      let minPriceUnit: "session" | "hr" | null = null
+
+      for (const listing of listings) {
+        if (listing.service_type !== serviceType) continue
+
+        const isFixedSession = listing.session_type === "fixed_session"
+        const rawPrice = isFixedSession ? listing.fixed_session_price : listing.price_solo
+        const parsedPrice = Number(rawPrice)
+
+        if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) continue
+        if (minPrice === null || parsedPrice < minPrice) {
+          minPrice = parsedPrice
+          minPriceUnit = isFixedSession ? "session" : "hr"
+        }
+      }
+
+      if (minPrice === null || minPriceUnit === null) return null
+
+      const serviceTypeMeta = serviceTypeMetaMap.get(serviceType)
+      if (!serviceTypeMeta) return null
+
+      return {
+        id: serviceType,
+        emoji: serviceTypeMeta.emoji,
+        label: serviceTypeMeta.label,
+        tagline: TRENDING_TAGLINES[serviceType],
+        priceText: `From $${formatTrendingPrice(minPrice)}/${minPriceUnit}`,
+      }
+    }).filter((category): category is NonNullable<typeof category> => category !== null)
+  }, [listings])
 
   const skeletonCards = new Array(6).fill(null)
   const blurDataURL =
@@ -423,18 +473,16 @@ export default function Home() {
         <section className="space-y-3">
           <h2 className="type-h2">Trending</h2>
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="card-base p-4">
-              <p className="font-medium">♨️ Contrast Therapy</p>
-              <p className="type-label">Contrast therapy · Heat + cold protocol · From $25/session</p>
-            </div>
-            <div className="card-base p-4">
-              <p className="font-medium">🧊 Cold Plunge</p>
-              <p className="type-label">Cold plunge · Boosts recovery · From $15/session</p>
-            </div>
-            <div className="card-base p-4">
-              <p className="font-medium">🛁 Float Tank</p>
-              <p className="type-label">Float tank · Deep reset · From $45/session</p>
-            </div>
+            {trendingCategories.map((category) => (
+              <div key={category.id} className="card-base p-4">
+                <p className="font-medium">
+                  {category.emoji} {category.label}
+                </p>
+                <p className="type-label">
+                  {category.tagline} · {category.priceText}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 

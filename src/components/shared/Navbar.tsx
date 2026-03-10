@@ -29,6 +29,8 @@ export function Navbar() {
   const [loggedIn, setLoggedIn] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [isHost, setIsHost] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
 
   function normalizeAvatarUrl(value: unknown) {
     return typeof value === "string" && value.trim().length > 0 ? value : null
@@ -233,6 +235,14 @@ export function Navbar() {
     window.location.assign("/")
   }
 
+  function closeUserMenu() {
+    setIsUserMenuOpen(false)
+  }
+
+  function closeMobileNav() {
+    setIsMobileNavOpen(false)
+  }
+
   const homeTransparent = isHome && !scrolled
   const desktopLinkColor = homeTransparent ? "text-[#F5EFE8]" : "text-[#1A1410]"
   const initials = (userName ?? "M")
@@ -259,7 +269,7 @@ export function Navbar() {
 
         <nav className="hidden items-center gap-7 md:flex">
           {loggedIn ? (
-            <DropdownMenu>
+            <DropdownMenu open={isUserMenuOpen} onOpenChange={setIsUserMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 rounded-full border border-current/20 px-2 py-1">
                   <Avatar size="sm">
@@ -273,16 +283,26 @@ export function Navbar() {
                 <DropdownMenuLabel>{userName ?? "Member"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/account">Profile</Link>
+                  <Link href="/dashboard/account" onClick={closeUserMenu}>
+                    Profile
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/bookings">My bookings</Link>
+                  <Link href="/dashboard/bookings" onClick={closeUserMenu}>
+                    My bookings
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/saved">Saved spaces</Link>
+                  <Link href="/dashboard/saved" onClick={closeUserMenu}>
+                    Saved spaces
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/messages" className="flex items-center justify-between gap-2">
+                  <Link
+                    href="/dashboard/messages"
+                    className="flex items-center justify-between gap-2"
+                    onClick={closeUserMenu}
+                  >
                     Messages
                     {unreadCount > 0 ? (
                       unreadCount > 9 ? (
@@ -297,22 +317,37 @@ export function Navbar() {
                 {isHost ? (
                   <>
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard">Host dashboard</Link>
+                      <Link href="/dashboard" onClick={closeUserMenu}>
+                        Host dashboard
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard/listings">My listings</Link>
+                      <Link href="/dashboard/listings" onClick={closeUserMenu}>
+                        My listings
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard/earnings">Earnings</Link>
+                      <Link href="/dashboard/earnings" onClick={closeUserMenu}>
+                        Earnings
+                      </Link>
                     </DropdownMenuItem>
                   </>
                 ) : (
                   <DropdownMenuItem asChild className="text-[#8B4513] font-medium">
-                    <Link href="/dashboard/listings/new">Become a host</Link>
+                    <Link href="/dashboard/listings/new" onClick={closeUserMenu}>
+                      Become a host
+                    </Link>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>Sign out</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    closeUserMenu()
+                    await handleSignOut()
+                  }}
+                >
+                  Sign out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
@@ -335,7 +370,7 @@ export function Navbar() {
         </nav>
 
         <div className="md:hidden">
-          <Sheet>
+          <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
             <SheetTrigger asChild>
               <button
                 type="button"
@@ -353,13 +388,21 @@ export function Navbar() {
                 <SheetTitle className="font-serif text-4xl lowercase text-[#F5EFE8]">thrml</SheetTitle>
               </SheetHeader>
               <div className="flex flex-col gap-5 px-4 py-6 text-lg">
-                <Link href="/explore">Explore</Link>
+                <Link href="/explore" onClick={closeMobileNav}>
+                  Explore
+                </Link>
                 {loggedIn ? (
                   <>
-                    <Link href="/dashboard/account">Profile</Link>
-                    <Link href="/dashboard/bookings">My bookings</Link>
-                    <Link href="/dashboard/saved">Saved spaces</Link>
-                    <Link href="/dashboard/messages" className="flex items-center gap-2">
+                    <Link href="/dashboard/account" onClick={closeMobileNav}>
+                      Profile
+                    </Link>
+                    <Link href="/dashboard/bookings" onClick={closeMobileNav}>
+                      My bookings
+                    </Link>
+                    <Link href="/dashboard/saved" onClick={closeMobileNav}>
+                      Saved spaces
+                    </Link>
+                    <Link href="/dashboard/messages" className="flex items-center gap-2" onClick={closeMobileNav}>
                       Messages
                       {unreadCount > 0 ? (
                         unreadCount > 9 ? (
@@ -372,31 +415,52 @@ export function Navbar() {
                     {isHost ? (
                       <>
                         <div className="my-1 border-t border-[#3A3029]" />
-                        <Link href="/dashboard">Host dashboard</Link>
-                        <Link href="/dashboard/listings">My listings</Link>
-                        <Link href="/dashboard/earnings">Earnings</Link>
+                        <Link href="/dashboard" onClick={closeMobileNav}>
+                          Host dashboard
+                        </Link>
+                        <Link href="/dashboard/listings" onClick={closeMobileNav}>
+                          My listings
+                        </Link>
+                        <Link href="/dashboard/earnings" onClick={closeMobileNav}>
+                          Earnings
+                        </Link>
                       </>
                     ) : (
                       <>
                         <div className="my-1 border-t border-[#3A3029]" />
-                        <Link href="/dashboard/listings/new" className="text-[#FFAB90] font-medium">
+                        <Link
+                          href="/dashboard/listings/new"
+                          className="text-[#FFAB90] font-medium"
+                          onClick={closeMobileNav}
+                        >
                           Become a host
                         </Link>
                       </>
                     )}
                     <div className="my-1 border-t border-[#3A3029]" />
-                    <button type="button" className="text-left" onClick={handleSignOut}>
+                    <button
+                      type="button"
+                      className="text-left"
+                      onClick={async () => {
+                        closeMobileNav()
+                        await handleSignOut()
+                      }}
+                    >
                       Sign out
                     </button>
                   </>
                 ) : (
                   <>
-                    <Link href="/login">Log in</Link>
+                    <Link href="/login" onClick={closeMobileNav}>
+                      Log in
+                    </Link>
                     <Button asChild className="mt-2 rounded-full bg-[#C75B3A] text-white hover:bg-[#B45033]">
-                      <Link href="/signup">Sign up</Link>
+                      <Link href="/signup" onClick={closeMobileNav}>
+                        Sign up
+                      </Link>
                     </Button>
                     <div className="my-1 border-t border-[#3A3029]" />
-                    <Link href="/dashboard/listings/new" className="text-[#FFAB90] font-medium">
+                    <Link href="/dashboard/listings/new" className="text-[#FFAB90] font-medium" onClick={closeMobileNav}>
                       Become a host
                     </Link>
                   </>

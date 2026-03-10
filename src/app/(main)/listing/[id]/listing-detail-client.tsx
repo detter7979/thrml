@@ -77,6 +77,8 @@ interface HostProfile {
   response_time?: string | null
   response_time_hours?: number | null
   bio?: string | null
+  average_rating?: number | null
+  total_reviews?: number | null
 }
 
 interface Photo {
@@ -1071,6 +1073,15 @@ export function ListingDetailClient({
     typeof host?.response_rate === "number" && Number.isFinite(host.response_rate)
       ? Math.round(host.response_rate)
       : null
+  const hostTotalReviews =
+    typeof host?.total_reviews === "number" && Number.isFinite(host.total_reviews)
+      ? Math.max(0, host.total_reviews)
+      : 0
+  const hostAverageRating =
+    typeof host?.average_rating === "number" && Number.isFinite(host.average_rating)
+      ? host.average_rating
+      : null
+  const showHostAsNew = hostTotalReviews === 0 || hostAverageRating === null
   const hostResponseTime =
     typeof host?.response_time === "string" && host.response_time.trim().length > 0
       ? host.response_time.trim()
@@ -1320,6 +1331,11 @@ export function ListingDetailClient({
                         <div className="min-w-0 flex-1">
                           <p className="text-[17px] font-semibold text-[#1A1410]">{hostName}</p>
                           <p className="text-sm text-muted-foreground">Hosted since {hostYear}</p>
+                          {showHostAsNew ? (
+                            <span className="mt-1 inline-flex rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+                          ) : (
+                            <p className="mt-1 text-sm text-muted-foreground">★ {hostAverageRating.toFixed(1)} ({hostTotalReviews})</p>
+                          )}
                           {hostResponseRate !== null ? (
                             <p className="mt-1 text-sm text-muted-foreground">Response rate: {hostResponseRate}%</p>
                           ) : null}
@@ -1365,6 +1381,11 @@ export function ListingDetailClient({
                       <div className="min-w-0 flex-1">
                         <p className="text-[17px] font-semibold text-[#1A1410]">{hostName}</p>
                         <p className="text-sm text-muted-foreground">Hosted since {hostYear}</p>
+                        {showHostAsNew ? (
+                          <span className="mt-1 inline-flex rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+                        ) : (
+                          <p className="mt-1 text-sm text-muted-foreground">★ {hostAverageRating.toFixed(1)} ({hostTotalReviews})</p>
+                        )}
                         {hostResponseRate !== null ? (
                           <p className="mt-1 text-sm text-muted-foreground">Response rate: {hostResponseRate}%</p>
                         ) : null}

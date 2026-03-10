@@ -35,6 +35,14 @@ function normalizeAvatarUrl(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
 }
 
+function hasAnyMarketingOptIn(preferences: NotificationPreferences) {
+  return Boolean(
+    preferences.marketing_wellness_tips ||
+      preferences.marketing_offers ||
+      preferences.marketing_product_updates
+  )
+}
+
 const PROFILE_NAME_OVERRIDE_KEY = "thrml.profileNameOverride"
 
 export function AccountClient({
@@ -87,6 +95,9 @@ export function AccountClient({
   const [message, setMessage] = useState<string | null>(null)
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(notificationPreferences)
   const [prefsSaveState, setPrefsSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const [notificationToast, setNotificationToast] = useState<{ tone: "success" | "error"; message: string } | null>(
+    null
+  )
   const [connectStatus, setConnectStatus] = useState({
     onboardingComplete: stripeOnboardingComplete,
     payoutsEnabled: stripePayoutsEnabled,
@@ -348,29 +359,57 @@ export function AccountClient({
   }, [notificationPreferences])
 
   async function updateNotificationPreference(key: NotificationPreferenceKey, checked: boolean) {
+    const previous = notificationPrefs
     const next = { ...notificationPrefs, [key]: checked }
     setNotificationPrefs(next)
     setPrefsSaveState("saving")
+    setNotificationToast(null)
 
-    const response = await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        notification_preferences: next,
-        // Back-compat mirrors for existing downstream usage during transition.
-        newsletter_opted_in: next.marketing_wellness_tips,
-        offers_opted_in: next.marketing_offers,
-        product_updates_opted_in: next.marketing_product_updates,
-      }),
-    })
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          notification_preferences: next,
+          // Back-compat mirrors for existing downstream usage during transition.
+          newsletter_opted_in: hasAnyMarketingOptIn(next),
+          offers_opted_in: next.marketing_offers,
+          product_updates_opted_in: next.marketing_product_updates,
+        }),
+      })
 
-    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Unable to save notification preferences.")
+      }
+
+      const wasMarketingOptedIn = hasAnyMarketingOptIn(previous)
+      const isMarketingOptedIn = hasAnyMarketingOptIn(next)
+
+      if (email && wasMarketingOptedIn !== isMarketingOptedIn) {
+        const endpoint = isMarketingOptedIn ? "/api/newsletter/subscribe" : "/api/newsletter/unsubscribe"
+        const newsletterResponse = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        })
+        const newsletterPayload = (await newsletterResponse.json().catch(() => null)) as { error?: string } | null
+        if (!newsletterResponse.ok) {
+          throw new Error(newsletterPayload?.error ?? "Saved preferences, but failed to sync newsletter settings.")
+        }
+      }
+
+      setPrefsSaveState("saved")
+      setNotificationToast({ tone: "success", message: "Email notification preferences saved." })
+      setTimeout(() => setPrefsSaveState("idle"), 1800)
+    } catch (error) {
+      setNotificationPrefs(previous)
       setPrefsSaveState("error")
-      return
+      setNotificationToast({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Unable to save notification preferences.",
+      })
     }
-
-    setPrefsSaveState("saved")
-    setTimeout(() => setPrefsSaveState("idle"), 1800)
   }
 
   async function syncStripeStatus() {
@@ -459,6 +498,12 @@ export function AccountClient({
     const timeout = setTimeout(() => setToastMessage(null), 5500)
     return () => clearTimeout(timeout)
   }, [toastMessage])
+
+  useEffect(() => {
+    if (!notificationToast) return
+    const timeout = setTimeout(() => setNotificationToast(null), 4000)
+    return () => clearTimeout(timeout)
+  }, [notificationToast])
 
   useEffect(() => {
     if (passwordResetCooldown <= 0) return
@@ -865,6 +910,17 @@ export function AccountClient({
       {toastMessage ? (
         <div className="fixed bottom-4 right-4 z-50 max-w-md rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-sm text-[#166534] shadow-lg">
           {toastMessage}
+        </div>
+      ) : null}
+      {notificationToast ? (
+        <div
+          className={`fixed bottom-4 left-4 z-50 max-w-md rounded-xl border px-4 py-3 text-sm shadow-lg ${
+            notificationToast.tone === "success"
+              ? "border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]"
+              : "border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]"
+          }`}
+        >
+          {notificationToast.message}
         </div>
       ) : null}
 

@@ -13,7 +13,7 @@ export type ListingCardData = {
   bookingModel?: "hourly" | "fixed_session"
   photoUrl?: string | null
   priceSolo: number
-  rating?: number
+  rating?: number | null
   reviewCount?: number
   initialSaved?: boolean
 }
@@ -25,6 +25,10 @@ export function ListingCard({
   listing: ListingCardData
   onSavedChange?: (saved: boolean) => void
 }) {
+  const reviewCount = Number(listing.reviewCount ?? 0)
+  const hasRating =
+    reviewCount >= 1 && typeof listing.rating === "number" && Number.isFinite(listing.rating)
+
   return (
     <Link href={`/listing/${listing.id}`} className="card-base group block p-3">
       <div className="relative mb-3 h-44 w-full overflow-hidden rounded-xl bg-warm-100">
@@ -57,9 +61,9 @@ export function ListingCard({
               ? `$${listing.priceSolo}/session`
               : `from $${listing.priceSolo}/person/hr`}
           </p>
-          {Number(listing.reviewCount ?? 0) > 0 ? (
+          {hasRating ? (
             <p className="text-sm text-[#5C4D40]">
-              ★ {Number(listing.rating ?? 0).toFixed(2)} ({Number(listing.reviewCount ?? 0)})
+              ★ {Number(listing.rating).toFixed(1)} ({reviewCount})
             </p>
           ) : (
             <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>

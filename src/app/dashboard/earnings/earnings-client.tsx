@@ -62,6 +62,7 @@ export function EarningsClient({
   rows,
   breakdownRows,
   overallAverageRating,
+  profileTotalReviews,
   ratingSummary,
   perListingRatings,
   stripeConnected,
@@ -71,7 +72,8 @@ export function EarningsClient({
 }: {
   rows: EarningRow[]
   breakdownRows: EarningsBreakdownRow[]
-  overallAverageRating: number
+  overallAverageRating: number | null
+  profileTotalReviews: number
   ratingSummary: RatingSummary
   perListingRatings: PerListingRating[]
   stripeConnected: boolean
@@ -101,6 +103,8 @@ export function EarningsClient({
       setOpeningDashboard(false)
     }
   }
+
+  const showNewHostRating = profileTotalReviews === 0 || overallAverageRating === null
 
   const totals = useMemo(() => {
     const allTime = rows.reduce((sum, row) => sum + row.hostPayout, 0)
@@ -216,7 +220,10 @@ export function EarningsClient({
               { label: "All time", value: formatMoney(totals.allTime) },
               { label: "This month", value: formatMoney(totals.thisMonth) },
               { label: "Bookings", value: String(totals.bookings) },
-              { label: "Rating", value: `★${overallAverageRating ? overallAverageRating.toFixed(2) : "0.00"}` },
+              {
+                label: "Rating",
+                value: showNewHostRating ? "New" : `★ ${overallAverageRating.toFixed(1)} (${profileTotalReviews})`,
+              },
             ].map((card) => (
               <div key={card.label} className="rounded-2xl bg-white p-4 shadow-sm">
                 <p className="font-serif text-3xl text-[#1A1410]">{card.value}</p>
@@ -268,8 +275,10 @@ export function EarningsClient({
               <>
                 <div className="mb-4 rounded-xl border border-[#E9E2D8] bg-[#FAF6F1] p-3">
                   <p className="text-sm text-[#7A6A5D]">Overall rating</p>
-                  <p className="font-serif text-3xl text-[#1A1410]">★ {overallAverageRating.toFixed(2)}</p>
-                  <p className="text-xs text-[#8A7A6D]">{ratingSummary.totalReviews} published reviews</p>
+                  <p className="font-serif text-3xl text-[#1A1410]">
+                    ★ {(overallAverageRating ?? ratingSummary.overall).toFixed(1)}
+                  </p>
+                  <p className="text-xs text-[#8A7A6D]">{profileTotalReviews} published reviews</p>
                 </div>
 
                 <div className="grid gap-2 md:grid-cols-2">

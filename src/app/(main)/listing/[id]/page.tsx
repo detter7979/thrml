@@ -47,6 +47,8 @@ type HostProfileRow = {
   response_time?: string | null
   response_time_hours?: number | null
   bio?: string | null
+  average_rating?: number | null
+  total_reviews?: number | null
 }
 
 async function getHostProfile(
@@ -64,6 +66,8 @@ async function getHostProfile(
     "response_time",
     "response_time_hours",
     "bio",
+    "average_rating",
+    "total_reviews",
   ]
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -474,6 +478,14 @@ export default async function ListingDetailPage({
                   ? Number(hostProfile.response_time_hours)
                   : null,
               bio: typeof hostProfile.bio === "string" ? hostProfile.bio : null,
+              average_rating:
+                typeof hostProfile.average_rating === "number" && Number.isFinite(hostProfile.average_rating)
+                  ? Number(hostProfile.average_rating)
+                  : null,
+              total_reviews:
+                typeof hostProfile.total_reviews === "number" && Number.isFinite(hostProfile.total_reviews)
+                  ? Number(hostProfile.total_reviews)
+                  : 0,
             }
           : null
       }

@@ -16,7 +16,7 @@ export default async function DashboardEarningsPage() {
   const [{ data: profile }, { data: listings }, { data: rows }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("stripe_account_id, stripe_onboarding_complete, stripe_payouts_enabled, ui_intent, average_rating")
+      .select("stripe_account_id, stripe_onboarding_complete, stripe_payouts_enabled, ui_intent, average_rating, total_reviews")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -213,7 +213,16 @@ export default async function DashboardEarningsPage() {
     <EarningsClient
       rows={normalized}
       breakdownRows={normalizedBreakdown}
-      overallAverageRating={Number(profile?.average_rating ?? 0)}
+      overallAverageRating={
+        typeof profile?.average_rating === "number" && Number.isFinite(profile.average_rating)
+          ? Number(profile.average_rating)
+          : null
+      }
+      profileTotalReviews={
+        typeof profile?.total_reviews === "number" && Number.isFinite(profile.total_reviews)
+          ? Math.max(0, Number(profile.total_reviews))
+          : 0
+      }
       ratingSummary={ratingSummary}
       perListingRatings={perListingRatings}
       stripeConnected={Boolean(isMockHost || profile?.stripe_payouts_enabled)}

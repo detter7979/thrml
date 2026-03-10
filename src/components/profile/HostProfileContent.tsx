@@ -354,10 +354,16 @@ export async function HostProfileContent({
     value: averageFor((row) => row.rating_value as number | null),
   }
 
-  const overallRating = Number(
-    profileSafe.average_rating ?? averageFor((row) => row.rating_overall as number | null) ?? 0
-  )
   const totalReviews = Number(profileSafe.total_reviews ?? reviewItems.length ?? 0)
+  const computedOverallRating = averageFor((row) => row.rating_overall as number | null)
+  const profileAverageRating = toNumberOrNull(profileSafe.average_rating)
+  const overallRating =
+    profileAverageRating !== null
+      ? profileAverageRating
+      : totalReviews > 0
+        ? computedOverallRating
+        : null
+  const showNewRating = totalReviews === 0 || overallRating === null
 
   const hostBio =
     typeof profileSafe.bio === "string" && profileSafe.bio.trim().length > 0
@@ -417,9 +423,15 @@ export async function HostProfileContent({
                 <p className="text-[#6D5E51]">{String(profileSafe.tagline)}</p>
               ) : null}
               <p className="text-sm text-[#4D3F34]">
-                <span className="font-medium">★ {overallRating ? overallRating.toFixed(2) : "0.00"}</span>
-                <span className="mx-1">·</span>
-                <span>{totalReviews} reviews</span>
+                {showNewRating ? (
+                  <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+                ) : (
+                  <>
+                    <span className="font-medium">★ {overallRating.toFixed(1)}</span>
+                    <span className="mx-1">·</span>
+                    <span>{totalReviews} reviews</span>
+                  </>
+                )}
               </p>
               <p className="text-sm text-[#7A6A5D]">Member since {hostSinceYear}</p>
             </div>
@@ -443,7 +455,7 @@ export async function HostProfileContent({
           </div>
           <div className="rounded-xl bg-[#F8F3EC] p-3">
             <p className="text-xs uppercase tracking-wide text-[#8A7A6D]">Average rating</p>
-            <p className="mt-1 font-serif text-2xl text-[#1A1410]">{overallRating ? overallRating.toFixed(2) : "—"}</p>
+            <p className="mt-1 font-serif text-2xl text-[#1A1410]">{showNewRating ? "New" : overallRating.toFixed(1)}</p>
           </div>
         </div>
 

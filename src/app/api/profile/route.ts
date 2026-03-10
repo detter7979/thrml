@@ -18,6 +18,14 @@ const updateSchema = z
   })
   .strict()
 
+function hasAnyMarketingOptIn(preferences: Record<string, boolean>) {
+  return Boolean(
+    preferences.marketing_wellness_tips ||
+      preferences.marketing_offers ||
+      preferences.marketing_product_updates
+  )
+}
+
 export async function PATCH(req: NextRequest) {
   const supabase = await createClient()
   const {
@@ -36,24 +44,80 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (updates.notification_preferences) {
-    const { data: existing } = await supabase
+    let existingNotificationPreferences: Record<string, unknown> = {}
+
+    const { data: existingById } = await supabase
       .from("profiles")
       .select("notification_preferences")
       .eq("id", user.id)
       .maybeSingle()
+    if (existingById?.notification_preferences && typeof existingById.notification_preferences === "object") {
+      existingNotificationPreferences = existingById.notification_preferences as Record<string, unknown>
+    } else {
+      const { data: existingByUserId, error: existingByUserIdError } = await supabase
+        .from("profiles")
+        .select("notification_preferences")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      const isMissingUserIdColumn = Boolean(
+        existingByUserIdError?.message?.includes("column profiles.user_id does not exist")
+      )
+      if (!isMissingUserIdColumn && existingByUserId?.notification_preferences && typeof existingByUserId.notification_preferences === "object") {
+        existingNotificationPreferences = existingByUserId.notification_preferences as Record<string, unknown>
+      }
+    }
 
     updates.notification_preferences = normalizeNotificationPreferences({
-      ...(existing?.notification_preferences && typeof existing.notification_preferences === "object"
-        ? (existing.notification_preferences as Record<string, unknown>)
-        : {}),
+      ...existingNotificationPreferences,
       ...updates.notification_preferences,
     })
   }
 
-  const { error } = await supabase.from("profiles").update(updates).eq("id", user.id)
+  if (updates.notification_preferences && updates.newsletter_opted_in === undefined) {
+    updates.newsletter_opted_in = hasAnyMarketingOptIn(updates.notification_preferences)
+  }
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  let updateError: { message: string } | null = null
+  let hasPersistedChanges = false
+
+  const { data: updatedRowsById, error: updateByIdError } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", user.id)
+    .select("id")
+  if (updateByIdError) {
+    updateError = updateByIdError
+  } else {
+    hasPersistedChanges = Boolean(updatedRowsById?.length)
+  }
+
+  if (!updateError && !hasPersistedChanges) {
+    const { data: updatedRowsByUserId, error: updateByUserIdError } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("user_id", user.id)
+      .select("id")
+    const isMissingUserIdColumn = Boolean(updateByUserIdError?.message?.includes("column profiles.user_id does not exist"))
+    if (!isMissingUserIdColumn && updateByUserIdError) {
+      updateError = updateByUserIdError
+    } else if (!updateByUserIdError) {
+      hasPersistedChanges = Boolean(updatedRowsByUserId?.length)
+    }
+  }
+
+  if (!updateError && !hasPersistedChanges) {
+    const { error: upsertError } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, ...updates }, { onConflict: "id" })
+    if (upsertError) {
+      updateError = upsertError
+    } else {
+      hasPersistedChanges = true
+    }
+  }
+
+  if (updateError || !hasPersistedChanges) {
+    return NextResponse.json({ error: updateError?.message ?? "Unable to update profile." }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })

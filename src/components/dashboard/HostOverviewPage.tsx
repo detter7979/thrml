@@ -10,6 +10,7 @@ type HostProfile = {
   name: string
   avatarUrl: string | null
   rating: number | null
+  totalReviews: number
 }
 
 type ListingSummary = {
@@ -105,9 +106,10 @@ async function getHostProfile(userId: string): Promise<HostProfile> {
   const supabase = await createClient()
   const { data } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, average_rating")
+    .select("full_name, avatar_url, average_rating, total_reviews")
     .eq("id", userId)
     .maybeSingle()
+  const parsedTotalReviews = Number(data?.total_reviews ?? 0)
   return {
     name: asNonEmptyString(data?.full_name) ?? "Host",
     avatarUrl: asNonEmptyString(data?.avatar_url),
@@ -115,6 +117,7 @@ async function getHostProfile(userId: string): Promise<HostProfile> {
       typeof data?.average_rating === "number" && Number.isFinite(data.average_rating)
         ? Number(data.average_rating.toFixed(1))
         : null,
+    totalReviews: Number.isFinite(parsedTotalReviews) ? Math.max(0, parsedTotalReviews) : 0,
   }
 }
 
@@ -365,6 +368,7 @@ function SectionSkeleton({ heightClass = "h-24" }: { heightClass?: string }) {
 async function IdentityCardSection({ userId }: { userId: string }) {
   const data = await getHostOverviewData(userId)
   const activeListingsCount = data.listings.filter((listing) => listing.isActive).length
+  const showNewRating = data.profile.totalReviews === 0 || data.profile.rating === null
 
   return (
     <section className="rounded-2xl bg-[#FAF7F4] p-4">
@@ -376,7 +380,11 @@ async function IdentityCardSection({ userId }: { userId: string }) {
         <div className="min-w-0">
           <p className="truncate text-lg font-semibold text-[#1A1410]">{data.profile.name}</p>
           <div className="mt-0.5 flex items-center gap-2 text-sm text-[#6D5E51]">
-            <span>⭐ {data.profile.rating?.toFixed(1) ?? "New"}</span>
+            {showNewRating ? (
+              <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+            ) : (
+              <span>★ {data.profile.rating.toFixed(1)} ({data.profile.totalReviews})</span>
+            )}
             <span className="rounded-full bg-[#F0E8E0] px-2 py-0.5 text-[11px] font-medium text-[#8B4513]">Host</span>
           </div>
           <p className="mt-1 text-sm text-[#6D5E51]">

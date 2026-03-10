@@ -118,6 +118,10 @@ const SERVICE_COLORS: Record<string, string> = {
   halotherapy: "#C7C73A",
 }
 
+function hasPublishedRating(reviewCount: number, rating: number) {
+  return reviewCount >= 1 && Number.isFinite(rating)
+}
+
 const LISTINGS_SELECT_PRIMARY =
   "id, title, service_type, session_type, lat, lng, location_city, city, listing_photos(url, order_index), price_solo, fixed_session_price, capacity, instant_book, amenities, is_featured, created_at, availability, listing_ratings(avg_overall, review_count)"
 const LISTINGS_SELECT_NO_RATINGS =
@@ -1035,7 +1039,10 @@ export function ExploreClient() {
               <div className="space-y-1 p-3 text-xs">
                 <p className="line-clamp-1 font-serif text-[13px]">{popupListing.title}</p>
                 <p className="text-muted-foreground">
-                  ★ {popupListing.rating.toFixed(2)} · {popupListing.serviceLabel} · {popupListing.distanceMiles.toFixed(1)} mi
+                  {hasPublishedRating(popupListing.reviewCount, popupListing.rating)
+                    ? `★ ${popupListing.rating.toFixed(1)} (${popupListing.reviewCount})`
+                    : "New"}{" "}
+                  · {popupListing.serviceLabel} · {popupListing.distanceMiles.toFixed(1)} mi
                 </p>
                 <p className="font-medium text-[#C75B3A]">
                   ${Math.round(popupListing.priceSolo)}{" "}
@@ -1098,7 +1105,10 @@ export function ExploreClient() {
           </p>
           <p className="truncate font-serif text-[15px]">{listing.title}</p>
           <p className="truncate text-[12px] text-[#7C6B5E]">
-            ★ {listing.rating.toFixed(2)} ({listing.reviewCount}) ·{" "}
+            {hasPublishedRating(listing.reviewCount, listing.rating)
+              ? `★ ${listing.rating.toFixed(1)} (${listing.reviewCount})`
+              : "New"}{" "}
+            ·{" "}
             <Users className="mx-0.5 inline size-3.5 text-current" aria-hidden="true" />
             up to {listing.capacity} ·{" "}
             {listing.instantBook ? "⚡ Instant book" : "Request to book"}
@@ -1582,7 +1592,12 @@ export function ExploreClient() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="line-clamp-1 text-sm font-semibold text-[#1A1410]">{listing.title}</p>
-                            <p className="mt-1 text-xs text-[#6C5B4F]">★ {listing.rating.toFixed(2)} · {listing.distanceMiles.toFixed(1)} mi</p>
+                            <p className="mt-1 text-xs text-[#6C5B4F]">
+                              {hasPublishedRating(listing.reviewCount, listing.rating)
+                                ? `★ ${listing.rating.toFixed(1)} (${listing.reviewCount})`
+                                : "New"}{" "}
+                              · {listing.distanceMiles.toFixed(1)} mi
+                            </p>
                             <p className="mt-2 text-sm font-semibold text-[#C75B3A]">
                               ${Math.round(listing.priceSolo)}{listing.sessionType === "fixed_session" ? "/session" : "/pp/hr"}
                             </p>

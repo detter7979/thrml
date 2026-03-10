@@ -1158,7 +1158,7 @@ export function ExploreClient() {
     <div className={viewMode === "list" ? "min-h-[calc(100svh-88px)] bg-[#F7F3EE]" : "h-[calc(100svh-88px)] overflow-hidden bg-[#F7F3EE]"}>
       <div className="sticky top-0 z-30 border-b border-[#F0E8E0] bg-[#FAF7F4]">
           <div className="relative z-30 px-4 py-3 md:px-6">
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-2 md:justify-between md:gap-3">
             <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto md:overflow-visible">
               <div className="flex w-max items-center gap-2 whitespace-nowrap pl-1 md:w-full md:flex-wrap md:gap-2.5 md:whitespace-normal md:pl-0">
             <Popover
@@ -1409,58 +1409,57 @@ export function ExploreClient() {
                 )}
               </span>
             </button>
-          </div>
-
-          <div className="hidden items-center gap-3 md:flex">
-            <div>
-              <p className="text-sm text-[#6C5B4F]">{resultCountLabel}</p>
-              {showingNearbyFallback ? (
-                <p className="text-xs text-[#8A7769]">
-                  Showing nearby options up to {NEARBY_FALLBACK_MILES} mi in split/map view.
-                </p>
-              ) : null}
-            </div>
-            <Select value={filters.sort} onValueChange={(value) => updateFilter("sort", value as SortKey)}>
-              <SelectTrigger className="h-9 min-w-[190px] rounded-full border bg-white px-3 text-sm shadow-none focus-visible:ring-1">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent align="end">
-                <SelectItem value="recommended">Recommended</SelectItem>
-                <SelectItem value="nearest">Nearest first</SelectItem>
-                <SelectItem value="price_low">Price: low to high</SelectItem>
-                <SelectItem value="price_high">Price: high to low</SelectItem>
-                <SelectItem value="rating">Highest rated</SelectItem>
-                <SelectItem value="newest">Newest</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex rounded-full border bg-white p-1">
-              {(isMobile
-                ? [
-                    { key: "list", icon: List, label: "List" },
-                    { key: "map", icon: MapIcon, label: "Map" },
-                  ]
-                : [
-                    { key: "list", icon: List, label: "List" },
-                    { key: "split", icon: Layers, label: "Split" },
-                    { key: "map", icon: MapIcon, label: "Map" },
-                  ]
-              ).map((item) => {
-                const Icon = item.icon
-                const active = viewMode === item.key
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setViewMode(item.key as ViewMode)}
-                    className={`rounded-full px-3 py-1.5 text-xs ${
-                      active ? "bg-[#1A1410] text-white" : "text-[#6C5B4F]"
-                    }`}
-                  >
-                    <Icon className="mr-1 inline size-3.5" />
-                    {item.label}
-                  </button>
-                )
-              })}
+            <div className="hidden items-center gap-3 md:flex md:shrink-0 md:pl-3">
+              <div className="text-right">
+                <p className="text-sm text-[#6C5B4F]">{resultCountLabel}</p>
+                {showingNearbyFallback ? (
+                  <p className="text-xs text-[#8A7769]">
+                    Showing nearby options up to {NEARBY_FALLBACK_MILES} mi in split/map view.
+                  </p>
+                ) : null}
+              </div>
+              <Select value={filters.sort} onValueChange={(value) => updateFilter("sort", value as SortKey)}>
+                <SelectTrigger className="h-9 min-w-[190px] rounded-full border bg-white px-3 text-sm shadow-none focus-visible:ring-1">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="recommended">Recommended</SelectItem>
+                  <SelectItem value="nearest">Nearest first</SelectItem>
+                  <SelectItem value="price_low">Price: low to high</SelectItem>
+                  <SelectItem value="price_high">Price: high to low</SelectItem>
+                  <SelectItem value="rating">Highest rated</SelectItem>
+                  <SelectItem value="newest">Newest</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex rounded-full border bg-white p-1">
+                {(isMobile
+                  ? [
+                      { key: "list", icon: List, label: "List" },
+                      { key: "map", icon: MapIcon, label: "Map" },
+                    ]
+                  : [
+                      { key: "list", icon: List, label: "List" },
+                      { key: "split", icon: Layers, label: "Split" },
+                      { key: "map", icon: MapIcon, label: "Map" },
+                    ]
+                ).map((item) => {
+                  const Icon = item.icon
+                  const active = viewMode === item.key
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setViewMode(item.key as ViewMode)}
+                      className={`rounded-full px-3 py-1.5 text-xs ${
+                        active ? "bg-[#1A1410] text-white" : "text-[#6C5B4F]"
+                      }`}
+                    >
+                      <Icon className="mr-1 inline size-3.5" />
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>

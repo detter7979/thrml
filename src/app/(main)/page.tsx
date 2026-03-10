@@ -36,7 +36,7 @@ type ListingApiRow = {
 }
 
 const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const TRENDING_SERVICE_TYPES: ServiceType[] = ["sauna", "cold_plunge", "hot_tub"]
+const TRENDING_SERVICE_TYPES = ["sauna", "cold_plunge", "hot_tub"] as const satisfies readonly ServiceType[]
 type TrendingServiceType = (typeof TRENDING_SERVICE_TYPES)[number]
 const TRENDING_TAGLINES: Record<TrendingServiceType, string> = {
   sauna: "Traditional heat therapy · Relax & recover",

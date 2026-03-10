@@ -368,7 +368,8 @@ function SectionSkeleton({ heightClass = "h-24" }: { heightClass?: string }) {
 async function IdentityCardSection({ userId }: { userId: string }) {
   const data = await getHostOverviewData(userId)
   const activeListingsCount = data.listings.filter((listing) => listing.isActive).length
-  const showNewRating = data.profile.totalReviews === 0 || data.profile.rating === null
+  const rating = data.profile.rating
+  const showNewRating = data.profile.totalReviews === 0 || rating === null
 
   return (
     <section className="rounded-2xl bg-[#FAF7F4] p-4">
@@ -383,7 +384,7 @@ async function IdentityCardSection({ userId }: { userId: string }) {
             {showNewRating ? (
               <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
             ) : (
-              <span>★ {data.profile.rating.toFixed(1)} ({data.profile.totalReviews})</span>
+              <span>★ {rating.toFixed(1)} ({data.profile.totalReviews})</span>
             )}
             <span className="rounded-full bg-[#F0E8E0] px-2 py-0.5 text-[11px] font-medium text-[#8B4513]">Host</span>
           </div>

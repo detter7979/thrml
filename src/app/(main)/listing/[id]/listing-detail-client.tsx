@@ -1005,9 +1005,18 @@ export function ListingDetailClient({
   const [showFullCancellationPolicy, setShowFullCancellationPolicy] = useState(false)
   const [showAllPhotos, setShowAllPhotos] = useState(false)
   const [hostBioExpanded, setHostBioExpanded] = useState(false)
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
   const [activePhotoIndex, setActivePhotoIndex] = useState(0)
   const policy = getCancellationPolicy(cancellationPolicy)
   const hasCancellationPolicy = typeof cancellationPolicy === "string" && cancellationPolicy.trim().length > 0
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)")
+    const updateViewport = () => setIsMobileViewport(mediaQuery.matches)
+    updateViewport()
+    mediaQuery.addEventListener("change", updateViewport)
+    return () => mediaQuery.removeEventListener("change", updateViewport)
+  }, [])
 
   const avgRating = ratings.avg_overall || (reviews.length
     ? reviews.reduce((acc, review) => acc + Number(review.rating_overall ?? 0), 0) / reviews.length
@@ -1091,7 +1100,7 @@ export function ListingDetailClient({
           : `within ${Math.round(host.response_time_hours)} hours`
         : null
   const hostBioFull = typeof host?.bio === "string" && host.bio.trim().length > 0 ? host.bio.trim() : null
-  const hostBioPreview = hostBioFull ? truncateAtSentence(hostBioFull, 120) : null
+  const hostBioPreview = hostBioFull ? truncateAtSentence(hostBioFull, isMobileViewport ? 80 : 120) : null
   const hostBioIsTruncated = Boolean(hostBioFull && hostBioPreview && hostBioPreview !== hostBioFull)
   const hostBioDisplay = hostBioExpanded ? hostBioFull : hostBioPreview
   const galleryPhotos = photos.slice(0, 3)

@@ -304,7 +304,7 @@ export default function Home() {
         <div className="relative z-20 hidden md:grid md:min-h-[100svh] md:grid-cols-[60%_40%]">
           <div className="flex items-center px-6 py-14 md:px-16">
             <div className="w-full max-w-[640px]">
-              <p className="hero-anim-in hero-delay-0 mb-5 text-xs tracking-[0.24em] text-[#C75B3A]">
+              <p className="hero-anim-in hero-delay-0 mb-5 text-xs font-semibold tracking-[0.24em] text-[#E8A58F]">
                 PRIVATE WELLNESS · ON DEMAND
               </p>
               <h1 className="font-serif text-[44px] leading-[0.98] text-[#F5EFE8] md:text-[72px]">
@@ -368,7 +368,7 @@ export default function Home() {
         </div>
 
         <div className="px-5 pt-2 pb-10 md:hidden">
-          <p className="hero-anim-in hero-delay-0 mb-5 text-xs tracking-[0.24em] text-[#C75B3A]">
+          <p className="hero-anim-in hero-delay-0 mb-5 text-xs font-semibold tracking-[0.24em] text-[#E8A58F]">
             PRIVATE WELLNESS · ON DEMAND
           </p>
           <h1 className="font-serif text-[clamp(22px,6vw,32px)] leading-[1.2] font-bold text-[#F5EFE8]">
@@ -443,33 +443,6 @@ export default function Home() {
       </section>
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 md:px-8">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => setFilter("all")}
-            className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
-              filter === "all" ? "border-brand-500 bg-brand-100 text-brand-900" : "bg-white text-warm-600"
-            }`}
-          >
-            All
-          </button>
-          {serviceTypes.map((serviceType) => (
-            <button
-              key={serviceType.id}
-              type="button"
-              onClick={() => setFilter(serviceType.id)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
-                serviceType.id === filter
-                  ? "border-brand-500 bg-brand-100 text-brand-900"
-                  : "bg-white text-warm-600"
-              }`}
-            >
-              <span className="mr-1">{serviceType.icon}</span>
-              {serviceType.display_name}
-            </button>
-          ))}
-        </div>
-
         <section className="space-y-3">
           <h2 className="type-h2">Trending</h2>
           <div className="grid gap-3 md:grid-cols-3">
@@ -488,6 +461,32 @@ export default function Home() {
 
         <section className="space-y-3 pb-10 md:pb-14">
           <h2 className="type-h2">Wellness spaces near you</h2>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setFilter("all")}
+              className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
+                filter === "all" ? "border-brand-500 bg-brand-100 text-brand-900" : "bg-white text-warm-600"
+              }`}
+            >
+              All
+            </button>
+            {serviceTypes.map((serviceType) => (
+              <button
+                key={serviceType.id}
+                type="button"
+                onClick={() => setFilter(serviceType.id)}
+                className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
+                  serviceType.id === filter
+                    ? "border-brand-500 bg-brand-100 text-brand-900"
+                    : "bg-white text-warm-600"
+                }`}
+              >
+                <span className="mr-1">{serviceType.icon}</span>
+                {serviceType.display_name}
+              </button>
+            ))}
+          </div>
           {loading ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {skeletonCards.map((_, index) => (
@@ -524,8 +523,8 @@ export default function Home() {
               </div>
             ) : (
               <form onSubmit={handleNewsletterSubmit} className="w-full max-w-xl space-y-2">
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <div className="flex-1">
+                <div className="flex w-full items-center gap-3 flex-col sm:flex-row sm:items-stretch">
+                  <div className="w-full flex-1">
                     <input
                       ref={newsletterInputRef}
                       type="email"
@@ -536,13 +535,13 @@ export default function Home() {
                       }}
                       placeholder="Enter your email"
                       disabled={newsletterStatus === "loading"}
-                      className="h-12 w-full rounded-full border border-white/20 bg-white px-5 text-sm text-[#1A1410] outline-none placeholder:text-[#8E8176] focus:border-[#C75B3A] disabled:cursor-not-allowed disabled:opacity-70"
+                      className="h-14 w-full rounded-full border border-white/20 bg-white px-6 text-base text-[#1A1410] outline-none placeholder:text-[#8E8176] focus:border-[#C75B3A] disabled:cursor-not-allowed disabled:opacity-70"
                     />
                   </div>
                   <Button
                     type="submit"
                     disabled={newsletterStatus === "loading"}
-                    className="h-12 rounded-full bg-[#C75B3A] px-6 text-white hover:bg-[#B45033] disabled:cursor-not-allowed disabled:opacity-80"
+                    className="h-14 w-full rounded-full bg-[#C75B3A] px-8 text-base text-white hover:bg-[#B45033] sm:w-auto disabled:cursor-not-allowed disabled:opacity-80"
                   >
                     {newsletterStatus === "loading" ? (
                       <span className="inline-flex items-center gap-2">

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Camera, CheckCircle2, Mail } from "lucide-react"
-import { type FormEvent, useEffect, useMemo, useState } from "react"
+import { Suspense, type FormEvent, useEffect, useMemo, useState } from "react"
 
 import { AuthShell } from "@/components/auth/AuthShell"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,7 @@ function formatPhoneNumber(value: string) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
 }
 
-export default function SignupPage() {
+function SignupForm() {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -382,5 +382,13 @@ export default function SignupPage() {
         </div>
       ) : null}
     </AuthShell>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading signup...</div>}>
+      <SignupForm />
+    </Suspense>
   )
 }

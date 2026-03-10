@@ -471,16 +471,14 @@ export function DashboardShell({
           </div>
         </div>
 
-        {isHost ? (
-          <div className="p-4 pt-2">
-            <Button asChild className="h-11 w-full rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]">
-              <Link href="/dashboard/listings/new">
-                <PlusCircle className="mr-2 size-4" />
-                List a new space
-              </Link>
-            </Button>
-          </div>
-        ) : null}
+        <div className="p-4 pt-2">
+          <Button asChild className="h-11 w-full rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]">
+            <Link href="/dashboard/listings/new">
+              <PlusCircle className="mr-2 size-4" />
+              List a new space
+            </Link>
+          </Button>
+        </div>
       </aside>
 
       <div className="sticky top-0 z-50 border-b border-[#E7DED3] bg-white md:hidden" style={{ paddingTop: "env(safe-area-inset-top)" }}>

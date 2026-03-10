@@ -175,6 +175,8 @@ export function DashboardListingsClient({
   const [sendingByBookingId, setSendingByBookingId] = useState<string | null>(null)
   const [resentConfirmationByBooking, setResentConfirmationByBooking] = useState<Record<string, string>>({})
   const [expandedAccessByBooking, setExpandedAccessByBooking] = useState<Record<string, boolean>>({})
+  const [listingActionLoadingId, setListingActionLoadingId] = useState<string | null>(null)
+  const [listingActionErrorById, setListingActionErrorById] = useState<Record<string, string | null>>({})
 
   const visiblePendingRequests = useMemo(
     () => pendingRequests.filter((request) => !dismissedRequestIds.includes(request.id)),
@@ -383,6 +385,28 @@ export function DashboardListingsClient({
     }
   }
 
+  async function setListingActiveState(listingId: string, shouldActivate: boolean) {
+    const endpoint = shouldActivate ? "reactivate" : "deactivate"
+    setListingActionLoadingId(listingId)
+    setListingActionErrorById((current) => ({ ...current, [listingId]: null }))
+    try {
+      const response = await fetch(`/api/listings/${listingId}/${endpoint}`, { method: "PATCH" })
+      const payload = (await response.json().catch(() => ({}))) as { error?: string }
+      if (!response.ok) {
+        setListingActionErrorById((current) => ({
+          ...current,
+          [listingId]:
+            payload.error ??
+            (shouldActivate ? "Unable to reactivate listing right now." : "Unable to deactivate listing right now."),
+        }))
+        return
+      }
+      router.refresh()
+    } finally {
+      setListingActionLoadingId((current) => (current === listingId ? null : current))
+    }
+  }
+
   function hoursRemaining(deadline: string | null) {
     if (!deadline) return null
     const diffMs = new Date(deadline).getTime() - Date.now()
@@ -571,6 +595,34 @@ export function DashboardListingsClient({
                     type="button"
                     onClick={(event) => {
                       event.stopPropagation()
+                      const shouldActivate = !listing.is_active
+                      if (!shouldActivate) {
+                        const confirmed = window.confirm(
+                          "Deactivate this listing? It will no longer appear to new guests."
+                        )
+                        if (!confirmed) return
+                      }
+                      void setListingActiveState(listing.id, shouldActivate)
+                    }}
+                    disabled={listingActionLoadingId === listing.id}
+                    className={`rounded-lg border px-3 py-2 text-sm ${
+                      listing.is_active
+                        ? "border-rose-200 text-rose-700 hover:bg-rose-50"
+                        : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    {listingActionLoadingId === listing.id
+                      ? listing.is_active
+                        ? "Deactivating..."
+                        : "Reactivating..."
+                      : listing.is_active
+                        ? "Deactivate"
+                        : "Reactivate"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
                       setExpandedListingId((current) => (current === listing.id ? null : listing.id))
                     }}
                     className="rounded-lg border border-[#E6DDD3] px-3 py-2 text-sm text-[#5D4E43]"
@@ -586,6 +638,9 @@ export function DashboardListingsClient({
                   </Link>
                 </div>
               </div>
+              {listingActionErrorById[listing.id] ? (
+                <p className="mt-2 text-sm text-rose-700">{listingActionErrorById[listing.id]}</p>
+              ) : null}
 
               {isExpanded ? (
                 <div

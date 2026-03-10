@@ -541,7 +541,7 @@ export default function Home() {
                   <Button
                     type="submit"
                     disabled={newsletterStatus === "loading"}
-                    className="h-14 w-full rounded-full bg-[#C75B3A] px-8 text-base text-white hover:bg-[#B45033] sm:w-auto disabled:cursor-not-allowed disabled:opacity-80"
+                    className="h-14 w-full rounded-full bg-[#C75B3A] px-8 text-base text-white hover:bg-[#B45033] sm:w-auto md:h-14 disabled:cursor-not-allowed disabled:opacity-80"
                   >
                     {newsletterStatus === "loading" ? (
                       <span className="inline-flex items-center gap-2">

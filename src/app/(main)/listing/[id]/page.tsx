@@ -159,10 +159,15 @@ function fallbackPhoto(index: number) {
 
 export default async function ListingDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<Params>
+  searchParams: Promise<{ from?: string }>
 }) {
   const { id } = await params
+  const query = await searchParams
+  const backToResultsPath =
+    typeof query.from === "string" && query.from.startsWith("/explore") ? query.from : null
   const supabase = await createClient()
   const admin = createAdminClient()
   const {
@@ -508,6 +513,7 @@ export default async function ListingDetailPage({
       canReserve={Boolean(listing.is_active)}
       hostPayoutsReady={Boolean(isMockHost || (host?.stripe_account_id && host?.stripe_payouts_enabled))}
       cancellationPolicy={typeof listing.cancellation_policy === "string" ? listing.cancellation_policy : null}
+      backToResultsPath={backToResultsPath}
     />
   )
 }

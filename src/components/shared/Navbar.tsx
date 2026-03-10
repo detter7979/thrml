@@ -22,6 +22,9 @@ const PROFILE_NAME_OVERRIDE_KEY = "thrml.profileNameOverride"
 
 export function Navbar() {
   const pathname = usePathname()
+  const pathForAuth = pathname || "/"
+  const loginHref = `/login?next=${encodeURIComponent(pathForAuth)}`
+  const signupHref = `/signup?next=${encodeURIComponent(pathForAuth)}`
   const isHome = pathname === "/"
   const [scrolled, setScrolled] = useState(() => !isHome)
   const [userName, setUserName] = useState<string | null>(null)
@@ -359,11 +362,11 @@ export function Navbar() {
               >
                 <Link href="/dashboard/listings/new">Become a host</Link>
               </Button>
-              <Link href="/login" className={`text-sm ${desktopLinkColor}`}>
+              <Link href={loginHref} className={`text-sm ${desktopLinkColor}`}>
                 Log in
               </Link>
               <Button asChild className="rounded-full bg-[#C75B3A] px-5 text-white hover:bg-[#B45033]">
-                <Link href="/signup">Sign up</Link>
+                <Link href={signupHref}>Sign up</Link>
               </Button>
             </>
           )}
@@ -451,11 +454,11 @@ export function Navbar() {
                   </>
                 ) : (
                   <>
-                    <Link href="/login" onClick={closeMobileNav}>
+                    <Link href={loginHref} onClick={closeMobileNav}>
                       Log in
                     </Link>
                     <Button asChild className="mt-2 rounded-full bg-[#C75B3A] text-white hover:bg-[#B45033]">
-                      <Link href="/signup" onClick={closeMobileNav}>
+                      <Link href={signupHref} onClick={closeMobileNav}>
                         Sign up
                       </Link>
                     </Button>

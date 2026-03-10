@@ -1,16 +1,20 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { type FormEvent, useState } from "react"
 
 import { AuthShell } from "@/components/auth/AuthShell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { sanitizeNextPath } from "@/lib/security"
 import { createClient } from "@/lib/supabase/client"
 
 export default function ForgotPasswordPage() {
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const requestedNext = sanitizeNextPath(searchParams.get("next"), null)
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -54,7 +58,10 @@ export default function ForgotPasswordPage() {
       ) : (
         <div className="space-y-4 rounded-2xl border border-[#E7DED3] bg-[#FCFAF7] p-5">
           <p className="text-sm text-[#1A1410]">If an account exists for this email, you will receive a reset link.</p>
-          <Link href="/login" className="text-sm text-brand-600 hover:underline">
+          <Link
+            href={requestedNext ? `/login?next=${encodeURIComponent(requestedNext)}` : "/login"}
+            className="text-sm text-brand-600 hover:underline"
+          >
             Back to login
           </Link>
         </div>

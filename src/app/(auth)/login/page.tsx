@@ -16,8 +16,10 @@ function LoginForm() {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = sanitizeNextPath(searchParams.get("next"), "/")
+  const requestedNext = sanitizeNextPath(searchParams.get("next"), null)
   const loginError = searchParams.get("error")
+  const loginMessage = searchParams.get("message")
+  const nextQuery = requestedNext ? `?next=${encodeURIComponent(requestedNext)}` : ""
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -65,6 +67,31 @@ function LoginForm() {
     window.localStorage.removeItem("auth:login-attempts")
   }
 
+  function resolveNextPath() {
+    if (requestedNext) return requestedNext
+    if (typeof window === "undefined") return "/"
+
+    const referrer = document.referrer
+    if (!referrer) return "/"
+
+    try {
+      const referrerUrl = new URL(referrer)
+      if (referrerUrl.origin !== window.location.origin) return "/"
+      const candidate = sanitizeNextPath(`${referrerUrl.pathname}${referrerUrl.search}`, "/")
+      if (
+        candidate.startsWith("/login") ||
+        candidate.startsWith("/signup") ||
+        candidate.startsWith("/forgot-password") ||
+        candidate.startsWith("/auth/")
+      ) {
+        return "/"
+      }
+      return candidate
+    } catch {
+      return "/"
+    }
+  }
+
   async function handlePasswordLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
@@ -89,7 +116,7 @@ function LoginForm() {
     }
 
     clearFailedAttempts()
-    router.push(next)
+    router.push(resolveNextPath())
     router.refresh()
   }
 
@@ -108,6 +135,7 @@ function LoginForm() {
     setError(null)
     setLoading(true)
 
+    const next = resolveNextPath()
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -125,6 +153,11 @@ function LoginForm() {
       {loginError === "invalid_reset_link" ? (
         <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
           That reset link is invalid or has expired. Please request a new one.
+        </div>
+      ) : null}
+      {loginMessage === "please_sign_in" ? (
+        <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-sm text-[#1E3A8A]">
+          Please sign in to continue.
         </div>
       ) : null}
       <div className="space-y-2">
@@ -147,7 +180,7 @@ function LoginForm() {
         />
       </div>
       <div className="-mt-1 text-right">
-        <Link href="/forgot-password" className="text-xs text-brand-600 hover:underline">
+        <Link href={`/forgot-password${nextQuery}`} className="text-xs text-brand-600 hover:underline">
           Forgot password?
         </Link>
       </div>
@@ -166,7 +199,7 @@ function LoginForm() {
         Continue with Google
       </Button>
       <p className="type-label text-center md:text-left">
-        New to Thrml? <Link href="/signup" className="text-brand-600">Create an account</Link>
+        New to Thrml? <Link href={`/signup${nextQuery}`} className="text-brand-600">Create an account</Link>
       </p>
     </form>
   )

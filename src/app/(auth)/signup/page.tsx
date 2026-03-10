@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Camera, CheckCircle2, Mail } from "lucide-react"
 import { type FormEvent, useEffect, useMemo, useState } from "react"
 
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { sanitizeNextPath } from "@/lib/security"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -27,6 +28,8 @@ function formatPhoneNumber(value: string) {
 export default function SignupPage() {
   const supabase = createClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const requestedNext = sanitizeNextPath(searchParams.get("next"), null)
   const [step, setStep] = useState<SignupStep>(1)
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -50,6 +53,11 @@ export default function SignupPage() {
     return score
   }, [password])
 
+  function getPostSignupDestination() {
+    if (requestedNext) return requestedNext
+    return intent === "host" ? "/dashboard" : "/"
+  }
+
   useEffect(() => {
     if (resendCooldown <= 0) return
     const id = window.setInterval(() => setResendCooldown((prev) => Math.max(0, prev - 1)), 1000)
@@ -63,13 +71,12 @@ export default function SignupPage() {
         data: { user },
       } = await supabase.auth.getUser()
       if (user?.email_confirmed_at) {
-        const destination = intent === "host" ? "/dashboard" : "/"
-        router.push(destination)
+        router.push(getPostSignupDestination())
         router.refresh()
       }
     }, 3000)
     return () => window.clearInterval(id)
-  }, [intent, router, step, supabase.auth])
+  }, [requestedNext, intent, router, step, supabase.auth])
 
   async function uploadAvatar(userId: string) {
     if (!photoFile) return null
@@ -104,7 +111,9 @@ export default function SignupPage() {
     setError(null)
     setLoading(true)
 
-    const redirectTo = `${window.location.origin}/auth/callback`
+    const redirectTo = `${window.location.origin}/auth/callback${
+      requestedNext ? `?next=${encodeURIComponent(requestedNext)}` : ""
+    }`
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -165,7 +174,11 @@ export default function SignupPage() {
     const { error: resendError } = await supabase.auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback${
+          requestedNext ? `?next=${encodeURIComponent(requestedNext)}` : ""
+        }`,
+      },
     })
     if (resendError) {
       setError(resendError.message)
@@ -179,7 +192,7 @@ export default function SignupPage() {
       data: { user },
     } = await supabase.auth.getUser()
     if (user?.email_confirmed_at) {
-      router.push(intent === "host" ? "/dashboard" : "/")
+      router.push(getPostSignupDestination())
       router.refresh()
       return
     }
@@ -260,7 +273,13 @@ export default function SignupPage() {
             Continue
           </Button>
           <p className="type-label text-center md:text-left">
-            Already have an account? <Link href="/login" className="text-brand-600">Log in</Link>
+            Already have an account?{" "}
+            <Link
+              href={requestedNext ? `/login?next=${encodeURIComponent(requestedNext)}` : "/login"}
+              className="text-brand-600"
+            >
+              Log in
+            </Link>
           </p>
         </form>
       ) : null}

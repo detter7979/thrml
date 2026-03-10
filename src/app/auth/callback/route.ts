@@ -3,6 +3,37 @@ import { NextRequest, NextResponse } from "next/server"
 import { sanitizeNextPath } from "@/lib/security"
 import { createClient } from "@/lib/supabase/server"
 
+const OTP_AUTO_SIGN_IN_TYPES = new Set(["signup", "invite", "email", "email_change"])
+
+function loginFallbackUrl(requestUrl: URL, next: string | null) {
+  const loginUrl = new URL("/login", requestUrl.origin)
+  loginUrl.searchParams.set("message", "please_sign_in")
+  if (next) loginUrl.searchParams.set("next", next)
+  return loginUrl
+}
+
+async function resolvePostAuthRedirect(requestUrl: URL, next: string | null) {
+  if (next) return NextResponse.redirect(new URL(next, requestUrl.origin))
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.redirect(loginFallbackUrl(requestUrl, next))
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("ui_intent")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  const destination = profile?.ui_intent === "host" ? "/dashboard" : "/"
+  return NextResponse.redirect(new URL(destination, requestUrl.origin))
+}
+
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const tokenHash = requestUrl.searchParams.get("token_hash")
@@ -30,26 +61,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/login?error=invalid_reset_link", requestUrl.origin))
   }
 
+  if (tokenHash && type && OTP_AUTO_SIGN_IN_TYPES.has(type)) {
+    const supabase = await createClient()
+    const { error } = await supabase.auth.verifyOtp({
+      type: type as "signup" | "invite" | "email" | "email_change",
+      token_hash: tokenHash,
+    })
+
+    if (!error) {
+      return resolvePostAuthRedirect(requestUrl, next)
+    }
+
+    return NextResponse.redirect(loginFallbackUrl(requestUrl, next))
+  }
+
   if (code) {
     const supabase = await createClient()
-    await supabase.auth.exchangeCodeForSession(code)
-
-    if (next) return NextResponse.redirect(new URL(next, requestUrl.origin))
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("ui_intent")
-        .eq("id", user.id)
-        .maybeSingle()
-
-      const destination = profile?.ui_intent === "host" ? "/dashboard" : "/"
-      return NextResponse.redirect(new URL(destination, requestUrl.origin))
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error) {
+      return resolvePostAuthRedirect(requestUrl, next)
     }
+    return NextResponse.redirect(loginFallbackUrl(requestUrl, next))
   }
 
   if (tokenHash || type === "recovery") {

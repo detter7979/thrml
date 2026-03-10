@@ -1077,7 +1077,10 @@ export function ExploreClient() {
           })
           setActiveSource((prev) => (prev === "hover" ? null : prev))
         }}
-        onClick={() => router.push(`/listing/${listing.id}`)}
+        onClick={() => {
+          const fromPath = `${window.location.pathname}${window.location.search}`
+          router.push(`/listing/${listing.id}?from=${encodeURIComponent(fromPath)}`)
+        }}
         className={cn(
           "group cursor-pointer rounded-2xl border border-transparent bg-white p-3 shadow-[0_6px_16px_rgba(26,20,16,0.06)] transition-all duration-150",
           active && [

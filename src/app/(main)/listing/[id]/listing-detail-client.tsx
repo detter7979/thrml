@@ -143,6 +143,7 @@ interface ListingDetailProps {
   canReserve: boolean
   hostPayoutsReady: boolean
   cancellationPolicy: string | null
+  backToResultsPath?: string | null
 }
 
 function formatMoney(value: number) {
@@ -996,6 +997,7 @@ export function ListingDetailClient({
   canReserve,
   hostPayoutsReady,
   cancellationPolicy,
+  backToResultsPath = null,
 }: ListingDetailProps) {
   const router = useRouter()
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest")
@@ -1156,6 +1158,10 @@ export function ListingDetailClient({
     () => (amenities ?? []).filter((amenity) => validAmenities.includes(amenity)),
     [amenities, validAmenities]
   )
+  const listingPathWithReturn =
+    backToResultsPath && backToResultsPath.startsWith("/explore")
+      ? `/listing/${id}?from=${encodeURIComponent(backToResultsPath)}`
+      : `/listing/${id}`
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
@@ -1164,6 +1170,10 @@ export function ListingDetailClient({
           <button
             type="button"
             onClick={() => {
+              if (backToResultsPath && backToResultsPath.startsWith("/explore")) {
+                router.push(backToResultsPath)
+                return
+              }
               if (window.history.length > 1) {
                 router.back()
                 return
@@ -1327,7 +1337,7 @@ export function ListingDetailClient({
                 {host?.is_superhost ? <Badge>Superhost</Badge> : null}
               </div>
               {host?.id ? (
-                <Link href={`/hosts/${host.id}?from=/listing/${id}`} className="block">
+                <Link href={`/hosts/${host.id}?from=${encodeURIComponent(listingPathWithReturn)}`} className="block">
                   <Card className="rounded-xl border border-[#E6DDD3] bg-[#FCFAF7] py-4 shadow-none transition hover:bg-[#F8F4EE]">
                     <CardContent className="px-4">
                       <div className="flex items-center gap-4">

@@ -603,11 +603,11 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                       </div>
 
                       <div className="space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
                           <h3 className="flex-1 font-serif text-[20px] leading-tight">
                             {booking.listings?.title ?? "Thrml session"}
                           </h3>
-                          <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} shrink-0`}>
+                          <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} shrink-0 md:hidden`}>
                             {serviceEmoji(booking.listings?.service_type ?? null)}{" "}
                             {serviceName(booking.listings?.service_type ?? null)}
                           </span>
@@ -627,6 +627,9 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                       </div>
 
                       <div className="flex flex-col items-start gap-2 md:h-full md:items-end">
+                        <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} hidden shrink-0 md:inline-flex`}>
+                          {serviceEmoji(booking.listings?.service_type ?? null)} {serviceName(booking.listings?.service_type ?? null)}
+                        </span>
                         {isToday(booking.session_date) ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">
                             <span className="size-1.5 animate-pulse rounded-full bg-[#C75B3A]" />

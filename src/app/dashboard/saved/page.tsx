@@ -5,13 +5,6 @@ import { Heart } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { ListingCard, type ListingCardData } from "@/components/listings/ListingCard"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { getServiceType, SERVICE_TYPES } from "@/lib/constants/service-types"
 
 type SavedRow = {
@@ -19,8 +12,6 @@ type SavedRow = {
   created_at: string
   listings: SavedListing | null
 }
-
-type SortKey = "recent" | "price" | "rating"
 
 type SavedListing = {
   id: string
@@ -41,7 +32,6 @@ function serviceMeta(serviceType: string | null | undefined) {
 export default function DashboardSavedPage() {
   const [rows, setRows] = useState<SavedRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [sortKey, setSortKey] = useState<SortKey>("recent")
   const [serviceFilter, setServiceFilter] = useState<string>("all")
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
   const removeTimersRef = useRef<Record<string, number>>({})
@@ -110,13 +100,9 @@ export default function DashboardSavedPage() {
       })
 
     const filtered = serviceFilter === "all" ? mapped : mapped.filter((item) => item.serviceType === serviceFilter)
-    if (sortKey === "price") filtered.sort((a, b) => a.price - b.price)
-    if (sortKey === "rating") filtered.sort((a, b) => b.rating - a.rating)
-    if (sortKey === "recent") {
-      filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    }
+    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     return filtered
-  }, [rows, serviceFilter, sortKey])
+  }, [rows, serviceFilter])
 
   const savedCount = rows.length
 
@@ -193,19 +179,6 @@ export default function DashboardSavedPage() {
                 </button>
               ))}
             </div>
-            <label className="text-sm text-[#6D5E51]">
-              Sort by:{" "}
-              <Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
-                <SelectTrigger className="h-9 min-w-[150px] rounded-full border bg-white px-3 text-sm text-[#3E3128] shadow-none focus-visible:ring-1">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value="recent">Recently saved</SelectItem>
-                  <SelectItem value="price">Price</SelectItem>
-                  <SelectItem value="rating">Rating</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

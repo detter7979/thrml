@@ -146,6 +146,13 @@ async function getUpcomingBookings(userId: string, limit = 3): Promise<UpcomingB
   const fetchLimit = Math.max(limit * 5, 20)
   const today = now
   const localDateIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+  const { data: hostListings } = await supabase.from("listings").select("id").eq("host_id", userId)
+  const hostListingIds = (hostListings ?? [])
+    .map((row) => (typeof row.id === "string" ? row.id : null))
+    .filter((id): id is string => Boolean(id))
+
+  if (!hostListingIds.length) return []
+
   const { data } = await supabase
     .from("bookings")
     .select(`
@@ -164,8 +171,8 @@ async function getUpcomingBookings(userId: string, limit = 3): Promise<UpcomingB
         listing_photos(url, order_index)
       )
     `)
-    .eq("host_id", userId)
-    .in("status", ["confirmed", "pending_host"])
+    .in("listing_id", hostListingIds)
+    .eq("status", "confirmed")
     .gte("session_date", localDateIso)
     .order("session_date", { ascending: true })
     .order("start_time", { ascending: true })

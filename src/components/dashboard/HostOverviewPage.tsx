@@ -391,6 +391,12 @@ async function IdentityCardSection({ userId }: { userId: string }) {
           <p className="mt-1 text-sm text-[#6D5E51]">
             {activeListingsCount} active listing{activeListingsCount === 1 ? "" : "s"}
           </p>
+          <Link
+            href={`/hosts/${userId}`}
+            className="mt-1 inline-flex text-sm font-medium text-[#8B4513] hover:underline"
+          >
+            View host profile →
+          </Link>
         </div>
       </div>
     </section>

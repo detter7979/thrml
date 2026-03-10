@@ -81,7 +81,7 @@ export default function ResetPasswordPage() {
 
     setSuccess(true)
     window.setTimeout(() => {
-      router.push("/dashboard/account")
+      router.push("/dashboard")
       router.refresh()
     }, 2000)
   }
@@ -97,8 +97,8 @@ export default function ResetPasswordPage() {
           <p className="text-sm text-[#991B1B]">
             This reset link has expired or already been used. Request a new one from your account settings.
           </p>
-          <Link href="/dashboard/account" className="text-sm text-brand-600 hover:underline">
-            Back to account settings
+          <Link href="/forgot-password" className="text-sm text-brand-600 hover:underline">
+            Request a new reset link
           </Link>
         </div>
       ) : success ? (

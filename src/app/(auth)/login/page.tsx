@@ -23,8 +23,11 @@ function LoginForm() {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [view, setView] = useState<"password" | "magic-link" | "check-email">("password")
   const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false)
+  const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
 
   function isTemporarilyLocked() {
     if (typeof window === "undefined") return false
@@ -101,7 +104,7 @@ function LoginForm() {
       return
     }
 
-    setLoading(true)
+    setIsPasswordLoading(true)
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
@@ -111,13 +114,40 @@ function LoginForm() {
     if (signInError) {
       recordFailedAttempt()
       setError("If an account exists for this email, you will receive a reset link.")
-      setLoading(false)
+      setIsPasswordLoading(false)
       return
     }
 
     clearFailedAttempts()
     router.push(resolveNextPath())
     router.refresh()
+  }
+
+  async function handleMagicLinkLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+    if (!email.trim()) {
+      setError("Please enter your email address.")
+      return
+    }
+
+    setIsMagicLinkLoading(true)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") || window.location.origin
+    const magicLinkNext = requestedNext ?? "/dashboard"
+    const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: `${appUrl}/auth/confirm?next=${encodeURIComponent(magicLinkNext)}`,
+      },
+    })
+
+    setIsMagicLinkLoading(false)
+    if (magicLinkError) {
+      setError(magicLinkError.message)
+      return
+    }
+
+    setView("check-email")
   }
 
   function toProviderErrorMessage(providerLabel: string, raw: string) {
@@ -133,7 +163,7 @@ function LoginForm() {
 
   async function handleGoogleLogin() {
     setError(null)
-    setLoading(true)
+    setIsGoogleLoading(true)
 
     const next = resolveNextPath()
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
@@ -144,12 +174,14 @@ function LoginForm() {
 
     if (oauthError) {
       setError(toProviderErrorMessage("Google", oauthError.message))
-      setLoading(false)
+      setIsGoogleLoading(false)
     }
   }
 
+  const isBusy = isPasswordLoading || isMagicLinkLoading || isGoogleLoading
+
   return (
-    <form onSubmit={handlePasswordLogin} className="space-y-4">
+    <div className="space-y-4">
       {loginError === "invalid_reset_link" ? (
         <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
           That reset link is invalid or has expired. Please request a new one.
@@ -160,48 +192,107 @@ function LoginForm() {
           Please sign in to continue.
         </div>
       ) : null}
-      <div className="space-y-2">
-        <Label>Email</Label>
-        <Input
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
+
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          type="button"
+          variant={view === "password" ? "default" : "outline"}
+          className={view === "password" ? "btn-primary h-10" : "h-10"}
+          onClick={() => setView("password")}
+          disabled={isBusy}
+        >
+          Password
+        </Button>
+        <Button
+          type="button"
+          variant={view === "magic-link" ? "default" : "outline"}
+          className={view === "magic-link" ? "btn-primary h-10" : "h-10"}
+          onClick={() => setView("magic-link")}
+          disabled={isBusy}
+        >
+          Email link
+        </Button>
       </div>
-      <div className="space-y-2">
-        <Label>Password</Label>
-        <Input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          required
-        />
-      </div>
-      <div className="-mt-1 text-right">
-        <Link href={`/forgot-password${nextQuery}`} className="text-xs text-brand-600 hover:underline">
-          Forgot password?
-        </Link>
-      </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button className="btn-primary h-11 w-full" disabled={loading}>
-        <Mail className="mr-2 size-4" />
-        {loading ? "Signing in..." : "Continue"}
-      </Button>
+
+      {view === "check-email" ? (
+        <div className="space-y-4 rounded-2xl border border-[#E7DED3] bg-[#FCFAF7] p-5">
+          <h2 className="text-base font-medium text-[#1A1410]">Check your inbox</h2>
+          <p className="text-sm text-[#746558]">
+            We sent a login link to <strong>{email}</strong>. Click it to sign in without a password.
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setView("magic-link")}>
+              Send another link
+            </Button>
+            <Button type="button" className="btn-primary flex-1" onClick={() => setView("password")}>
+              Use password
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {view === "password" ? (
+        <form onSubmit={handlePasswordLogin} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Password</Label>
+            <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          </div>
+          <div className="-mt-1 text-right">
+            <Link href={`/forgot-password${nextQuery}`} className="text-xs text-brand-600 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button className="btn-primary h-11 w-full" disabled={isBusy}>
+            <Mail className="mr-2 size-4" />
+            {isPasswordLoading ? "Signing in..." : "Continue"}
+          </Button>
+        </form>
+      ) : null}
+
+      {view === "magic-link" ? (
+        <form onSubmit={handleMagicLinkLogin} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </div>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button className="btn-primary h-11 w-full" disabled={isBusy}>
+            <Mail className="mr-2 size-4" />
+            {isMagicLinkLoading ? "Sending..." : "Send magic link"}
+          </Button>
+        </form>
+      ) : null}
+
       <div className="flex items-center gap-3 py-1">
         <div className="h-px flex-1 bg-border" />
         <p className="text-xs uppercase tracking-wide text-muted-foreground">or</p>
         <div className="h-px flex-1 bg-border" />
       </div>
-      <Button type="button" variant="outline" className="h-11 w-full" onClick={handleGoogleLogin} disabled={loading}>
+      <Button type="button" variant="outline" className="h-11 w-full" onClick={handleGoogleLogin} disabled={isBusy}>
         <Chrome className="mr-2 size-4" />
-        Continue with Google
+        {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
       </Button>
       <p className="type-label text-center md:text-left">
         New to Thrml? <Link href={`/signup${nextQuery}`} className="text-brand-600">Create an account</Link>
       </p>
-    </form>
+    </div>
   )
 }
 

@@ -30,7 +30,7 @@ async function resolvePostAuthRedirect(requestUrl: URL, next: string | null) {
     .eq("id", user.id)
     .maybeSingle()
 
-  const destination = profile?.ui_intent === "host" ? "/dashboard" : "/"
+  const destination = profile?.ui_intent === "host" ? "/dashboard" : "/explore"
   return NextResponse.redirect(new URL(destination, requestUrl.origin))
 }
 
@@ -69,6 +69,9 @@ export async function GET(request: NextRequest) {
     })
 
     if (!error) {
+      if (type === "email_change" && !next) {
+        return NextResponse.redirect(new URL("/dashboard/account?email_change=confirmed", requestUrl.origin))
+      }
       return resolvePostAuthRedirect(requestUrl, next)
     }
 

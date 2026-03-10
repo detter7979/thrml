@@ -494,6 +494,12 @@ export function AccountClient({
   }, [hostingEnabled, searchParams, router])
 
   useEffect(() => {
+    if (searchParams.get("email_change") !== "confirmed") return
+    setToastMessage("Email address updated successfully.")
+    router.replace("/dashboard/account")
+  }, [searchParams, router])
+
+  useEffect(() => {
     if (!toastMessage) return
     const timeout = setTimeout(() => setToastMessage(null), 5500)
     return () => clearTimeout(timeout)
@@ -574,7 +580,9 @@ export function AccountClient({
     }
 
     setIsUpdatingEmail(false)
-    setEmailChangeMessage("Check your new inbox to confirm the email change.")
+    setEmailChangeMessage(
+      `A confirmation link has been sent to ${nextEmail}. Your email address will update once confirmed.`
+    )
   }
 
   async function sendPasswordResetEmail() {

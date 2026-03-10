@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { type FormEvent, useState } from "react"
+import { Suspense, type FormEvent, useState } from "react"
 
 import { AuthShell } from "@/components/auth/AuthShell"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { sanitizeNextPath } from "@/lib/security"
 import { createClient } from "@/lib/supabase/client"
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordForm() {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const requestedNext = sanitizeNextPath(searchParams.get("next"), null)
@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthShell title="Reset password" subtitle="We will send you a secure reset link.">
+    <>
       {!sent ? (
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
@@ -66,6 +66,16 @@ export default function ForgotPasswordPage() {
           </Link>
         </div>
       )}
+    </>
+  )
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <AuthShell title="Reset password" subtitle="We will send you a secure reset link.">
+      <Suspense fallback={<div className="text-sm text-muted-foreground">Loading reset form...</div>}>
+        <ForgotPasswordForm />
+      </Suspense>
     </AuthShell>
   )
 }

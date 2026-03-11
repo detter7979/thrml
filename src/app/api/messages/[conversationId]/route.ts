@@ -6,18 +6,25 @@ import { createAdminClient } from "@/lib/supabase/admin"
 type Params = { conversationId: string }
 
 async function ensureAccess(conversationId: string) {
-  const { error, session, supabase } = await requireAuth()
-  if (error || !session || !supabase) {
-    return { error, supabase: null, userId: null, conversation: null }
+  const { error: authError, session, supabase } = await requireAuth()
+  if (authError || !session || !supabase) {
+    return { error: authError, supabase: null, userId: null, conversation: null }
   }
 
-  const { data: conversation, error } = await supabase
+  const { data: conversation, error: conversationError } = await supabase
     .from("conversations")
     .select("id, guest_id, host_id, booking_id, listing_id")
     .eq("id", conversationId)
     .maybeSingle()
 
-  if (error) return { error: NextResponse.json({ error: error.message }, { status: 500 }), supabase, userId: null, conversation: null }
+  if (conversationError) {
+    return {
+      error: NextResponse.json({ error: conversationError.message }, { status: 500 }),
+      supabase,
+      userId: null,
+      conversation: null,
+    }
+  }
   if (!conversation || (conversation.guest_id !== session.user.id && conversation.host_id !== session.user.id)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }), supabase, userId: null, conversation: null }
   }

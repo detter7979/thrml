@@ -13,9 +13,9 @@ const messageSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const { error, session, supabase } = await requireAuth()
-  if (error || !session || !supabase) {
-    return error ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error: authError, session, supabase } = await requireAuth()
+  if (authError || !session || !supabase) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   const conversationId = req.nextUrl.searchParams.get("conversationId")
@@ -32,13 +32,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const { data: messages, error } = await supabase
+  const { data: messages, error: messagesError } = await supabase
     .from("messages")
     .select("id, conversation_id, sender_id, body, message_type, created_at, read_at")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (messagesError) return NextResponse.json({ error: messagesError.message }, { status: 500 })
   return NextResponse.json({ messages: messages ?? [] })
 }
 
@@ -50,9 +50,9 @@ export async function POST(req: NextRequest) {
   })
   if (limited) return limited
 
-  const { error, session, supabase } = await requireAuth()
-  if (error || !session || !supabase) {
-    return error ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error: authError, session, supabase } = await requireAuth()
+  if (authError || !session || !supabase) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
   const admin = createAdminClient()
 

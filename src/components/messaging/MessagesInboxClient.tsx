@@ -9,9 +9,11 @@ import { createClient } from "@/lib/supabase/client"
 export function MessagesInboxClient({
   currentUserId,
   activeConversationId,
+  canManageTemplates,
 }: {
   currentUserId: string
   activeConversationId: string | null
+  canManageTemplates: boolean
 }) {
   const [conversations, setConversations] = useState<ConversationItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -96,11 +98,16 @@ export function MessagesInboxClient({
       <ConversationList
         conversations={conversations}
         activeConversationId={selectedId}
+        showTemplatesLink={canManageTemplates}
         onOpenConversation={handleOpenConversation}
       />
       <div className="bg-[#F7F3EE]">
         {!loading && selectedId ? (
-          <MessageThread conversationId={selectedId} currentUserId={currentUserId} />
+          <MessageThread
+            conversationId={selectedId}
+            currentUserId={currentUserId}
+            canManageTemplates={canManageTemplates}
+          />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-[#7A6A5D]">
             {loading ? "Loading conversations..." : "Select a conversation to start messaging."}

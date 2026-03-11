@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       const { data: booking } = await supabase
         .from("bookings")
         .select(
-          "id, status, access_code, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, total_charged, host_payout"
+          "id, status, access_code, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, total_charged, host_payout, automated_messages_sent"
         )
         .eq("id", bookingId)
         .maybeSingle()
@@ -123,13 +123,14 @@ export async function POST(req: NextRequest) {
 
       const newlyConfirmed = Boolean(statusTransition?.id)
       if (booking && !newlyConfirmed) {
-        console.log("[stripe/webhook] Booking already confirmed; skipping duplicate post-confirm actions", {
+        console.log("[stripe/webhook] Booking already confirmed; running idempotent post-confirm checks", {
           bookingId: booking.id,
           paymentIntentId: pi.id,
         })
       }
 
-      if (!bookingUpdateError && newlyConfirmed && booking?.id && booking.guest_id && booking.host_id && booking.listing_id) {
+      if (!bookingUpdateError && booking?.id && booking.guest_id && booking.host_id && booking.listing_id) {
+        const tags = new Set(booking.automated_messages_sent ?? [])
         const [{ data: listing }, { data: guestProfile }, { data: hostProfile }] = await Promise.all([
           supabase
             .from("listings")
@@ -176,25 +177,30 @@ export async function POST(req: NextRequest) {
             .eq("id", booking.guest_id)
         }
 
-        try {
-          await sendAutomatedBookingConfirmedMessage({
-            bookingId: booking.id,
-            listingId: booking.listing_id,
-            guestId: booking.guest_id,
-            hostId: booking.host_id,
-          })
-          console.log("[stripe/webhook] Confirmation message sent", { bookingId: booking.id })
-        } catch (messageError) {
-          const message = messageError instanceof Error ? messageError.message : "Unknown message error"
-          console.error("[stripe/webhook] Non-blocking message send failure", {
-            bookingId: booking.id,
-            error: message,
-          })
+        if (!tags.has("booking_confirmed_message")) {
+          try {
+            await sendAutomatedBookingConfirmedMessage({
+              bookingId: booking.id,
+              listingId: booking.listing_id,
+              guestId: booking.guest_id,
+              hostId: booking.host_id,
+            })
+            tags.add("booking_confirmed_message")
+            console.log("[stripe/webhook] Confirmation message sent", { bookingId: booking.id })
+          } catch (messageError) {
+            const message = messageError instanceof Error ? messageError.message : "Unknown message error"
+            console.error("[stripe/webhook] Non-blocking message send failure", {
+              bookingId: booking.id,
+              error: message,
+            })
+          }
         }
 
-        try {
-          await Promise.all([
-            sendHostBookingConfirmedEmail({
+        if (!tags.has("booking_confirmed_host_email") || !tags.has("booking_confirmed_guest_email")) {
+          const [hostEmailResult, guestEmailResult] = await Promise.all([
+            tags.has("booking_confirmed_host_email")
+              ? Promise.resolve({ sent: true as const })
+              : sendHostBookingConfirmedEmail({
               booking_id: booking.id,
               guest_id: booking.guest_id,
               host_id: booking.host_id,
@@ -227,7 +233,9 @@ export async function POST(req: NextRequest) {
               host_name: hostProfile?.full_name ?? null,
               host_email: hostEmail,
             }),
-            sendGuestBookingConfirmedEmail({
+            tags.has("booking_confirmed_guest_email")
+              ? Promise.resolve({ sent: true as const })
+              : sendGuestBookingConfirmedEmail({
               booking_id: booking.id,
               guest_id: booking.guest_id,
               host_id: booking.host_id,
@@ -265,12 +273,29 @@ export async function POST(req: NextRequest) {
               host_email: hostEmail,
             }),
           ])
-        } catch (emailError) {
-          const message = emailError instanceof Error ? emailError.message : "Unknown booking confirmation email error"
-          console.error("[stripe/webhook] Non-blocking booking confirmation email failure", {
-            bookingId: booking.id,
-            error: message,
-          })
+          if (hostEmailResult.sent) {
+            tags.add("booking_confirmed_host_email")
+          } else {
+            console.warn("[stripe/webhook] Host booking confirmation email not sent", {
+              bookingId: booking.id,
+              error: hostEmailResult.error ?? "Unknown host confirmation email error",
+            })
+          }
+          if (guestEmailResult.sent) {
+            tags.add("booking_confirmed_guest_email")
+          } else {
+            console.warn("[stripe/webhook] Guest booking confirmation email not sent", {
+              bookingId: booking.id,
+              error: guestEmailResult.error ?? "Unknown guest confirmation email error",
+            })
+          }
+        }
+
+        if (tags.size !== (booking.automated_messages_sent ?? []).length) {
+          await supabase
+            .from("bookings")
+            .update({ automated_messages_sent: Array.from(tags) })
+            .eq("id", booking.id)
         }
 
         const timing =
@@ -325,7 +350,7 @@ export async function POST(req: NextRequest) {
             supabase.auth.admin.getUserById(booking.guest_id),
           ])
 
-          await Promise.allSettled([
+          const [hostRequestResult, guestRequestResult, automatedMessageResult] = await Promise.allSettled([
             sendHostBookingRequestEmail({
               booking_id: booking.id,
               listing_title: (listing as Record<string, unknown> | null)?.title as string | null,
@@ -381,12 +406,44 @@ export async function POST(req: NextRequest) {
                 : "your selected date",
             }),
           ])
+          const hostRequestSent =
+            hostRequestResult.status === "fulfilled" && Boolean(hostRequestResult.value?.sent)
+          const guestRequestSent =
+            guestRequestResult.status === "fulfilled" && Boolean(guestRequestResult.value?.sent)
+          const automatedMessageSent = automatedMessageResult.status === "fulfilled"
 
-          tags.add("request_to_book_notified")
-          await supabase
-            .from("bookings")
-            .update({ automated_messages_sent: Array.from(tags) })
-            .eq("id", booking.id)
+          if (hostRequestSent && guestRequestSent && automatedMessageSent) {
+            tags.add("request_to_book_notified")
+            await supabase
+              .from("bookings")
+              .update({ automated_messages_sent: Array.from(tags) })
+              .eq("id", booking.id)
+          } else {
+            console.warn("[stripe/webhook] Request-to-book notifications incomplete; will not mark as sent", {
+              bookingId: booking.id,
+              hostRequestSent,
+              guestRequestSent,
+              automatedMessageSent,
+              hostRequestError:
+                hostRequestResult.status === "fulfilled"
+                  ? hostRequestResult.value?.error ?? null
+                  : hostRequestResult.reason instanceof Error
+                    ? hostRequestResult.reason.message
+                    : String(hostRequestResult.reason),
+              guestRequestError:
+                guestRequestResult.status === "fulfilled"
+                  ? guestRequestResult.value?.error ?? null
+                  : guestRequestResult.reason instanceof Error
+                    ? guestRequestResult.reason.message
+                    : String(guestRequestResult.reason),
+              automatedMessageError:
+                automatedMessageResult.status === "fulfilled"
+                  ? null
+                  : automatedMessageResult.reason instanceof Error
+                    ? automatedMessageResult.reason.message
+                    : String(automatedMessageResult.reason),
+            })
+          }
         }
       }
     }

@@ -32,9 +32,11 @@ function isAutomated(messageType: string) {
 export function MessageThread({
   conversationId,
   currentUserId,
+  canManageTemplates,
 }: {
   conversationId: string
   currentUserId: string
+  canManageTemplates: boolean
 }) {
   const [conversation, setConversation] = useState<{ host_id: string } | null>(null)
   const [messages, setMessages] = useState<MessageRow[]>([])
@@ -173,7 +175,7 @@ export function MessageThread({
               </Link>
             </div>
           </div>
-          {conversation?.host_id === currentUserId ? (
+          {canManageTemplates && conversation?.host_id === currentUserId ? (
             <Link
               href="/dashboard/host/templates"
               className="shrink-0 rounded-full border border-[#E5DDD6] px-3 py-1.5 text-xs font-medium text-[#5A4B40] transition-colors hover:bg-[#FAF6F1]"

@@ -28,13 +28,30 @@ const updateTemplateSchema = z.object({
   access_details: z.record(z.string(), z.unknown()).nullable().optional(),
 })
 
-export async function GET() {
+async function canUserManageTemplates() {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
+  if (!user) {
+    return { supabase, user: null, canManageTemplates: false }
+  }
+
+  const [{ count: listingCount }, { data: profile }] = await Promise.all([
+    supabase.from("listings").select("*", { count: "exact", head: true }).eq("host_id", user.id).eq("is_active", true),
+    supabase.from("profiles").select("ui_intent").eq("id", user.id).maybeSingle(),
+  ])
+  const canManageTemplates =
+    Boolean((listingCount ?? 0) > 0) || profile?.ui_intent === "host" || profile?.ui_intent === "both"
+
+  return { supabase, user, canManageTemplates }
+}
+
+export async function GET() {
+  const { supabase, user, canManageTemplates } = await canUserManageTemplates()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!canManageTemplates) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { data, error } = await supabase
     .from("message_templates")
@@ -74,12 +91,9 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const { supabase, user, canManageTemplates } = await canUserManageTemplates()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!canManageTemplates) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const parsed = updateTemplateSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Missing template_type or content" }, { status: 400 })

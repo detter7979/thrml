@@ -36,10 +36,12 @@ function relative(value: string | null) {
 export function ConversationList({
   conversations,
   activeConversationId,
+  showTemplatesLink = false,
   onOpenConversation,
 }: {
   conversations: ConversationItem[]
   activeConversationId: string | null
+  showTemplatesLink?: boolean
   onOpenConversation?: (conversationId: string, unreadCount: number) => void
 }) {
   return (
@@ -47,12 +49,14 @@ export function ConversationList({
       <div className="border-b border-[#F1E7DC] px-4 py-4">
         <div className="flex items-center justify-between gap-2">
           <h1 className="font-serif text-3xl text-[#1A1410]">Messages</h1>
-          <Link
-            href="/dashboard/host/templates"
-            className="rounded-full border border-[#E5DDD6] px-3 py-1.5 text-xs font-medium text-[#5A4B40] transition-colors hover:bg-[#FAF6F1]"
-          >
-            Message templates
-          </Link>
+          {showTemplatesLink ? (
+            <Link
+              href="/dashboard/host/templates"
+              className="rounded-full border border-[#E5DDD6] px-3 py-1.5 text-xs font-medium text-[#5A4B40] transition-colors hover:bg-[#FAF6F1]"
+            >
+              Message templates
+            </Link>
+          ) : null}
         </div>
       </div>
       <div className="max-h-[calc(100vh-180px)] overflow-y-auto">

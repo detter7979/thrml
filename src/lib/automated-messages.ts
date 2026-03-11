@@ -203,7 +203,7 @@ export async function sendAutomatedBookingConfirmedMessage(params: {
     supabase.from("profiles").select("id, full_name").eq("id", params.hostId).maybeSingle(),
     supabase
       .from("message_templates")
-      .select("template_type, content")
+      .select("template_type, content, is_automated")
       .eq("host_id", params.hostId)
       .eq("template_type", "booking_confirmed")
       .maybeSingle(),
@@ -213,8 +213,12 @@ export async function sendAutomatedBookingConfirmedMessage(params: {
   const listingRecord = listing as ListingRow | null
   const guestRecord = guest as ProfileRow | null
   const hostRecord = host as ProfileRow | null
-  const templateContent =
-    (template as { content?: string } | null)?.content ?? DEFAULT_TEMPLATE_CONTENT.booking_confirmed
+  const templateRecord = template as { content?: string; is_automated?: boolean } | null
+  // Respect host toggle for booking confirmation automation when a custom row exists.
+  if (templateRecord && templateRecord.is_automated === false) {
+    return conversationId
+  }
+  const templateContent = templateRecord?.content ?? DEFAULT_TEMPLATE_CONTENT.booking_confirmed
 
   const body = formatTemplate(templateContent, {
     guest_name: firstName(guestRecord?.full_name),

@@ -96,13 +96,13 @@ export default function MainLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-4 text-xs text-white/45 md:flex-row md:items-center md:justify-between">
-            <p>&copy; {currentYear} Thrml</p>
+            <p>&copy; {currentYear} thrml</p>
             <div className="flex items-center gap-2 md:justify-end">
               <a
                 href="https://www.facebook.com"
                 target="_blank"
                 rel="noreferrer"
-                aria-label="Visit Thrml on Facebook"
+                aria-label="Visit thrml on Facebook"
                 className="inline-flex size-8 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:border-white/30 hover:text-white"
               >
                 <Facebook className="size-4" />
@@ -111,7 +111,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                 href="https://www.instagram.com"
                 target="_blank"
                 rel="noreferrer"
-                aria-label="Visit Thrml on Instagram"
+                aria-label="Visit thrml on Instagram"
                 className="inline-flex size-8 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:border-white/30 hover:text-white"
               >
                 <Instagram className="size-4" />
@@ -120,7 +120,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                 href="https://x.com"
                 target="_blank"
                 rel="noreferrer"
-                aria-label="Visit Thrml on X"
+                aria-label="Visit thrml on X"
                 className="inline-flex size-8 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:border-white/30 hover:text-white"
               >
                 <Twitter className="size-4" />

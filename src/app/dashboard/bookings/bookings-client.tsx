@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { AnimatePresence, motion, useDragControls } from "framer-motion"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -22,7 +23,6 @@ import {
 
 import { CancelModal } from "@/components/booking/CancelModal"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { ACCESS_TYPES, resolveInstructions } from "@/lib/constants/access-types"
 import { formatServiceType, getServiceType } from "@/lib/constants/service-types"
 
@@ -225,12 +225,12 @@ function downloadIcs(booking: BookingRecord) {
   const end = new Date(`${booking.session_date}T${booking.end_time}`)
   const toIcs = (value: Date) =>
     value.toISOString().replace(/[-:]/g, "").replace(".000", "")
-  const title = booking.listings?.title ?? "Thrml session"
+  const title = booking.listings?.title ?? "thrml session"
   const description = `Booking ${booking.id}`
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Thrml//Bookings//EN",
+    "PRODID:-//thrml//Bookings//EN",
     "BEGIN:VEVENT",
     `UID:${booking.id}@thrml`,
     `DTSTAMP:${toIcs(new Date())}`,
@@ -257,7 +257,7 @@ function bookingIcsDataUri(booking: BookingRecord) {
   const end = new Date(`${booking.session_date}T${booking.end_time}`)
   const toIcs = (value: Date) =>
     value.toISOString().replace(/[-:]/g, "").replace(".000", "")
-  const title = booking.listings?.title ?? "Thrml session"
+  const title = booking.listings?.title ?? "thrml session"
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -300,6 +300,59 @@ function BookingSkeleton() {
         </div>
       </div>
     </div>
+  )
+}
+
+function BookingDetailSheet({
+  isOpen,
+  onClose,
+  children,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  children: ReactNode
+}) {
+  const dragControls = useDragControls()
+
+  return (
+    <AnimatePresence>
+      {isOpen ? (
+        <>
+          <motion.div
+            className="fixed inset-0 z-40 bg-black/30"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.div
+            className="fixed inset-x-0 bottom-0 z-50 flex h-[75vh] max-h-[75vh] flex-col rounded-t-[24px] bg-white shadow-xl"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            drag="y"
+            dragControls={dragControls}
+            dragListener={false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0.05, bottom: 0.3 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 150 || info.velocity.y > 500) {
+                onClose()
+              }
+            }}
+          >
+            <div
+              className="flex shrink-0 cursor-grab justify-center pt-3 pb-2 active:cursor-grabbing"
+              onPointerDown={(event) => dragControls.start(event)}
+            >
+              <div className="h-1 w-10 rounded-full bg-[#E5DDD6]" />
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6">{children}</div>
+          </motion.div>
+        </>
+      ) : null}
+    </AnimatePresence>
   )
 }
 
@@ -605,14 +658,14 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                       <div className="space-y-1.5">
                         <div className="flex items-start gap-2">
                           <h3 className="flex-1 font-serif text-[20px] leading-tight">
-                            {booking.listings?.title ?? "Thrml session"}
+                            {booking.listings?.title ?? "thrml session"}
                           </h3>
                           <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} shrink-0 md:hidden`}>
                             {serviceEmoji(booking.listings?.service_type ?? null)}{" "}
                             {serviceName(booking.listings?.service_type ?? null)}
                           </span>
                         </div>
-                        <p className="text-sm text-[#7C6B5E]">with {booking.host?.full_name ?? "Thrml host"}</p>
+                        <p className="text-sm text-[#7C6B5E]">with {booking.host?.full_name ?? "thrml host"}</p>
                         <p className="text-sm font-semibold">{formatDateTime(booking)}</p>
                         {booking.status === "pending_host" && confirmationDeadlineLabel ? (
                           <p className="text-xs text-amber-700">Host must respond by {confirmationDeadlineLabel}</p>
@@ -716,7 +769,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                               className="size-10 rounded-full bg-[#EEE7DE] object-cover"
                             />
                             <div>
-                              <p className="text-sm font-medium">{booking.host?.full_name ?? "Thrml host"}</p>
+                              <p className="text-sm font-medium">{booking.host?.full_name ?? "thrml host"}</p>
                               <button
                                 type="button"
                                 className="text-xs text-[#6C5B4F] underline disabled:no-underline"
@@ -887,22 +940,16 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                     ) : null}
 
                     {activeTab === "upcoming" ? (
-                      <Sheet
-                        open={mobileOpenId === booking.id}
-                        onOpenChange={(open) => setMobileOpenId(open ? booking.id : null)}
+                      <BookingDetailSheet
+                        isOpen={mobileOpenId === booking.id}
+                        onClose={() => setMobileOpenId(null)}
                       >
-                        <SheetContent
-                          side="bottom"
-                          showCloseButton={false}
-                          className="z-40 max-h-[90vh] overflow-y-auto rounded-t-[24px] border-0 bg-white p-0 data-[state=closed]:duration-300 data-[state=open]:duration-300 ease-out"
-                        >
-                          <div className="mx-auto mt-3 h-1 w-10 rounded-full bg-[#E5DDD6]" />
-                          <SheetHeader className="pb-2">
+                          <div className="pb-2 text-sm">
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <SheetTitle className="text-[18px] font-semibold">
-                                  {booking.listings?.title ?? "Thrml session"}
-                                </SheetTitle>
+                                <p className="text-[18px] font-semibold">
+                                  {booking.listings?.title ?? "thrml session"}
+                                </p>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
                                   <span className={serviceTypePill(booking.listings?.service_type ?? null)}>
                                     {serviceEmoji(booking.listings?.service_type ?? null)}{" "}
@@ -914,8 +961,6 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 </div>
                               </div>
                             </div>
-                          </SheetHeader>
-                          <div className="px-4 pb-6 text-sm">
                             <section className="space-y-2">
                               <p>📅 Date: {booking.session_date ? new Date(`${booking.session_date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
                               <p>⏰ Time: {formatDateTime(booking).split(" · ")[1] ?? "TBD"}</p>
@@ -1053,8 +1098,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                               ) : null}
                             </div>
                           </div>
-                        </SheetContent>
-                      </Sheet>
+                      </BookingDetailSheet>
                     ) : null}
 
                   </article>

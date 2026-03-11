@@ -896,7 +896,7 @@ export function AccountClient({
               />
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-[#1A1410]">Product updates from Thrml</p>
+              <p className="text-sm text-[#1A1410]">Product updates from thrml</p>
               <Switch
                 checked={notificationPrefs.marketing_product_updates}
                 onCheckedChange={(checked) =>

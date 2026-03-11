@@ -7,6 +7,8 @@ export type ListingCardData = {
   id: string
   title: string
   location: string
+  city?: string | null
+  state?: string | null
   serviceTypeId?: string | null
   serviceTypeName?: string | null
   serviceTypeIcon?: string | null
@@ -30,10 +32,16 @@ export function ListingCard({
     reviewCount >= 1 && typeof listing.rating === "number" && Number.isFinite(listing.rating)
 
   return (
-    <Link href={`/listing/${listing.id}`} className="card-base group block p-3">
+    <Link href={`/listings/${listing.id}`} className="card-base group block p-3">
       <div className="relative mb-3 h-44 w-full overflow-hidden rounded-xl bg-warm-100">
         {listing.photoUrl ? (
-          <img src={listing.photoUrl} alt={listing.title} className="h-full w-full object-cover" />
+          <img
+            src={listing.photoUrl}
+            alt={`${listing.title} in ${
+              listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
+            }`}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-warm-600">No photo</div>
         )}

@@ -214,7 +214,7 @@ function PaymentStep({
               <label ref={termsRowRef} className="flex min-h-11 items-start gap-3 rounded-md px-1 py-2">
                 <Checkbox checked={acceptedTerms} onCheckedChange={(checked) => onAcceptedTermsChange(Boolean(checked))} />
                 <span className="text-[13px] leading-5 text-[#1A1410]">
-                  I agree to Thrml&apos;s{" "}
+                  I agree to thrml&apos;s{" "}
                   <Link href="/terms" target="_blank" rel="noopener noreferrer" className="underline">
                     Terms of Service
                   </Link>{" "}
@@ -229,7 +229,7 @@ function PaymentStep({
                   onCheckedChange={(checked) => onNewsletterCheckedChange(Boolean(checked))}
                 />
                 <span className="text-[13px] leading-5 text-[#1A1410]">
-                  Send me wellness tips, new spaces in Seattle, and exclusive offers from Thrml.
+                  Send me wellness tips, new spaces in Seattle, and exclusive offers from thrml.
                 </span>
               </label>
             </div>
@@ -475,7 +475,7 @@ export function BookingFlowClient({
 
   function handleWaiverDecline() {
     setWaiverModalOpen(false)
-    window.location.href = `/listing/${listingId}`
+    window.location.href = `/listings/${listingId}`
   }
 
   return (

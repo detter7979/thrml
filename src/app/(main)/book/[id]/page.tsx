@@ -87,11 +87,11 @@ export default async function BookingPage({
     .single()
 
   if (error || !listing) {
-    redirect(`/listing/${id}`)
+    redirect(`/listings/${id}`)
   }
 
   if (!listing.is_active) {
-    redirect(`/listing/${id}`)
+    redirect(`/listings/${id}`)
   }
 
   const maxGuests = Math.max(1, Number(listing.capacity ?? 1))
@@ -157,7 +157,7 @@ export default async function BookingPage({
   return (
     <BookingFlowClient
       listingId={listing.id}
-      listingTitle={listing.title ?? "Thrml Wellness Listing"}
+      listingTitle={listing.title ?? "thrml Wellness Listing"}
       serviceType={listingServiceType}
       listingPhotoUrl={listingPhotoUrl}
       pricing={pricing}

@@ -107,6 +107,7 @@ const DEFAULT_FILTERS: Filters = {
   sort: "recommended",
 }
 const NEARBY_FALLBACK_MILES = 150
+const TAP_MOVE_THRESHOLD_PX = 10
 const SERVICE_COLORS: Record<string, string> = {
   sauna: "#E85D3A",
   cold_plunge: "#3A8BC7",
@@ -306,6 +307,17 @@ export function ExploreClient() {
   const mapRef = useRef<MapRef | null>(null)
   const listRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const mobileMapCardsRef = useRef<HTMLDivElement | null>(null)
+  const mapCardTapRef = useRef<{
+    pointerId: number | null
+    startX: number
+    startY: number
+    suppressClick: boolean
+  }>({
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    suppressClick: false,
+  })
   const [isMobile, setIsMobile] = useState(false)
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
 
@@ -701,7 +713,7 @@ export function ExploreClient() {
 
               return {
                 id: String(row.id ?? crypto.randomUUID()),
-                title: typeof row.title === "string" ? row.title : "Thrml listing",
+                title: typeof row.title === "string" ? row.title : "thrml listing",
                 serviceType,
                 serviceLabel: meta?.display_name ?? formatServiceType(serviceType),
                 serviceIcon: meta?.icon ?? serviceEmoji(serviceType),
@@ -854,6 +866,37 @@ export function ExploreClient() {
         geometry: { type: "Point", coordinates: [item.lng, item.lat] },
       })),
     } as const
+  }
+
+  function beginMapCardTap(pointerId: number, x: number, y: number) {
+    mapCardTapRef.current = { pointerId, startX: x, startY: y, suppressClick: false }
+  }
+
+  function trackMapCardTap(pointerId: number, x: number, y: number) {
+    const tap = mapCardTapRef.current
+    if (tap.pointerId !== pointerId || tap.suppressClick) return
+    const deltaX = x - tap.startX
+    const deltaY = y - tap.startY
+    if (Math.hypot(deltaX, deltaY) > TAP_MOVE_THRESHOLD_PX) {
+      tap.suppressClick = true
+    }
+  }
+
+  function releaseMapCardTap(pointerId?: number) {
+    const tap = mapCardTapRef.current
+    if (typeof pointerId === "number" && tap.pointerId !== pointerId) return
+    mapCardTapRef.current.pointerId = null
+  }
+
+  function clearMapCardTap(pointerId?: number) {
+    const tap = mapCardTapRef.current
+    if (typeof pointerId === "number" && tap.pointerId !== pointerId) return
+    mapCardTapRef.current = { pointerId: null, startX: 0, startY: 0, suppressClick: false }
+  }
+
+  function openListingFromCard(listingId: string) {
+    const fromPath = `${window.location.pathname}${window.location.search}`
+    router.push(`/listings/${listingId}?from=${encodeURIComponent(fromPath)}`)
   }
 
   const mapPanel = (
@@ -1079,7 +1122,7 @@ export function ExploreClient() {
         }}
         onClick={() => {
           const fromPath = `${window.location.pathname}${window.location.search}`
-          router.push(`/listing/${listing.id}?from=${encodeURIComponent(fromPath)}`)
+          router.push(`/listings/${listing.id}?from=${encodeURIComponent(fromPath)}`)
         }}
         className={cn(
           "group cursor-pointer rounded-2xl border border-transparent bg-white p-3 shadow-[0_6px_16px_rgba(26,20,16,0.06)] transition-all duration-150",
@@ -1575,10 +1618,21 @@ export function ExploreClient() {
                       <button
                         key={listing.id}
                         type="button"
+                        onPointerDown={(event) =>
+                          beginMapCardTap(event.pointerId, event.clientX, event.clientY)
+                        }
+                        onPointerMove={(event) =>
+                          trackMapCardTap(event.pointerId, event.clientX, event.clientY)
+                        }
+                        onPointerCancel={(event) => clearMapCardTap(event.pointerId)}
+                        onPointerUp={(event) => releaseMapCardTap(event.pointerId)}
                         onClick={() => {
-                          setActiveId(listing.id)
-                          setActiveSource("pin")
-                          mapRef.current?.flyTo({ center: [listing.lng, listing.lat], zoom: 13 })
+                          if (mapCardTapRef.current.suppressClick) {
+                            clearMapCardTap()
+                            return
+                          }
+                          clearMapCardTap()
+                          openListingFromCard(listing.id)
                         }}
                         className="w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl bg-white p-3 text-left shadow-[0_4px_20px_rgba(0,0,0,0.12)]"
                       >
@@ -1637,10 +1691,21 @@ export function ExploreClient() {
                           <button
                             key={listing.id}
                             type="button"
+                            onPointerDown={(event) =>
+                              beginMapCardTap(event.pointerId, event.clientX, event.clientY)
+                            }
+                            onPointerMove={(event) =>
+                              trackMapCardTap(event.pointerId, event.clientX, event.clientY)
+                            }
+                            onPointerCancel={(event) => clearMapCardTap(event.pointerId)}
+                            onPointerUp={(event) => releaseMapCardTap(event.pointerId)}
                             onClick={() => {
-                              setActiveId(listing.id)
-                              setActiveSource("pin")
-                              mapRef.current?.flyTo({ center: [listing.lng, listing.lat], zoom: 13 })
+                              if (mapCardTapRef.current.suppressClick) {
+                                clearMapCardTap()
+                                return
+                              }
+                              clearMapCardTap()
+                              openListingFromCard(listing.id)
                             }}
                             className="w-40 shrink-0 overflow-hidden rounded-xl border bg-white text-left"
                           >

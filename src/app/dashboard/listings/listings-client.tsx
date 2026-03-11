@@ -547,7 +547,7 @@ export function DashboardListingsClient({
         {listings.map((listing) => {
           const isExpanded = expandedListingId === listing.id
           const activeTab = activeTabs[listing.id] ?? "upcoming"
-          const openListing = () => router.push(`/listing/${listing.id}`)
+          const openListing = () => router.push(`/listings/${listing.id}`)
           const orderedReviews = [...listing.reviews].sort((a, b) => {
             const aPending = !a.host_response
             const bPending = !b.host_response

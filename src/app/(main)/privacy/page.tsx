@@ -2,11 +2,11 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-12 text-[#1A1410] md:px-8">
       <h1 className="font-serif text-4xl">Privacy Policy</h1>
-      <p className="mt-2 text-sm text-[#5F5148]">Thrml Wellness Marketplace - usethermal.com</p>
+      <p className="mt-2 text-sm text-[#5F5148]">thrml Wellness Marketplace - usethrml.com</p>
       <p className="mt-1 text-sm text-[#5F5148]">Effective Date: March 2026</p>
 
       <div className="mt-8 whitespace-pre-line text-sm leading-relaxed text-[#2F241E]">
-        {`This Privacy Policy explains how Thrml collects, uses, shares, and protects your personal information when you use our platform.
+        {`This Privacy Policy explains how thrml collects, uses, shares, and protects your personal information when you use our platform.
 
 1. Information We Collect
 1.1 Information You Provide
@@ -40,7 +40,7 @@ Process bookings and payments
 Send booking confirmations, access codes, and session reminders
 Facilitate communication between Hosts and Guests
 Display listings and enable search functionality
-Promote Host listings on Thrml's social media and marketing channels (Hosts may opt out)
+Promote Host listings on thrml's social media and marketing channels (Hosts may opt out)
 Respond to support requests and resolve disputes
 Detect and prevent fraud, abuse, and platform policy violations
 Comply with legal obligations
@@ -60,13 +60,13 @@ Analytics and performance monitoring tools
 These providers are contractually obligated to protect your information and use it only for the purposes we specify.
 
 3.3 For Marketing
-With Host consent, we may share listing content (photos, descriptions, location) publicly on Thrml's social media channels for promotional purposes. We do not sell Host or Guest personal data to advertisers.
+With Host consent, we may share listing content (photos, descriptions, location) publicly on thrml's social media channels for promotional purposes. We do not sell Host or Guest personal data to advertisers.
 
 3.4 Legal Requirements
-We may disclose information when required by law, court order, or government authority, or to protect the rights, property, or safety of Thrml, our users, or the public.
+We may disclose information when required by law, court order, or government authority, or to protect the rights, property, or safety of thrml, our users, or the public.
 
 3.5 Business Transfers
-In the event of a merger, acquisition, or sale of substantially all of Thrml's assets, user information may be transferred as part of that transaction. We will provide notice before your information is transferred and becomes subject to a different privacy policy.
+In the event of a merger, acquisition, or sale of substantially all of thrml's assets, user information may be transferred as part of that transaction. We will provide notice before your information is transferred and becomes subject to a different privacy policy.
 
 4. Cookies and Tracking
 We use cookies and similar technologies to maintain sessions, remember preferences, and analyze platform usage. You can control cookie settings through your browser, but disabling cookies may affect platform functionality.
@@ -87,13 +87,13 @@ Deletion: Request deletion of your personal data, subject to legal retention req
 Portability: Request your data in a portable format
 Opt-out: Opt out of marketing communications at any time
 Restrict processing: Request that we limit how we use your data in certain circumstances
-To exercise any of these rights, contact us at legal@usethermal.com. We will respond within 30 days.
+To exercise any of these rights, contact us at legal@usethrml.com. We will respond within 30 days.
 
 7. California Privacy Rights (CCPA)
-California residents have additional rights under the California Consumer Privacy Act, including the right to know what personal information is collected, the right to delete, and the right to opt out of the sale of personal information. Thrml does not sell personal information. To submit a CCPA request, contact us at the address below.
+California residents have additional rights under the California Consumer Privacy Act, including the right to know what personal information is collected, the right to delete, and the right to opt out of the sale of personal information. thrml does not sell personal information. To submit a CCPA request, contact us at the address below.
 
 8. Children's Privacy
-The Thrml platform is not intended for individuals under 18 years of age. We do not knowingly collect personal information from minors. If we become aware that we have collected information from a minor, we will delete it promptly.
+The thrml platform is not intended for individuals under 18 years of age. We do not knowingly collect personal information from minors. If we become aware that we have collected information from a minor, we will delete it promptly.
 
 9. Security
 We implement industry-standard security measures including encryption in transit (TLS), encrypted storage, access controls, and regular security reviews. However, no system is completely secure. We encourage users to use strong passwords and protect their account credentials.
@@ -106,7 +106,7 @@ The platform may contain links to third-party websites or services. We are not r
 We may update this Privacy Policy from time to time. We will notify you of material changes by email or via notice on the platform. The date at the top of this policy reflects the most recent revision.
 
 12. Contact
-For privacy-related inquiries, data requests, or to report a concern, contact us at: legal@usethermal.com`}
+For privacy-related inquiries, data requests, or to report a concern, contact us at: legal@usethrml.com`}
       </div>
     </main>
   )

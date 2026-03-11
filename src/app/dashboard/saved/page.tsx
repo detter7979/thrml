@@ -80,7 +80,7 @@ export default function DashboardSavedPage() {
           rating,
           card: {
             id: listing.id,
-            title: listing.title ?? "Thrml space",
+            title: listing.title ?? "thrml space",
             location: listing.location_city ?? "Location shared after booking",
             serviceTypeId: listing.service_type ?? "sauna",
             serviceTypeName: service?.label ?? "Sauna",

@@ -248,7 +248,7 @@ function SignupForm() {
             <label className="flex min-h-11 items-start gap-3 rounded-md">
               <Checkbox checked={signupTermsAccepted} onCheckedChange={(checked) => setSignupTermsAccepted(Boolean(checked))} />
               <span className="font-sans text-[13px] leading-5 text-[#1A1410]">
-                I agree to Thrml&apos;s{" "}
+                I agree to thrml&apos;s{" "}
                 <Link href="/terms" target="_blank" rel="noopener noreferrer" className="underline">
                   Terms of Service
                 </Link>{" "}
@@ -265,7 +265,7 @@ function SignupForm() {
                 onCheckedChange={(checked) => setSignupNewsletterOptIn(Boolean(checked))}
               />
               <span className="font-sans text-[13px] leading-5 text-[#1A1410]">
-                I&apos;d like to receive wellness news and updates from Thrml
+                I&apos;d like to receive wellness news and updates from thrml
               </span>
             </label>
           </div>
@@ -326,7 +326,7 @@ function SignupForm() {
           </div>
 
           <div className="space-y-2">
-            <Label>What brings you to Thrml?</Label>
+            <Label>What brings you to thrml?</Label>
             <div className="grid gap-2">
               <button
                 type="button"

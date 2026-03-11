@@ -290,7 +290,7 @@ function LoginForm() {
         {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
       </Button>
       <p className="type-label text-center md:text-left">
-        New to Thrml? <Link href={`/signup${nextQuery}`} className="text-brand-600">Create an account</Link>
+        New to thrml? <Link href={`/signup${nextQuery}`} className="text-brand-600">Create an account</Link>
       </p>
     </div>
   )

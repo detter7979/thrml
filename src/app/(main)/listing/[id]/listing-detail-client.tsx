@@ -748,7 +748,7 @@ function BookingWidget({
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) {
-        router.push(`/login?next=/listing/${listingId}`)
+        router.push(`/login?next=/listings/${listingId}`)
         return
       }
 
@@ -1077,7 +1077,7 @@ export function ListingDetailClient({
 
   const visibleReviews = showAllReviews ? sortedReviews : sortedReviews.slice(0, 6)
 
-  const hostName = host?.full_name || "Thrml Host"
+  const hostName = host?.full_name || "thrml Host"
   const hostYear = host?.created_at ? new Date(host.created_at).getFullYear() : new Date().getFullYear()
   const hostInitials = initialsFromFullName(hostName)
   const hostResponseRate =
@@ -1160,8 +1160,8 @@ export function ListingDetailClient({
   )
   const listingPathWithReturn =
     backToResultsPath && backToResultsPath.startsWith("/explore")
-      ? `/listing/${id}?from=${encodeURIComponent(backToResultsPath)}`
-      : `/listing/${id}`
+      ? `/listings/${id}?from=${encodeURIComponent(backToResultsPath)}`
+      : `/listings/${id}`
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
@@ -1226,7 +1226,11 @@ export function ListingDetailClient({
             >
               {photos.map((photo, index) => (
                 <div key={`${photo.url}-${index}`} className="w-full shrink-0 snap-start">
-                  <img src={photo.url} alt={`${title} photo ${index + 1}`} className="aspect-[4/3] w-full object-cover object-center" />
+                  <img
+                    src={photo.url}
+                    alt={`${title} — photo ${index + 1}`}
+                    className="aspect-[4/3] w-full object-cover object-center"
+                  />
                 </div>
               ))}
             </div>
@@ -1248,7 +1252,11 @@ export function ListingDetailClient({
           <div className="hidden md:block">
             {photos.length === 1 ? (
             <div className="overflow-hidden rounded-2xl">
-              <img src={photos[0].url} alt={title} className="aspect-[16/9] w-full object-cover object-center" />
+              <img
+                src={photos[0].url}
+                alt={`${title} — photo 1`}
+                className="aspect-[16/9] w-full object-cover object-center"
+              />
             </div>
             ) : photos.length === 2 ? (
             <div className="grid grid-cols-2 gap-2 overflow-hidden rounded-2xl">
@@ -1256,7 +1264,7 @@ export function ListingDetailClient({
                 <img
                   key={`${photo.url}-${index}`}
                   src={photo.url}
-                  alt={`${title} photo ${index + 1}`}
+                  alt={`${title} — photo ${index + 1}`}
                   className="aspect-[4/3] w-full object-cover object-center"
                 />
               ))}
@@ -1265,7 +1273,7 @@ export function ListingDetailClient({
             <div className="relative grid max-h-[480px] grid-cols-[3fr_2fr] gap-2 overflow-hidden rounded-2xl">
               <img
                 src={galleryPhotos[0]?.url}
-                alt={`${title} photo 1`}
+                alt={`${title} — photo 1`}
                 className="aspect-[4/3] h-full w-full object-cover object-center"
               />
               <div className="grid gap-2">
@@ -1273,7 +1281,7 @@ export function ListingDetailClient({
                   <img
                     key={`${photo.url}-${index + 1}`}
                     src={photo.url}
-                    alt={`${title} photo ${index + 2}`}
+                    alt={`${title} — photo ${index + 2}`}
                     className="aspect-[4/3] h-full w-full object-cover object-center"
                   />
                 ))}
@@ -1311,7 +1319,7 @@ export function ListingDetailClient({
                     <img
                       key={`${photo.url}-${index}`}
                       src={photo.url}
-                      alt={`${title} photo ${index + 1}`}
+                      alt={`${title} — photo ${index + 1}`}
                       className="w-full rounded-xl object-cover object-center"
                     />
                   ))}

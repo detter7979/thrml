@@ -21,8 +21,8 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
   const canUseNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function"
 
   const shareUrl = useMemo(() => {
-    if (typeof window === "undefined") return `/listing/${listing.id}`
-    return `${window.location.origin}/listing/${listing.id}`
+    if (typeof window === "undefined") return `/listings/${listing.id}`
+    return `${window.location.origin}/listings/${listing.id}`
   }, [listing.id])
 
   function stopCardNavigation(event: MouseEvent) {

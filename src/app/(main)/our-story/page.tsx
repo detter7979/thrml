@@ -1,4 +1,12 @@
+import type { Metadata } from "next"
 import Link from "next/link"
+
+export const metadata: Metadata = {
+  title: "Our Story — Why We Built thrml",
+  description:
+    "thrml exists to make private wellness spaces — saunas, cold plunges, float tanks — accessible to everyone. No spa membership required.",
+  alternates: { canonical: "https://usethrml.com/our-story" },
+}
 
 export default function OurStoryPage() {
   return (
@@ -26,7 +34,7 @@ export default function OurStoryPage() {
         </p>
 
         <p className="border-l-2 border-[#C75B3A] pl-5 font-serif text-3xl leading-tight text-[#1A1410] md:text-4xl">
-          Thrml exists to close that gap.
+          thrml exists to close that gap.
         </p>
 
         <p>

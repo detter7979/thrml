@@ -40,7 +40,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="font-serif text-3xl text-[#1A1410]">{profile.full_name ?? "Thrml member"}</h1>
+            <h1 className="font-serif text-3xl text-[#1A1410]">{profile.full_name ?? "thrml member"}</h1>
             <p className="text-sm text-[#7A6A5D]">Member since {memberSince}</p>
             {profile.phone_verified ? <p className="mt-1 text-xs text-[#5B8A69]">📱 Verified</p> : null}
           </div>

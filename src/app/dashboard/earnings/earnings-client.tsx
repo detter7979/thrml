@@ -209,7 +209,7 @@ export function EarningsClient({
           </h2>
           <p className="mt-2 text-sm text-[#6D5E51]">
             {guestOnly
-              ? "You are currently using Thrml as a guest. Create a listing anytime to start tracking payouts and analytics."
+              ? "You are currently using thrml as a guest. Create a listing anytime to start tracking payouts and analytics."
               : "Once your first booking is confirmed, you&apos;ll see your payouts, history, and analytics."}
           </p>
         </div>
@@ -441,7 +441,7 @@ export function EarningsClient({
                           </td>
                           <td className="px-4 py-3">
                             <Link
-                              href={`/listing/${row.listingId}`}
+                              href={`/listings/${row.listingId}`}
                               target="_blank"
                               rel="noreferrer"
                               className="text-sm font-medium text-[#C75B3A] hover:underline"

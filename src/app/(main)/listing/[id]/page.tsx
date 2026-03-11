@@ -93,17 +93,13 @@ async function getHostProfile(
   return null
 }
 
-function truncateDescription(value: string | null, max = 150) {
-  if (!value) return "Explore this wellness space on Thrml."
-  if (value.length <= max) return value
-  return `${value.slice(0, max).trimEnd()}...`
-}
-
 async function fetchListingById(id: string) {
   const supabase = await createClient()
   const { data: listing } = await supabase
     .from("listings")
-    .select("id, title, description, service_type, listing_photos(url, order_index)")
+    .select(
+      "id, title, description, city, state, service_type, price_solo, fixed_session_price, session_type, listing_photos(url, order_index)"
+    )
     .eq("id", id)
     .single()
 
@@ -117,30 +113,42 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
   const listing = await fetchListingById(id)
-  if (!listing) return {}
+  if (!listing) return { title: "Listing Not Found | thrml" }
 
-  const title = listing.title ?? "Thrml Wellness Space"
-  const description = truncateDescription(listing.description ?? null, 150)
-  const ogImage =
-    Array.isArray(listing.listing_photos) &&
-    typeof (listing.listing_photos[0] as { url?: string } | undefined)?.url === "string"
-      ? (listing.listing_photos[0] as { url: string }).url
-      : undefined
-  const canonicalPath = `/listing/${listing.id}`
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://thermal.app"
-  const canonicalUrl = `${siteUrl}${canonicalPath}`
+  const price =
+    listing.session_type === "fixed_session"
+      ? Number(listing.fixed_session_price ?? 0)
+      : Number(listing.price_solo ?? 0)
+  const firstPhoto = Array.isArray(listing.listing_photos)
+    ? [...listing.listing_photos].sort((a, b) => (a.order_index ?? 999) - (b.order_index ?? 999))[0]
+    : undefined
+  const title = `${listing.title ?? "thrml Wellness Space"} — ${listing.city ?? "City"}, ${listing.state ?? "State"}`
+  const normalizedServiceType = (listing.service_type ?? "wellness_space").replace(/_/g, " ")
+  const description = `Book ${listing.title ?? "this space"}, a private ${normalizedServiceType} in ${
+    listing.city ?? "your city"
+  }, ${listing.state ?? "your state"}. From $${price}. Instant access.`
 
   return {
     title,
     description,
     alternates: {
-      canonical: canonicalPath,
+      canonical: `https://usethrml.com/listings/${id}`,
     },
     openGraph: {
       title,
       description,
-      images: ogImage ? [ogImage] : undefined,
-      url: canonicalUrl,
+      url: `https://usethrml.com/listings/${id}`,
+      images:
+        firstPhoto?.url
+          ? [
+              {
+                url: firstPhoto.url,
+                width: 1200,
+                height: 800,
+                alt: listing.title ?? "thrml listing",
+              },
+            ]
+          : undefined,
       type: "website",
     },
   }
@@ -437,83 +445,117 @@ export default async function ListingDetailPage({
         .filter((value): value is string => typeof value === "string" && value.length > 0)
     : []
 
+  const lowestPrice =
+    sessionTypeConstraint === "fixed_session"
+      ? Number(listing.fixed_session_price ?? listing.price_solo ?? 0)
+      : Number(listing.price_solo ?? 0)
+  const listingSchema = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: listing.title,
+    description: listing.description,
+    url: `https://usethrml.com/listings/${listing.id}`,
+    image: safePhotos.map((photo) => photo.url),
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: listing.city,
+      addressRegion: listing.state,
+      addressCountry: "US",
+    },
+    priceRange: `From $${lowestPrice}`,
+    aggregateRating:
+      Number(ratingsRow?.avg_overall ?? 0) > 0
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: Number(ratingsRow?.avg_overall ?? 0),
+            reviewCount: Number(ratingsRow?.review_count ?? 0),
+          }
+        : undefined,
+  }
+
   return (
-    <ListingDetailClient
-      id={listing.id}
-      title={listing.title ?? "Thrml Wellness Listing"}
-      locationLabel={locationLabel}
-      serviceTypeId={serviceTypeId}
-      serviceTypeName={serviceType?.display_name ?? "Sauna"}
-      serviceTypeIcon={serviceType?.icon ?? "🔥"}
-      bookingModel={serviceType?.booking_model ?? "hourly"}
-      healthDisclaimer={serviceType?.health_disclaimer ?? null}
-      saunaType={listing.sauna_type ?? null}
-      capacity={listing.capacity ? Number(listing.capacity) : null}
-      description={listing.description ?? null}
-      serviceAttributes={
-        typeof listing.service_attributes === "object" && listing.service_attributes
-          ? (listing.service_attributes as Record<string, unknown>)
-          : {}
-      }
-      serviceDurationMin={
-        typeof listing.service_duration_min === "number" ? Number(listing.service_duration_min) : null
-      }
-      serviceDurationMax={
-        typeof listing.service_duration_max === "number" ? Number(listing.service_duration_max) : null
-      }
-      serviceDurationUnit={listing.service_duration_unit === "hours" ? "hours" : "minutes"}
-      amenities={toStringArray(listing.amenities, ["Cold Plunge", "Towels", "Outdoor Deck"])}
-      houseRules={toStringArray(listing.house_rules, ["No smoking", "Respect quiet hours", "Leave on time"])}
-      host={
-        hostProfile
-          ? {
-              id: typeof hostProfile.id === "string" ? hostProfile.id : listing.host_id,
-              full_name: hostProfile.full_name ?? null,
-              avatar_url: hostProfile.avatar_url ?? null,
-              is_superhost: hostProfile.is_superhost ?? null,
-              created_at: hostProfile.created_at ?? null,
-              response_rate:
-                typeof hostProfile.response_rate === "number"
-                  ? Number(hostProfile.response_rate)
-                  : null,
-              response_time:
-                typeof hostProfile.response_time === "string" ? hostProfile.response_time : null,
-              response_time_hours:
-                typeof hostProfile.response_time_hours === "number"
-                  ? Number(hostProfile.response_time_hours)
-                  : null,
-              bio: typeof hostProfile.bio === "string" ? hostProfile.bio : null,
-              average_rating:
-                typeof hostProfile.average_rating === "number" && Number.isFinite(hostProfile.average_rating)
-                  ? Number(hostProfile.average_rating)
-                  : null,
-              total_reviews:
-                typeof hostProfile.total_reviews === "number" && Number.isFinite(hostProfile.total_reviews)
-                  ? Number(hostProfile.total_reviews)
-                  : 0,
-            }
-          : null
-      }
-      photos={safePhotos}
-      reviews={reviews}
-      ratings={{
-        avg_overall: Number((ratingsRow as Record<string, unknown> | null)?.avg_overall ?? 0),
-        review_count: Number((ratingsRow as Record<string, unknown> | null)?.review_count ?? reviews.length),
-      }}
-      isHostView={Boolean(isHost)}
-      pricing={pricing}
-      availability={availabilityPayload}
-      blackoutDates={blackoutDates}
-      durationConstraints={{
-        minMins: Number.isFinite(minMins) ? minMins : 30,
-        maxMins: Number.isFinite(maxMins) ? maxMins : 180,
-        increment: Number.isFinite(increment) ? increment : 30,
-        sessionType: sessionTypeConstraint,
-      }}
-      canReserve={Boolean(listing.is_active)}
-      hostPayoutsReady={Boolean(isMockHost || (host?.stripe_account_id && host?.stripe_payouts_enabled))}
-      cancellationPolicy={typeof listing.cancellation_policy === "string" ? listing.cancellation_policy : null}
-      backToResultsPath={backToResultsPath}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema) }}
+      />
+      <ListingDetailClient
+        id={listing.id}
+        title={listing.title ?? "thrml Wellness Listing"}
+        locationLabel={locationLabel}
+        serviceTypeId={serviceTypeId}
+        serviceTypeName={serviceType?.display_name ?? "Sauna"}
+        serviceTypeIcon={serviceType?.icon ?? "🔥"}
+        bookingModel={serviceType?.booking_model ?? "hourly"}
+        healthDisclaimer={serviceType?.health_disclaimer ?? null}
+        saunaType={listing.sauna_type ?? null}
+        capacity={listing.capacity ? Number(listing.capacity) : null}
+        description={listing.description ?? null}
+        serviceAttributes={
+          typeof listing.service_attributes === "object" && listing.service_attributes
+            ? (listing.service_attributes as Record<string, unknown>)
+            : {}
+        }
+        serviceDurationMin={
+          typeof listing.service_duration_min === "number" ? Number(listing.service_duration_min) : null
+        }
+        serviceDurationMax={
+          typeof listing.service_duration_max === "number" ? Number(listing.service_duration_max) : null
+        }
+        serviceDurationUnit={listing.service_duration_unit === "hours" ? "hours" : "minutes"}
+        amenities={toStringArray(listing.amenities, ["Cold Plunge", "Towels", "Outdoor Deck"])}
+        houseRules={toStringArray(listing.house_rules, ["No smoking", "Respect quiet hours", "Leave on time"])}
+        host={
+          hostProfile
+            ? {
+                id: typeof hostProfile.id === "string" ? hostProfile.id : listing.host_id,
+                full_name: hostProfile.full_name ?? null,
+                avatar_url: hostProfile.avatar_url ?? null,
+                is_superhost: hostProfile.is_superhost ?? null,
+                created_at: hostProfile.created_at ?? null,
+                response_rate:
+                  typeof hostProfile.response_rate === "number"
+                    ? Number(hostProfile.response_rate)
+                    : null,
+                response_time:
+                  typeof hostProfile.response_time === "string" ? hostProfile.response_time : null,
+                response_time_hours:
+                  typeof hostProfile.response_time_hours === "number"
+                    ? Number(hostProfile.response_time_hours)
+                    : null,
+                bio: typeof hostProfile.bio === "string" ? hostProfile.bio : null,
+                average_rating:
+                  typeof hostProfile.average_rating === "number" && Number.isFinite(hostProfile.average_rating)
+                    ? Number(hostProfile.average_rating)
+                    : null,
+                total_reviews:
+                  typeof hostProfile.total_reviews === "number" && Number.isFinite(hostProfile.total_reviews)
+                    ? Number(hostProfile.total_reviews)
+                    : 0,
+              }
+            : null
+        }
+        photos={safePhotos}
+        reviews={reviews}
+        ratings={{
+          avg_overall: Number((ratingsRow as Record<string, unknown> | null)?.avg_overall ?? 0),
+          review_count: Number((ratingsRow as Record<string, unknown> | null)?.review_count ?? reviews.length),
+        }}
+        isHostView={Boolean(isHost)}
+        pricing={pricing}
+        availability={availabilityPayload}
+        blackoutDates={blackoutDates}
+        durationConstraints={{
+          minMins: Number.isFinite(minMins) ? minMins : 30,
+          maxMins: Number.isFinite(maxMins) ? maxMins : 180,
+          increment: Number.isFinite(increment) ? increment : 30,
+          sessionType: sessionTypeConstraint,
+        }}
+        canReserve={Boolean(listing.is_active)}
+        hostPayoutsReady={Boolean(isMockHost || (host?.stripe_account_id && host?.stripe_payouts_enabled))}
+        cancellationPolicy={typeof listing.cancellation_policy === "string" ? listing.cancellation_policy : null}
+        backToResultsPath={backToResultsPath}
+      />
+    </>
   )
 }

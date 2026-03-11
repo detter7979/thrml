@@ -574,14 +574,14 @@ export async function sendGuestBookingPaymentCaptureFailedEmail(booking: Booking
     <p>Hi ${firstName(booking.guest_name)},</p>
     <p>Your booking for ${title} on ${dateLabel} could not be completed because payment authorization could not be captured.</p>
     <p>No charge was made. Please book again with a valid payment method.</p>
-    <p><a href="${APP_URL}/listing/${booking.listing_id ?? ""}">Book again →</a></p>
+    <p><a href="${APP_URL}/listings/${booking.listing_id ?? ""}">Book again →</a></p>
   `
   const text = [
     `Hi ${firstName(booking.guest_name)},`,
     "",
     `Your booking for ${title} on ${dateLabel} could not be completed because payment authorization could not be captured.`,
     "No charge was made. Please book again with a valid payment method.",
-    `Book again: ${APP_URL}/listing/${booking.listing_id ?? ""}`,
+    `Book again: ${APP_URL}/listings/${booking.listing_id ?? ""}`,
   ].join("\n")
 
   return sendEmail({

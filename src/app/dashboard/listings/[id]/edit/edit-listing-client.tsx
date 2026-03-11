@@ -934,7 +934,7 @@ export function EditListingClient({
           {usingDefaultHouseRules ? (
             <>
               <p className="mt-1 text-sm text-[#6D5E51]">
-                You haven&apos;t set house rules yet. Thrml&apos;s standard community rules will be included in
+                You haven&apos;t set house rules yet. thrml&apos;s standard community rules will be included in
                 guest emails until you add your own.
               </p>
               <a

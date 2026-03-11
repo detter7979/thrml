@@ -88,7 +88,7 @@ export default async function BookingConfirmationPage({
     .eq("id", booking.listing_id)
     .single()
 
-  const title = listing?.title ?? "Thrml Session"
+  const title = listing?.title ?? "thrml Session"
   const photoUrl =
     (listing?.listing_photos ?? [])
       .slice()
@@ -98,7 +98,7 @@ export default async function BookingConfirmationPage({
   const calendarStart = toCalendarDateTime(booking.session_date, booking.start_time, 10)
   const calendarEnd = toCalendarDateTime(booking.session_date, booking.end_time, 11)
   const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-    `${title} - Thrml`
+    `${title} - thrml`
   )}&dates=${calendarStart}/${calendarEnd}&details=${encodeURIComponent(
     `Booking #${booking.id} for ${booking.guest_count} guests.`
   )}`
@@ -156,7 +156,7 @@ export default async function BookingConfirmationPage({
           </a>
         </Button>
         <Button variant="outline" asChild>
-          <Link href={query.listingId ? `/listing/${query.listingId}` : "/"}>Back to listing</Link>
+          <Link href={query.listingId ? `/listings/${query.listingId}` : "/"}>Back to listing</Link>
         </Button>
       </div>
     </div>

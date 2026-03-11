@@ -808,7 +808,7 @@ export function HostNewListingClient({
     }
 
     allowNavigationRef.current = true
-    router.push(`/listing/${listing.id}`)
+    router.push(`/listings/${listing.id}`)
   }
 
   async function handleSetupPayouts() {
@@ -833,7 +833,7 @@ export function HostNewListingClient({
     <div className="mx-auto max-w-4xl px-4 py-8 md:px-8">
       <Card className="card-base gap-4">
         <CardHeader className="space-y-3">
-          <CardTitle className="type-h2">Create your Thrml listing</CardTitle>
+          <CardTitle className="type-h2">Create your thrml listing</CardTitle>
           <ProgressBar step={step} totalSteps={TOTAL_STEPS} />
         </CardHeader>
 

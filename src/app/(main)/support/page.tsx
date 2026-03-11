@@ -83,7 +83,7 @@ const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         question: "I can't get into the space",
         answer:
-          "Entry methods vary by host - some use a digital access code sent through the Thrml platform, others use a lockbox combination, a door code, a key handoff, or another arrangement described in their listing.\n\nStart by checking your booking confirmation email and the listing's entry instructions for the specific method your host uses. If your host uses a digital code, try copying and pasting it directly from your confirmation rather than typing it manually, and confirm you are at the correct address.\n\nIf you still cannot get in, message the host immediately through your Thrml dashboard - hosts are notified right away and most respond within minutes. If you cannot reach the host within 10 minutes of your session start time, email us at hello@usethrml.com with your booking ID and we will step in.",
+          "Entry methods vary by host - some use a digital access code sent through the thrml platform, others use a lockbox combination, a door code, a key handoff, or another arrangement described in their listing.\n\nStart by checking your booking confirmation email and the listing's entry instructions for the specific method your host uses. If your host uses a digital code, try copying and pasting it directly from your confirmation rather than typing it manually, and confirm you are at the correct address.\n\nIf you still cannot get in, message the host immediately through your thrml dashboard - hosts are notified right away and most respond within minutes. If you cannot reach the host within 10 minutes of your session start time, email us at hello@usethrml.com with your booking ID and we will step in.",
       },
       {
         question: "I can't find the entrance to the space",
@@ -145,7 +145,7 @@ const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         question: "How do I update my payout bank account?",
         answer:
-          "Log into your Stripe Express dashboard directly at dashboard.stripe.com to update your bank account details. This is managed entirely by Stripe - Thrml does not store or have access to your banking information.",
+          "Log into your Stripe Express dashboard directly at dashboard.stripe.com to update your bank account details. This is managed entirely by Stripe - thrml does not store or have access to your banking information.",
       },
     ],
   },
@@ -166,7 +166,7 @@ const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         question: "The space was not clean",
         answer:
-          "Message the host to flag it, then email support with your booking ID and photos. Cleanliness is a core expectation on Thrml and we take these reports seriously in our host review process.",
+          "Message the host to flag it, then email support with your booking ID and photos. Cleanliness is a core expectation on thrml and we take these reports seriously in our host review process.",
       },
     ],
   },
@@ -259,7 +259,7 @@ export default function SupportPage() {
       const fallbackName =
         typeof user.user_metadata.full_name === "string" && user.user_metadata.full_name.trim()
           ? user.user_metadata.full_name.trim()
-          : fallbackEmail.split("@")[0] || "Thrml user"
+          : fallbackEmail.split("@")[0] || "thrml user"
 
       const [{ data: profile }, { data: bookingRows }] = await Promise.all([
         supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),

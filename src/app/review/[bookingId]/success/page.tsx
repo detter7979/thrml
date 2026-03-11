@@ -33,7 +33,7 @@ export default async function ReviewSuccessPage({ params }: { params: Promise<Pa
   ])
 
   const hostLabel = firstName(host?.full_name)
-  const reviewHref = listing?.id ? `/listing/${listing.id}#reviews` : "/dashboard/bookings"
+  const reviewHref = listing?.id ? `/listings/${listing.id}#reviews` : "/dashboard/bookings"
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#F7F3EE] px-4">
@@ -47,7 +47,7 @@ export default async function ReviewSuccessPage({ params }: { params: Promise<Pa
 
         <h1 className="font-serif text-[28px] leading-tight text-[#1A1410]">Thank you for your review!</h1>
         <p className="mx-auto mt-3 max-w-md text-sm text-[#7D6D60]">
-          Your feedback helps {hostLabel} and the Thrml community.
+          Your feedback helps {hostLabel} and the thrml community.
         </p>
 
         <div className="mt-8 space-y-3">

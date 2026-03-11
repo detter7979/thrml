@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { DM_Sans, DM_Serif_Display, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -88,6 +89,7 @@ export default function RootLayout({
         className={`${dmSans.variable} ${dmSerifDisplay.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <GoogleAnalytics gaId="G-L20J7S2M51" />
       </body>
     </html>
   );

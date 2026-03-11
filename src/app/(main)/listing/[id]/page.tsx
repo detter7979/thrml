@@ -186,7 +186,7 @@ export default async function ListingDetailPage({
     supabase
       .from("listings")
       .select(
-        "id, host_id, title, description, service_type, sauna_type, is_active, location, location_address, location_city, location_state, city, state, country, capacity, price_solo, price_2, price_3, price_4plus, min_duration_override_minutes, max_duration_override_minutes, fixed_session_minutes, service_attributes, service_duration_min, service_duration_max, service_duration_unit, amenities, house_rules, cancellation_policy, availability, listing_photos(url, order_index), listing_blackout_dates(blackout_date)"
+        "id, host_id, title, description, service_type, sauna_type, is_active, location, location_address, location_city, location_state, city, state, country, capacity, price_solo, fixed_session_price, price_2, price_3, price_4plus, min_duration_override_minutes, max_duration_override_minutes, fixed_session_minutes, service_attributes, service_duration_min, service_duration_max, service_duration_unit, amenities, house_rules, cancellation_policy, availability, listing_photos(url, order_index), listing_blackout_dates(blackout_date)"
       )
       .eq("id", id)
       .single(),

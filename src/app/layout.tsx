@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     url: "https://usethrml.com",
     images: [
       {
-        url: "/og-image.png",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
         alt: "thrml — Private Wellness Spaces",
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     title: "thrml — Book Private Saunas, Cold Plunges & Wellness Spaces",
     description:
       "Book private saunas, cold plunges, float tanks and more — hosted by people in your city.",
-    images: ["/og-image.png"],
+    images: ["/opengraph-image"],
   },
   robots: {
     index: true,
@@ -89,7 +89,7 @@ export default function RootLayout({
         className={`${dmSans.variable} ${dmSerifDisplay.variable} ${geistMono.variable} antialiased`}
       >
         {children}
-        <GoogleAnalytics gaId="G-L20J7S2M51" />
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!} />
       </body>
     </html>
   );

@@ -19,6 +19,7 @@ import {
   isServiceTypeId,
   type ServiceTypeMeta,
 } from "@/lib/service-types"
+import { trackGaEvent } from "@/lib/analytics/ga"
 import { SERVICE_TYPES, type ServiceType } from "@/lib/constants/service-types"
 
 type ListingApiRow = {
@@ -255,6 +256,11 @@ export function HomePageClient() {
     if (heroServiceType !== "all") params.set("service", heroServiceType)
     params.set("distance", "50")
     params.set("view", "split")
+    trackGaEvent("search", {
+      search_term: location.trim() || "Seattle, WA",
+      service_type: heroServiceType === "all" ? "all" : heroServiceType,
+      results_count: filteredListings.length,
+    })
     router.push(`/explore?${params.toString()}`)
   }
 
@@ -299,6 +305,9 @@ export function HomePageClient() {
         throw new Error("Newsletter subscribe request failed")
       }
 
+      trackGaEvent("newsletter_subscribe", {
+        source: "home_page",
+      })
       setNewsletterStatus("success")
       setNewsletterEmail("")
     } catch {

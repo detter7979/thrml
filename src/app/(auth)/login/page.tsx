@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { sanitizeNextPath } from "@/lib/security"
+import { trackGaEvent } from "@/lib/analytics/ga"
 import { createClient } from "@/lib/supabase/client"
 
 function LoginForm() {
@@ -119,6 +120,9 @@ function LoginForm() {
     }
 
     clearFailedAttempts()
+    trackGaEvent("login", {
+      method: "email",
+    })
     router.push(resolveNextPath())
     router.refresh()
   }
@@ -148,6 +152,9 @@ function LoginForm() {
     }
 
     setView("check-email")
+    trackGaEvent("login", {
+      method: "magic_link",
+    })
   }
 
   function toProviderErrorMessage(providerLabel: string, raw: string) {

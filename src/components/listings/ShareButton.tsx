@@ -4,6 +4,7 @@ import { Check, Facebook, Link2, Mail, MessageCircle, MoreHorizontal, Share2 } f
 import { useMemo, useState, type MouseEvent } from "react"
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { trackGaEvent } from "@/lib/analytics/ga"
 
 type ShareButtonProps = {
   listing: {
@@ -33,6 +34,11 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
     stopCardNavigation(event)
     try {
       await navigator.clipboard.writeText(shareUrl)
+      trackGaEvent("share", {
+        method: "copy_link",
+        content_type: "listing",
+        item_id: listing.id,
+      })
       setCopied(true)
       window.setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -42,6 +48,11 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
 
   function handleEmail(event: MouseEvent<HTMLButtonElement>) {
     stopCardNavigation(event)
+    trackGaEvent("share", {
+      method: "email",
+      content_type: "listing",
+      item_id: listing.id,
+    })
     const subject = encodeURIComponent("Check out this wellness space on Thrml")
     const body = encodeURIComponent(
       `I found this on Thrml and thought you might like it:\n\n${listing.title}\n${shareUrl}`
@@ -51,18 +62,33 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
 
   function handleX(event: MouseEvent<HTMLButtonElement>) {
     stopCardNavigation(event)
+    trackGaEvent("share", {
+      method: "x",
+      content_type: "listing",
+      item_id: listing.id,
+    })
     const text = encodeURIComponent(`Just found this on @ThrmlApp — ${listing.title}`)
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(shareUrl)}`, "_blank", "noopener,noreferrer")
   }
 
   function handleWhatsApp(event: MouseEvent<HTMLButtonElement>) {
     stopCardNavigation(event)
+    trackGaEvent("share", {
+      method: "whatsapp",
+      content_type: "listing",
+      item_id: listing.id,
+    })
     const text = encodeURIComponent(`Check out this wellness space on Thrml: ${shareUrl}`)
     window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer")
   }
 
   function handleFacebook(event: MouseEvent<HTMLButtonElement>) {
     stopCardNavigation(event)
+    trackGaEvent("share", {
+      method: "facebook",
+      content_type: "listing",
+      item_id: listing.id,
+    })
     window.open(
       `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
       "_blank",
@@ -74,6 +100,11 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
     stopCardNavigation(event)
     if (!canUseNativeShare) return
     try {
+      trackGaEvent("share", {
+        method: "native",
+        content_type: "listing",
+        item_id: listing.id,
+      })
       await navigator.share({
         title: listing.title,
         url: shareUrl,

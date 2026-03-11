@@ -63,6 +63,7 @@ import { calculateBookingTotal, getPricePerPerson, type PricingTiers } from "@/l
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
 import { SPEC_CONFIG } from "@/lib/constants/specs"
+import { trackGaEvent } from "@/lib/analytics/ga"
 import { roundUpTo30 } from "@/lib/slots"
 import { createClient } from "@/lib/supabase/client"
 import type { BookingModel } from "@/lib/service-types"
@@ -109,6 +110,8 @@ interface ListingDetailProps {
   id: string
   title: string
   locationLabel: string
+  city: string | null
+  state: string | null
   serviceTypeId: string
   serviceTypeName: string
   serviceTypeIcon: string
@@ -434,6 +437,9 @@ function availabilityWindowsForDay(availability: unknown[], date: Date) {
 function BookingWidget({
   pricing,
   listingId,
+  listingTitle,
+  city,
+  state,
   bookingModel,
   serviceTypeName,
   serviceDurationMin,
@@ -450,6 +456,9 @@ function BookingWidget({
 }: {
   pricing: PricingTiers
   listingId: string
+  listingTitle: string
+  city: string | null
+  state: string | null
   bookingModel: BookingModel
   serviceTypeName: string
   serviceDurationMin: number | null
@@ -737,6 +746,15 @@ function BookingWidget({
       endTime: selected.endTime,
     })
 
+    trackGaEvent("begin_checkout", {
+      listing_id: listingId,
+      listing_title: listingTitle,
+      service_type: serviceTypeId,
+      city,
+      value: totals.total,
+      currency: "USD",
+    })
+
     router.push(`/book/${listingId}?${params.toString()}`)
   }
 
@@ -971,6 +989,8 @@ export function ListingDetailClient({
   id,
   title,
   locationLabel,
+  city,
+  state,
   serviceTypeId,
   serviceTypeName,
   serviceTypeIcon,
@@ -1163,6 +1183,17 @@ export function ListingDetailClient({
       ? `/listings/${id}?from=${encodeURIComponent(backToResultsPath)}`
       : `/listings/${id}`
 
+  useEffect(() => {
+    trackGaEvent("view_listing", {
+      listing_id: id,
+      listing_title: title,
+      service_type: serviceTypeId,
+      city,
+      state,
+      price: pricing.price_solo,
+    })
+  }, [city, id, pricing.price_solo, serviceTypeId, state, title])
+
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
@@ -1208,7 +1239,11 @@ export function ListingDetailClient({
                     service_type: serviceTypeId,
                   }}
                 />
-                <SaveButton listingId={id} variant="detail" />
+                <SaveButton
+                  listingId={id}
+                  variant="detail"
+                  listingMeta={{ serviceType: serviceTypeId, city }}
+                />
               </div>
             </div>
           </div>
@@ -1614,6 +1649,9 @@ export function ListingDetailClient({
               <BookingWidget
                 pricing={pricing}
                 listingId={id}
+                listingTitle={title}
+                city={city}
+                state={state}
                 bookingModel={bookingModel}
                 serviceTypeName={serviceTypeName}
                 serviceDurationMin={serviceDurationMin}
@@ -1657,6 +1695,9 @@ export function ListingDetailClient({
                 <BookingWidget
                   pricing={pricing}
                   listingId={id}
+                  listingTitle={title}
+                  city={city}
+                  state={state}
                   bookingModel={bookingModel}
                   serviceTypeName={serviceTypeName}
                   serviceDurationMin={serviceDurationMin}

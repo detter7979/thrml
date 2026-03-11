@@ -5,6 +5,7 @@ import { AccessCodeCard } from "@/components/booking/AccessCodeCard"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
+import { BookingConfirmationTracker } from "./booking-confirmation-tracker"
 import { PendingRefresh } from "./pending-refresh"
 
 type SearchParams = {
@@ -84,7 +85,7 @@ export default async function BookingConfirmationPage({
 
   const { data: listing } = await supabase
     .from("listings")
-    .select("title, listing_photos(url, order_index)")
+    .select("title, city, service_type, listing_photos(url, order_index)")
     .eq("id", booking.listing_id)
     .single()
 
@@ -103,9 +104,19 @@ export default async function BookingConfirmationPage({
     `Booking #${booking.id} for ${booking.guest_count} guests.`
   )}`
   const awaitingHost = booking.status === "pending_host"
+  const shouldTrackPurchase = booking.status === "confirmed" || booking.status === "completed"
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-10 md:px-8">
+      {shouldTrackPurchase ? (
+        <BookingConfirmationTracker
+          bookingId={booking.id}
+          listingId={booking.listing_id}
+          totalAmount={Number(booking.total_charged ?? 0)}
+          serviceType={typeof listing?.service_type === "string" ? listing.service_type : null}
+          city={typeof listing?.city === "string" ? listing.city : null}
+        />
+      ) : null}
       <PendingRefresh enabled={booking.status === "pending" || (booking.status === "confirmed" && !booking.access_code)} />
       <header className="space-y-1">
         <Link href="/dashboard/bookings" className="inline-flex min-h-[44px] items-center text-sm font-medium text-[#5D4D41] hover:underline">

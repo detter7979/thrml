@@ -7,10 +7,15 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { trackGaEvent } from "@/lib/analytics/ga"
 import { createClient } from "@/lib/supabase/client"
 
 type SaveButtonProps = {
   listingId: string
+  listingMeta?: {
+    serviceType?: string | null
+    city?: string | null
+  }
   initialSaved?: boolean
   variant?: "card" | "detail"
   className?: string
@@ -19,6 +24,7 @@ type SaveButtonProps = {
 
 export function SaveButton({
   listingId,
+  listingMeta,
   initialSaved = false,
   variant = "card",
   className,
@@ -165,7 +171,18 @@ export function SaveButton({
     if (error) {
       setSaved(previous)
       onSavedChange?.(previous)
+      return
     }
+
+    trackGaEvent(next ? "save_listing" : "unsave_listing", {
+      listing_id: listingId,
+      ...(next
+        ? {
+            service_type: listingMeta?.serviceType ?? undefined,
+            city: listingMeta?.city ?? undefined,
+          }
+        : {}),
+    })
   }
 
   if (variant === "detail") {

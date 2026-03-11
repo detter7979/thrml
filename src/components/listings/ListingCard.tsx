@@ -48,6 +48,10 @@ export function ListingCard({
         <div className="absolute top-3 right-3">
           <SaveButton
             listingId={listing.id}
+            listingMeta={{
+              serviceType: listing.serviceTypeId ?? null,
+              city: listing.city ?? null,
+            }}
             initialSaved={listing.initialSaved}
             variant="card"
             onSavedChange={onSavedChange}

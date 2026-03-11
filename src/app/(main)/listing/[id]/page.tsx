@@ -483,6 +483,8 @@ export default async function ListingDetailPage({
         id={listing.id}
         title={listing.title ?? "thrml Wellness Listing"}
         locationLabel={locationLabel}
+        city={typeof listing.city === "string" ? listing.city : null}
+        state={typeof listing.state === "string" ? listing.state : null}
         serviceTypeId={serviceTypeId}
         serviceTypeName={serviceType?.display_name ?? "Sauna"}
         serviceTypeIcon={serviceType?.icon ?? "🔥"}

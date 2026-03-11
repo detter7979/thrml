@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { formatServiceType, getServiceType, SERVICE_TYPES } from "@/lib/constants/service-types"
+import { trackGaEvent } from "@/lib/analytics/ga"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
@@ -318,6 +319,7 @@ export function ExploreClient() {
     startY: 0,
     suppressClick: false,
   })
+  const hasTrackedSearchRef = useRef(false)
   const [isMobile, setIsMobile] = useState(false)
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
 
@@ -824,6 +826,22 @@ export function ExploreClient() {
       window.clearTimeout(timer)
     }
   }, [filters, queryBounds, searchCenter.lat, searchCenter.lng, serviceMetaMap])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (!hasTrackedSearchRef.current) {
+        hasTrackedSearchRef.current = true
+        return
+      }
+      trackGaEvent("search", {
+        search_term: locationLabel,
+        service_type: filters.serviceTypes.length === 1 ? filters.serviceTypes[0] : "all",
+        results_count: modeListings.length,
+      })
+    }, 500)
+
+    return () => window.clearTimeout(timer)
+  }, [filters, locationLabel, modeListings.length])
 
   const activeListing = modeListings.find((item) => item.id === activeId) ?? null
   const popupListing = activeSource === "pin" ? activeListing : null

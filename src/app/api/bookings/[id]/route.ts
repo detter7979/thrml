@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+import { requireAuth } from "@/lib/auth-check"
+import { rateLimit } from "@/lib/rate-limit"
 import { isUuid } from "@/lib/security"
-import { createClient } from "@/lib/supabase/server"
 
 type Params = { id: string }
 const bookingIdSchema = z.string().uuid()
@@ -22,17 +23,23 @@ function isMissingColumnError(message: string) {
   )
 }
 
-export async function GET(_: NextRequest, { params }: { params: Promise<Params> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<Params> }) {
+  const limited = rateLimit(req, {
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    identifier: "bookings",
+  })
+  if (limited) return limited
+
   const { id } = await params
   if (!bookingIdSchema.safeParse(id).success) {
     return NextResponse.json({ error: "Invalid booking id" }, { status: 400 })
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error: authError, session, supabase } = await requireAuth()
+  if (authError || !session || !supabase) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   let data: Record<string, unknown> | null = null
   let error: { message: string } | null = null
@@ -41,7 +48,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<Params> 
       .from("bookings")
       .select(select)
       .eq("id", id)
-      .or(`guest_id.eq.${user.id},host_id.eq.${user.id}`)
+      .or(`guest_id.eq.${session.user.id},host_id.eq.${session.user.id}`)
       .maybeSingle()
     if (!attempt.error) {
       data = attempt.data as Record<string, unknown> | null
@@ -62,23 +69,29 @@ export async function GET(_: NextRequest, { params }: { params: Promise<Params> 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<Params> }) {
+  const limited = rateLimit(req, {
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    identifier: "bookings",
+  })
+  if (limited) return limited
+
   const { id } = await params
   if (!isUuid(id)) {
     return NextResponse.json({ error: "Invalid booking id" }, { status: 400 })
   }
 
   await req.text()
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error: authError, session, supabase } = await requireAuth()
+  if (authError || !session || !supabase) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   const { data: booking, error } = await supabase
     .from("bookings")
     .select("id")
     .eq("id", id)
-    .or(`guest_id.eq.${user.id},host_id.eq.${user.id}`)
+    .or(`guest_id.eq.${session.user.id},host_id.eq.${session.user.id}`)
     .maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 })

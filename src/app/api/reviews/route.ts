@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
+import { sanitizeText } from "@/lib/sanitize"
 import { sendHostNewReviewEmail } from "@/lib/emails"
 import { normalizePhotoUrls, normalizeSubRatings } from "@/lib/reviews"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
     rating_communication: subRatings.communication ?? null,
     rating_value: subRatings.value ?? null,
     sub_ratings: subRatings,
-    comment: parsed.data.comment?.trim() || null,
+    comment: parsed.data.comment ? sanitizeText(parsed.data.comment) || null : null,
     photo_urls: photoUrls,
     metadata,
   }

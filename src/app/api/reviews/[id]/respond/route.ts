@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+import { sanitizeText } from "@/lib/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
   }
 
   const payload: Record<string, unknown> = {
-    host_response: parsed.data.response,
+    host_response: sanitizeText(parsed.data.response),
     host_responded_at: new Date().toISOString(),
   }
 

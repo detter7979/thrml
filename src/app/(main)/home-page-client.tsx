@@ -283,6 +283,8 @@ export function HomePageClient() {
   async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (newsletterStatus !== "idle") return
+    const formData = new FormData(event.currentTarget)
+    const website = typeof formData.get("website") === "string" ? (formData.get("website") as string).trim() : ""
 
     const email = newsletterEmail.trim().toLowerCase()
     if (!VALID_EMAIL_REGEX.test(email)) {
@@ -298,7 +300,7 @@ export function HomePageClient() {
       const response = await fetch("/api/newsletter/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, website }),
       })
 
       if (!response.ok) {
@@ -570,6 +572,15 @@ export function HomePageClient() {
               </div>
             ) : (
               <form onSubmit={handleNewsletterSubmit} className="w-full max-w-xl space-y-2">
+                {/* Honeypot - hidden from real users, bots will fill this */}
+                <input
+                  type="text"
+                  name="website"
+                  autoComplete="off"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  style={{ display: "none" }}
+                />
                 <div className="flex w-full items-center gap-3 flex-col sm:flex-row sm:items-stretch">
                   <div className="w-full flex-1">
                     <input

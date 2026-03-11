@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { requireAuth } from "@/lib/auth-check"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 
 type Params = { conversationId: string }
 
 async function ensureAccess(conversationId: string) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }), supabase, user: null }
+  const { error, session, supabase } = await requireAuth()
+  if (error || !session || !supabase) {
+    return { error, supabase: null, userId: null, conversation: null }
+  }
 
   const { data: conversation, error } = await supabase
     .from("conversations")
@@ -19,19 +17,19 @@ async function ensureAccess(conversationId: string) {
     .eq("id", conversationId)
     .maybeSingle()
 
-  if (error) return { error: NextResponse.json({ error: error.message }, { status: 500 }), supabase, user: null }
-  if (!conversation || (conversation.guest_id !== user.id && conversation.host_id !== user.id)) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }), supabase, user: null }
+  if (error) return { error: NextResponse.json({ error: error.message }, { status: 500 }), supabase, userId: null, conversation: null }
+  if (!conversation || (conversation.guest_id !== session.user.id && conversation.host_id !== session.user.id)) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }), supabase, userId: null, conversation: null }
   }
 
-  return { conversation, supabase, user, error: null as NextResponse<unknown> | null }
+  return { conversation, supabase, userId: session.user.id, error: null as NextResponse<unknown> | null }
 }
 
 export async function GET(_: NextRequest, { params }: { params: Promise<Params> }) {
   const { conversationId } = await params
   const access = await ensureAccess(conversationId)
   if (access.error) return access.error
-  if (!access.conversation || !access.user) {
+  if (!access.conversation || !access.userId || !access.supabase) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -44,7 +42,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<Params> 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const otherPartyId =
-    access.conversation.guest_id === access.user.id ? access.conversation.host_id : access.conversation.guest_id
+    access.conversation.guest_id === access.userId ? access.conversation.host_id : access.conversation.guest_id
 
   const [{ data: profile }, { data: listing }, { data: booking }] = await Promise.all([
     access.supabase
@@ -77,7 +75,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
   const { conversationId } = await params
   const access = await ensureAccess(conversationId)
   if (access.error) return access.error
-  if (!access.conversation || !access.user) {
+  if (!access.conversation || !access.userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
   const admin = createAdminClient()
@@ -91,7 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
     .from("messages")
     .update({ read_at: new Date().toISOString() })
     .eq("conversation_id", conversationId)
-    .neq("sender_id", access.user.id)
+    .neq("sender_id", access.userId)
     .is("read_at", null)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

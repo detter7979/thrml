@@ -15,16 +15,66 @@ export async function POST(
 
   const body = (await req.json().catch(() => ({}))) as { deactivateOriginal?: boolean }
 
-  const { data: listing, error } = await supabase
-    .from("listings")
-    .select("id, host_id, parent_listing_id")
-    .eq("id", id)
-    .eq("host_id", user.id)
-    .single()
+  const selectCandidates = [
+    "id, host_id, parent_listing_id, access_type, access_code, access_code_template",
+    "id, host_id, parent_listing_id, access_type, access_code_template",
+    "id, host_id, parent_listing_id, access_type, access_code",
+    "id, host_id, parent_listing_id, access_type",
+  ] as const
+  let listing: Record<string, unknown> | null = null
+  let error: { message?: string } | null = null
+  for (const select of selectCandidates) {
+    const attempt = await supabase
+      .from("listings")
+      .select(select)
+      .eq("id", id)
+      .eq("host_id", user.id)
+      .maybeSingle()
+    if (!attempt.error) {
+      listing = attempt.data as Record<string, unknown> | null
+      error = null
+      break
+    }
+    error = attempt.error
+    if (!attempt.error.message.toLowerCase().includes("column")) break
+  }
 
   if (error || !listing) {
     return NextResponse.json({ error: "Listing not found" }, { status: 404 })
   }
+
+  const accessTypeRaw =
+    typeof (listing as Record<string, unknown>).access_type === "string"
+      ? ((listing as Record<string, unknown>).access_type as string).trim().toLowerCase()
+      : "code"
+  const accessType =
+    accessTypeRaw === "keypick" || accessTypeRaw === "host_present"
+      ? "host_onsite"
+      : accessTypeRaw === "smart_lock"
+        ? "code"
+        : accessTypeRaw
+  const accessCode =
+    typeof (listing as Record<string, unknown>).access_code === "string"
+      ? ((listing as Record<string, unknown>).access_code as string)
+      : typeof (listing as Record<string, unknown>).access_code_template === "string"
+        ? ((listing as Record<string, unknown>).access_code_template as string)
+        : ""
+  const codeRequired = accessType === "code" || accessType === "lockbox"
+  if (codeRequired && accessCode.trim() === "") {
+    return NextResponse.json(
+      {
+        error: `An access code is required for ${
+          accessType === "code" ? "code" : "lockbox"
+        } entry. Add it in your listing settings before going live.`,
+      },
+      { status: 400 }
+    )
+  }
+  const listingId = String((listing as Record<string, unknown>).id)
+  const parentListingId =
+    typeof (listing as Record<string, unknown>).parent_listing_id === "string"
+      ? ((listing as Record<string, unknown>).parent_listing_id as string)
+      : null
 
   const publishPayload: Record<string, unknown> = {
     is_draft: false,
@@ -34,7 +84,7 @@ export async function POST(
     const { error: publishError } = await supabase
       .from("listings")
       .update(publishPayload)
-      .eq("id", listing.id)
+      .eq("id", listingId)
       .eq("host_id", user.id)
     if (!publishError) break
     const message = publishError.message ?? ""
@@ -46,7 +96,7 @@ export async function POST(
     delete publishPayload[missingColumn]
   }
 
-  if (body.deactivateOriginal && typeof listing.parent_listing_id === "string") {
+  if (body.deactivateOriginal && parentListingId) {
     const deactivatePayload: Record<string, unknown> = {
       is_active: false,
       deactivated_at: new Date().toISOString(),
@@ -57,7 +107,7 @@ export async function POST(
       const { error: deactivateError } = await supabase
         .from("listings")
         .update(deactivatePayload)
-        .eq("id", listing.parent_listing_id)
+        .eq("id", parentListingId)
         .eq("host_id", user.id)
       if (!deactivateError) break
 

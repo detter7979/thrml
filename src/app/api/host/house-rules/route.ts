@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+import { sanitizeText } from "@/lib/sanitize"
 import { createClient } from "@/lib/supabase/server"
 
 const payloadSchema = z
@@ -27,7 +28,7 @@ export async function PATCH(req: NextRequest) {
 
   const uniqueRules: string[] = []
   for (const rule of parsed.data.houseRules) {
-    const normalized = rule.trim()
+    const normalized = sanitizeText(rule)
     if (!normalized) continue
     if (!uniqueRules.includes(normalized)) uniqueRules.push(normalized)
   }

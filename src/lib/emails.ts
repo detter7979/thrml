@@ -593,3 +593,141 @@ export async function sendGuestBookingPaymentCaptureFailedEmail(booking: Booking
     preferenceKey: "booking_cancelled",
   })
 }
+
+function buildDarkReminderEmail(params: {
+  title: string
+  intro: string
+  lines: string[]
+  ctaLabel: string
+  ctaUrl: string
+}) {
+  const linesHtml = params.lines.map((line) => `<p style="margin:0 0 8px;">${line}</p>`).join("")
+  const html = `
+    <div style="margin:0;padding:28px 12px;background:#1a1a1a;">
+      <div style="max-width:620px;margin:0 auto;background:#262626;border:1px solid #3a3a3a;border-radius:12px;overflow:hidden;font-family:Arial,sans-serif;color:#f7f7f7;">
+        <div style="padding:18px 24px;border-bottom:1px solid #3a3a3a;">
+          <div style="font-size:22px;font-weight:700;letter-spacing:0.4px;">THRML</div>
+        </div>
+        <div style="padding:24px;">
+          <p style="margin:0 0 12px;">${params.intro}</p>
+          <p style="margin:0 0 12px;font-weight:700;">${params.title}</p>
+          ${linesHtml}
+          <p style="margin:16px 0 0;">
+            <a href="${params.ctaUrl}" style="display:inline-block;background:#C4623A;color:#FFFFFF;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700;">${params.ctaLabel}</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  `
+  const text = [params.intro, "", params.title, ...params.lines, "", `${params.ctaLabel}: ${params.ctaUrl}`].join("\n")
+  return { html, text }
+}
+
+export async function sendHostOnsiteReminder(args: {
+  hostId: string
+  hostEmail: string | null
+  hostName: string | null
+  bookingId: string
+  listingTitle: string
+  guestName: string | null
+  startTimeLabel: string
+  accessInstructions: string | null
+}) {
+  if (!args.hostEmail) return { sent: false, error: "Missing host email" }
+  const subject = `Reminder - guest arriving in 2 hours at ${args.listingTitle}`
+  const email = buildDarkReminderEmail({
+    intro: `Hi ${firstName(args.hostName, "there")},`,
+    title: args.listingTitle,
+    lines: [
+      `${args.guestName ?? "Your guest"} is arriving in about 2 hours.`,
+      `Session time: ${args.startTimeLabel}`,
+      args.accessInstructions ? `Guest arrival notes: ${args.accessInstructions}` : "Be ready to greet your guest on arrival.",
+    ].filter(Boolean) as string[],
+    ctaLabel: "Open host booking",
+    ctaUrl: `${APP_URL}/dashboard/listings?highlight=${args.bookingId}`,
+  })
+  return sendEmail({
+    to: args.hostEmail,
+    subject,
+    html: email.html,
+    text: email.text,
+    userId: args.hostId,
+    preferenceKey: "new_booking",
+  })
+}
+
+export async function sendGuestOnsiteReminder(args: {
+  guestId: string | null
+  to: string | null
+  guestName: string | null
+  listingTitle: string
+  address: string
+  accessInstructions: string | null
+  onsiteContactName: string | null
+  onsiteContactPhone: string | null
+  startTimeLabel: string
+  endTimeLabel: string
+  bookingId: string
+}) {
+  if (!args.to) return { sent: false, error: "Missing guest email" }
+  const subject = `Your session at ${args.listingTitle} is in 2 hours`
+  const contactLine =
+    args.onsiteContactName && args.onsiteContactPhone
+      ? `Need help finding the space? Reach ${args.onsiteContactName} at ${args.onsiteContactPhone}.`
+      : null
+  const email = buildDarkReminderEmail({
+    intro: `Hi ${firstName(args.guestName)},`,
+    title: args.listingTitle,
+    lines: [
+      `Address: ${args.address}`,
+      `Session time: ${args.startTimeLabel} - ${args.endTimeLabel}`,
+      "Your host will meet you on arrival.",
+      args.accessInstructions ? `Entry notes: ${args.accessInstructions}` : null,
+      contactLine,
+    ].filter(Boolean) as string[],
+    ctaLabel: "View booking details",
+    ctaUrl: `${APP_URL}/dashboard/bookings/${args.bookingId}`,
+  })
+  return sendEmail({
+    to: args.to,
+    subject,
+    html: email.html,
+    text: email.text,
+    userId: args.guestId ?? null,
+    preferenceKey: "new_booking",
+  })
+}
+
+export async function sendGuestEntryInstructionsEmail(args: {
+  guestId: string | null
+  to: string | null
+  guestName: string | null
+  listingTitle: string
+  address: string
+  accessInstructions: string
+  startTimeLabel: string
+  endTimeLabel: string
+  bookingId: string
+}) {
+  if (!args.to) return { sent: false, error: "Missing guest email" }
+  const subject = `Your session at ${args.listingTitle} is in 2 hours`
+  const email = buildDarkReminderEmail({
+    intro: `Hi ${firstName(args.guestName)},`,
+    title: args.listingTitle,
+    lines: [
+      `Address: ${args.address}`,
+      `Session time: ${args.startTimeLabel} - ${args.endTimeLabel}`,
+      `Entry instructions: ${args.accessInstructions}`,
+    ],
+    ctaLabel: "View booking details",
+    ctaUrl: `${APP_URL}/dashboard/bookings/${args.bookingId}`,
+  })
+  return sendEmail({
+    to: args.to,
+    subject,
+    html: email.html,
+    text: email.text,
+    userId: args.guestId ?? null,
+    preferenceKey: "new_booking",
+  })
+}

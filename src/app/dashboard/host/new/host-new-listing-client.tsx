@@ -33,6 +33,7 @@ import {
 } from "@/lib/constants/cancellation-policies"
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
 import { SERVICE_TYPES } from "@/lib/constants/service-types"
+import { sanitizeText } from "@/lib/sanitize"
 import { createClient } from "@/lib/supabase/client"
 import { getPricePerPerson } from "@/lib/pricing"
 import type { ServiceTypeId } from "@/lib/service-types"
@@ -690,9 +691,13 @@ export function HostNewListingClient({
       Number(values.serviceDurationMaxHours ?? 0) * 60 + Number(values.serviceDurationMaxMinutes ?? 0)
     const hasServiceDuration = serviceDurationMinTotal > 0 && serviceDurationMaxTotal > 0
 
+    const sanitizedTitle = sanitizeText(values.title)
+    const sanitizedDescription = sanitizeText(values.description)
+    const sanitizedHouseRules = defaultHouseRules.map((rule) => sanitizeText(rule)).filter(Boolean)
+
     const listingPayload: Record<string, unknown> = {
       host_id: userId,
-      title: values.title,
+      title: sanitizedTitle,
       service_type: values.serviceType,
       sauna_type: values.saunaType,
       capacity: values.capacity,
@@ -710,7 +715,7 @@ export function HostNewListingClient({
       service_duration_unit: "minutes",
       max_temp: values.maxTemperature,
       max_temperature: values.maxTemperature,
-      description: values.description,
+      description: sanitizedDescription,
       amenities: values.amenities,
       location_address: values.address,
       location: values.address,
@@ -737,7 +742,7 @@ export function HostNewListingClient({
       instant_book: values.instantBook,
       is_instant_book: values.instantBook,
       cancellation_policy: values.cancellationPolicy,
-      house_rules: defaultHouseRules,
+      house_rules: sanitizedHouseRules,
       is_active: true,
     }
 

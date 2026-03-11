@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 import { sendAccessCode } from "@/lib/access/send-access-code"
+import { requireAuth } from "@/lib/auth-check"
+import { rateLimit } from "@/lib/rate-limit"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 
 const payloadSchema = z.object({
   code: z.string().trim().min(1).max(20),
@@ -24,13 +25,19 @@ function isMissingColumnError(message: string) {
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<Params> }) {
   try {
+    const limited = rateLimit(req, {
+      maxRequests: 20,
+      windowMs: 60 * 1000,
+      identifier: "bookings",
+    })
+    if (limited) return limited
+
     const { id } = await params
-    const supabase = await createClient()
+    const { error: authError, session } = await requireAuth()
+    if (authError || !session) {
+      return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     const admin = createAdminClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const parsed = payloadSchema.safeParse(await req.json().catch(() => null))
     if (!parsed.success) {
@@ -54,7 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
     if (listingError || !listing) {
       return NextResponse.json({ error: listingError?.message ?? "Listing not found" }, { status: 404 })
     }
-    if (listing.host_id !== user.id) {
+    if (listing.host_id !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 

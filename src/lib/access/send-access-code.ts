@@ -343,13 +343,21 @@ export async function sendAccessCode(
       }
       await admin.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", conversationId)
     }
-    const updateSentAt = await admin
+    const sentAtIso = new Date().toISOString()
+    const updateSent = await admin
       .from("bookings")
-      .update({ access_code_sent_at: new Date().toISOString() })
+      .update({ access_code_sent: true, access_code_sent_at: sentAtIso })
       .eq("id", booking.id)
-    if (updateSentAt.error) {
-      if (!isMissingColumnError(updateSentAt.error.message)) {
-        return { sent: false, error: updateSentAt.error.message }
+    if (updateSent.error) {
+      if (!isMissingColumnError(updateSent.error.message)) {
+        return { sent: false, error: updateSent.error.message }
+      }
+      const updateSentAtOnly = await admin
+        .from("bookings")
+        .update({ access_code_sent_at: sentAtIso })
+        .eq("id", booking.id)
+      if (updateSentAtOnly.error && !isMissingColumnError(updateSentAtOnly.error.message)) {
+        return { sent: false, error: updateSentAtOnly.error.message }
       }
     }
 

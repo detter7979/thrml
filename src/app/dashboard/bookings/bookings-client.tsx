@@ -11,19 +11,14 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
-  Handshake,
-  KeyRound,
   List,
-  Lock,
   MapPin,
-  Smartphone,
   Star,
-  User,
 } from "lucide-react"
 
 import { CancelModal } from "@/components/booking/CancelModal"
 import { Button } from "@/components/ui/button"
-import { ACCESS_TYPES, resolveInstructions } from "@/lib/constants/access-types"
+import { resolveInstructions } from "@/lib/constants/access-types"
 import { formatServiceType, getServiceType } from "@/lib/constants/service-types"
 
 type BookingStatus = "pending" | "pending_host" | "confirmed" | "cancelled" | "completed" | "declined" | string
@@ -67,6 +62,8 @@ type BookingRecord = {
     access_type?: string | null
     access_instructions?: string | null
     access_code_send_timing?: string | null
+    onsite_contact_name?: string | null
+    onsite_contact_phone?: string | null
   } | null
   host: {
     id: string
@@ -91,19 +88,12 @@ function serviceName(serviceType: string | null) {
   return formatServiceType(key)
 }
 
-const ACCESS_ICON_MAP = {
-  KeyRound,
-  Lock,
-  Handshake,
-  Smartphone,
-  User,
-} as const
-
-function timingLabel(timing: string | null | undefined) {
-  if (timing === "on_confirm") return "once the booking is confirmed"
-  if (timing === "24h_before") return "24 hours before your session"
-  if (timing === "1h_before") return "1 hour before your session"
-  return "before your session"
+function normalizedAccessType(value: string | null | undefined) {
+  const key = (value ?? "code").trim().toLowerCase()
+  if (key === "keypick" || key === "host_present") return "host_onsite"
+  if (key === "smart_lock") return "code"
+  if (key === "host_onsite" || key === "other" || key === "lockbox" || key === "code") return key
+  return "code"
 }
 
 function formatDuration(hours: number | null) {
@@ -280,6 +270,36 @@ function mapsLinkFor(address: string) {
   return isIOS
     ? `maps://maps.apple.com/?q=${encodeURIComponent(address)}`
     : `https://maps.google.com/?q=${encodeURIComponent(address)}`
+}
+
+function getAccessReleaseState(booking: BookingRecord) {
+  if (!booking.session_date || !booking.start_time) {
+    return {
+      released: true,
+      minutesUntilRelease: 0,
+      hoursUntilRelease: 0,
+    }
+  }
+  const sessionStart = new Date(`${booking.session_date}T${booking.start_time}`)
+  if (Number.isNaN(sessionStart.getTime())) {
+    return {
+      released: true,
+      minutesUntilRelease: 0,
+      hoursUntilRelease: 0,
+    }
+  }
+  const twoHoursBefore = new Date(sessionStart.getTime() - 2 * 60 * 60 * 1000)
+  const now = new Date()
+  const released = now >= twoHoursBefore
+  const minutesUntilRelease = Math.max(
+    0,
+    Math.ceil((twoHoursBefore.getTime() - now.getTime()) / (1000 * 60))
+  )
+  return {
+    released,
+    minutesUntilRelease,
+    hoursUntilRelease: Math.ceil(minutesUntilRelease / 60),
+  }
 }
 
 function BookingSkeleton() {
@@ -618,10 +638,9 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                   booking.status !== "pending_host" &&
                   booking.status !== "cancelled" &&
                   booking.status !== "declined"
-                const accessTypeKey = (booking.listings?.access_type ?? "code") as keyof typeof ACCESS_TYPES
-                const accessTypeMeta = ACCESS_TYPES[accessTypeKey] ?? ACCESS_TYPES.code
+                const accessType = normalizedAccessType(booking.listings?.access_type ?? "code")
                 const showAccessDetails = booking.status === "confirmed"
-                const hasSentAccessDetails = Boolean(booking.access_code_sent_at)
+                const releaseState = getAccessReleaseState(booking)
                 const confirmationDeadlineLabel =
                   booking.status === "pending_host" ? formatDeadline(booking.confirmation_deadline ?? null) : null
                 const total = Number(booking.total_charged ?? 0)
@@ -814,85 +833,114 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                         <div className="space-y-3">
                           <div className="rounded-xl bg-white p-3">
                             {showAccessDetails ? (
-                              hasSentAccessDetails ? (
-                                <div className="mb-3 rounded-lg border border-[#E9DFD3] bg-[#FCFAF7] p-3">
-                                  <div className="flex items-center gap-2 text-sm font-medium text-[#1A1410]">
-                                    {(() => {
-                                      const Icon =
-                                        ACCESS_ICON_MAP[
-                                          (accessTypeMeta.icon as keyof typeof ACCESS_ICON_MAP) ?? "KeyRound"
-                                        ] ?? KeyRound
-                                      return <Icon className="size-4" />
-                                    })()}
-                                    How to get in
+                              <div className="mb-3 rounded-lg border border-[#E9DFD3] bg-[#FCFAF7] p-3">
+                                {(accessType === "code" || accessType === "lockbox") && !releaseState.released ? (
+                                  <div className="rounded-lg bg-neutral-100 p-3">
+                                    <p className="text-xs uppercase tracking-wide text-neutral-500">Access code</p>
+                                    <p className="mt-1 text-sm font-medium text-neutral-800">
+                                      Releases 2 hours before your session
+                                    </p>
+                                    <p className="text-xs text-neutral-500">
+                                      {releaseState.minutesUntilRelease > 60
+                                        ? `Available in ${releaseState.hoursUntilRelease} hour${
+                                            releaseState.hoursUntilRelease === 1 ? "" : "s"
+                                          }`
+                                        : `Available in ${releaseState.minutesUntilRelease} minutes`}
+                                    </p>
                                   </div>
-                                  {accessTypeMeta.supportsCode && booking.access_code ? (
+                                ) : null}
+                                {(accessType === "code" || accessType === "lockbox") && releaseState.released ? (
+                                  <>
+                                    <p className="text-xs uppercase tracking-wide text-[#8A7769]">
+                                      {accessType === "code" ? "Keypad code" : "Lockbox code"}
+                                    </p>
                                     <div className="mt-2 rounded-lg bg-[#F5EFE9] p-3">
-                                      <p className="text-xs text-[#6D5E51]">
-                                        {accessTypeKey === "lockbox" ? "Lockbox combination" : "Access code"}
-                                      </p>
                                       <div className="mt-1 flex items-center justify-between gap-2">
-                                        <p className="font-mono text-lg tracking-[0.15em] text-[#5D4D41]">{booking.access_code}</p>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            booking.access_code
-                                              ? void copyAccessCode(booking.id, booking.access_code)
-                                              : undefined
-                                          }
-                                          className="inline-flex items-center gap-1 rounded-md border border-[#E8BE9A] bg-[#FFF9F3] px-2 py-1 text-xs text-[#C75B3A] hover:bg-[#FFF1E5]"
-                                        >
-                                          {copiedBookingId === booking.id ? (
-                                            <>
-                                              <Check className="size-3.5" />
-                                              Copied!
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Copy className="size-3.5" />
-                                              Copy
-                                            </>
-                                          )}
-                                        </button>
+                                        <p className="font-mono text-lg tracking-[0.15em] text-[#5D4D41]">
+                                          {booking.access_code ?? "Code will be shared shortly"}
+                                        </p>
+                                        {booking.access_code ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => void copyAccessCode(booking.id, booking.access_code as string)}
+                                            className="inline-flex items-center gap-1 rounded-md border border-[#E8BE9A] bg-[#FFF9F3] px-2 py-1 text-xs text-[#C75B3A] hover:bg-[#FFF1E5]"
+                                          >
+                                            {copiedBookingId === booking.id ? (
+                                              <>
+                                                <Check className="size-3.5" />
+                                                Copied!
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Copy className="size-3.5" />
+                                                Copy
+                                              </>
+                                            )}
+                                          </button>
+                                        ) : null}
                                       </div>
                                     </div>
-                                  ) : null}
-                                  <p className="mt-2 text-xs uppercase tracking-wide text-[#8A7769]">Entry instructions</p>
-                                  <p className="mt-1 text-sm text-[#5E4E42]">
-                                    {resolveInstructions(booking.listings?.access_instructions ?? "", {
-                                      code: booking.access_code ?? "",
-                                      date: booking.session_date
-                                        ? new Date(`${booking.session_date}T12:00:00`).toLocaleDateString(undefined, {
-                                            month: "long",
-                                            day: "numeric",
-                                            year: "numeric",
-                                          })
-                                        : "",
-                                      time:
-                                        booking.session_date && booking.start_time
-                                          ? new Date(`${booking.session_date}T${booking.start_time}`).toLocaleTimeString([], {
-                                              hour: "numeric",
-                                              minute: "2-digit",
-                                            })
-                                          : "",
-                                      guestName: "there",
-                                      duration: formatDuration(booking.duration_hours),
-                                    })}
-                                  </p>
-                                  <div className="mt-2 border-t border-dashed pt-2 text-xs">
-                                    <p className="text-[#6C5B4F]">Having trouble getting in?</p>
-                                    {booking.conversation_id ? (
-                                      <Link className="text-[#C75B3A] underline" href={`/dashboard/messages/${booking.conversation_id}`}>
-                                        Message {booking.host?.full_name?.split(" ")[0] ?? "host"} →
-                                      </Link>
+                                  </>
+                                ) : null}
+                                {accessType === "host_onsite" ? (
+                                  <div className="rounded-lg bg-neutral-100 p-3">
+                                    <p className="text-sm font-medium text-neutral-800">
+                                      🙋 Your host will meet you on arrival
+                                    </p>
+                                    {booking.listings?.access_instructions ? (
+                                      <p className="mt-1 text-xs text-neutral-500">{booking.listings.access_instructions}</p>
+                                    ) : null}
+                                    {booking.listings?.onsite_contact_name && booking.listings?.onsite_contact_phone ? (
+                                      <p className="mt-2 text-xs text-neutral-500">
+                                        📞 {booking.listings.onsite_contact_name} · {booking.listings.onsite_contact_phone}
+                                      </p>
                                     ) : null}
                                   </div>
+                                ) : null}
+                                {accessType === "other" ? (
+                                  <div className="rounded-lg bg-neutral-100 p-3">
+                                    <p className="text-xs uppercase tracking-wide text-neutral-500">Entry instructions</p>
+                                    <p className="mt-1 text-sm text-neutral-700">
+                                      {booking.listings?.access_instructions ||
+                                        "Your host will provide entry details before your session."}
+                                    </p>
+                                  </div>
+                                ) : null}
+                                {(accessType === "code" || accessType === "lockbox") && booking.listings?.access_instructions ? (
+                                  <>
+                                    <p className="mt-2 text-xs uppercase tracking-wide text-[#8A7769]">Entry instructions</p>
+                                    <p className="mt-1 text-sm text-[#5E4E42]">
+                                      {resolveInstructions(booking.listings?.access_instructions ?? "", {
+                                        code: booking.access_code ?? "",
+                                        date: booking.session_date
+                                          ? new Date(`${booking.session_date}T12:00:00`).toLocaleDateString(undefined, {
+                                              month: "long",
+                                              day: "numeric",
+                                              year: "numeric",
+                                            })
+                                          : "",
+                                        time:
+                                          booking.session_date && booking.start_time
+                                            ? new Date(`${booking.session_date}T${booking.start_time}`).toLocaleTimeString([], {
+                                                hour: "numeric",
+                                                minute: "2-digit",
+                                              })
+                                            : "",
+                                        guestName: "there",
+                                        duration: formatDuration(booking.duration_hours),
+                                      })}
+                                    </p>
+                                  </>
+                                ) : null}
+                                <div className="mt-2 border-t border-dashed pt-2 text-xs">
+                                  <p className="text-[#6C5B4F]">Having trouble getting in?</p>
+                                  {booking.conversation_id ? (
+                                    <Link className="text-[#C75B3A] underline" href={`/dashboard/messages/${booking.conversation_id}`}>
+                                      Message {booking.host?.full_name?.split(" ")[0] ?? "host"} →
+                                    </Link>
+                                  ) : null}
                                 </div>
-                              ) : (
-                                <div className="mb-3 rounded-lg border border-[#E9DFD3] bg-[#F8F4EF] p-3 text-sm text-[#6A5848]">
-                                  🔐 Access details will be sent {timingLabel(booking.listings?.access_code_send_timing)}.
-                                </div>
-                              )
+                              </div>
                             ) : null}
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
@@ -1011,37 +1059,66 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                             <div className="my-4 border-t border-[#F0E8E0]" />
                             <section className="space-y-2">
                               <p className="font-medium">🔐 Access details</p>
-                              {showAccessDetails && hasSentAccessDetails && booking.access_code ? (
-                                <div className="rounded-lg border border-[#E9DFD3] bg-[#FCFAF7] p-3">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className="font-mono text-lg tracking-[0.15em] text-[#5D4D41]">{booking.access_code}</p>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        booking.access_code
-                                          ? void copyAccessCode(booking.id, booking.access_code)
-                                          : undefined
-                                      }
-                                      className="inline-flex items-center gap-1 rounded-md border border-[#E8BE9A] bg-[#FFF9F3] px-2 py-1 text-xs text-[#C75B3A]"
-                                    >
-                                      {copiedBookingId === booking.id ? "Copied!" : "Copy"}
-                                    </button>
-                                  </div>
-                                  <p className="mt-2 text-sm leading-relaxed text-[#5E4E42]">
-                                    {resolveInstructions(booking.listings?.access_instructions ?? "", {
-                                      code: booking.access_code ?? "",
-                                      date: booking.session_date ?? "",
-                                      time: booking.start_time ?? "",
-                                      guestName: "there",
-                                      duration: formatDuration(booking.duration_hours),
-                                    })}
-                                  </p>
-                                </div>
-                              ) : (
-                                <p className="text-[#6A5848]">
-                                  Access details will be sent {timingLabel(booking.listings?.access_code_send_timing)}.
-                                </p>
-                              )}
+                              {showAccessDetails ? (
+                                <>
+                                  {(accessType === "code" || accessType === "lockbox") && !releaseState.released ? (
+                                    <p className="text-[#6A5848]">
+                                      Access code releases 2 hours before your session (
+                                      {releaseState.minutesUntilRelease > 60
+                                        ? `${releaseState.hoursUntilRelease}h`
+                                        : `${releaseState.minutesUntilRelease}m`}{" "}
+                                      remaining).
+                                    </p>
+                                  ) : null}
+                                  {(accessType === "code" || accessType === "lockbox") && releaseState.released ? (
+                                    <div className="rounded-lg border border-[#E9DFD3] bg-[#FCFAF7] p-3">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="font-mono text-lg tracking-[0.15em] text-[#5D4D41]">
+                                          {booking.access_code ?? "Code will be shared shortly"}
+                                        </p>
+                                        {booking.access_code ? (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              booking.access_code
+                                                ? void copyAccessCode(booking.id, booking.access_code)
+                                                : undefined
+                                            }
+                                            className="inline-flex items-center gap-1 rounded-md border border-[#E8BE9A] bg-[#FFF9F3] px-2 py-1 text-xs text-[#C75B3A]"
+                                          >
+                                            {copiedBookingId === booking.id ? "Copied!" : "Copy"}
+                                          </button>
+                                        ) : null}
+                                      </div>
+                                      {booking.listings?.access_instructions ? (
+                                        <p className="mt-2 text-sm leading-relaxed text-[#5E4E42]">
+                                          {resolveInstructions(booking.listings?.access_instructions ?? "", {
+                                            code: booking.access_code ?? "",
+                                            date: booking.session_date ?? "",
+                                            time: booking.start_time ?? "",
+                                            guestName: "there",
+                                            duration: formatDuration(booking.duration_hours),
+                                          })}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                  {accessType === "host_onsite" ? (
+                                    <p className="text-[#6A5848]">
+                                      Your host will meet you on arrival.
+                                      {booking.listings?.onsite_contact_name && booking.listings?.onsite_contact_phone
+                                        ? ` Reach ${booking.listings.onsite_contact_name} at ${booking.listings.onsite_contact_phone}.`
+                                        : ""}
+                                    </p>
+                                  ) : null}
+                                  {accessType === "other" ? (
+                                    <p className="text-[#6A5848]">
+                                      {booking.listings?.access_instructions ||
+                                        "Your host will provide entry details before your session."}
+                                    </p>
+                                  ) : null}
+                                </>
+                              ) : null}
                             </section>
                             <div className="my-4 border-t border-[#F0E8E0]" />
                             <section className="space-y-1">

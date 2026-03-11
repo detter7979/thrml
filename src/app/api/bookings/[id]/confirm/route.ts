@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { sendAccessCode } from "@/lib/access/send-access-code"
 import { sendAutomatedBookingConfirmedByHostMessage } from "@/lib/automated-messages"
+import { requireAuth } from "@/lib/auth-check"
 import {
   sendGuestBookingConfirmedEmail,
   sendGuestBookingPaymentCaptureFailedEmail,
   sendHostBookingConfirmedEmail,
 } from "@/lib/emails"
+import { rateLimit } from "@/lib/rate-limit"
 import { stripe } from "@/lib/stripe"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 
 type Params = { id: string }
 
@@ -20,14 +21,20 @@ function isCodeAccessType(value: unknown) {
   )
 }
 
-export async function PATCH(_: NextRequest, { params }: { params: Promise<Params> }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<Params> }) {
+  const limited = rateLimit(req, {
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    identifier: "bookings",
+  })
+  if (limited) return limited
+
   const { id } = await params
-  const supabase = await createClient()
+  const { error: authError, session } = await requireAuth()
+  if (authError || !session) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   const admin = createAdminClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { data: booking, error: bookingError } = await admin
     .from("bookings")
@@ -99,8 +106,8 @@ export async function PATCH(_: NextRequest, { params }: { params: Promise<Params
     .eq("id", booking.listing_id)
     .maybeSingle()
 
-  const isListingHost = Boolean(listing && listing.host_id === user.id)
-  const isBookingHost = booking.host_id === user.id
+  const isListingHost = Boolean(listing && listing.host_id === session.user.id)
+  const isBookingHost = booking.host_id === session.user.id
   if (!isListingHost && !isBookingHost) {
     return NextResponse.json(
       { error: "Forbidden: you are not the host for this booking request." },
@@ -110,7 +117,7 @@ export async function PATCH(_: NextRequest, { params }: { params: Promise<Params
 
   const listingRecord = listing ?? {
     id: booking.listing_id,
-    host_id: user.id,
+    host_id: session.user.id,
     title: "Thrml session",
     access_type: null,
     access_instructions: null,
@@ -121,7 +128,7 @@ export async function PATCH(_: NextRequest, { params }: { params: Promise<Params
     service_type: "sauna",
   }
 
-  const hostId = booking.host_id === user.id ? booking.host_id : user.id
+  const hostId = booking.host_id === session.user.id ? booking.host_id : session.user.id
   if (hostId !== booking.host_id) {
     await admin.from("bookings").update({ host_id: hostId }).eq("id", booking.id).eq("status", "pending_host")
   }

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
-import { applyMemoryRateLimit, requestIp } from "@/lib/security"
+import { requireAuth } from "@/lib/auth-check"
+import { rateLimit } from "@/lib/rate-limit"
+import { sanitizeText } from "@/lib/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 
 const messageSchema = z.object({
   conversationId: z.string().uuid(),
@@ -12,12 +13,10 @@ const messageSchema = z.object({
 })
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error, session, supabase } = await requireAuth()
+  if (error || !session || !supabase) {
+    return error ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   const conversationId = req.nextUrl.searchParams.get("conversationId")
   if (!conversationId) return NextResponse.json({ error: "Missing conversationId" }, { status: 400 })
@@ -29,7 +28,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
 
   if (conversationError) return NextResponse.json({ error: conversationError.message }, { status: 500 })
-  if (!conversation || (conversation.guest_id !== user.id && conversation.host_id !== user.id)) {
+  if (!conversation || (conversation.guest_id !== session.user.id && conversation.host_id !== session.user.id)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -44,28 +43,24 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = requestIp(req)
-  const limit = applyMemoryRateLimit({
-    key: `api:messages:send:${ip}`,
-    max: 60,
-    windowMs: 60_000,
+  const limited = rateLimit(req, {
+    maxRequests: 30,
+    windowMs: 60 * 1000,
+    identifier: "messages",
   })
-  if (!limit.allowed) {
-    return NextResponse.json({ error: "Too many messages sent. Please slow down." }, { status: 429 })
+  if (limited) return limited
+
+  const { error, session, supabase } = await requireAuth()
+  if (error || !session || !supabase) {
+    return error ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-
-  const supabase = await createClient()
   const admin = createAdminClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const parsed = messageSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
   const conversationId = parsed.data.conversationId
-  const body = parsed.data.body
+  const body = sanitizeText(parsed.data.body)
+  if (!body) return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
   const messageType = parsed.data.messageType ?? "text"
 
   const { data: conversation, error: conversationError } = await supabase
@@ -75,7 +70,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   if (conversationError) return NextResponse.json({ error: conversationError.message }, { status: 500 })
-  if (!conversation || (conversation.guest_id !== user.id && conversation.host_id !== user.id)) {
+  if (!conversation || (conversation.guest_id !== session.user.id && conversation.host_id !== session.user.id)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -83,7 +78,7 @@ export async function POST(req: NextRequest) {
     .from("messages")
     .insert({
       conversation_id: conversationId,
-      sender_id: user.id,
+      sender_id: session.user.id,
       body,
       content: body,
       message_type: messageType,

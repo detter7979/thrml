@@ -1,15 +1,30 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
 import { newsletterWelcomeVariantA as welcomeEmail } from "@/lib/emails/templates"
+import { rateLimit } from "@/lib/rate-limit"
+import { sanitizeText } from "@/lib/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json().catch(() => null)) as { email?: unknown } | null
-    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : ""
+    const limited = rateLimit(request, {
+      maxRequests: 3,
+      windowMs: 10 * 60 * 1000,
+      identifier: "newsletter",
+    })
+    if (limited) return limited
+
+    const body = (await request.json().catch(() => null)) as { email?: unknown; website?: unknown } | null
+    const honeypot = typeof body?.website === "string" ? body.website.trim() : ""
+    if (honeypot.length > 0) {
+      // Silently accept but do not process to avoid tipping off bots.
+      return NextResponse.json({ success: true })
+    }
+
+    const email = typeof body?.email === "string" ? sanitizeText(body.email).toLowerCase() : ""
     if (!VALID_EMAIL_REGEX.test(email)) {
       return NextResponse.json({ error: "Valid email required" }, { status: 400 })
     }

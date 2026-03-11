@@ -14,9 +14,10 @@ import {
   sendGuestHostCancelledNotice,
   sendHostCancellationNotice,
 } from "@/lib/emails"
+import { requireAuth } from "@/lib/auth-check"
+import { rateLimit } from "@/lib/rate-limit"
 import { stripe } from "@/lib/stripe"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 
 type Params = { id: string }
 
@@ -85,6 +86,13 @@ function calculateRefundPreview(params: {
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<Params> }) {
+  const limited = rateLimit(req, {
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    identifier: "bookings",
+  })
+  if (limited) return limited
+
   const { id } = await params
   const bodyRaw = await req.json().catch(() => null)
   const parsed = cancelSchema.safeParse(bodyRaw)
@@ -92,11 +100,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
     return NextResponse.json({ error: "Invalid payload", details: parsed.error.flatten() }, { status: 400 })
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error: authError, session } = await requireAuth()
+  if (authError || !session) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   const admin = createAdminClient()
   const { data: booking, error: bookingError } = await admin
@@ -114,8 +121,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
   }
 
   const cancelledBy = parsed.data.cancelled_by
-  const isGuestRequester = cancelledBy === "guest" && booking.guest_id === user.id
-  const isHostRequester = cancelledBy === "host" && booking.host_id === user.id
+  const isGuestRequester = cancelledBy === "guest" && booking.guest_id === session.user.id
+  const isHostRequester = cancelledBy === "host" && booking.host_id === session.user.id
   if (!isGuestRequester && !isHostRequester) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }

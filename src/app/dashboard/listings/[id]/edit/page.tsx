@@ -97,11 +97,23 @@ export default async function EditListingPage({
         accessType:
           typeof listing.access_type === "string" ? listing.access_type : "code",
         accessCodeTemplate:
-          typeof listing.access_code_template === "string" ? listing.access_code_template : "",
+          typeof listing.access_code_template === "string"
+            ? listing.access_code_template
+            : typeof (listing as Record<string, unknown>).access_code === "string"
+              ? ((listing as Record<string, unknown>).access_code as string)
+              : "",
         accessCodeType:
           typeof listing.access_code_type === "string" ? listing.access_code_type : "static",
         accessInstructions:
           typeof listing.access_instructions === "string" ? listing.access_instructions : "",
+        onsiteContactName:
+          typeof (listing as Record<string, unknown>).onsite_contact_name === "string"
+            ? ((listing as Record<string, unknown>).onsite_contact_name as string)
+            : "",
+        onsiteContactPhone:
+          typeof (listing as Record<string, unknown>).onsite_contact_phone === "string"
+            ? ((listing as Record<string, unknown>).onsite_contact_phone as string)
+            : "",
         accessCodeSendTiming:
           typeof listing.access_code_send_timing === "string" ? listing.access_code_send_timing : "24h_before",
         houseRules: Array.isArray(listing.house_rules)

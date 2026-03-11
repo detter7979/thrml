@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { sendAutomatedBookingDeclinedMessage } from "@/lib/automated-messages"
+import { requireAuth } from "@/lib/auth-check"
 import { sendGuestBookingRequestDeclinedEmail } from "@/lib/emails"
+import { rateLimit } from "@/lib/rate-limit"
 import { stripe } from "@/lib/stripe"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 
 type Params = { id: string }
 
@@ -16,6 +17,13 @@ const DECLINE_REASON_OPTIONS = new Set([
 ])
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<Params> }) {
+  const limited = rateLimit(req, {
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    identifier: "bookings",
+  })
+  if (limited) return limited
+
   const { id } = await params
   const payload = (await req.json().catch(() => null)) as { reason?: string } | null
   const declineReasonRaw = typeof payload?.reason === "string" ? payload.reason.trim() : ""
@@ -25,12 +33,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
       : "Other"
     : null
 
-  const supabase = await createClient()
+  const { error: authError, session } = await requireAuth()
+  if (authError || !session) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   const admin = createAdminClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { data: booking, error: bookingError } = await admin
     .from("bookings")
@@ -40,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
     .eq("id", id)
     .maybeSingle()
   if (bookingError || !booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 })
-  if (booking.host_id !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (booking.host_id !== session.user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   if (booking.status !== "pending_host") {
     return NextResponse.json({ error: "Booking is not awaiting host confirmation" }, { status: 409 })
   }
@@ -53,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
       admin.auth.admin.getUserById(booking.host_id),
       admin.auth.admin.getUserById(booking.guest_id),
     ])
-  if (!listing || listing.host_id !== user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!listing || listing.host_id !== session.user.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   if (booking.stripe_payment_intent_id) {
     try {

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import {
+  sendGuestEntryInstructionsEmail,
   sendGuestBookingRequestExpiredEmail,
+  sendGuestOnsiteReminder,
+  sendHostOnsiteReminder,
   sendHostPayoutSentEmail,
   sendPostSessionReviewRequestEmail,
   sendPreArrivalReminderEmail,
@@ -24,6 +27,7 @@ type BookingRow = {
   review_submitted: boolean | null
   review_requested_at: string | null
   access_code: string | null
+  access_code_sent: boolean | null
   access_code_sent_at: string | null
   host_payout: number | null
 }
@@ -33,7 +37,12 @@ type ListingRow = {
   title: string | null
   access_type: string | null
   access_instructions: string | null
+  onsite_contact_name: string | null
+  onsite_contact_phone: string | null
   access_code_send_timing: string | null
+  location_address?: string | null
+  city?: string | null
+  state?: string | null
 }
 
 function isMissingColumnError(message: string) {
@@ -62,6 +71,21 @@ function parseSessionStart(booking: Pick<BookingRow, "session_date" | "start_tim
   if (!booking.session_date || !booking.start_time) return null
   const parsed = new Date(`${booking.session_date}T${booking.start_time}`)
   return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function normalizeAccessType(value: string | null | undefined) {
+  const key = (value ?? "code").trim().toLowerCase()
+  if (key === "keypick" || key === "host_present") return "host_onsite"
+  if (key === "smart_lock") return "code"
+  if (key === "host_onsite" || key === "other" || key === "lockbox" || key === "code") return key
+  return "code"
+}
+
+function formatTimeLabel(sessionDate: string | null, time: string | null) {
+  if (!sessionDate || !time) return "TBD"
+  const parsed = new Date(`${sessionDate}T${time}`)
+  if (Number.isNaN(parsed.getTime())) return "TBD"
+  return parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
 }
 
 async function getEmailMap(userIds: string[]) {
@@ -197,6 +221,7 @@ export async function GET(req: NextRequest) {
   }
 
   const BOOKING_SELECT_CANDIDATES = [
+    "id, guest_id, host_id, listing_id, session_date, start_time, end_time, status, reminder_sent, review_submitted, review_requested_at, access_code, access_code_sent, access_code_sent_at, host_payout",
     "id, guest_id, host_id, listing_id, session_date, start_time, end_time, status, reminder_sent, review_submitted, review_requested_at, access_code, access_code_sent_at, host_payout",
     "id, guest_id, host_id, listing_id, session_date, start_time, end_time, status, reminder_sent, review_submitted, review_requested_at, access_code, host_payout",
   ] as const
@@ -236,7 +261,9 @@ export async function GET(req: NextRequest) {
     listingIds.length
       ? admin
           .from("listings")
-          .select("id, title, access_type, access_instructions, access_code_send_timing")
+          .select(
+            "id, title, access_type, access_instructions, onsite_contact_name, onsite_contact_phone, access_code_send_timing, location_address, city, state"
+          )
           .in("id", listingIds)
       : Promise.resolve({ data: [] as ListingRow[] }),
     profileIds.length
@@ -259,11 +286,11 @@ export async function GET(req: NextRequest) {
   let accessDetailsSent = 0
   for (const booking of bookings) {
     if (booking.status !== "confirmed") continue
-    if (booking.access_code_sent_at) continue
     const listing = booking.listing_id ? listingMap.get(booking.listing_id) : null
     if (!listing?.access_code_send_timing) continue
     const startsAt = parseSessionStart(booking)
     if (!startsAt) continue
+    if (booking.access_code_sent_at || booking.access_code_sent) continue
 
     const diffHours = (startsAt.getTime() - now.getTime()) / (1000 * 60 * 60)
     const due =
@@ -271,8 +298,78 @@ export async function GET(req: NextRequest) {
       (listing.access_code_send_timing === "1h_before" && diffHours <= 2 && diffHours >= 1)
     if (!due) continue
 
-    const sent = await sendAccessCode(booking.id)
-    if (sent.sent) accessDetailsSent += 1
+    const guest = profileMap.get(booking.guest_id)
+    const host = profileMap.get(booking.host_id)
+    const guestEmail = emailMap.get(booking.guest_id) ?? null
+    const hostEmail = emailMap.get(booking.host_id) ?? null
+    const accessType = normalizeAccessType(listing.access_type)
+    const isCodeBased = accessType === "code" || accessType === "lockbox"
+    const startTimeLabel = formatTimeLabel(booking.session_date, booking.start_time)
+    const endTimeLabel = formatTimeLabel(booking.session_date, booking.end_time)
+    const address = [listing.location_address, listing.city, listing.state]
+      .filter((part): part is string => typeof part === "string" && part.length > 0)
+      .join(", ")
+
+    if (isCodeBased) {
+      const sent = await sendAccessCode(booking.id)
+      if (!sent.sent) continue
+    } else if (accessType === "host_onsite") {
+      const hostReminder = await sendHostOnsiteReminder({
+        bookingId: booking.id,
+        hostId: booking.host_id,
+        hostEmail,
+        hostName: host?.full_name ?? null,
+        listingTitle: listing.title ?? "Your listing",
+        guestName: guest?.full_name ?? "Guest",
+        startTimeLabel,
+        accessInstructions: listing.access_instructions,
+      })
+      const guestReminder = await sendGuestOnsiteReminder({
+        guestId: booking.guest_id,
+        to: guestEmail,
+        guestName: guest?.full_name ?? "there",
+        listingTitle: listing.title ?? "your session",
+        address: address || "Address available in your booking details",
+        accessInstructions: listing.access_instructions,
+        onsiteContactName: listing.onsite_contact_name,
+        onsiteContactPhone: listing.onsite_contact_phone,
+        startTimeLabel,
+        endTimeLabel,
+        bookingId: booking.id,
+      })
+      if (!hostReminder.sent && !guestReminder.sent) continue
+    } else {
+      const sent = await sendGuestEntryInstructionsEmail({
+        guestId: booking.guest_id,
+        to: guestEmail,
+        guestName: guest?.full_name ?? "there",
+        listingTitle: listing.title ?? "your session",
+        address: address || "Address available in your booking details",
+        accessInstructions: listing.access_instructions || "Your host will provide entry details.",
+        startTimeLabel,
+        endTimeLabel,
+        bookingId: booking.id,
+      })
+      if (!sent.sent) continue
+    }
+
+    const updateSent = await admin
+      .from("bookings")
+      .update({
+        access_code_sent: true,
+        access_code_sent_at: new Date().toISOString(),
+      })
+      .eq("id", booking.id)
+    if (updateSent.error) {
+      const fallbackUpdate = await admin
+        .from("bookings")
+        .update({
+          access_code_sent_at: new Date().toISOString(),
+        })
+        .eq("id", booking.id)
+      if (fallbackUpdate.error && !isMissingColumnError(fallbackUpdate.error.message)) continue
+    }
+    accessDetailsSent += 1
   }
 
   for (const booking of bookings) {

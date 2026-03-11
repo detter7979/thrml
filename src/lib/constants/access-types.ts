@@ -1,36 +1,28 @@
 export const ACCESS_TYPES = {
   code: {
-    label: "Entry code",
-    description: "A PIN or door code guests enter to access the space",
+    label: "Keypad / Smart Lock",
+    description: "Guest enters a code on a keypad or digital lock.",
     icon: "KeyRound",
     supportsAutoSend: true,
     supportsCode: true,
   },
   lockbox: {
     label: "Lockbox",
-    description: "A physical lockbox with a combination guests use to retrieve a key",
+    description: "Guest uses a code to open a lockbox and retrieve the key.",
     icon: "Lock",
     supportsAutoSend: true,
     supportsCode: true,
   },
-  keypick: {
-    label: "Key handoff",
-    description: "You or a designated person will hand the key to the guest directly",
+  host_onsite: {
+    label: "I'll be on-site",
+    description: "You'll greet the guest and let them in yourself.",
     icon: "Handshake",
     supportsAutoSend: false,
     supportsCode: false,
   },
-  smart_lock: {
-    label: "Smart lock",
-    description: "August, Schlage, Yale or similar - unique code per booking",
-    icon: "Smartphone",
-    supportsAutoSend: true,
-    supportsCode: true,
-    comingSoon: true,
-  },
-  host_present: {
-    label: "Host present",
-    description: "You will be on-site to let guests in",
+  other: {
+    label: "Other",
+    description: "Describe your entry method in the instructions below.",
     icon: "User",
     supportsAutoSend: false,
     supportsCode: false,

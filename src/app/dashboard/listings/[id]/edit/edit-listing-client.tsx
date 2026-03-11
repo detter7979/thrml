@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Handshake, KeyRound, Lock, MoreHorizontal, Smartphone, Trash2, User } from "lucide-react"
+import { Handshake, KeyRound, Lock, MoreHorizontal, Trash2, User } from "lucide-react"
 
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
 import { Button } from "@/components/ui/button"
@@ -63,6 +63,8 @@ type ListingEditModel = {
   accessCodeType: string
   accessInstructions: string
   accessCodeSendTiming: string
+  onsiteContactName: string
+  onsiteContactPhone: string
   houseRules: string[]
   houseRulesCustom: string | null
 }
@@ -77,16 +79,21 @@ const ACCESS_ICON_MAP = {
   KeyRound,
   Lock,
   Handshake,
-  Smartphone,
   User,
 } as const
 
 const ACCESS_INSTRUCTION_PLACEHOLDERS: Record<AccessTypeKey, string> = {
   code: "Enter through the side gate. The keypad is on the left. Code: [CODE]",
   lockbox: "Lockbox is on the front fence. Combo: [CODE]. Please return the key when done.",
-  keypick: "Text me when you arrive and I'll meet you at the front door.",
-  smart_lock: "A unique code will be sent automatically before your session.",
-  host_present: "I'll be there to let you in. Feel free to message if you need anything.",
+  host_onsite: "I'll meet you at the front door. Text me when you arrive.",
+  other: "Describe how your guest should access the space.",
+}
+
+function normalizeAccessType(value: string): AccessTypeKey {
+  if (value in ACCESS_TYPES) return value as AccessTypeKey
+  if (value === "keypick" || value === "host_present") return "host_onsite"
+  if (value === "smart_lock") return "code"
+  return "code"
 }
 
 function DisplayRow({ label, value }: { label: string; value: string }) {
@@ -131,10 +138,12 @@ export function EditListingClient({
     serviceDurationMin: listing.serviceDurationMin ? String(listing.serviceDurationMin) : "",
     serviceDurationMax: listing.serviceDurationMax ? String(listing.serviceDurationMax) : "",
     serviceDurationUnit: listing.serviceDurationUnit,
-    accessType: (listing.accessType in ACCESS_TYPES ? listing.accessType : "code") as AccessTypeKey,
+    accessType: normalizeAccessType(listing.accessType),
     accessCodeTemplate: listing.accessCodeTemplate ?? "",
     accessCodeType: listing.accessCodeType === "dynamic" ? "dynamic" : "static",
     accessInstructions: listing.accessInstructions ?? "",
+    onsiteContactName: listing.onsiteContactName ?? "",
+    onsiteContactPhone: listing.onsiteContactPhone ?? "",
     accessCodeSendTiming: (listing.accessCodeSendTiming in CODE_SEND_TIMING
       ? listing.accessCodeSendTiming
       : "24h_before") as CodeSendTimingKey,
@@ -167,6 +176,7 @@ export function EditListingClient({
   const canPublishReplacement = Boolean(listing.parentListingId)
   const selectedCancellationPolicy = getCancellationPolicy(form.cancellationPolicy)
   const accessConfig = ACCESS_TYPES[form.accessType]
+  const requiresCode = accessConfig.supportsCode
   const accessCodePlaceholder = form.accessType === "lockbox" ? "e.g. A-394" : "e.g. 4829"
   const resolvedInstructionPreview = resolveInstructions(form.accessInstructions || "", {
     code: form.accessCodeTemplate || "",
@@ -301,7 +311,7 @@ export function EditListingClient({
     const response = await fetch(`/api/listings/${listing.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ access_code_template: nextValue }),
+      body: JSON.stringify({ access_code_template: nextValue, access_code: nextValue }),
     })
     const payload = (await response.json()) as { error?: string }
     if (!response.ok) {
@@ -747,35 +757,28 @@ export function EditListingClient({
         </div>
 
         <div className="space-y-2">
-          <Label>Access method</Label>
+          <Label>How do guests access your space?</Label>
           <div className="grid gap-2 md:grid-cols-2">
             {(Object.entries(ACCESS_TYPES) as Array<[AccessTypeKey, (typeof ACCESS_TYPES)[AccessTypeKey]]>).map(
               ([key, value]) => {
                 const Icon = ACCESS_ICON_MAP[value.icon as keyof typeof ACCESS_ICON_MAP] ?? KeyRound
                 const isSelected = form.accessType === key
-                const disabled = "comingSoon" in value && Boolean(value.comingSoon)
                 return (
                   <button
                     key={key}
                     type="button"
-                    onClick={() => (disabled ? undefined : void handleAccessTypeChange(key))}
-                    disabled={disabled}
+                    onClick={() => void handleAccessTypeChange(key)}
                     className={`rounded-lg p-3 text-left ${
                       isSelected
-                        ? "ring-2 ring-[#8B4513]"
-                        : "border border-[#E5DDD6]"
-                    } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+                        ? "border-[#C4623A] bg-orange-50 ring-2 ring-[#C4623A33]"
+                        : "border border-[#E5DDD6] hover:border-[#D8CABC]"
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Icon className="size-4 text-[#5D4D41]" />
                         <p className="text-sm font-semibold text-[#1A1410]">{value.label}</p>
                       </div>
-                      {"comingSoon" in value && value.comingSoon ? (
-                        <span className="rounded-full bg-[#F5EFE9] px-2 py-0.5 text-[11px] text-[#7A6A5D]">
-                          Coming soon
-                        </span>
-                      ) : null}
                     </div>
                     <p className="mt-1 text-xs text-[#7A6A5D]">{value.description}</p>
                   </button>
@@ -785,9 +788,11 @@ export function EditListingClient({
           </div>
         </div>
 
-        {accessConfig.supportsCode ? (
+        {requiresCode ? (
           <div className="space-y-2">
-            <Label>Default access code</Label>
+            <Label>
+              Access code <span className="text-red-500">*</span>
+            </Label>
             <div className="flex items-start gap-2">
               <Input
                 value={form.accessCodeTemplate}
@@ -814,7 +819,7 @@ export function EditListingClient({
               </Button>
             </div>
             <p className="text-xs text-[#6A5848]">
-              Used for all new bookings on this listing unless overridden.
+              Automatically sent to your guest based on your send timing setting.
             </p>
             <p className="text-xs">
               {accessCodeSaveState === "saving" ? (
@@ -897,6 +902,44 @@ export function EditListingClient({
             <p className="text-xs text-[#7A6A5D]">Preview: {resolvedInstructionPreview}</p>
           ) : null}
         </div>
+
+        {form.accessType === "host_onsite" ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label>Contact name</Label>
+              <Input
+                value={form.onsiteContactName}
+                placeholder="e.g. Alex"
+                onChange={(event) => setForm((current) => ({ ...current, onsiteContactName: event.target.value }))}
+                onBlur={() => void saveAccessPatch({ onsite_contact_name: form.onsiteContactName.trim().slice(0, 120) })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Contact phone</Label>
+              <Input
+                value={form.onsiteContactPhone}
+                placeholder="e.g. (206) 555-0182"
+                onChange={(event) => setForm((current) => ({ ...current, onsiteContactPhone: event.target.value }))}
+                onBlur={() =>
+                  void saveAccessPatch({ onsite_contact_phone: form.onsiteContactPhone.trim().slice(0, 40) })
+                }
+              />
+            </div>
+            <p className="text-xs text-[#6A5848] md:col-span-2">
+              Shared with guests 2 hours before their session so they can reach you on arrival.
+            </p>
+          </div>
+        ) : null}
+
+        {form.accessType === "host_onsite" ? (
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+            <p className="text-sm font-medium text-blue-800">You&apos;ll receive a reminder</p>
+            <p className="mt-1 text-xs text-blue-700">
+              Since you&apos;ll be on-site, Thrml sends a reminder 2 hours before each session so you&apos;re ready
+              to greet your guest.
+            </p>
+          </div>
+        ) : null}
 
         {accessConfig.supportsAutoSend ? (
           <div className="space-y-2">

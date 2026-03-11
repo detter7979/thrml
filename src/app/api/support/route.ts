@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
 import { buildSupportConfirmationEmail, buildSupportInternalAlertEmail } from "@/lib/emails/support"
 import { sendEmail } from "@/lib/emails/send"
-import { applyMemoryRateLimit, requestIp } from "@/lib/security"
+import { rateLimit } from "@/lib/rate-limit"
+import { sanitizeText } from "@/lib/sanitize"
 import { deriveSupportPriority, SUPPORT_SUBJECTS, type SupportSubject } from "@/lib/support"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -27,7 +28,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function asTrimmedString(value: unknown) {
-  return typeof value === "string" ? value.trim() : ""
+  return typeof value === "string" ? sanitizeText(value) : ""
 }
 
 function validateSupportPayload(payload: unknown): { data?: ValidSupportPayload; errors?: ValidationErrors } {
@@ -39,7 +40,7 @@ function validateSupportPayload(payload: unknown): { data?: ValidSupportPayload;
   const subject = asTrimmedString(body.subject)
   const message = asTrimmedString(body.message)
   const bookingIdRaw = body.booking_id ?? body.bookingId
-  const bookingId = typeof bookingIdRaw === "string" ? bookingIdRaw.trim() : ""
+  const bookingId = typeof bookingIdRaw === "string" ? sanitizeText(bookingIdRaw) : ""
 
   if (name.length < 2) errors.name = "Name must be at least 2 characters."
   if (!EMAIL_REGEX.test(email)) errors.email = "Enter a valid email address."
@@ -68,22 +69,22 @@ function validateSupportPayload(payload: unknown): { data?: ValidSupportPayload;
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const ip = requestIp(req)
-    const limit = applyMemoryRateLimit({
-      key: `api:support:${ip}`,
-      max: 5,
-      windowMs: 10 * 60_000,
+    const limited = rateLimit(req, {
+      maxRequests: 5,
+      windowMs: 15 * 60 * 1000,
+      identifier: "support",
     })
-    if (!limit.allowed) {
-      return NextResponse.json(
-        { error: "Too many support submissions. Please wait a few minutes before trying again." },
-        { status: 429 }
-      )
+    if (limited) return limited
+
+    const body = (await req.json().catch(() => null)) as { website?: unknown } | null
+    const honeypot = typeof body?.website === "string" ? body.website.trim() : ""
+    if (honeypot.length > 0) {
+      // Silently accept but do not process to avoid tipping off bots.
+      return NextResponse.json({ success: true })
     }
 
-    const body = await req.json().catch(() => null)
     const validation = validateSupportPayload(body)
     if (validation.errors) {
       return NextResponse.json({ errors: validation.errors }, { status: 400 })

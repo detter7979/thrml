@@ -7,8 +7,9 @@ import {
   parseSessionStart,
   serializePolicyReminder,
 } from "@/lib/cancellations"
+import { requireAuth } from "@/lib/auth-check"
+import { rateLimit } from "@/lib/rate-limit"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 
 type Params = { id: string }
 
@@ -47,24 +48,30 @@ async function calculateRefundPreview(bookingId: string, cancelledBy: "guest" | 
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<Params> }) {
+  const limited = rateLimit(req, {
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    identifier: "bookings",
+  })
+  if (limited) return limited
+
   const { id } = await params
   const role = req.nextUrl.searchParams.get("role")
   const cancelledBy: "guest" | "host" = role === "host" ? "host" : "guest"
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error: authError, session } = await requireAuth()
+  if (authError || !session) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   const admin = createAdminClient()
   const { data: booking, error } = await admin.from("bookings").select("*").eq("id", id).single()
   if (error || !booking) return NextResponse.json({ error: "Booking not found" }, { status: 404 })
 
-  if (cancelledBy === "guest" && booking.guest_id !== user.id) {
+  if (cancelledBy === "guest" && booking.guest_id !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
-  if (cancelledBy === "host" && booking.host_id !== user.id) {
+  if (cancelledBy === "host" && booking.host_id !== session.user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 

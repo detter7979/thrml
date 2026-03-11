@@ -402,6 +402,8 @@ export default function SupportPage() {
     event.preventDefault()
     if (isSubmitting) return
     setSubmitError(null)
+    const formData = new FormData(event.currentTarget)
+    const website = typeof formData.get("website") === "string" ? (formData.get("website") as string).trim() : ""
 
     const nextErrors = validateForm()
     setFieldErrors(nextErrors)
@@ -422,6 +424,7 @@ export default function SupportPage() {
           subject: form.subject,
           booking_id: form.bookingId.trim() || null,
           message: form.message.trim(),
+          website,
         }),
       })
 
@@ -596,6 +599,15 @@ export default function SupportPage() {
           </div>
         ) : (
           <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+            {/* Honeypot - hidden from real users, bots will fill this */}
+            <input
+              type="text"
+              name="website"
+              autoComplete="off"
+              tabIndex={-1}
+              aria-hidden="true"
+              style={{ display: "none" }}
+            />
             <div className="grid gap-5 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="support-name">

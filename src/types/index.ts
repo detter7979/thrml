@@ -1,3 +1,5 @@
+export type AccessType = "code" | "lockbox" | "host_onsite" | "other"
+
 export type Listing = {
   id: string
   title: string
@@ -8,6 +10,11 @@ export type Listing = {
   price_2?: number | null
   price_3?: number | null
   price_4plus?: number | null
+  access_type: AccessType
+  access_code?: string | null
+  access_instructions?: string | null
+  onsite_contact_name?: string | null
+  onsite_contact_phone?: string | null
 }
 
 export type Booking = {

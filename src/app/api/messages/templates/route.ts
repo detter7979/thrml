@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 import { DEFAULT_TEMPLATE_CONTENT, TEMPLATE_TYPES } from "@/lib/automated-messages"
-import { createClient } from "@/lib/supabase/server"
+import { requireAuth } from "@/lib/auth-check"
 
 type TemplateType =
   | "booking_confirmed"
@@ -29,34 +29,36 @@ const updateTemplateSchema = z.object({
 })
 
 async function canUserManageTemplates() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { supabase, user: null, canManageTemplates: false }
+  const { error, session, supabase } = await requireAuth()
+  if (error || !session || !supabase) {
+    return { supabase: null, userId: null, authError: error, canManageTemplates: false }
   }
 
   const [{ count: listingCount }, { data: profile }] = await Promise.all([
-    supabase.from("listings").select("*", { count: "exact", head: true }).eq("host_id", user.id).eq("is_active", true),
-    supabase.from("profiles").select("ui_intent").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("listings")
+      .select("*", { count: "exact", head: true })
+      .eq("host_id", session.user.id)
+      .eq("is_active", true),
+    supabase.from("profiles").select("ui_intent").eq("id", session.user.id).maybeSingle(),
   ])
   const canManageTemplates =
     Boolean((listingCount ?? 0) > 0) || profile?.ui_intent === "host" || profile?.ui_intent === "both"
 
-  return { supabase, user, canManageTemplates }
+  return { supabase, userId: session.user.id, authError: null, canManageTemplates }
 }
 
 export async function GET() {
-  const { supabase, user, canManageTemplates } = await canUserManageTemplates()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { supabase, userId, authError, canManageTemplates } = await canUserManageTemplates()
+  if (authError || !supabase || !userId) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   if (!canManageTemplates) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { data, error } = await supabase
     .from("message_templates")
     .select("id, host_id, template_type, content, is_automated, send_hours_before, access_type, access_details")
-    .eq("host_id", user.id)
+    .eq("host_id", userId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -75,7 +77,7 @@ export async function GET() {
     const found = existing.find((item) => item.template_type === template.type)
     return {
       id: found?.id ?? null,
-      host_id: user.id,
+      host_id: userId,
       template_type: template.type,
       content: found?.content ?? DEFAULT_TEMPLATE_CONTENT[template.type],
       is_automated: found?.is_automated ?? template.type === "booking_confirmed",
@@ -91,8 +93,10 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const { supabase, user, canManageTemplates } = await canUserManageTemplates()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { supabase, userId, authError, canManageTemplates } = await canUserManageTemplates()
+  if (authError || !supabase || !userId) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
   if (!canManageTemplates) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const parsed = updateTemplateSchema.safeParse(await req.json().catch(() => null))
@@ -103,7 +107,7 @@ export async function PUT(req: NextRequest) {
     .from("message_templates")
     .upsert(
       {
-        host_id: user.id,
+        host_id: userId,
         template_type: payload.template_type,
         content: payload.content,
         is_automated: Boolean(payload.is_automated),
@@ -123,7 +127,7 @@ export async function PUT(req: NextRequest) {
     if (payload.access_type === "lockbox") {
       const lockbox = typeof details.lockbox === "string" ? details.lockbox : null
       if (lockbox) {
-        await supabase.from("listings").update({ access_instructions: lockbox }).eq("host_id", user.id)
+        await supabase.from("listings").update({ access_instructions: lockbox }).eq("host_id", userId)
       }
     }
     if (payload.access_type === "onsite") {
@@ -132,12 +136,12 @@ export async function PUT(req: NextRequest) {
       await supabase
         .from("listings")
         .update({ onsite_contact_name: onsiteName, onsite_contact_phone: onsitePhone })
-        .eq("host_id", user.id)
+        .eq("host_id", userId)
     }
     if (payload.access_type === "key_exchange") {
       const instructions = typeof details.key_exchange === "string" ? details.key_exchange : null
       if (instructions) {
-        await supabase.from("listings").update({ access_instructions: instructions }).eq("host_id", user.id)
+        await supabase.from("listings").update({ access_instructions: instructions }).eq("host_id", userId)
       }
     }
   }

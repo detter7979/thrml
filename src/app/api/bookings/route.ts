@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { applyMemoryRateLimit, requestIp } from "@/lib/security"
+import { requireAuth } from "@/lib/auth-check"
+import { rateLimit } from "@/lib/rate-limit"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 
 type BookingRow = Record<string, unknown>
 const LISTING_SAFE_FIELDS =
-  "id, title, service_type, sauna_type, location, location_address, city, state, country, lat, lng, access_type, access_instructions, access_code_send_timing"
+  "id, title, service_type, sauna_type, location, location_address, city, state, country, lat, lng, access_type, access_instructions, access_code_send_timing, onsite_contact_name, onsite_contact_phone"
 const LISTING_SAFE_FIELDS_FALLBACK =
   "id, title, service_type, sauna_type, location, location_address, city, state, country, lat, lng"
 const BOOKING_SELECT_CANDIDATES = [
@@ -49,12 +49,18 @@ function shouldMarkCompleted(booking: BookingRow, now: Date) {
   return endsAt.getTime() < now.getTime()
 }
 
-export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export async function GET(req: NextRequest) {
+  const limited = rateLimit(req, {
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    identifier: "bookings",
+  })
+  if (limited) return limited
+
+  const { error: authError, session, supabase } = await requireAuth()
+  if (authError || !session || !supabase) {
+    return authError ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   const loadBookings = async () => {
     let lastError: string | null = null
@@ -63,7 +69,7 @@ export async function GET() {
       const attempt = await supabase
         .from("bookings")
         .select(select as string)
-        .eq("guest_id", user.id)
+        .eq("guest_id", session.user.id)
         .order("session_date", { ascending: true })
 
       if (!attempt.error) {
@@ -93,7 +99,7 @@ export async function GET() {
     await admin
       .from("bookings")
       .update({ status: "completed" })
-      .eq("guest_id", user.id)
+      .eq("guest_id", session.user.id)
       .eq("status", "confirmed")
       .in("id", completedIds)
 
@@ -137,7 +143,7 @@ export async function GET() {
         ? supabase
             .from("listing_reviews")
             .select("id, booking_id, listing_id, rating, rating_overall, comment, created_at")
-            .eq("guest_id", user.id)
+            .eq("guest_id", session.user.id)
             .in("listing_id", listingIds)
         : Promise.resolve({ data: [] as Record<string, unknown>[] }),
       bookings.length
@@ -190,6 +196,10 @@ export async function GET() {
           access_instructions: typeof row.access_instructions === "string" ? row.access_instructions : null,
           access_code_send_timing:
             typeof row.access_code_send_timing === "string" ? row.access_code_send_timing : null,
+          onsite_contact_name:
+            typeof row.onsite_contact_name === "string" ? row.onsite_contact_name : null,
+          onsite_contact_phone:
+            typeof row.onsite_contact_phone === "string" ? row.onsite_contact_phone : null,
         },
       ]
     })
@@ -277,21 +287,15 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = requestIp(req)
-  const limit = applyMemoryRateLimit({
-    key: `api:bookings:legacy-post:${ip}`,
-    max: 10,
-    windowMs: 60_000,
+  const limited = rateLimit(req, {
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    identifier: "bookings",
   })
-  if (!limit.allowed) {
-    return NextResponse.json({ error: "Too many requests. Please try again shortly." }, { status: 429 })
-  }
+  if (limited) return limited
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { error: authError } = await requireAuth()
+  if (authError) return authError
 
   await req.text()
   return NextResponse.json(

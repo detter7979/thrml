@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { sanitizeText } from "@/lib/sanitize"
 import { createClient } from "@/lib/supabase/server"
 
 async function getActiveBookingCount(
@@ -46,6 +47,45 @@ export async function PATCH(
 
   const payload = (await req.json()) as Record<string, unknown>
   const updatePayload: Record<string, unknown> = { ...payload }
+  if (typeof updatePayload.title === "string") {
+    updatePayload.title = sanitizeText(updatePayload.title)
+  }
+  if (typeof updatePayload.description === "string") {
+    updatePayload.description = sanitizeText(updatePayload.description)
+  }
+  if (typeof updatePayload.access_type === "string") {
+    const normalized = updatePayload.access_type.trim().toLowerCase()
+    if (normalized === "keypick" || normalized === "host_present") {
+      updatePayload.access_type = "host_onsite"
+    } else if (normalized === "smart_lock") {
+      updatePayload.access_type = "code"
+    } else if (["code", "lockbox", "host_onsite", "other"].includes(normalized)) {
+      updatePayload.access_type = normalized
+    } else {
+      delete updatePayload.access_type
+    }
+  }
+  if (typeof updatePayload.access_code_template === "string") {
+    updatePayload.access_code_template = sanitizeText(updatePayload.access_code_template).slice(0, 20)
+  }
+  if (typeof updatePayload.access_code === "string") {
+    updatePayload.access_code = sanitizeText(updatePayload.access_code).slice(0, 20)
+  }
+  if (typeof updatePayload.access_instructions === "string") {
+    updatePayload.access_instructions = sanitizeText(updatePayload.access_instructions).slice(0, 500)
+  }
+  if (typeof updatePayload.onsite_contact_name === "string") {
+    updatePayload.onsite_contact_name = sanitizeText(updatePayload.onsite_contact_name).slice(0, 120)
+  }
+  if (typeof updatePayload.onsite_contact_phone === "string") {
+    updatePayload.onsite_contact_phone = sanitizeText(updatePayload.onsite_contact_phone).slice(0, 40)
+  }
+  if (Array.isArray(updatePayload.house_rules)) {
+    updatePayload.house_rules = updatePayload.house_rules
+      .filter((rule): rule is string => typeof rule === "string")
+      .map((rule) => sanitizeText(rule))
+      .filter((rule) => Boolean(rule))
+  }
   if (typeof updatePayload.min_duration_override_minutes === "number") {
     updatePayload.min_duration_override_minutes = Math.max(
       30,

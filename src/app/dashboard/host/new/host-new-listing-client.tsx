@@ -473,11 +473,27 @@ export function HostNewListingClient({
           { signal: controller.signal }
         )
 
-        if (!response.ok) return
+        if (!response.ok) {
+          setMapSuggestions([])
+          if (response.status === 401 || response.status === 403) {
+            setMapError("Address search is not configured correctly right now. Please try again later.")
+          } else if (response.status === 429) {
+            setMapError("Address search is temporarily rate limited. Please wait a moment and try again.")
+          } else if (response.status >= 500) {
+            setMapError("Address search is temporarily unavailable. Please try again in a few minutes.")
+          } else {
+            setMapError("Could not load address suggestions. Check your connection and try again.")
+          }
+          return
+        }
         const data = (await response.json()) as { features?: GeocodeSuggestion[] }
         setMapSuggestions(data.features ?? [])
         setMapError(null)
-      } catch {
+      } catch (error) {
+        // Typing quickly aborts the previous request; that's expected and not a user-facing failure.
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return
+        }
         setMapSuggestions([])
         setMapError("Could not load address suggestions. Check your connection and try again.")
       } finally {

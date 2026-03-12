@@ -337,6 +337,7 @@ export function HostNewListingClient({
   const [draggingPhotoId, setDraggingPhotoId] = useState<string | null>(null)
   const [mapSuggestions, setMapSuggestions] = useState<GeocodeSuggestion[]>([])
   const [mapLoading, setMapLoading] = useState(false)
+  const [mapError, setMapError] = useState<string | null>(null)
   const [isConnectingStripe, setIsConnectingStripe] = useState(false)
   const [onboardingError, setOnboardingError] = useState<string | null>(null)
   const [stripeConnected, setStripeConnected] = useState(initialStripeConnected)
@@ -349,6 +350,7 @@ export function HostNewListingClient({
     handleSubmit,
     trigger,
     setValue,
+    setError,
     getValues,
     watch,
     formState: { errors, isSubmitting, isDirty },
@@ -447,13 +449,18 @@ export function HostNewListingClient({
   })
 
   useEffect(() => {
+    setMapError(null)
     if (address.trim().length < 3) {
       setMapSuggestions([])
       return
     }
 
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-    if (!token) return
+    if (!token) {
+      setMapSuggestions([])
+      setMapError("Map search is temporarily unavailable. Please try again later.")
+      return
+    }
 
     const controller = new AbortController()
     const timeout = setTimeout(async () => {
@@ -469,8 +476,10 @@ export function HostNewListingClient({
         if (!response.ok) return
         const data = (await response.json()) as { features?: GeocodeSuggestion[] }
         setMapSuggestions(data.features ?? [])
+        setMapError(null)
       } catch {
         setMapSuggestions([])
+        setMapError("Could not load address suggestions. Check your connection and try again.")
       } finally {
         setMapLoading(false)
       }
@@ -677,6 +686,29 @@ export function HostNewListingClient({
 
   async function onSubmit(values: ListingFormValues) {
     setPhotoError(null)
+    const hasEnabledDay = values.availability.some((day) => day.enabled)
+    if (!hasEnabledDay) {
+      setError("availability", {
+        type: "manual",
+        message: "Enable at least one day of availability.",
+      })
+      setStep(5)
+      return
+    }
+
+    const hasMappedAddress =
+      Number.isFinite(values.lat) &&
+      Number.isFinite(values.lng) &&
+      !(values.lat === 0 && values.lng === 0)
+    if (!hasMappedAddress) {
+      setError("address", {
+        type: "manual",
+        message: "Select an address suggestion so we can map your listing location.",
+      })
+      setStep(5)
+      return
+    }
+
     if (photos.length < 3) {
       setPhotoError("Please upload at least 3 photos.")
       setStep(4)
@@ -1220,6 +1252,7 @@ export function HostNewListingClient({
                     />
 
                     {mapLoading ? <p className="text-xs text-muted-foreground">Searching...</p> : null}
+                    {mapError ? <p className="text-xs text-destructive">{mapError}</p> : null}
                     {mapSuggestions.length ? (
                       <div className="rounded-md border">
                         {mapSuggestions.map((suggestion) => (

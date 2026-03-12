@@ -335,14 +335,18 @@ export async function POST(req: NextRequest) {
 
     const { data: serviceType } = await supabase
       .from("service_types")
-      .select("min_duration_minutes, max_duration_minutes, duration_increment_minutes, session_type")
+      .select("min_duration_minutes, max_duration_minutes, duration_increment_minutes, session_type, booking_model")
       .eq("id", listing.service_type)
       .maybeSingle()
 
     const sessionType =
-      serviceType?.session_type === "fixed_session" || serviceType?.session_type === "hourly"
-        ? serviceType.session_type
-        : "hourly"
+      listing.session_type === "fixed_session" || listing.session_type === "hourly"
+        ? listing.session_type
+        : serviceType?.session_type === "fixed_session" || serviceType?.session_type === "hourly"
+          ? serviceType.session_type
+          : serviceType?.booking_model === "fixed_session" || serviceType?.booking_model === "hourly"
+            ? serviceType.booking_model
+            : "hourly"
     const rawBlockMins = Number(
       sessionType === "fixed_session"
         ? listing.fixed_session_minutes ??

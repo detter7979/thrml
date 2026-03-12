@@ -45,6 +45,31 @@ function hasAnyMarketingOptIn(preferences: NotificationPreferences) {
 
 const PROFILE_NAME_OVERRIDE_KEY = "thrml.profileNameOverride"
 
+async function parseJsonResponse<T>(response: Response): Promise<T | null> {
+  const contentType = response.headers.get("content-type") ?? ""
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return null
+  }
+  try {
+    return (await response.json()) as T
+  } catch {
+    return null
+  }
+}
+
+function formatNonJsonApiError(status: number) {
+  if (status === 401 || status === 403) {
+    return "Your session may have expired. Refresh the page and sign in again."
+  }
+  if (status === 404) {
+    return "House rules endpoint was not found. Check that the latest app version is deployed."
+  }
+  if (status >= 500) {
+    return "Server returned an unexpected response. Please try again in a moment."
+  }
+  return "Received an unexpected response while saving house rules."
+}
+
 export function AccountClient({
   userId,
   fullName,
@@ -332,14 +357,20 @@ export function AccountClient({
         }),
       })
 
-      const payload = (await response.json()) as {
+      const payload = await parseJsonResponse<{
         message?: string
         error?: string
         warning?: string
         houseRules?: string[]
-      }
+      }>(response)
       if (!response.ok) {
+        if (!payload) {
+          throw new Error(formatNonJsonApiError(response.status))
+        }
         throw new Error(payload.error ?? "Unable to save house rules.")
+      }
+      if (!payload) {
+        throw new Error(formatNonJsonApiError(response.status))
       }
 
       const persistedRules = Array.isArray(payload.houseRules) ? payload.houseRules : normalizedRules

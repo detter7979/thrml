@@ -202,7 +202,7 @@ function PaymentStep({
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
           <PaymentElement
-            onLoaderror={() => {
+            onLoadError={() => {
               setPaymentUiError(
                 "Secure payment UI failed to load. Refresh the page and try again."
               )

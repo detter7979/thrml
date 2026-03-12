@@ -44,6 +44,7 @@ type BookingConfirmedEmailPayload = {
   guest_id?: string | null
   host_id?: string | null
   listing_title: string | null
+  service_type?: string | null
   listing_access_type: string | null
   listing_access_code_send_timing?: string | null
   listing_location_label?: string | null

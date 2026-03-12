@@ -131,6 +131,13 @@ export async function POST(req: NextRequest) {
       message,
       priority,
     }
+    const legacyInsertPayload = {
+      name,
+      email,
+      subject,
+      booking_id: validatedBookingId ?? null,
+      message,
+    }
 
     let ticketNumber = "Pending"
     let savedPriority = priority
@@ -143,8 +150,8 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error?.code === "42703") {
-      // Fallback for environments where support_requests doesn't yet include one of these selected columns.
-      const { error: fallbackError } = await supabaseAdmin.from("support_requests").insert(insertPayload)
+      // Legacy schema fallback: retry insert without newer columns like user_id/priority.
+      const { error: fallbackError } = await supabaseAdmin.from("support_requests").insert(legacyInsertPayload)
       if (fallbackError) {
         console.error("[api/support] support insert fallback failed", {
           error: fallbackError.message,

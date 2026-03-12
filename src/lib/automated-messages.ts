@@ -1,4 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import { ctaButton, thrmlEmailWrapper } from "@/lib/emails/send"
+import { sendEmail } from "@/lib/emails/send"
 
 type TemplateType =
   | "booking_confirmed"
@@ -40,6 +42,17 @@ type MessageTemplateRow = {
   send_hours_before: number | null
   access_type: string | null
   access_details: Record<string, unknown> | null
+}
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
 }
 
 export const TEMPLATE_TYPES: Array<{
@@ -405,6 +418,12 @@ export async function processScheduledMessages() {
   const guestMap = new Map((guestsRaw ?? []).map((row) => [row.id as string, row as ProfileRow]))
   const hostMap = new Map((hostsRaw ?? []).map((row) => [row.id as string, row as ProfileRow]))
   const conversationByBooking = new Map((conversationsRaw ?? []).map((row) => [row.booking_id as string, row.id as string]))
+  const guestEmailMap = new Map<string, string>()
+  for (const guestId of guestIds) {
+    const { data } = await supabase.auth.admin.getUserById(guestId)
+    const email = data.user?.email
+    if (email) guestEmailMap.set(guestId, email)
+  }
   const templatesByHost = new Map<string, Map<TemplateType, MessageTemplateRow>>()
 
   for (const templateType of TEMPLATE_TYPES) {
@@ -481,6 +500,38 @@ export async function processScheduledMessages() {
         message_type: messageType,
       })
       if (messageError) continue
+
+      const guestEmail = guestEmailMap.get(booking.guest_id) ?? null
+      if (guestEmail) {
+        const hostName = firstName(host?.full_name)
+        const listingTitle = listing?.title ?? "your session"
+        const html = thrmlEmailWrapper(`
+          <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">New message from your host.</h1>
+          <p style="color:#d6d6d6;line-height:1.65;margin:0 0 14px;">
+            ${escapeHtml(hostName)} sent you an automated update about ${escapeHtml(listingTitle)}.
+          </p>
+          <div style="background-color:#2a2a2a;border-radius:12px;padding:20px;margin:16px 0;">
+            <p style="color:#ffffff;line-height:1.6;margin:0;">${escapeHtml(body).replaceAll("\n", "<br/>")}</p>
+          </div>
+          ${ctaButton("View message thread →", `${APP_URL}/dashboard/messages`)}
+        `)
+        const text = [
+          "New message from your host.",
+          `${hostName} sent you an automated update about ${listingTitle}.`,
+          "",
+          body,
+          "",
+          `View message thread: ${APP_URL}/dashboard/messages`,
+        ].join("\n")
+        await sendEmail({
+          to: guestEmail,
+          subject: `New host message — ${listingTitle}`,
+          html,
+          text,
+          userId: booking.guest_id,
+          preferenceKey: "new_booking",
+        })
+      }
 
       alreadySent.add(templateType.type)
       sent += 1

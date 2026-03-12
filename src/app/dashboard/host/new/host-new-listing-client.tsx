@@ -815,6 +815,17 @@ export function HostNewListingClient({
       return
     }
 
+    const { error: publishEnforcementError } = await supabase
+      .from("listings")
+      .update({ is_active: true, is_draft: false })
+      .eq("id", listing.id)
+      .eq("host_id", userId)
+
+    if (publishEnforcementError) {
+      setPhotoError("Listing created, but we couldn't publish it. Please try again.")
+      return
+    }
+
     const photoRows: { listing_id: string; url: string; order_index: number }[] = []
 
     for (const [index, photo] of photos.entries()) {

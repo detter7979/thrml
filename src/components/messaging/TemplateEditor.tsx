@@ -121,6 +121,15 @@ export function TemplateEditor() {
         </p>
       </header>
 
+      <div className="mb-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+        <p className="text-sm font-medium text-neutral-800">📬 Thrml handles the essentials automatically</p>
+        <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+          Booking confirmations, reminders, access codes, and cancellations are sent to guests
+          automatically by Thrml - no action needed on your part. Use message templates below to
+          add a personal touch on top of those.
+        </p>
+      </div>
+
       {templates.map((template) => {
         const open = expanded === template.template_type
         return (

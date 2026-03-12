@@ -21,6 +21,84 @@ export type SendEmailParams = {
 
 export type SendEmailResult = { sent: boolean; error?: string }
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+
+export function formatBookingTime(startTime: string, endTime: string): string {
+  const start = new Date(startTime)
+  const end = new Date(endTime)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "Time TBD"
+
+  const dateStr = start.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  })
+  const startStr = start.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  })
+  const endStr = end.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  })
+  return `${dateStr} · ${startStr} - ${endStr}`
+}
+
+export function thrmlEmailWrapper(content: string): string {
+  return `
+    <div style="background-color:#1a1a1a;padding:48px 24px;font-family:Georgia,serif;">
+      <div style="max-width:520px;margin:0 auto;">
+        <div style="margin-bottom:32px;">
+          <span style="color:#ffffff;font-size:22px;font-weight:600;letter-spacing:0.15em;">THRML</span>
+        </div>
+        ${content}
+        <hr style="border:none;border-top:1px solid #2e2e2e;margin:32px 0;" />
+        <p style="color:#555555;font-size:12px;margin:0;">
+          &copy; Thrml ·
+          <a href="${APP_URL}" style="color:#555555;text-decoration:none;">
+            usethrml.com
+          </a>
+          · <a href="${APP_URL}/support" style="color:#555555;text-decoration:none;">
+            Support
+          </a>
+        </p>
+      </div>
+    </div>
+  `
+}
+
+export function ctaButton(text: string, url: string): string {
+  return `
+    <a href="${url}"
+       style="display:inline-block;background-color:#C4623A;color:#ffffff;
+              font-size:16px;font-weight:600;padding:14px 28px;
+              border-radius:100px;text-decoration:none;margin-top:8px;">
+      ${text}
+    </a>
+  `
+}
+
+export function bookingSummaryCard(fields: { label: string; value: string }[]): string {
+  const rows = fields
+    .map(
+      (field) => `
+    <p style="color:#ffffff;font-size:15px;margin:0 0 8px;">
+      <span style="color:#a0a0a0;font-size:13px;display:block;margin-bottom:2px;">${field.label}</span>
+      ${field.value}
+    </p>
+  `
+    )
+    .join("")
+  return `
+    <div style="background-color:#2a2a2a;border-radius:12px;padding:24px;margin:24px 0;">
+      ${rows}
+    </div>
+  `
+}
+
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
   try {
     if (!params.to) return { sent: false, error: "Missing recipient email" }

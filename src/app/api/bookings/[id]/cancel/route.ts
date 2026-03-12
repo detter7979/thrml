@@ -12,6 +12,7 @@ import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
 import {
   sendGuestCancellationConfirmation,
   sendGuestHostCancelledNotice,
+  sendHostCancellationConfirmation,
   sendHostCancellationNotice,
 } from "@/lib/emails"
 import { requireAuth } from "@/lib/auth-check"
@@ -316,19 +317,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
     cancellation_reason: parsed.data.reason ?? null,
   }
 
-  if (cancelledBy === "guest") {
-    void Promise.allSettled([
-      sendGuestCancellationConfirmation(emailBooking, refundAmount),
-      sendHostCancellationNotice(emailBooking, refundAmount, undefined, "guest"),
-    ])
-  } else {
-    void Promise.allSettled([
-      sendGuestHostCancelledNotice(emailBooking, refundAmount),
-      sendHostCancellationNotice(emailBooking, refundAmount, {
-        penaltyAmount: hostPenalty?.penaltyAmount ?? 0,
-        policyApplied: hostPenalty?.policyApplied ?? "warning",
-      }, "host"),
-    ])
+  try {
+    if (cancelledBy === "guest") {
+      await Promise.all([
+        sendGuestCancellationConfirmation(emailBooking, refundAmount),
+        sendHostCancellationNotice(emailBooking, refundAmount, undefined, "guest"),
+      ])
+    } else {
+      await Promise.all([
+        sendGuestHostCancelledNotice(emailBooking, refundAmount),
+        sendHostCancellationConfirmation(emailBooking),
+      ])
+    }
+  } catch (emailError) {
+    console.error("[bookings/cancel] Cancellation email failed:", emailError)
   }
 
   const policy = getCancellationPolicy(listing?.cancellation_policy)

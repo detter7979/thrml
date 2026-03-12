@@ -196,71 +196,75 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
   const listingAccessType = (listingRecord as Record<string, unknown>).access_type ?? null
   const shouldIncludeCode = isCodeAccessType(listingAccessType) && Boolean(booking.access_code)
 
-  await Promise.allSettled([
-    sendHostBookingConfirmedEmail({
-      booking_id: booking.id,
-      guest_id: booking.guest_id,
-      host_id: hostId,
-      listing_title: listingRecord.title ?? null,
-      listing_access_type: typeof listingAccessType === "string" ? listingAccessType : null,
-      listing_access_instructions:
-        typeof listingRecord.access_instructions === "string" ? listingRecord.access_instructions : null,
-      listing_location_label: [listingRecord.city, listingRecord.state]
-        .filter((part): part is string => typeof part === "string" && part.length > 0)
-        .join(", "),
-      listing_cancellation_policy:
-        typeof listingRecord.cancellation_policy === "string" ? listingRecord.cancellation_policy : null,
-      session_date: booking.session_date ?? null,
-      start_time: booking.start_time ?? null,
-      end_time: booking.end_time ?? null,
-      duration_hours: Number(booking.duration_hours ?? 1),
-      guest_count: Number(booking.guest_count ?? 1),
-      total_charged: Number(booking.total_charged ?? 0),
-      host_payout: Number(booking.host_payout ?? 0),
-      access_code: shouldIncludeCode ? booking.access_code : null,
-      guest_name: guestProfile?.full_name ?? null,
-      guest_email: guestEmail,
-      host_name: hostProfile?.full_name ?? null,
-      host_email: hostEmail,
-    }),
-    sendGuestBookingConfirmedEmail({
-      booking_id: booking.id,
-      guest_id: booking.guest_id,
-      host_id: hostId,
-      listing_title: listingRecord.title ?? null,
-      listing_access_type: typeof listingAccessType === "string" ? listingAccessType : null,
-      listing_access_code_send_timing:
-        typeof (listingRecord as Record<string, unknown>).access_code_send_timing === "string"
-          ? ((listingRecord as Record<string, unknown>).access_code_send_timing as string)
-          : null,
-      listing_access_instructions:
-        typeof listingRecord.access_instructions === "string" ? listingRecord.access_instructions : null,
-      listing_location_label: [listingRecord.city, listingRecord.state]
-        .filter((part): part is string => typeof part === "string" && part.length > 0)
-        .join(", "),
-      listing_cancellation_policy:
-        typeof listingRecord.cancellation_policy === "string" ? listingRecord.cancellation_policy : null,
-      session_date: booking.session_date ?? null,
-      start_time: booking.start_time ?? null,
-      end_time: booking.end_time ?? null,
-      duration_hours: Number(booking.duration_hours ?? 1),
-      guest_count: Number(booking.guest_count ?? 1),
-      total_charged: Number(booking.total_charged ?? 0),
-      host_payout: Number(booking.host_payout ?? 0),
-      access_code: shouldIncludeCode ? booking.access_code : null,
-      guest_name: guestProfile?.full_name ?? null,
-      guest_email: guestEmail,
-      host_name: hostProfile?.full_name ?? null,
-      host_email: hostEmail,
-    }),
-    sendAutomatedBookingConfirmedByHostMessage({
-      bookingId: booking.id,
-      listingId: booking.listing_id,
-      guestId: booking.guest_id,
-      hostId,
-      hostName: hostProfile?.full_name?.split(" ")[0] ?? "your host",
-    }),
-  ])
+  try {
+    await Promise.all([
+      sendHostBookingConfirmedEmail({
+        booking_id: booking.id,
+        guest_id: booking.guest_id,
+        host_id: hostId,
+        listing_title: listingRecord.title ?? null,
+        listing_access_type: typeof listingAccessType === "string" ? listingAccessType : null,
+        listing_access_instructions:
+          typeof listingRecord.access_instructions === "string" ? listingRecord.access_instructions : null,
+        listing_location_label: [listingRecord.city, listingRecord.state]
+          .filter((part): part is string => typeof part === "string" && part.length > 0)
+          .join(", "),
+        listing_cancellation_policy:
+          typeof listingRecord.cancellation_policy === "string" ? listingRecord.cancellation_policy : null,
+        session_date: booking.session_date ?? null,
+        start_time: booking.start_time ?? null,
+        end_time: booking.end_time ?? null,
+        duration_hours: Number(booking.duration_hours ?? 1),
+        guest_count: Number(booking.guest_count ?? 1),
+        total_charged: Number(booking.total_charged ?? 0),
+        host_payout: Number(booking.host_payout ?? 0),
+        access_code: shouldIncludeCode ? booking.access_code : null,
+        guest_name: guestProfile?.full_name ?? null,
+        guest_email: guestEmail,
+        host_name: hostProfile?.full_name ?? null,
+        host_email: hostEmail,
+      }),
+      sendGuestBookingConfirmedEmail({
+        booking_id: booking.id,
+        guest_id: booking.guest_id,
+        host_id: hostId,
+        listing_title: listingRecord.title ?? null,
+        listing_access_type: typeof listingAccessType === "string" ? listingAccessType : null,
+        listing_access_code_send_timing:
+          typeof (listingRecord as Record<string, unknown>).access_code_send_timing === "string"
+            ? ((listingRecord as Record<string, unknown>).access_code_send_timing as string)
+            : null,
+        listing_access_instructions:
+          typeof listingRecord.access_instructions === "string" ? listingRecord.access_instructions : null,
+        listing_location_label: [listingRecord.city, listingRecord.state]
+          .filter((part): part is string => typeof part === "string" && part.length > 0)
+          .join(", "),
+        listing_cancellation_policy:
+          typeof listingRecord.cancellation_policy === "string" ? listingRecord.cancellation_policy : null,
+        session_date: booking.session_date ?? null,
+        start_time: booking.start_time ?? null,
+        end_time: booking.end_time ?? null,
+        duration_hours: Number(booking.duration_hours ?? 1),
+        guest_count: Number(booking.guest_count ?? 1),
+        total_charged: Number(booking.total_charged ?? 0),
+        host_payout: Number(booking.host_payout ?? 0),
+        access_code: shouldIncludeCode ? booking.access_code : null,
+        guest_name: guestProfile?.full_name ?? null,
+        guest_email: guestEmail,
+        host_name: hostProfile?.full_name ?? null,
+        host_email: hostEmail,
+      }),
+      sendAutomatedBookingConfirmedByHostMessage({
+        bookingId: booking.id,
+        listingId: booking.listing_id,
+        guestId: booking.guest_id,
+        hostId,
+        hostName: hostProfile?.full_name?.split(" ")[0] ?? "your host",
+      }),
+    ])
+  } catch (emailError) {
+    console.error("[bookings/confirm] confirmation email failed", emailError)
+  }
 
   const timing =
     typeof (listingRecord as Record<string, unknown>).access_code_send_timing === "string"

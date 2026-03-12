@@ -20,6 +20,7 @@ type MessageRow = {
 
 function dayLabel(value: string) {
   const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "Unknown date"
   if (isToday(date)) return "Today"
   if (isYesterday(date)) return "Yesterday"
   return format(date, "MMM d")
@@ -27,6 +28,12 @@ function dayLabel(value: string) {
 
 function isAutomated(messageType: string) {
   return messageType.startsWith("automated_")
+}
+
+function formatMessageTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  return format(date, "h:mm a")
 }
 
 export function MessageThread({
@@ -122,7 +129,13 @@ export function MessageThread({
     presence
       .on("presence", { event: "sync" }, () => {
         const state = presence.presenceState<Record<string, unknown>>()
-        const active = Object.values(state).flat().some((entry) => {
+        const entries = Object.values(state).reduce<unknown[]>((all, group) => {
+          if (Array.isArray(group)) {
+            all.push(...group)
+          }
+          return all
+        }, [])
+        const active = entries.some((entry) => {
           const userId = (entry as { user_id?: string }).user_id
           const isTyping = Boolean((entry as { typing?: boolean }).typing)
           return userId && userId !== currentUserId && isTyping
@@ -207,7 +220,7 @@ export function MessageThread({
                 <div className="mx-auto max-w-lg rounded-xl bg-[#ECEAE6] px-3 py-2 text-center text-xs text-[#6D6056] italic">
                   Automated message: {message.body}
                   <div className="mt-1 text-[10px] not-italic text-[#97897D]">
-                    {format(new Date(message.created_at), "h:mm a")}
+                    {formatMessageTime(message.created_at)}
                   </div>
                 </div>
               ) : (
@@ -227,7 +240,7 @@ export function MessageThread({
                         own ? "text-right" : "text-left"
                       }`}
                     >
-                      {format(new Date(message.created_at), "h:mm a")}
+                      {formatMessageTime(message.created_at)}
                     </div>
                   </div>
                 </div>

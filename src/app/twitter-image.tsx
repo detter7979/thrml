@@ -12,24 +12,24 @@ export default async function Image() {
         style={{
           width: "1200px",
           height: "630px",
-          backgroundColor: "#1a1a1a",
+          backgroundColor: "#c46339",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
-          gap: "16px",
-          transform: "translateY(-24px)",
+          justifyContent: "flex-start",
+          position: "relative",
         }}
       >
         <div
           style={{
             color: "#ffffff",
-            fontSize: "120px",
+            fontSize: "188px",
             fontWeight: "400",
             letterSpacing: "0.01em",
             textTransform: "lowercase",
             fontFamily: '"DM Serif Display", Georgia, serif',
             lineHeight: 1,
+            marginTop: "220px",
           }}
         >
           thrml
@@ -37,15 +37,34 @@ export default async function Image() {
 
         <div
           style={{
-            color: "#a0a0a0",
-            fontSize: "24px",
+            color: "rgba(255,255,255,0.82)",
+            fontSize: "50px",
             fontWeight: "400",
             letterSpacing: "0.01em",
             fontFamily: '"DM Sans", Arial, sans-serif',
             lineHeight: 1.3,
+            marginTop: "16px",
           }}
         >
           Discover private wellness spaces near you.
+        </div>
+
+        <div
+          style={{
+            color: "rgba(255,255,255,0.42)",
+            fontSize: "40px",
+            fontWeight: "400",
+            letterSpacing: "0.01em",
+            fontFamily: '"DM Sans", Arial, sans-serif',
+            lineHeight: 1,
+            position: "absolute",
+            bottom: "36px",
+            left: 0,
+            right: 0,
+            textAlign: "center",
+          }}
+        >
+          usethrml.com
         </div>
       </div>
     ),

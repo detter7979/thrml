@@ -12,6 +12,7 @@ import {
   sendHostBookingRequestEmail,
   sendHostBookingConfirmedEmail,
 } from "@/lib/emails"
+import { sendPostSessionEmails } from "@/lib/emails/post-session"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
     id: event.id,
   })
   const supportedEvents = new Set([
+    "checkout.session.completed",
     "payment_intent.succeeded",
     "payment_intent.amount_capturable_updated",
     "payment_intent.payment_failed",
@@ -306,6 +308,56 @@ export async function POST(req: NextRequest) {
           void sendAccessCode(booking.id)
         } else if (timing === "24h_before" || timing === "1h_before") {
           console.log("[stripe/webhook] Access code queued for cron send", { bookingId: booking.id, timing })
+        }
+      }
+    }
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session
+    const bookingId = session.metadata?.booking_id ?? session.metadata?.bookingId
+    if (bookingId) {
+      const { data: booking } = await supabase
+        .from("bookings")
+        .select(
+          "id, guest_id, host_id, session_date, end_time, host_payout, post_session_email_sent, listings(id, title, service_type)"
+        )
+        .eq("id", bookingId)
+        .maybeSingle()
+
+      if (booking?.id && !booking.post_session_email_sent) {
+        const [guestProfile, hostProfile] = await Promise.all([
+          supabase.from("profiles").select("full_name").eq("id", booking.guest_id).maybeSingle(),
+          supabase.from("profiles").select("full_name").eq("id", booking.host_id).maybeSingle(),
+        ])
+        const [guestAuth, hostAuth] = await Promise.all([
+          supabase.auth.admin.getUserById(booking.guest_id),
+          supabase.auth.admin.getUserById(booking.host_id),
+        ])
+
+        const sessionEnd = booking.end_time
+          ? new Date(`${booking.session_date ?? ""}T${booking.end_time}`)
+          : null
+        const now = new Date()
+        if (sessionEnd && !Number.isNaN(sessionEnd.getTime()) && now >= sessionEnd) {
+          await sendPostSessionEmails({
+            id: booking.id,
+            guest_id: booking.guest_id,
+            host_id: booking.host_id,
+            host_payout: Number(booking.host_payout ?? 0),
+            post_session_email_sent: booking.post_session_email_sent,
+            listings: Array.isArray(booking.listings)
+              ? (booking.listings[0] ?? null)
+              : (booking.listings as { id: string; title: string | null; service_type: string | null } | null),
+            guest_profile: {
+              full_name: guestProfile.data?.full_name ?? null,
+              email: guestAuth.data.user?.email ?? null,
+            },
+            host_profile: {
+              full_name: hostProfile.data?.full_name ?? null,
+              email: hostAuth.data.user?.email ?? null,
+            },
+          })
         }
       }
     }

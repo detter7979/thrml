@@ -12,6 +12,17 @@ type BookingRow = {
   end_time: string | null
   duration_hours: number | null
   guest_count: number | null
+  post_session_email_sent?: boolean | null
+}
+
+function isMissingColumnError(message: string) {
+  const normalized = message.toLowerCase()
+  return (
+    (normalized.includes("column") && normalized.includes("does not exist")) ||
+    (normalized.includes("could not find") &&
+      normalized.includes("column") &&
+      normalized.includes("schema cache"))
+  )
 }
 
 function parseSessionEnd(booking: BookingRow) {
@@ -40,13 +51,36 @@ export async function GET(req: NextRequest) {
   const supabase = createAdminClient()
   const todayIso = new Date().toISOString().split("T")[0]
 
-  const { data, error } = await supabase
-    .from("bookings")
-    .select("id, guest_id, listing_id, session_date, start_time, end_time, duration_hours, guest_count")
-    .eq("status", "confirmed")
-    .lte("session_date", todayIso)
-    .is("review_requested_at", null)
-    .eq("review_submitted", false)
+  const attempts = [
+    () =>
+      supabase
+        .from("bookings")
+        .select("id, guest_id, listing_id, session_date, start_time, end_time, duration_hours, guest_count, post_session_email_sent")
+        .eq("status", "confirmed")
+        .lte("session_date", todayIso)
+        .eq("post_session_email_sent", false),
+    () =>
+      supabase
+        .from("bookings")
+        .select("id, guest_id, listing_id, session_date, start_time, end_time, duration_hours, guest_count")
+        .eq("status", "confirmed")
+        .lte("session_date", todayIso)
+        .is("review_requested_at", null)
+        .eq("review_submitted", false),
+  ] as const
+
+  let data: BookingRow[] | null = null
+  let error: { message: string } | null = null
+  for (const attempt of attempts) {
+    const result = await attempt()
+    if (!result.error) {
+      data = (result.data ?? []) as BookingRow[]
+      error = null
+      break
+    }
+    error = result.error
+    if (!isMissingColumnError(result.error.message)) break
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -119,6 +153,7 @@ export async function GET(req: NextRequest) {
       })
 
       await supabase.from("bookings").update({ review_requested_at: new Date().toISOString() }).eq("id", booking.id)
+      await supabase.from("bookings").update({ post_session_email_sent: true }).eq("id", booking.id)
       emailed += 1
     } catch {
       // Keep the booking completed even if email delivery fails this run.

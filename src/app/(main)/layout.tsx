@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import Link from "next/link"
-import { Facebook, Instagram, Twitter } from "lucide-react"
+import { Facebook, Instagram } from "lucide-react"
 
 import { Navbar } from "@/components/shared/Navbar"
 
@@ -99,7 +99,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
             <p>&copy; {currentYear} thrml</p>
             <div className="flex items-center gap-2 md:justify-end">
               <a
-                href="https://www.facebook.com"
+                href="https://www.facebook.com/usethrml"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Visit thrml on Facebook"
@@ -108,22 +108,13 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                 <Facebook className="size-4" />
               </a>
               <a
-                href="https://www.instagram.com"
+                href="https://www.instagram.com/usethrml"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Visit thrml on Instagram"
                 className="inline-flex size-8 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:border-white/30 hover:text-white"
               >
                 <Instagram className="size-4" />
-              </a>
-              <a
-                href="https://x.com"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Visit thrml on X"
-                className="inline-flex size-8 items-center justify-center rounded-full border border-white/15 text-white/70 transition-colors hover:border-white/30 hover:text-white"
-              >
-                <Twitter className="size-4" />
               </a>
             </div>
           </div>

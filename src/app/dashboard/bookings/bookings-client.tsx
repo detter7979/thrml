@@ -368,7 +368,11 @@ function BookingDetailSheet({
             >
               <div className="h-1 w-10 rounded-full bg-[#E5DDD6]" />
             </div>
-            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6">{children}</div>
+            <div
+              className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            >
+              {children}
+            </div>
           </motion.div>
         </>
       ) : null}

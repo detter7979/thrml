@@ -16,7 +16,8 @@ import { Label } from "@/components/ui/label"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
 import { calculateBookingTotal, getPricePerPerson, type PricingTiers } from "@/lib/pricing"
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null
 
 interface BookingFlowClientProps {
   listingId: string
@@ -123,6 +124,7 @@ function PaymentStep({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [legalError, setLegalError] = useState<string | null>(null)
+  const [paymentUiError, setPaymentUiError] = useState<string | null>(null)
   const termsRowRef = useRef<HTMLLabelElement | null>(null)
   const policy = getCancellationPolicy(cancellationPolicy)
 
@@ -199,7 +201,14 @@ function PaymentStep({
           <span>Secure payment by Stripe</span>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
-          <PaymentElement />
+          <PaymentElement
+            onLoaderror={() => {
+              setPaymentUiError(
+                "Secure payment UI failed to load. Refresh the page and try again."
+              )
+            }}
+          />
+          {paymentUiError ? <p className="text-sm text-destructive">{paymentUiError}</p> : null}
           <div className="mb-4 rounded-lg border border-[#E5DDD6] p-4">
             <div className="mb-2">
               <span className="text-sm font-medium">Cancellation policy</span>
@@ -630,7 +639,19 @@ export function BookingFlowClient({
             <span>Almost done. Complete payment to confirm your booking.</span>
           </div>
 
-          {clientSecret && bookingId ? (
+          {!stripePromise ? (
+            <Card className="card-base">
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CreditCard className="size-4" />
+                  <span>Secure payment unavailable</span>
+                </div>
+                <p className="text-sm text-destructive">
+                  Missing Stripe publishable key. Set `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` and reload.
+                </p>
+              </CardContent>
+            </Card>
+          ) : clientSecret && bookingId ? (
             <Elements stripe={stripePromise} options={{ clientSecret }}>
               <PaymentStep
                 payload={payload}

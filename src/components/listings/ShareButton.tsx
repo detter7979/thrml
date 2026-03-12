@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Facebook, Link2, Mail, MessageCircle, MoreHorizontal, Share2 } from "lucide-react"
+import { Check, Facebook, Link2, Mail, MoreHorizontal, Share2 } from "lucide-react"
 import { useMemo, useState, type MouseEvent } from "react"
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -58,28 +58,6 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
       `I found this on Thrml and thought you might like it:\n\n${listing.title}\n${shareUrl}`
     )
     window.location.href = `mailto:?subject=${subject}&body=${body}`
-  }
-
-  function handleX(event: MouseEvent<HTMLButtonElement>) {
-    stopCardNavigation(event)
-    trackGaEvent("share", {
-      method: "x",
-      content_type: "listing",
-      item_id: listing.id,
-    })
-    const text = encodeURIComponent(`Just found this on @ThrmlApp — ${listing.title}`)
-    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(shareUrl)}`, "_blank", "noopener,noreferrer")
-  }
-
-  function handleWhatsApp(event: MouseEvent<HTMLButtonElement>) {
-    stopCardNavigation(event)
-    trackGaEvent("share", {
-      method: "whatsapp",
-      content_type: "listing",
-      item_id: listing.id,
-    })
-    const text = encodeURIComponent(`Check out this wellness space on Thrml: ${shareUrl}`)
-    window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer")
   }
 
   function handleFacebook(event: MouseEvent<HTMLButtonElement>) {
@@ -151,14 +129,6 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
           <button type="button" className={rowClass} onClick={handleEmail}>
             <Mail className="size-4" />
             Email
-          </button>
-          <button type="button" className={rowClass} onClick={handleX}>
-            <span className="inline-block w-4 text-center text-sm font-semibold">X</span>
-            Post on X (Twitter)
-          </button>
-          <button type="button" className={rowClass} onClick={handleWhatsApp}>
-            <MessageCircle className="size-4" />
-            Share on WhatsApp
           </button>
           <button type="button" className={rowClass} onClick={handleFacebook}>
             <Facebook className="size-4" />

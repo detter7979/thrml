@@ -1,14 +1,11 @@
 import { formatMoney } from "@/lib/cancellations"
 import { sendEmail } from "@/lib/emails/send"
 import {
-  buildBookingCancelledEmail,
-  buildBookingConfirmationGuestEmail,
-  buildNewBookingHostEmail,
-  buildNewReviewHostEmail,
-  buildPayoutSentEmail,
-  buildPreArrivalReminderEmail,
-  buildReviewRequestEmail,
-} from "@/lib/emails/templates"
+  bookingSummaryCard,
+  ctaButton,
+  formatBookingTime,
+  thrmlEmailWrapper,
+} from "@/lib/emails/send"
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
 
@@ -87,10 +84,6 @@ type BookingRequestEmailPayload = {
   host_decline_reason?: string | null
 }
 
-function isCodeAccessType(value: string | null | undefined) {
-  return (value ?? "").trim().toLowerCase() === "code"
-}
-
 function firstName(fullName: string | null | undefined, fallback = "there") {
   const normalized = (fullName ?? "").trim()
   if (!normalized) return fallback
@@ -131,29 +124,78 @@ function formatDateTime(value: string | null) {
   }).format(parsed)
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+}
+
+function formatUsd(value: number | null | undefined) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(value ?? 0))
+}
+
+function serviceEmoji(serviceType: string | null | undefined) {
+  const key = (serviceType ?? "").toLowerCase()
+  if (key.includes("cold")) return "🧊"
+  if (key.includes("float")) return "🌊"
+  if (key.includes("massage")) return "💆"
+  if (key.includes("yoga")) return "🧘"
+  return "🔥"
+}
+
+function formatBookingWindow(sessionDate: string | null, startTime: string | null, endTime: string | null) {
+  if (!sessionDate || !startTime || !endTime) return "Time TBD"
+  return formatBookingTime(`${sessionDate}T${startTime}`, `${sessionDate}T${endTime}`)
+}
+
+function normalizeAccessType(value: string | null | undefined) {
+  const key = (value ?? "").trim().toLowerCase()
+  if (key === "host_present" || key === "keypick") return "host_onsite"
+  if (key === "smart_lock") return "code"
+  return key
+}
+
+function policyReminder(cancellationPolicy: string | null | undefined) {
+  const key = (cancellationPolicy ?? "").trim().toLowerCase()
+  if (key === "strict") return "Free cancellation up to 72 hours before your session."
+  if (key === "moderate") return "Free cancellation up to 48 hours before your session."
+  return "Free cancellation up to 24 hours before your session."
+}
+
 export async function sendGuestCancellationConfirmation(
   booking: BookingEmailPayload,
   refundAmount: number
 ) {
   if (!booking.guest_email) return { sent: false, error: "Missing guest email" }
-  const email = buildBookingCancelledEmail({
-    role: "guest",
-    listingTitle: booking.listing_title ?? "Thrml session",
-    sessionDate: booking.session_date,
-    guestFirstName: booking.guest_name,
-    hostFirstName: booking.host_name,
-    guestFullName: booking.guest_name,
-    cancelledBy: "guest",
-    totalCharged: Number(booking.total_charged ?? 0),
-    refundAmount,
-    refundEligible: refundAmount > 0,
-    reason: booking.cancellation_reason ?? null,
-  })
+  const title = booking.listing_title ?? "Thrml session"
+  const refundLine =
+    refundAmount > 0
+      ? `A refund of ${formatUsd(refundAmount)} will appear on your statement within 5-10 business days.`
+      : "This booking was cancelled within 48 hours of the session and is not eligible for a refund per our cancellation policy."
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">Your booking has been cancelled.</h1>
+    ${bookingSummaryCard([
+      { label: "Listing", value: escapeHtml(title) },
+      { label: "Date & time", value: escapeHtml(formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">${escapeHtml(refundLine)}</p>
+    ${ctaButton("Browse more spaces →", `${APP_URL}/explore`)}
+  `)
+  const text = [
+    "Your booking has been cancelled.",
+    `Listing: ${title}`,
+    `Date & time: ${formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)}`,
+    refundLine,
+    `Browse more spaces: ${APP_URL}/explore`,
+  ].join("\n")
   return sendEmail({
     to: booking.guest_email,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
+    subject: `Booking cancelled — ${title}`,
+    html,
+    text,
     userId: booking.guest_id ?? null,
     preferenceKey: "booking_cancelled",
   })
@@ -161,40 +203,37 @@ export async function sendGuestCancellationConfirmation(
 
 export async function sendHostCancellationNotice(
   booking: BookingEmailPayload,
-  refundAmount: number,
-  penalty?: HostPenaltyEmailPayload,
-  cancelledBy: "guest" | "host" = "guest"
+  _refundAmount: number,
+  _penalty?: HostPenaltyEmailPayload,
+  _cancelledBy: "guest" | "host" = "guest"
 ) {
+  void _cancelledBy
   if (!booking.host_email) return { sent: false, error: "Missing host email" }
-  const reasonBits = [
-    booking.cancellation_reason ? `Reason: ${booking.cancellation_reason}` : null,
-    penalty && penalty.penaltyAmount > 0
-      ? `Host policy: ${penalty.policyApplied} (${formatMoney(penalty.penaltyAmount)} penalty)`
-      : null,
-    refundAmount > 0 ? `Refund processed: ${formatMoney(refundAmount)}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ")
-
-  const email = buildBookingCancelledEmail({
-    role: "host",
-    listingTitle: booking.listing_title ?? "Thrml session",
-    sessionDate: booking.session_date,
-    guestFirstName: booking.guest_name,
-    hostFirstName: booking.host_name,
-    guestFullName: booking.guest_name,
-    cancelledBy,
-    totalCharged: Number(booking.total_charged ?? 0),
-    refundAmount,
-    refundEligible: refundAmount > 0,
-    reason: reasonBits || null,
-  })
+  const title = booking.listing_title ?? "Thrml session"
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">A guest has cancelled their booking.</h1>
+    ${bookingSummaryCard([
+      { label: "Guest", value: escapeHtml(booking.guest_name ?? "Guest") },
+      { label: "Listing", value: escapeHtml(title) },
+      { label: "Date & time", value: escapeHtml(formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">Your calendar has been updated and this slot is now available again.</p>
+    ${ctaButton("View your calendar →", `${APP_URL}/dashboard/calendar`)}
+  `)
+  const text = [
+    "A guest has cancelled their booking.",
+    `Guest: ${booking.guest_name ?? "Guest"}`,
+    `Listing: ${title}`,
+    `Date & time: ${formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)}`,
+    "Your calendar has been updated and this slot is now available again.",
+    `View your calendar: ${APP_URL}/dashboard/calendar`,
+  ].join("\n")
 
   return sendEmail({
     to: booking.host_email,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
+    subject: `Booking cancelled by guest — ${formatLongDate(booking.session_date)}`,
+    html,
+    text,
     userId: booking.host_id ?? null,
     preferenceKey: "booking_cancelled",
   })
@@ -205,78 +244,156 @@ export async function sendGuestHostCancelledNotice(
   refundAmount: number
 ) {
   if (!booking.guest_email) return { sent: false, error: "Missing guest email" }
-  const email = buildBookingCancelledEmail({
-    role: "guest",
-    listingTitle: booking.listing_title ?? "Thrml session",
-    sessionDate: booking.session_date,
-    guestFirstName: booking.guest_name,
-    hostFirstName: booking.host_name,
-    guestFullName: booking.guest_name,
-    cancelledBy: "host",
-    totalCharged: Number(booking.total_charged ?? 0),
-    refundAmount,
-    refundEligible: true,
-    reason: booking.cancellation_reason ?? null,
-  })
+  const title = booking.listing_title ?? "Thrml session"
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">We're sorry — your host has cancelled this booking.</h1>
+    ${bookingSummaryCard([
+      { label: "Listing", value: escapeHtml(title) },
+      { label: "Date & time", value: escapeHtml(formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">
+      You will receive a full refund of ${escapeHtml(formatUsd(refundAmount))} including the platform fee within 5-10 business days.
+    </p>
+    ${ctaButton("Find another space →", `${APP_URL}/explore`)}
+    <p style="color:#9f9f9f;line-height:1.6;margin:20px 0 0;">If you have concerns about this cancellation, contact us at hello@usethrml.com.</p>
+  `)
+  const text = [
+    "We're sorry - your host has cancelled this booking.",
+    `Listing: ${title}`,
+    `Date & time: ${formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)}`,
+    `You will receive a full refund of ${formatUsd(refundAmount)} including the platform fee within 5-10 business days.`,
+    `Find another space: ${APP_URL}/explore`,
+    "If you have concerns about this cancellation, contact us at hello@usethrml.com.",
+  ].join("\n")
   return sendEmail({
     to: booking.guest_email,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
+    subject: "Your booking has been cancelled by the host",
+    html,
+    text,
     userId: booking.guest_id ?? null,
     preferenceKey: "booking_cancelled",
   })
 }
 
-export async function sendHostBookingConfirmedEmail(booking: BookingConfirmedEmailPayload) {
+export async function sendHostCancellationConfirmation(booking: BookingEmailPayload) {
   if (!booking.host_email) return { sent: false, error: "Missing host email" }
-  const email = buildNewBookingHostEmail({
-    listingTitle: booking.listing_title ?? "Your listing",
-    sessionDate: booking.session_date,
-    startTime: booking.start_time,
-    endTime: booking.end_time,
-    guestFullName: booking.guest_name ?? "Guest",
-    guestCount: Number(booking.guest_count ?? 1),
-    hostPayout: Number(booking.host_payout ?? 0),
-    accessCode: isCodeAccessType(booking.listing_access_type) ? booking.access_code : null,
-    bookingId: booking.booking_id,
-    hostFirstName: booking.host_name,
-  })
+  const title = booking.listing_title ?? "Thrml session"
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">Your cancellation has been processed.</h1>
+    ${bookingSummaryCard([
+      { label: "Guest", value: escapeHtml(booking.guest_name ?? "Guest") },
+      { label: "Listing", value: escapeHtml(title) },
+      { label: "Date & time", value: escapeHtml(formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">The guest has been notified and will receive a full refund.</p>
+    ${ctaButton("View your listings →", `${APP_URL}/dashboard/listings`)}
+  `)
+  const text = [
+    "Your cancellation has been processed.",
+    `Guest: ${booking.guest_name ?? "Guest"}`,
+    `Listing: ${title}`,
+    `Date & time: ${formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)}`,
+    "The guest has been notified and will receive a full refund.",
+    `View your listings: ${APP_URL}/dashboard/listings`,
+  ].join("\n")
 
   return sendEmail({
     to: booking.host_email,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
+    subject: `Booking cancellation confirmed — ${booking.guest_name ?? "Guest"}`,
+    html,
+    text,
+    userId: booking.host_id ?? null,
+    preferenceKey: "booking_cancelled",
+  })
+}
+
+export async function sendHostNewBookingAlert(booking: BookingConfirmedEmailPayload) {
+  if (!booking.host_email) return { sent: false, error: "Missing host email" }
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">You have a new booking.</h1>
+    ${bookingSummaryCard([
+      { label: "Guest", value: escapeHtml(booking.guest_name ?? "Guest") },
+      { label: "Date & time", value: escapeHtml(formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)) },
+      { label: "Your payout", value: escapeHtml(formatUsd(booking.host_payout ?? 0)) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">
+      Access details will be sent to your guest automatically 2 hours before their session. No action needed.
+    </p>
+    ${ctaButton("View booking →", `${APP_URL}/dashboard/bookings/${booking.booking_id}`)}
+  `)
+  const text = [
+    "You have a new booking.",
+    `Guest: ${booking.guest_name ?? "Guest"}`,
+    `Date & time: ${formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)}`,
+    `Your payout: ${formatUsd(booking.host_payout ?? 0)}`,
+    "Access details will be sent to your guest automatically 2 hours before their session. No action needed.",
+    `View booking: ${APP_URL}/dashboard/bookings/${booking.booking_id}`,
+  ].join("\n")
+  return sendEmail({
+    to: booking.host_email,
+    subject: `New booking — ${booking.guest_name ?? "Guest"} on ${formatLongDate(booking.session_date)}`,
+    html,
+    text,
     userId: booking.host_id ?? null,
     preferenceKey: "new_booking",
   })
 }
 
-export async function sendGuestBookingConfirmedEmail(booking: BookingConfirmedEmailPayload) {
+export async function sendHostBookingConfirmedEmail(booking: BookingConfirmedEmailPayload) {
+  return sendHostNewBookingAlert(booking)
+}
+
+export async function sendGuestBookingConfirmation(booking: BookingConfirmedEmailPayload) {
   if (!booking.guest_email) return { sent: false, error: "Missing guest email" }
-  const email = buildBookingConfirmationGuestEmail({
-    listingTitle: booking.listing_title ?? "Your session",
-    locationLabel: booking.listing_location_label ?? null,
-    sessionDate: booking.session_date,
-    startTime: booking.start_time,
-    endTime: booking.end_time,
-    guestCount: Number(booking.guest_count ?? 1),
-    totalCharged: Number(booking.total_charged ?? 0),
-    accessSendTiming: booking.listing_access_code_send_timing ?? null,
-    hostFirstName: booking.host_name,
-    guestFirstName: booking.guest_name,
-    bookingId: booking.booking_id,
-    cancellationPolicy: booking.listing_cancellation_policy ?? null,
-  })
+  const title = booking.listing_title ?? "Your session"
+  const accessType = normalizeAccessType(booking.listing_access_type)
+  const accessPreview =
+    accessType === "host_onsite"
+      ? "Your host will meet you on arrival."
+      : "Your access code will be sent 2 hours before your session."
+  const locationLabel =
+    booking.listing_location_label?.trim() || "Address available in your booking details"
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">Your booking is confirmed.</h1>
+    ${bookingSummaryCard([
+      { label: "Listing", value: `${serviceEmoji(booking.service_type)} ${escapeHtml(title)}` },
+      { label: "Address", value: `📍 ${escapeHtml(locationLabel)}` },
+      { label: "Date & time", value: `🕐 ${escapeHtml(formatBookingWindow(booking.session_date, booking.start_time, booking.end_time))}` },
+      { label: "Host", value: `👤 ${escapeHtml(booking.host_name ?? "Host")}` },
+      { label: "Total paid", value: `💳 ${escapeHtml(formatUsd(booking.total_charged ?? 0))}` },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 10px;">${escapeHtml(accessPreview)}</p>
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">${escapeHtml(policyReminder(booking.listing_cancellation_policy))}</p>
+    ${ctaButton("View booking details →", `${APP_URL}/dashboard/bookings/${booking.booking_id}`)}
+    <p style="color:#9f9f9f;line-height:1.6;margin:20px 0 0;">
+      If you need to cancel or have questions, visit your dashboard or contact us at hello@usethrml.com.
+    </p>
+  `)
+  const text = [
+    "Your booking is confirmed.",
+    `Listing: ${title}`,
+    `Address: ${locationLabel}`,
+    `Date & time: ${formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)}`,
+    `Host: ${booking.host_name ?? "Host"}`,
+    `Total paid: ${formatUsd(booking.total_charged ?? 0)}`,
+    accessPreview,
+    policyReminder(booking.listing_cancellation_policy),
+    `View booking details: ${APP_URL}/dashboard/bookings/${booking.booking_id}`,
+    "If you need to cancel or have questions, visit your dashboard or contact us at hello@usethrml.com.",
+  ].join("\n")
+
   return sendEmail({
     to: booking.guest_email,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
+    subject: `You're booked — ${title}`,
+    html,
+    text,
     userId: booking.guest_id ?? null,
     preferenceKey: "new_booking",
   })
+}
+
+export async function sendGuestBookingConfirmedEmail(booking: BookingConfirmedEmailPayload) {
+  return sendGuestBookingConfirmation(booking)
 }
 
 export async function sendHostNewReviewEmail(args: {
@@ -294,25 +411,58 @@ export async function sendHostNewReviewEmail(args: {
   ratingValue: number | null
 }) {
   if (!args.hostEmail) return { sent: false, error: "Missing host email" }
-  const email = buildNewReviewHostEmail({
-    hostFirstName: args.hostFirstName,
+  const stars = "★".repeat(Math.max(1, Math.min(5, Math.round(args.ratingOverall))))
+  const safeComment = args.comment ? escapeHtml(args.comment) : null
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">${escapeHtml(args.guestFirstName ?? "A guest")} left you a review.</h1>
+    ${bookingSummaryCard([
+      { label: "Listing", value: escapeHtml(args.listingTitle) },
+      { label: "Rating", value: `${stars} (${Math.round(args.ratingOverall)}/5)` },
+      ...(safeComment ? [{ label: "Review", value: safeComment }] : []),
+    ])}
+    ${ctaButton("View review →", `${APP_URL}/dashboard/listings/${args.listingId}#reviews`)}
+  `)
+  const text = [
+    `${args.guestFirstName ?? "A guest"} left you a review.`,
+    `Listing: ${args.listingTitle}`,
+    `Rating: ${stars} (${Math.round(args.ratingOverall)}/5)`,
+    args.comment ? `Review: ${args.comment}` : null,
+    `View review: ${APP_URL}/dashboard/listings/${args.listingId}#reviews`,
+  ]
+    .filter(Boolean)
+    .join("\n")
+  return sendEmail({
+    to: args.hostEmail,
+    subject: `New review for ${args.listingTitle}`,
+    html,
+    text,
+    userId: args.hostId ?? null,
+    preferenceKey: "new_review",
+  })
+}
+
+export async function sendHostNewReviewNotification(args: {
+  hostId: string | null
+  hostEmail: string | null
+  guestFirstName: string | null
+  listingTitle: string
+  listingId: string
+  ratingOverall: number
+  comment: string | null
+}) {
+  return sendHostNewReviewEmail({
+    hostId: args.hostId,
+    hostEmail: args.hostEmail,
+    hostFirstName: null,
     guestFirstName: args.guestFirstName,
     listingTitle: args.listingTitle,
     listingId: args.listingId,
     ratingOverall: args.ratingOverall,
     comment: args.comment,
-    ratingCleanliness: args.ratingCleanliness,
-    ratingAccuracy: args.ratingAccuracy,
-    ratingCommunication: args.ratingCommunication,
-    ratingValue: args.ratingValue,
-  })
-  return sendEmail({
-    to: args.hostEmail,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
-    userId: args.hostId ?? null,
-    preferenceKey: "new_review",
+    ratingCleanliness: null,
+    ratingAccuracy: null,
+    ratingCommunication: null,
+    ratingValue: null,
   })
 }
 
@@ -326,21 +476,52 @@ export async function sendHostPayoutSentEmail(args: {
   hostPayout: number
 }) {
   if (!args.hostEmail) return { sent: false, error: "Missing host email" }
-  const email = buildPayoutSentEmail({
-    hostFirstName: args.hostFirstName,
-    listingTitle: args.listingTitle,
-    sessionDate: args.sessionDate,
-    guestFullName: args.guestFullName,
-    hostPayout: args.hostPayout,
-  })
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">
+      Your session with ${escapeHtml(args.guestFullName ?? "a guest")} is complete.
+    </h1>
+    ${bookingSummaryCard([
+      { label: "Listing", value: escapeHtml(args.listingTitle) },
+      { label: "Session date", value: escapeHtml(formatLongDate(args.sessionDate)) },
+      { label: "Payout", value: escapeHtml(formatUsd(args.hostPayout)) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 8px;">
+      Your payout of ${escapeHtml(formatUsd(args.hostPayout))} is being processed by Stripe and should arrive within 2 business days.
+    </p>
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">
+      Check your payout status at any time in your Stripe Express dashboard.
+    </p>
+    ${ctaButton("View payout status →", `${APP_URL}/dashboard/payouts`)}
+  `)
+  const text = [
+    `Your session with ${args.guestFullName ?? "a guest"} is complete.`,
+    `Listing: ${args.listingTitle}`,
+    `Session date: ${formatLongDate(args.sessionDate)}`,
+    `Payout: ${formatUsd(args.hostPayout)}`,
+    `Your payout of ${formatUsd(args.hostPayout)} is being processed by Stripe and should arrive within 2 business days.`,
+    "Check your payout status at any time in your Stripe Express dashboard.",
+    `View payout status: ${APP_URL}/dashboard/payouts`,
+  ].join("\n")
   return sendEmail({
     to: args.hostEmail,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
+    subject: `Session complete — payout processing for ${args.listingTitle}`,
+    html,
+    text,
     userId: args.hostId ?? null,
     preferenceKey: "payout_sent",
   })
+}
+
+export async function sendHostPayoutNotice(args: {
+  hostId: string | null
+  hostEmail: string | null
+  hostFirstName: string | null
+  listingTitle: string
+  sessionDate: string | null
+  guestFullName: string | null
+  hostPayout: number
+}) {
+  return sendHostPayoutSentEmail(args)
 }
 
 export async function sendPreArrivalReminderEmail(args: {
@@ -358,24 +539,157 @@ export async function sendPreArrivalReminderEmail(args: {
   bookingId: string
 }) {
   if (!args.guestEmail) return { sent: false, error: "Missing guest email" }
-  const email = buildPreArrivalReminderEmail({
-    guestFirstName: args.guestFirstName,
-    hostFirstName: args.hostFirstName,
+  const accessType = normalizeAccessType(args.accessType)
+  const accessLine =
+    accessType === "host_onsite"
+      ? "Your host will meet you on arrival."
+      : "Your access code will arrive 2 hours before your session."
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">Your session is tomorrow.</h1>
+    ${bookingSummaryCard([
+      { label: "Listing", value: escapeHtml(args.listingTitle) },
+      { label: "Date & time", value: escapeHtml(formatBookingWindow(args.sessionDate, args.startTime, args.endTime)) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">${escapeHtml(accessLine)}</p>
+    ${ctaButton("View booking details →", `${APP_URL}/dashboard/bookings/${args.bookingId}`)}
+  `)
+  const text = [
+    "Your session is tomorrow.",
+    `Listing: ${args.listingTitle}`,
+    `Date & time: ${formatBookingWindow(args.sessionDate, args.startTime, args.endTime)}`,
+    accessLine,
+    `View booking details: ${APP_URL}/dashboard/bookings/${args.bookingId}`,
+  ].join("\n")
+  return sendEmail({
+    to: args.guestEmail,
+    subject: `Your session tomorrow — ${args.listingTitle}`,
+    html,
+    text,
+    userId: args.guestId ?? null,
+    preferenceKey: "new_booking",
+  })
+}
+
+export async function sendGuest24HourReminder(args: {
+  guestId: string | null
+  guestEmail: string | null
+  listingTitle: string
+  sessionDate: string | null
+  startTime: string | null
+  endTime: string | null
+  accessType: string | null
+  bookingId: string
+}) {
+  return sendPreArrivalReminderEmail({
+    guestId: args.guestId,
+    guestEmail: args.guestEmail,
+    guestFirstName: null,
+    hostFirstName: null,
     listingTitle: args.listingTitle,
     sessionDate: args.sessionDate,
     startTime: args.startTime,
     endTime: args.endTime,
     accessType: args.accessType,
-    accessCode: args.accessCode,
-    entryInstructions: args.entryInstructions,
+    accessCode: null,
+    entryInstructions: null,
     bookingId: args.bookingId,
   })
+}
+
+export async function sendHost24HourReminder(args: {
+  hostId: string | null
+  hostEmail: string | null
+  guestName: string | null
+  listingTitle: string
+  startTime: string | null
+  endTime: string | null
+  sessionDate: string | null
+  accessType: string | null
+  bookingId: string
+}) {
+  if (!args.hostEmail) return { sent: false, error: "Missing host email" }
+  const accessType = normalizeAccessType(args.accessType)
+  const startLabel = formatBookingWindow(args.sessionDate, args.startTime, args.endTime)
+  const twoHoursBeforeLabel =
+    args.sessionDate && args.startTime
+      ? new Date(new Date(`${args.sessionDate}T${args.startTime}`).getTime() - 2 * 60 * 60 * 1000).toLocaleTimeString(
+          "en-US",
+          { hour: "numeric", minute: "2-digit", timeZoneName: "short" }
+        )
+      : "2 hours before start"
+  const accessLine =
+    accessType === "host_onsite"
+      ? `You're listed as on-site — please be ready to greet your guest at ${startLabel}.`
+      : `Access code will be sent to your guest automatically at ${twoHoursBeforeLabel}. No action needed.`
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">You have a guest arriving tomorrow.</h1>
+    ${bookingSummaryCard([
+      { label: "Guest", value: escapeHtml(args.guestName ?? "Guest") },
+      { label: "Listing", value: escapeHtml(args.listingTitle) },
+      { label: "Date & time", value: escapeHtml(startLabel) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">${escapeHtml(accessLine)}</p>
+    ${ctaButton("View booking →", `${APP_URL}/dashboard/bookings/${args.bookingId}`)}
+  `)
+  const text = [
+    "You have a guest arriving tomorrow.",
+    `Guest: ${args.guestName ?? "Guest"}`,
+    `Listing: ${args.listingTitle}`,
+    `Date & time: ${startLabel}`,
+    accessLine,
+    `View booking: ${APP_URL}/dashboard/bookings/${args.bookingId}`,
+  ].join("\n")
   return sendEmail({
-    to: args.guestEmail,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
-    userId: args.guestId ?? null,
+    to: args.hostEmail,
+    subject: `Guest arriving tomorrow — ${args.listingTitle}`,
+    html,
+    text,
+    userId: args.hostId ?? null,
+    preferenceKey: "new_booking",
+  })
+}
+
+export async function sendHostTwoHourReminder(args: {
+  hostId: string | null
+  hostEmail: string | null
+  guestName: string | null
+  listingTitle: string
+  sessionDate: string | null
+  startTime: string | null
+  endTime: string | null
+  accessType: string | null
+  bookingId: string
+}) {
+  if (!args.hostEmail) return { sent: false, error: "Missing host email" }
+  const accessType = normalizeAccessType(args.accessType)
+  const line =
+    accessType === "host_onsite"
+      ? `You're listed as on-site — please be ready to greet your guest at ${formatBookingWindow(args.sessionDate, args.startTime, args.endTime)}.`
+      : "Access details are being sent to your guest automatically now. No action needed."
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">Your guest is arriving soon.</h1>
+    ${bookingSummaryCard([
+      { label: "Guest", value: escapeHtml(args.guestName ?? "Guest") },
+      { label: "Listing", value: escapeHtml(args.listingTitle) },
+      { label: "Date & time", value: escapeHtml(formatBookingWindow(args.sessionDate, args.startTime, args.endTime)) },
+    ])}
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">${escapeHtml(line)}</p>
+    ${ctaButton("View booking →", `${APP_URL}/dashboard/bookings/${args.bookingId}`)}
+  `)
+  const text = [
+    "Your guest is arriving soon.",
+    `Guest: ${args.guestName ?? "Guest"}`,
+    `Listing: ${args.listingTitle}`,
+    `Date & time: ${formatBookingWindow(args.sessionDate, args.startTime, args.endTime)}`,
+    line,
+    `View booking: ${APP_URL}/dashboard/bookings/${args.bookingId}`,
+  ].join("\n")
+  return sendEmail({
+    to: args.hostEmail,
+    subject: `Host reminder — session starts soon at ${args.listingTitle}`,
+    html,
+    text,
+    userId: args.hostId ?? null,
     preferenceKey: "new_booking",
   })
 }
@@ -388,19 +702,41 @@ export async function sendPostSessionReviewRequestEmail(args: {
   bookingId: string
 }) {
   if (!args.guestEmail) return { sent: false, error: "Missing guest email" }
-  const email = buildReviewRequestEmail({
-    guestFirstName: args.guestFirstName,
-    listingTitle: args.listingTitle,
-    bookingId: args.bookingId,
-  })
+  const html = thrmlEmailWrapper(`
+    <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">Hope your session was exactly what you needed.</h1>
+    <p style="color:#d6d6d6;line-height:1.65;margin:0 0 16px;">
+      Reviews help other guests discover great spaces and help hosts improve. Takes 30 seconds.
+    </p>
+    ${bookingSummaryCard([
+      { label: "Listing", value: escapeHtml(args.listingTitle) },
+      { label: "Rate your session", value: "⭐ ⭐ ⭐ ⭐ ⭐" },
+    ])}
+    ${ctaButton("Leave a review →", `${APP_URL}/dashboard/bookings/${args.bookingId}/review`)}
+  `)
+  const text = [
+    `How was your session at ${args.listingTitle}?`,
+    "Hope your session was exactly what you needed.",
+    "Reviews help other guests discover great spaces and help hosts improve. Takes 30 seconds.",
+    `Leave a review: ${APP_URL}/dashboard/bookings/${args.bookingId}/review`,
+  ].join("\n")
   return sendEmail({
     to: args.guestEmail,
-    subject: email.subject,
-    html: email.html,
-    text: email.text,
+    subject: `How was your session at ${args.listingTitle}?`,
+    html,
+    text,
     userId: args.guestId ?? null,
     preferenceKey: "new_booking",
   })
+}
+
+export async function sendGuestReviewRequest(args: {
+  guestId: string | null
+  guestEmail: string | null
+  guestFirstName: string | null
+  listingTitle: string
+  bookingId: string
+}) {
+  return sendPostSessionReviewRequestEmail(args)
 }
 
 export async function sendHostBookingRequestEmail(booking: BookingRequestEmailPayload) {

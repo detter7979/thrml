@@ -3,7 +3,7 @@ import { z } from "zod"
 
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
 import { sanitizeText } from "@/lib/sanitize"
-import { sendHostNewReviewEmail } from "@/lib/emails"
+import { sendHostNewReviewNotification } from "@/lib/emails"
 import { normalizePhotoUrls, normalizeSubRatings } from "@/lib/reviews"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -160,20 +160,19 @@ export async function POST(req: NextRequest) {
   ])
 
   if (insertedReview.is_published !== false) {
-    void sendHostNewReviewEmail({
-      hostId: booking.host_id ?? null,
-      hostEmail: hostProfile?.email ?? null,
-      hostFirstName: hostProfile?.full_name ?? null,
-      guestFirstName: guestProfile?.full_name ?? null,
-      listingTitle: listing?.title ?? "your listing",
-      listingId: listing?.id ?? booking.listing_id ?? "",
-      ratingOverall: Number(insertedReview.rating_overall ?? parsed.data.ratingOverall),
-      comment: insertedReview.comment,
-      ratingCleanliness: insertedReview.rating_cleanliness,
-      ratingAccuracy: insertedReview.rating_accuracy,
-      ratingCommunication: insertedReview.rating_communication,
-      ratingValue: insertedReview.rating_value,
-    })
+    try {
+      await sendHostNewReviewNotification({
+        hostId: booking.host_id ?? null,
+        hostEmail: hostProfile?.email ?? null,
+        guestFirstName: guestProfile?.full_name ?? null,
+        listingTitle: listing?.title ?? "your listing",
+        listingId: listing?.id ?? booking.listing_id ?? "",
+        ratingOverall: Number(insertedReview.rating_overall ?? parsed.data.ratingOverall),
+        comment: insertedReview.comment,
+      })
+    } catch (error) {
+      console.error("[reviews] Review notification email failed:", error)
+    }
   }
 
   return NextResponse.json({ review_id: insertedReview.id }, { status: 201 })

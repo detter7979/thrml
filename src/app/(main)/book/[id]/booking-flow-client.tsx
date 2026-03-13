@@ -54,6 +54,7 @@ interface CheckoutPayload {
   endTime: string
   durationHours: number
   waiver_version: string
+  waiverAccepted: boolean
   disclaimersAccepted: boolean
   newsletterOptIn: boolean
 }
@@ -308,6 +309,7 @@ export function BookingFlowClient({
       endTime: initialEndTime,
       durationHours: initialDurationHours,
       waiver_version: acceptedWaiverVersion ?? "",
+      waiverAccepted: Boolean(acceptedWaiverVersion),
       disclaimersAccepted: true,
       newsletterOptIn: newsletterChecked,
     }),
@@ -341,6 +343,7 @@ export function BookingFlowClient({
     const requestPayload = {
       ...payload,
       waiver_version: waiverVersionOverride ?? payload.waiver_version,
+      waiverAccepted: Boolean(waiverVersionOverride ?? payload.waiver_version),
     }
     if (!requestPayload.waiver_version.trim()) {
       setPaymentError("Waiver acceptance required")

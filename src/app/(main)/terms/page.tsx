@@ -101,7 +101,7 @@ Report any access issues to the Host immediately
 thrml is not responsible for access issues arising from Host-side technical failures, lock malfunctions, or code errors beyond our platform controls.
 
 9. Marketing and Social Media Promotion
-As part of thrml's marketplace services, we may promote Host listings across thrml's owned social media channels, email marketing, and digital advertising at our discretion. By listing on thrml, Hosts grant thrml a non-exclusive, royalty-free license to use listing photos, descriptions, and associated content for marketing purposes on behalf of the Host. Hosts may opt out of social media promotion by contacting legal@usethrml.com.
+As part of thrml's marketplace services, we may promote Host listings across thrml's owned social media channels, email marketing, and digital advertising at our discretion. By listing on thrml, Hosts grant thrml a non-exclusive, royalty-free license to use listing photos, descriptions, and associated content for marketing purposes on behalf of the Host. Hosts may opt out of social media promotion by contacting hello@usethrml.com.
 thrml does not guarantee any specific level of marketing exposure, bookings generated, or revenue from promotional activities.
 
 10. Reviews
@@ -144,7 +144,7 @@ thrml reserves the right to modify these Terms at any time. We will notify users
 thrml reserves the right to suspend or terminate any user account at its sole discretion, with or without notice, for violations of these Terms or conduct deemed harmful to the platform or its users.
 
 19. Contact
-For questions about these Terms of Service, contact us at: legal@usethrml.com`}
+For questions about these Terms of Service, contact us at: hello@usethrml.com`}
       </div>
     </main>
   )

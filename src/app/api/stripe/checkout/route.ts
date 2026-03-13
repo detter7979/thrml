@@ -18,6 +18,7 @@ const checkoutSchema = z.object({
   endTime: z.string().min(1),
   durationHours: z.coerce.number().positive(),
   waiver_version: z.string().optional(),
+  waiverAccepted: z.boolean().optional(),
   disclaimersAccepted: z.boolean(),
   newsletterOptIn: z.boolean().optional().default(false),
 })
@@ -236,6 +237,7 @@ export async function POST(req: NextRequest) {
       endTime,
       durationHours,
       waiver_version,
+      waiverAccepted,
       disclaimersAccepted,
       newsletterOptIn,
     } = parsed.data
@@ -523,6 +525,8 @@ export async function POST(req: NextRequest) {
         status: isInstantBook ? "pending" : "pending_host",
         confirmation_deadline: isInstantBook ? null : confirmationDeadline,
         waiver_version: waiver_version.trim(),
+        waiver_accepted: waiverAccepted ?? false,
+        waiver_accepted_at: waiverAccepted ? new Date().toISOString() : null,
       })
       .select()
       .single()

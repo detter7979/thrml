@@ -87,7 +87,7 @@ Deletion: Request deletion of your personal data, subject to legal retention req
 Portability: Request your data in a portable format
 Opt-out: Opt out of marketing communications at any time
 Restrict processing: Request that we limit how we use your data in certain circumstances
-To exercise any of these rights, contact us at legal@usethrml.com. We will respond within 30 days.
+To exercise any of these rights, contact us at hello@usethrml.com. We will respond within 30 days.
 
 7. California Privacy Rights (CCPA)
 California residents have additional rights under the California Consumer Privacy Act, including the right to know what personal information is collected, the right to delete, and the right to opt out of the sale of personal information. thrml does not sell personal information. To submit a CCPA request, contact us at the address below.
@@ -106,7 +106,8 @@ The platform may contain links to third-party websites or services. We are not r
 We may update this Privacy Policy from time to time. We will notify you of material changes by email or via notice on the platform. The date at the top of this policy reflects the most recent revision.
 
 12. Contact
-For privacy-related inquiries, data requests, or to report a concern, contact us at: legal@usethrml.com`}
+For privacy-related inquiries, data requests, or to report a concern,
+contact us at: hello@usethrml.com`}
       </div>
     </main>
   )

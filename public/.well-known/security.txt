@@ -1,0 +1,5 @@
+Contact: mailto:hello@usethrml.com
+Expires: 2027-03-12T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://usethrml.com/privacy
+Scope: https://usethrml.com

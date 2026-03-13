@@ -68,7 +68,7 @@ Hosts are solely responsible for ensuring their wellness spaces comply with all 
 
 
 thrml Wellness Marketplace
-usethrml.com  |  legal@usethrml.com
+usethrml.com  |  hello@usethrml.com
 These documents are drafts intended for legal review and are not legal advice.`}
       </div>
     </main>

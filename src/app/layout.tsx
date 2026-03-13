@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { DM_Sans, DM_Serif_Display, Geist_Mono } from "next/font/google";
+import Script from "next/script";
+import { CookieConsent } from "@/components/cookie-consent";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -89,7 +91,22 @@ export default function RootLayout({
         className={`${dmSans.variable} ${dmSerifDisplay.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <Script
+          id="ga-consent-default"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('consent', 'default', {
+                analytics_storage: 'denied',
+                wait_for_update: 2000
+              });
+            `,
+          }}
+        />
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!} />
+        <CookieConsent />
       </body>
     </html>
   );

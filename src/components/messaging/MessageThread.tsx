@@ -103,50 +103,59 @@ export function MessageThread({
   }, [messages.length])
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`messages:${conversationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload) => {
-          setMessages((prev) => {
-            const next = payload.new as MessageRow
-            if (prev.some((item) => item.id === next.id)) return prev
-            return [...prev, next]
-          })
-        }
-      )
-      .subscribe()
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let presence: ReturnType<typeof supabase.channel> | null = null
 
-    const presence = supabase.channel(`typing:${conversationId}`, {
-      config: { presence: { key: conversationId } },
-    })
-    presence
-      .on("presence", { event: "sync" }, () => {
-        const state = presence.presenceState<Record<string, unknown>>()
-        const entries = Object.values(state).reduce<unknown[]>((all, group) => {
-          if (Array.isArray(group)) {
-            all.push(...group)
+    try {
+      channel = supabase
+        .channel(`messages:${conversationId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            setMessages((prev) => {
+              const next = payload.new as MessageRow
+              if (prev.some((item) => item.id === next.id)) return prev
+              return [...prev, next]
+            })
           }
-          return all
-        }, [])
-        const active = entries.some((entry) => {
-          const userId = (entry as { user_id?: string }).user_id
-          const isTyping = Boolean((entry as { typing?: boolean }).typing)
-          return userId && userId !== currentUserId && isTyping
-        })
-        setTyping(active)
+        )
+      channel.subscribe()
+
+      const presenceChannel = supabase.channel(`typing:${conversationId}`, {
+        config: { presence: { key: conversationId } },
       })
-      .subscribe()
+      presence = presenceChannel
+      presenceChannel
+        .on("presence", { event: "sync" }, () => {
+          const state = presenceChannel.presenceState<Record<string, unknown>>()
+          const entries = Object.values(state).reduce<unknown[]>((all, group) => {
+            if (Array.isArray(group)) {
+              all.push(...group)
+            }
+            return all
+          }, [])
+          const active = entries.some((entry) => {
+            const userId = (entry as { user_id?: string }).user_id
+            const isTyping = Boolean((entry as { typing?: boolean }).typing)
+            return userId && userId !== currentUserId && isTyping
+          })
+          setTyping(active)
+        })
+      presenceChannel.subscribe()
+    } catch (error) {
+      setTyping(false)
+      console.warn("Realtime unavailable for thread, continuing without live updates.", error)
+    }
 
     return () => {
-      supabase.removeChannel(channel)
-      supabase.removeChannel(presence)
+      if (channel) supabase.removeChannel(channel)
+      if (presence) supabase.removeChannel(presence)
     }
   }, [conversationId, currentUserId, supabase])
 

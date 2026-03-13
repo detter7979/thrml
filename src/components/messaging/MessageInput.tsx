@@ -99,13 +99,20 @@ export function MessageInput({
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   useEffect(() => {
-    const channel = supabase.channel(`typing:${conversationId}`, {
-      config: { presence: { key: conversationId } },
-    })
-    typingChannelRef.current = channel
-    channel.subscribe()
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    try {
+      channel = supabase.channel(`typing:${conversationId}`, {
+        config: { presence: { key: conversationId } },
+      })
+      typingChannelRef.current = channel
+      channel.subscribe()
+    } catch (error) {
+      typingChannelRef.current = null
+      console.warn("Typing presence unavailable, continuing without realtime typing.", error)
+    }
 
     return () => {
+      if (!channel) return
       void channel.untrack()
       supabase.removeChannel(channel)
     }

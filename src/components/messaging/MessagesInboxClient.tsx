@@ -36,23 +36,30 @@ export function MessagesInboxClient({
 
   useEffect(() => {
     const supabase = createClient()
-    const messagesChannel = supabase
-      .channel(`dashboard-messages-${currentUserId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
-        void loadConversations()
-      })
-      .subscribe()
+    let messagesChannel: ReturnType<typeof supabase.channel> | null = null
+    let conversationsChannel: ReturnType<typeof supabase.channel> | null = null
 
-    const conversationsChannel = supabase
-      .channel(`dashboard-conversations-${currentUserId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
-        void loadConversations()
-      })
-      .subscribe()
+    try {
+      messagesChannel = supabase
+        .channel(`dashboard-messages-${currentUserId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
+          void loadConversations()
+        })
+      messagesChannel.subscribe()
+
+      conversationsChannel = supabase
+        .channel(`dashboard-conversations-${currentUserId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => {
+          void loadConversations()
+        })
+      conversationsChannel.subscribe()
+    } catch (error) {
+      console.warn("Realtime unavailable for inbox, continuing without live updates.", error)
+    }
 
     return () => {
-      supabase.removeChannel(messagesChannel)
-      supabase.removeChannel(conversationsChannel)
+      if (messagesChannel) supabase.removeChannel(messagesChannel)
+      if (conversationsChannel) supabase.removeChannel(conversationsChannel)
     }
   }, [currentUserId])
 

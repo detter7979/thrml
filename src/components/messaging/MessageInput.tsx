@@ -145,6 +145,7 @@ export function MessageInput({
   }, [value])
 
   useEffect(() => {
+    if (typeof window === "undefined") return
     const viewport = window.visualViewport
     if (!viewport) return
     const handler = () => {

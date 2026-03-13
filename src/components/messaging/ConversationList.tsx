@@ -59,7 +59,7 @@ export function ConversationList({
           ) : null}
         </div>
       </div>
-      <div className="max-h-[calc(100vh-180px)] overflow-y-auto">
+      <div className="max-h-[calc(100dvh-180px)] overflow-y-auto">
         {conversations.length ? (
           conversations.map((conversation) => {
             const name = conversation.other_party?.full_name ?? "Member"

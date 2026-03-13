@@ -93,8 +93,16 @@ export function MessagesInboxClient({
     await loadConversations()
   }
 
+  if (loading && conversations.length === 0) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center bg-[#F7F3EE] px-4 text-sm text-[#7A6A5D]">
+        Loading messages...
+      </div>
+    )
+  }
+
   return (
-    <div className="grid min-h-[calc(100vh-80px)] grid-cols-1 md:grid-cols-[360px_1fr]">
+    <div className="grid min-h-[calc(100dvh-80px)] grid-cols-1 md:grid-cols-[360px_1fr]">
       <ConversationList
         conversations={conversations}
         activeConversationId={selectedId}

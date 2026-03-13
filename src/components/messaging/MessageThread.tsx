@@ -170,7 +170,7 @@ export function MessageThread({
     .toUpperCase()
 
   return (
-    <section className="flex h-[calc(100vh-130px)] flex-col">
+    <section className="flex h-[calc(100dvh-130px)] flex-col">
       <header className="border-b border-[#E7DED3] bg-white px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">

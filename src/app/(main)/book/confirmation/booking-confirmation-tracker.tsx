@@ -28,6 +28,8 @@ export function BookingConfirmationTracker({
 }: BookingConfirmationTrackerProps) {
   useEffect(() => {
     const purchaseEventId = `purchase_${bookingId}`
+    const googleAdsIdRaw = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim()
+    const googleAdsId = googleAdsIdRaw && /^AW-\d+$/.test(googleAdsIdRaw) ? googleAdsIdRaw : null
 
     // GA4 purchase (client-side — deduplicates against server-side MP event).
     trackGaEvent("purchase", {
@@ -56,9 +58,13 @@ export function BookingConfirmationTracker({
     })
 
     // Google Ads Enhanced Conversions.
-    if (typeof window !== "undefined" && (window as { gtag?: (...args: unknown[]) => void }).gtag) {
+    if (
+      googleAdsId &&
+      typeof window !== "undefined" &&
+      (window as { gtag?: (...args: unknown[]) => void }).gtag
+    ) {
       ;(window as { gtag: (...args: unknown[]) => void }).gtag("event", "conversion", {
-        send_to: process.env.NEXT_PUBLIC_GOOGLE_ADS_ID,
+        send_to: googleAdsId,
         transaction_id: bookingId,
         value: totalAmount,
         currency: "USD",

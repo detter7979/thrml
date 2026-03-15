@@ -86,6 +86,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const googleAdsIdRaw = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim();
+  const googleAdsId = googleAdsIdRaw && /^AW-\d+$/.test(googleAdsIdRaw) ? googleAdsIdRaw : null;
+
   return (
     <html lang="en">
       <body
@@ -106,17 +109,21 @@ export default function RootLayout({
             `,
           }}
         />
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GOOGLE_ADS_ID}`}
-          strategy="afterInteractive"
-        />
-        <Script id="google-ads-init" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('config', '${process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? ""}');
-          `}
-        </Script>
+        {googleAdsId ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsId}`}
+              strategy="afterInteractive"
+            />
+            <Script id="google-ads-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('config', '${googleAdsId}');
+              `}
+            </Script>
+          </>
+        ) : null}
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!} />
         <MetaPixel />
         <CookieConsent />

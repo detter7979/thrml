@@ -761,6 +761,8 @@ function BookingWidget({
       value: totals.total,
       currency: "USD",
       num_items: 1,
+    }, {
+      eventId: `initiate_checkout_${listingId}_${Date.now()}`,
     })
 
     router.push(`/book/${listingId}?${params.toString()}`)
@@ -1207,6 +1209,8 @@ export function ListingDetailClient({
       content_category: serviceTypeId,
       value: pricing.price_solo ?? 0,
       currency: "USD",
+    }, {
+      eventId: `view_content_${id}_${Date.now()}`,
     })
   }, [city, id, pricing.price_solo, serviceTypeId, title])
 

@@ -32,6 +32,8 @@ export function BookingWidget({ pricing, listingId, listingTitle, serviceType }:
       content_type: "product",
       value: price,
       currency: "USD",
+    }, {
+      eventId: `initiate_checkout_${listingId}_${Date.now()}`,
     })
   }
 

@@ -27,9 +27,11 @@ export function BookingConfirmationTracker({
   userLastName,
 }: BookingConfirmationTrackerProps) {
   useEffect(() => {
+    const purchaseEventId = `purchase_${bookingId}`
+
     // GA4 purchase (client-side — deduplicates against server-side MP event).
     trackGaEvent("purchase", {
-      event_id: `purchase_${bookingId}`,
+      event_id: purchaseEventId,
       transaction_id: bookingId,
       listing_id: listingId,
       value: totalAmount,
@@ -44,7 +46,13 @@ export function BookingConfirmationTracker({
       content_type: "product",
       value: totalAmount,
       currency: "USD",
-      event_id: `purchase_${bookingId}`,
+    }, {
+      eventId: purchaseEventId,
+      userData: {
+        ...(userEmail ? { email: userEmail } : {}),
+        ...(userFirstName ? { firstName: userFirstName } : {}),
+        ...(userLastName ? { lastName: userLastName } : {}),
+      },
     })
 
     // Google Ads Enhanced Conversions.

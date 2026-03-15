@@ -13,6 +13,7 @@ import {
   sendHostBookingConfirmedEmail,
 } from "@/lib/emails"
 import { sendPostSessionEmails } from "@/lib/emails/post-session"
+import { sendGA4Event } from "@/lib/analytics/measurement-protocol"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest) {
           supabase
             .from("listings")
             .select(
-              "id, title, access_type, access_instructions, access_code_send_timing, city, state, cancellation_policy"
+              "id, title, service_type, access_type, access_instructions, access_code_send_timing, city, state, cancellation_policy"
             )
             .eq("id", booking.listing_id)
             .maybeSingle(),
@@ -153,6 +154,36 @@ export async function POST(req: NextRequest) {
         const guestEmail = guestAuthUser.data.user?.email ?? null
         const listingAccessType = (listing as Record<string, unknown> | null)?.access_type ?? null
         const shouldIncludeCode = isCodeAccessType(listingAccessType) && Boolean(booking.access_code)
+
+        // Server-side GA4 purchase — fires for all users including iOS/Safari.
+        if (newlyConfirmed) {
+          void sendGA4Event({
+            // Use guest_id as a stable client_id — GA4 MP requires one.
+            clientId: booking.guest_id,
+            events: [
+              {
+                name: "purchase",
+                params: {
+                  event_id: `purchase_${booking.id}`,
+                  transaction_id: booking.id,
+                  value: Number(booking.total_charged ?? 0),
+                  currency: "USD",
+                  items: [
+                    {
+                      item_id: booking.listing_id,
+                      item_name:
+                        ((listing as Record<string, unknown> | null)?.title as string | null) ?? "Thrml Session",
+                      item_category:
+                        ((listing as Record<string, unknown> | null)?.service_type as string | null) ?? "wellness",
+                      price: Number(booking.total_charged ?? 0),
+                      quantity: 1,
+                    },
+                  ],
+                },
+              },
+            ],
+          })
+        }
 
         if (newsletterOptIn) {
           const { data: guestPrefsProfile } = await supabase

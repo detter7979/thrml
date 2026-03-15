@@ -6,6 +6,7 @@ import { CheckCircle2, ChevronDown, Loader2, MapPin } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 import { ListingGrid } from "@/components/listings/ListingGrid"
+import { trackMetaEvent } from "@/components/meta-pixel"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -309,6 +310,9 @@ export function HomePageClient() {
 
       trackGaEvent("newsletter_subscribe", {
         source: "home_page",
+      })
+      trackMetaEvent("Lead", {
+        content_name: "newsletter_subscribe",
       })
       setNewsletterStatus("success")
       setNewsletterEmail("")

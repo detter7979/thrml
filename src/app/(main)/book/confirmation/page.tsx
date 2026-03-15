@@ -71,6 +71,10 @@ export default async function BookingConfirmationPage({
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect("/")
+  const fullName = (user.user_metadata?.full_name as string | null) ?? ""
+  const nameParts = fullName.trim().split(" ").filter(Boolean)
+  const firstName = nameParts[0] ?? null
+  const lastName = nameParts.slice(1).join(" ") || null
 
   const { data: booking, error } = await supabase
     .from("bookings")
@@ -115,6 +119,9 @@ export default async function BookingConfirmationPage({
           totalAmount={Number(booking.total_charged ?? 0)}
           serviceType={typeof listing?.service_type === "string" ? listing.service_type : null}
           city={typeof listing?.city === "string" ? listing.city : null}
+          userEmail={user.email ?? null}
+          userFirstName={firstName}
+          userLastName={lastName}
         />
       ) : null}
       <PendingRefresh enabled={booking.status === "pending" || (booking.status === "confirmed" && !booking.access_code)} />

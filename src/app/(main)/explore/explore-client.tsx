@@ -1077,10 +1077,23 @@ export function ExploreClient() {
               setActiveSource(null)
             }}
           >
-            <div className="relative w-[220px] overflow-hidden rounded-xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => openListingFromCard(popupListing.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  openListingFromCard(popupListing.id)
+                }
+              }}
+              className="relative w-[220px] overflow-hidden rounded-xl bg-white text-left shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
+            >
               <button
                 type="button"
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation()
+                  event.preventDefault()
                   setActiveId(null)
                   setActiveSource(null)
                 }}

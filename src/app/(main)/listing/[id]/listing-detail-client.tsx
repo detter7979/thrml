@@ -63,6 +63,7 @@ import { calculateBookingTotal, getPricePerPerson, type PricingTiers } from "@/l
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
 import { SPEC_CONFIG } from "@/lib/constants/specs"
+import { trackMetaEvent } from "@/components/meta-pixel"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { roundUpTo30 } from "@/lib/slots"
 import { createClient } from "@/lib/supabase/client"
@@ -754,6 +755,13 @@ function BookingWidget({
       value: totals.total,
       currency: "USD",
     })
+    trackMetaEvent("InitiateCheckout", {
+      content_ids: [listingId],
+      content_type: "product",
+      value: totals.total,
+      currency: "USD",
+      num_items: 1,
+    })
 
     router.push(`/book/${listingId}?${params.toString()}`)
   }
@@ -1184,15 +1192,23 @@ export function ListingDetailClient({
       : `/listings/${id}`
 
   useEffect(() => {
-    trackGaEvent("view_listing", {
+    trackGaEvent("view_item", {
       listing_id: id,
-      listing_title: title,
-      service_type: serviceTypeId,
+      item_name: title,
+      item_category: serviceTypeId,
       city,
-      state,
-      price: pricing.price_solo,
+      value: pricing.price_solo ?? 0,
+      currency: "USD",
     })
-  }, [city, id, pricing.price_solo, serviceTypeId, state, title])
+    trackMetaEvent("ViewContent", {
+      content_ids: [id],
+      content_type: "product",
+      content_name: title,
+      content_category: serviceTypeId,
+      value: pricing.price_solo ?? 0,
+      currency: "USD",
+    })
+  }, [city, id, pricing.price_solo, serviceTypeId, title])
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">

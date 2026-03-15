@@ -8,6 +8,7 @@ import { CheckCircle2, Loader2 } from "lucide-react"
 import { AvatarUpload } from "@/components/profile/AvatarUpload"
 import { StripeConnectBanner } from "@/components/host/StripeConnectBanner"
 import { Button } from "@/components/ui/button"
+import { trackMetaEvent } from "@/components/meta-pixel"
 import {
   Dialog,
   DialogContent,
@@ -427,6 +428,11 @@ export function AccountClient({
         const newsletterPayload = (await newsletterResponse.json().catch(() => null)) as { error?: string } | null
         if (!newsletterResponse.ok) {
           throw new Error(newsletterPayload?.error ?? "Saved preferences, but failed to sync newsletter settings.")
+        }
+        if (isMarketingOptedIn) {
+          trackMetaEvent("Lead", {
+            content_name: "newsletter_subscribe",
+          })
         }
       }
 

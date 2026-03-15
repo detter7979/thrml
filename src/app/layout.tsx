@@ -3,6 +3,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { DM_Sans, DM_Serif_Display, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { CookieConsent } from "@/components/cookie-consent";
+import { MetaPixel } from "@/components/meta-pixel";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -105,7 +106,19 @@ export default function RootLayout({
             `,
           }}
         />
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GOOGLE_ADS_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('config', '${process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? ""}');
+          `}
+        </Script>
         <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!} />
+        <MetaPixel />
         <CookieConsent />
       </body>
     </html>

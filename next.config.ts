@@ -68,6 +68,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/listing/:id",
+        destination: "/listings/:id",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

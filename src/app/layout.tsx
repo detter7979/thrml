@@ -86,8 +86,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const googleAdsIdRaw = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim();
-  const googleAdsId = googleAdsIdRaw && /^AW-\d+$/.test(googleAdsIdRaw) ? googleAdsIdRaw : null;
+  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 
   return (
     <html lang="en">
@@ -112,14 +111,14 @@ export default function RootLayout({
         {googleAdsId ? (
           <>
             <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=AW-18014799415`}
+              src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsId}`}
               strategy="afterInteractive"
             />
             <Script id="google-ads-init" strategy="afterInteractive">
               {`
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
-                gtag('config', 'AW-18014799415');
+                gtag('config', '${googleAdsId}');
               `}
             </Script>
           </>

@@ -50,7 +50,7 @@ function shouldMarkCompleted(booking: BookingRow, now: Date) {
 }
 
 export async function GET(req: NextRequest) {
-  const limited = rateLimit(req, {
+  const limited = await rateLimit(req, {
     maxRequests: 20,
     windowMs: 60 * 1000,
     identifier: "bookings",
@@ -287,7 +287,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const limited = rateLimit(req, {
+  const limited = await rateLimit(req, {
     maxRequests: 20,
     windowMs: 60 * 1000,
     identifier: "bookings",

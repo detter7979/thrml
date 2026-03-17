@@ -1,6 +1,8 @@
 import crypto from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 
+import { rateLimit } from "@/lib/rate-limit"
+
 type MetaEventsPayload = {
   eventName?: string
   eventId?: string
@@ -31,6 +33,13 @@ function hashIfPresent(value?: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const limited = await rateLimit(req, {
+    maxRequests: 30,
+    windowMs: 60 * 1000,
+    identifier: "meta-events",
+  })
+  if (limited) return limited
+
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
   const accessToken = process.env.META_CONVERSIONS_API_TOKEN
   if (!pixelId || !accessToken) {

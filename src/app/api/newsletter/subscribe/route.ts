@@ -10,7 +10,7 @@ const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(request: NextRequest) {
   try {
-    const limited = rateLimit(request, {
+    const limited = await rateLimit(request, {
       maxRequests: 3,
       windowMs: 10 * 60 * 1000,
       identifier: "newsletter",

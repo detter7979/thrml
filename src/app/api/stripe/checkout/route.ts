@@ -194,7 +194,7 @@ async function reserveSlotAtomically(params: {
 export async function POST(req: NextRequest) {
   try {
     const ip = requestIp(req)
-    const limit = applyMemoryRateLimit({
+    const limit = await applyMemoryRateLimit({
       key: `api:stripe:checkout:${ip}`,
       max: 20,
       windowMs: 10 * 60_000,

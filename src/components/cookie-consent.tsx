@@ -36,6 +36,12 @@ export function CookieConsent() {
 
   function handleAccept() {
     localStorage.setItem("thrml_cookie_consent", "accepted")
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: "thrml_cookie_consent",
+        newValue: "accepted",
+      })
+    )
     enableAnalytics()
     setVisible(false)
   }

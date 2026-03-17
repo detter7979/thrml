@@ -20,7 +20,7 @@ const reviewSchema = z.object({
 
 export async function POST(req: NextRequest) {
   const ip = requestIp(req)
-  const limit = applyMemoryRateLimit({
+  const limit = await applyMemoryRateLimit({
     key: `api:reviews:create:${ip}`,
     max: 10,
     windowMs: 10 * 60_000,

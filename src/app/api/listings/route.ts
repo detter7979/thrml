@@ -1,8 +1,16 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
+import { rateLimit } from "@/lib/rate-limit"
 import { createClient } from "@/lib/supabase/server"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const limited = await rateLimit(request, {
+    maxRequests: 60,
+    windowMs: 60 * 1000,
+    identifier: "listings",
+  })
+  if (limited) return limited
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("listings")

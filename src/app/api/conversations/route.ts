@@ -151,7 +151,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const ip = requestIp(req)
-  const limit = applyMemoryRateLimit({
+  const limit = await applyMemoryRateLimit({
     key: `api:conversations:create:${ip}`,
     max: 20,
     windowMs: 60_000,

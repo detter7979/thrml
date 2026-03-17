@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import Script from "next/script"
 
 type MetaUserData = {
@@ -26,7 +26,29 @@ declare global {
 
 export function MetaPixel() {
   const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  const [consented, setConsented] = useState(false)
+
   useEffect(() => {
+    const existing = localStorage.getItem("thrml_cookie_consent")
+    if (existing === "accepted") setConsented(true)
+
+    const handler = () => {
+      const current = localStorage.getItem("thrml_cookie_consent")
+      if (current === "accepted") setConsented(true)
+    }
+
+    window.addEventListener("storage", handler)
+    const timer = setTimeout(handler, 1500)
+
+    return () => {
+      window.removeEventListener("storage", handler)
+      clearTimeout(timer)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!consented) return
+
     const interval = window.setInterval(() => {
       if (!window.fbq || !window.__thrmlMetaQueue?.length) return
       const queue = [...window.__thrmlMetaQueue]
@@ -37,9 +59,9 @@ export function MetaPixel() {
     }, 300)
 
     return () => window.clearInterval(interval)
-  }, [])
+  }, [consented])
 
-  if (!pixelId) return null
+  if (!pixelId || !consented) return null
 
   return (
     <Script id="meta-pixel" strategy="afterInteractive">

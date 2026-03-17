@@ -48,7 +48,7 @@ async function calculateRefundPreview(bookingId: string, cancelledBy: "guest" | 
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<Params> }) {
-  const limited = rateLimit(req, {
+  const limited = await rateLimit(req, {
     maxRequests: 20,
     windowMs: 60 * 1000,
     identifier: "bookings",

@@ -71,7 +71,7 @@ function validateSupportPayload(payload: unknown): { data?: ValidSupportPayload;
 
 export async function POST(req: NextRequest) {
   try {
-    const limited = rateLimit(req, {
+    const limited = await rateLimit(req, {
       maxRequests: 5,
       windowMs: 15 * 60 * 1000,
       identifier: "support",

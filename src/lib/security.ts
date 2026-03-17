@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server"
+import { kv } from "@vercel/kv"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -19,36 +20,37 @@ export function sanitizeNextPath<T extends string | null>(
   return candidate
 }
 
-type RateLimitState = {
-  count: number
-  resetAt: number
-}
-
-const rateLimitStore = new Map<string, RateLimitState>()
-
-export function applyMemoryRateLimit(params: {
+export async function applyMemoryRateLimit(params: {
   key: string
   max: number
   windowMs: number
-}) {
-  const now = Date.now()
-  const existing = rateLimitStore.get(params.key)
-  if (!existing || existing.resetAt <= now) {
-    rateLimitStore.set(params.key, { count: 1, resetAt: now + params.windowMs })
-    return { allowed: true, remaining: Math.max(0, params.max - 1), retryAfterSec: 0 }
-  }
+}): Promise<{ allowed: boolean; remaining: number; retryAfterSec: number }> {
+  const windowSeconds = Math.ceil(params.windowMs / 1000)
 
-  if (existing.count >= params.max) {
-    return {
-      allowed: false,
-      remaining: 0,
-      retryAfterSec: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
+  try {
+    const count = await kv.incr(params.key)
+    if (count === 1) {
+      await kv.expire(params.key, windowSeconds)
     }
-  }
 
-  existing.count += 1
-  rateLimitStore.set(params.key, existing)
-  return { allowed: true, remaining: Math.max(0, params.max - existing.count), retryAfterSec: 0 }
+    if (count > params.max) {
+      const ttl = await kv.ttl(params.key)
+      return {
+        allowed: false,
+        remaining: 0,
+        retryAfterSec: Math.max(1, ttl),
+      }
+    }
+
+    return {
+      allowed: true,
+      remaining: Math.max(0, params.max - count),
+      retryAfterSec: 0,
+    }
+  } catch (err) {
+    console.error("[security] KV rate limit error, failing open:", err)
+    return { allowed: true, remaining: params.max, retryAfterSec: 0 }
+  }
 }
 
 export function requestIp(request: Request | NextRequest) {

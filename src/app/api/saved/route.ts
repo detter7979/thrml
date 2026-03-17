@@ -63,7 +63,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const ip = requestIp(req)
-  const limit = applyMemoryRateLimit({
+  const limit = await applyMemoryRateLimit({
     key: `api:saved:post:${ip}`,
     max: 30,
     windowMs: 60_000,

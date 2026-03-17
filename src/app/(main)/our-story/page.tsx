@@ -65,7 +65,7 @@ export default function OurStoryPage() {
           Explore spaces →
         </Link>
         <Link
-          href="/dashboard/listings/new"
+          href="/become-a-host"
           className="inline-flex min-w-[170px] items-center justify-center rounded-full border border-[#D9CEC2] px-6 py-3 text-sm font-medium text-[#2F241E] transition-colors hover:border-[#C75B3A] hover:text-[#C75B3A]"
         >
           List your space →

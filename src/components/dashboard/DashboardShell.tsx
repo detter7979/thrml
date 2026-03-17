@@ -458,7 +458,7 @@ export function DashboardShell({
             <div className="space-y-1 text-sm">
               {!isHost ? (
                 <Link
-                  href="/dashboard/listings/new"
+                  href="/become-a-host"
                   className="block font-medium text-[#8B4513] transition hover:text-[#6F3410]"
                 >
                   🏠 Become a host

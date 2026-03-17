@@ -40,7 +40,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/dashboard/listings/new" className="transition-colors hover:text-white">
+                  <Link href="/become-a-host" className="transition-colors hover:text-white">
                     List your space
                   </Link>
                 </li>

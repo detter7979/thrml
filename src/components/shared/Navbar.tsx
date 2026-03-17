@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { trackGaEvent } from "@/lib/analytics/ga"
+import { trackBecomeHostClick } from "@/lib/tracking/google-ads"
 import { createClient } from "@/lib/supabase/client"
 
 const PROFILE_NAME_OVERRIDE_KEY = "thrml.profileNameOverride"
@@ -339,9 +339,9 @@ export function Navbar() {
                 ) : (
                   <DropdownMenuItem asChild className="text-[#8B4513] font-medium">
                     <Link
-                      href="/dashboard/listings/new"
+                      href="/become-a-host"
                       onClick={() => {
-                        trackGaEvent("become_host_click", { source: "nav" })
+                        trackBecomeHostClick("/become-a-host")
                         closeUserMenu()
                       }}
                     >
@@ -368,8 +368,8 @@ export function Navbar() {
                 className={`rounded-full border border-current/25 px-5 hover:bg-white/10 ${desktopLinkColor}`}
               >
                 <Link
-                  href="/dashboard/listings/new"
-                  onClick={() => trackGaEvent("become_host_click", { source: "nav" })}
+                  href="/become-a-host"
+                  onClick={() => trackBecomeHostClick("/become-a-host")}
                 >
                   Become a host
                 </Link>
@@ -444,10 +444,10 @@ export function Navbar() {
                       <>
                         <div className="my-1 border-t border-[#3A3029]" />
                         <Link
-                          href="/dashboard/listings/new"
+                          href="/become-a-host"
                           className="text-[#FFAB90] font-medium"
                           onClick={() => {
-                            trackGaEvent("become_host_click", { source: "nav" })
+                            trackBecomeHostClick("/become-a-host")
                             closeMobileNav()
                           }}
                         >
@@ -479,10 +479,10 @@ export function Navbar() {
                     </Button>
                     <div className="my-1 border-t border-[#3A3029]" />
                     <Link
-                      href="/dashboard/listings/new"
+                      href="/become-a-host"
                       className="text-[#FFAB90] font-medium"
                       onClick={() => {
-                        trackGaEvent("become_host_click", { source: "nav" })
+                        trackBecomeHostClick("/become-a-host")
                         closeMobileNav()
                       }}
                     >

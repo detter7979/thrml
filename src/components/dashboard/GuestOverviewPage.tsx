@@ -71,7 +71,7 @@ export function GuestOverviewPage({ canHost }: GuestOverviewPageProps) {
           <p className="mt-1 text-sm text-[#6D5E51]">
             Share your wellness space and start accepting bookings.
           </p>
-          <Link href="/dashboard/listings/new" className="mt-3 inline-flex text-sm font-medium text-[#8B4513] hover:underline">
+          <Link href="/become-a-host" className="mt-3 inline-flex text-sm font-medium text-[#8B4513] hover:underline">
             Start hosting →
           </Link>
         </section>

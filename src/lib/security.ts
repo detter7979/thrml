@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server"
-import { kv } from "@vercel/kv"
+import Redis from "ioredis"
+
+const redis = process.env.thrml_REDIS_URL ? new Redis(process.env.thrml_REDIS_URL) : null
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -25,16 +27,18 @@ export async function applyMemoryRateLimit(params: {
   max: number
   windowMs: number
 }): Promise<{ allowed: boolean; remaining: number; retryAfterSec: number }> {
+  if (!redis) return { allowed: true, remaining: params.max, retryAfterSec: 0 }
+
   const windowSeconds = Math.ceil(params.windowMs / 1000)
 
   try {
-    const count = await kv.incr(params.key)
+    const count = await redis.incr(params.key)
     if (count === 1) {
-      await kv.expire(params.key, windowSeconds)
+      await redis.expire(params.key, windowSeconds)
     }
 
     if (count > params.max) {
-      const ttl = await kv.ttl(params.key)
+      const ttl = await redis.ttl(params.key)
       return {
         allowed: false,
         remaining: 0,
@@ -48,7 +52,7 @@ export async function applyMemoryRateLimit(params: {
       retryAfterSec: 0,
     }
   } catch (err) {
-    console.error("[security] KV rate limit error, failing open:", err)
+    console.error("[security] Redis rate limit error, failing open:", err)
     return { allowed: true, remaining: params.max, retryAfterSec: 0 }
   }
 }

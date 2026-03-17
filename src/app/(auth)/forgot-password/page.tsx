@@ -8,7 +8,7 @@ import { AuthShell } from "@/components/auth/AuthShell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { sanitizeNextPath } from "@/lib/security"
+import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { createClient } from "@/lib/supabase/client"
 
 function ForgotPasswordForm() {

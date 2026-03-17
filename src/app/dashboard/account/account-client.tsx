@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { buildFullName, splitFullName } from "@/lib/name-utils"
 import type { NotificationPreferenceKey, NotificationPreferences } from "@/lib/notification-preferences"
 import { createClient } from "@/lib/supabase/client"
 
@@ -74,6 +75,8 @@ function formatNonJsonApiError(status: number) {
 export function AccountClient({
   userId,
   fullName,
+  firstName: propFirstName,
+  lastName: propLastName,
   email,
   avatarUrl,
   phone,
@@ -89,6 +92,8 @@ export function AccountClient({
 }: {
   userId: string
   fullName: string
+  firstName?: string | null
+  lastName?: string | null
   email: string
   avatarUrl: string | null
   phone: string | null
@@ -105,8 +110,15 @@ export function AccountClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+  const splitFromFullName = useMemo(() => splitFullName(fullName), [fullName])
   const [name, setName] = useState(fullName)
   const [savedName, setSavedName] = useState(fullName)
+  const [firstName, setFirstName] = useState(
+    propFirstName?.trim() || splitFromFullName.firstName || ""
+  )
+  const [lastName, setLastName] = useState(
+    propLastName?.trim() || splitFromFullName.lastName || ""
+  )
   const [avatarUrlValue, setAvatarUrlValue] = useState<string | null>(avatarUrl)
   const [phoneValue, setPhoneValue] = useState(formatPhoneNumber(phone ?? ""))
   const [savedPhone, setSavedPhone] = useState(formatPhoneNumber(phone ?? ""))
@@ -148,7 +160,9 @@ export function AccountClient({
   useEffect(() => {
     setName(fullName)
     setSavedName(fullName)
-  }, [fullName])
+    setFirstName(propFirstName?.trim() || splitFromFullName.firstName || "")
+    setLastName(propLastName?.trim() || splitFromFullName.lastName || "")
+  }, [fullName, propFirstName, propLastName, splitFromFullName.firstName, splitFromFullName.lastName])
 
   useEffect(() => {
     setAvatarUrlValue(normalizeAvatarUrl(avatarUrl))
@@ -175,7 +189,7 @@ export function AccountClient({
     const syncProfileSnapshot = async () => {
       const { data: profileById, error: byIdError } = await supabase
         .from("profiles")
-        .select("full_name, avatar_url, phone, bio, house_rules")
+        .select("full_name, first_name, last_name, avatar_url, phone, bio, house_rules")
         .eq("id", userId)
         .maybeSingle()
 
@@ -186,6 +200,12 @@ export function AccountClient({
           const nextName = profileById.full_name.trim()
           setSavedName(nextName)
           setName(nextName)
+        }
+        if (typeof profileById.first_name === "string") {
+          setFirstName(profileById.first_name.trim())
+        }
+        if (typeof profileById.last_name === "string") {
+          setLastName(profileById.last_name.trim())
         }
         const nextPhone = typeof profileById.phone === "string" ? formatPhoneNumber(profileById.phone) : ""
         const nextBio = typeof profileById.bio === "string" ? profileById.bio : ""
@@ -212,7 +232,7 @@ export function AccountClient({
 
       const { data: profileByUserId, error: byUserIdError } = await supabase
         .from("profiles")
-        .select("full_name, avatar_url, phone, bio, house_rules")
+        .select("full_name, first_name, last_name, avatar_url, phone, bio, house_rules")
         .eq("user_id", userId)
         .maybeSingle()
 
@@ -224,6 +244,12 @@ export function AccountClient({
         const nextName = profileByUserId.full_name.trim()
         setSavedName(nextName)
         setName(nextName)
+      }
+      if (typeof profileByUserId.first_name === "string") {
+        setFirstName(profileByUserId.first_name.trim())
+      }
+      if (typeof profileByUserId.last_name === "string") {
+        setLastName(profileByUserId.last_name.trim())
       }
       const nextPhone = typeof profileByUserId.phone === "string" ? formatPhoneNumber(profileByUserId.phone) : ""
       const nextBio = typeof profileByUserId.bio === "string" ? profileByUserId.bio : ""
@@ -251,11 +277,15 @@ export function AccountClient({
   async function saveProfile() {
     setSaving(true)
     setMessage(null)
-    const normalizedName = name.trim() || savedName.trim()
+    const normalizedFirstName = firstName.trim()
+    const normalizedLastName = lastName.trim()
+    const normalizedName = buildFullName(normalizedFirstName, normalizedLastName) || name.trim() || savedName.trim()
     const normalizedPhone = formatPhoneNumber(phoneValue)
     const normalizedBio = bioValue.trim()
     const updates = {
       full_name: normalizedName || "Member",
+      first_name: normalizedFirstName || null,
+      last_name: normalizedLastName || null,
       phone: normalizedPhone || savedPhone.trim() || null,
       bio: normalizedBio || savedBio.trim() || null,
     }
@@ -310,6 +340,8 @@ export function AccountClient({
     const { error: authUpdateError } = await supabase.auth.updateUser({
       data: {
         full_name: resolvedName,
+        first_name: normalizedFirstName || null,
+        last_name: normalizedLastName || null,
       },
     })
     if (authUpdateError) {
@@ -318,6 +350,9 @@ export function AccountClient({
 
     setName(resolvedName)
     setSavedName(resolvedName)
+    const splitResolvedName = splitFullName(resolvedName)
+    setFirstName(normalizedFirstName || splitResolvedName.firstName)
+    setLastName(normalizedLastName || splitResolvedName.lastName)
     setPhoneValue(resolvedPhone)
     setSavedPhone(resolvedPhone)
     setBioValue(resolvedBio)
@@ -670,17 +705,37 @@ export function AccountClient({
           />
           <p className="text-xs text-[#7A6A5D]">Click your avatar to upload a JPG, PNG, or WEBP image (max 5MB).</p>
         </div>
-        <div className="space-y-2">
-          <Label>Full name</Label>
-          <Input
-            placeholder={savedName || "Your name"}
-            value={name}
-            onChange={(event) => {
-              const nextName = event.target.value
-              setName(nextName)
-              broadcastProfileNamePreview(nextName)
-            }}
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>First name</Label>
+            <Input
+              placeholder="First"
+              value={firstName}
+              onChange={(event) => {
+                const nextFirstName = event.target.value
+                setFirstName(nextFirstName)
+                const nextName = buildFullName(nextFirstName, lastName)
+                setName(nextName)
+                broadcastProfileNamePreview(nextName)
+              }}
+              autoComplete="given-name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Last name</Label>
+            <Input
+              placeholder="Last"
+              value={lastName}
+              onChange={(event) => {
+                const nextLastName = event.target.value
+                setLastName(nextLastName)
+                const nextName = buildFullName(firstName, nextLastName)
+                setName(nextName)
+                broadcastProfileNamePreview(nextName)
+              }}
+              autoComplete="family-name"
+            />
+          </div>
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">

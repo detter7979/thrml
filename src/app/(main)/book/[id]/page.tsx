@@ -153,6 +153,19 @@ export default async function BookingPage({
     serviceTypeConstraints?.session_type === "fixed_session" || serviceTypeConstraints?.session_type === "hourly"
       ? serviceTypeConstraints.session_type
       : serviceMeta?.booking_model ?? "hourly"
+  const metaFirstName =
+    typeof user.user_metadata?.first_name === "string"
+      ? user.user_metadata.first_name
+      : typeof user.user_metadata?.full_name === "string"
+        ? user.user_metadata.full_name.split(" ")[0]
+        : ""
+  const metaLastName =
+    typeof user.user_metadata?.last_name === "string"
+      ? user.user_metadata.last_name
+      : typeof user.user_metadata?.full_name === "string"
+        ? user.user_metadata.full_name.split(" ").slice(1).join(" ")
+        : ""
+  const metaFullName = `${metaFirstName} ${metaLastName}`.trim()
 
   return (
     <BookingFlowClient
@@ -168,7 +181,9 @@ export default async function BookingPage({
       initialEndTime={addHours(initialStartTime, initialDurationHours)}
       profileDefaults={{
         fullName:
-          (typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name) || "",
+          metaFullName || ((typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name) || ""),
+        firstName: metaFirstName,
+        lastName: metaLastName,
         email: user.email ?? "",
         phone:
           (typeof user.user_metadata?.phone === "string" && user.user_metadata.phone) || "",

@@ -15,7 +15,7 @@ export default async function DashboardAccountPage() {
   const normalizeAvatarUrl = (value: unknown) => (typeof value === "string" && value.trim().length > 0 ? value : null)
   const normalizeName = (value: unknown) => (typeof value === "string" && value.trim().length > 0 ? value.trim() : null)
   const profileColumns =
-    "full_name, avatar_url, phone, phone_verified, bio, house_rules, ui_intent, stripe_account_id, stripe_onboarding_complete, stripe_payouts_enabled, stripe_charges_enabled, newsletter_opted_in, offers_opted_in, product_updates_opted_in, notification_preferences"
+    "full_name, first_name, last_name, avatar_url, phone, phone_verified, bio, house_rules, ui_intent, stripe_account_id, stripe_onboarding_complete, stripe_payouts_enabled, stripe_charges_enabled, newsletter_opted_in, offers_opted_in, product_updates_opted_in, notification_preferences"
   const [{ count: listingCount }, { data: profileById }] = await Promise.all([
     supabase.from("listings").select("*", { count: "exact", head: true }).eq("host_id", user.id),
     supabase.from("profiles").select(profileColumns).eq("id", user.id).maybeSingle(),
@@ -53,6 +53,8 @@ export default async function DashboardAccountPage() {
     <AccountClient
       userId={user.id}
       fullName={normalizeName(profile?.full_name) ?? normalizeName(user.user_metadata.full_name) ?? "Member"}
+      firstName={typeof profile?.first_name === "string" ? profile.first_name : null}
+      lastName={typeof profile?.last_name === "string" ? profile.last_name : null}
       email={user.email ?? ""}
       avatarUrl={normalizeAvatarUrl(profile?.avatar_url)}
       phone={profile?.phone ?? null}

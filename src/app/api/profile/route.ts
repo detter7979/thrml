@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+import { buildFullName } from "@/lib/name-utils"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
 import { createClient } from "@/lib/supabase/server"
 
 const updateSchema = z
   .object({
+    first_name: z.string().trim().max(100).optional(),
+    last_name: z.string().trim().max(100).optional(),
+    full_name: z.string().trim().max(200).optional(),
     terms_accepted: z.boolean().optional(),
     terms_accepted_at: z.string().datetime().optional(),
     terms_version: z.string().trim().max(32).optional(),
@@ -38,7 +42,7 @@ export async function PATCH(req: NextRequest) {
 
   const parsed = updateSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Invalid profile update payload." }, { status: 400 })
-  const updates = parsed.data
+  const updates: Record<string, unknown> = { ...parsed.data }
   if (!Object.keys(updates).length) {
     return NextResponse.json({ error: "No valid fields to update." }, { status: 400 })
   }
@@ -69,12 +73,58 @@ export async function PATCH(req: NextRequest) {
 
     updates.notification_preferences = normalizeNotificationPreferences({
       ...existingNotificationPreferences,
-      ...updates.notification_preferences,
+      ...(updates.notification_preferences as Record<string, boolean>),
     })
   }
 
   if (updates.notification_preferences && updates.newsletter_opted_in === undefined) {
-    updates.newsletter_opted_in = hasAnyMarketingOptIn(updates.notification_preferences)
+    updates.newsletter_opted_in = hasAnyMarketingOptIn(updates.notification_preferences as Record<string, boolean>)
+  }
+
+  if ("first_name" in updates || "last_name" in updates || "full_name" in updates) {
+    let existingFirstName: string | null = null
+    let existingLastName: string | null = null
+    let existingFullName: string | null = null
+
+    const { data: profileById } = await supabase
+      .from("profiles")
+      .select("first_name, last_name, full_name")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    if (profileById) {
+      existingFirstName = typeof profileById.first_name === "string" ? profileById.first_name : null
+      existingLastName = typeof profileById.last_name === "string" ? profileById.last_name : null
+      existingFullName = typeof profileById.full_name === "string" ? profileById.full_name : null
+    } else {
+      const { data: profileByUserId, error: profileByUserIdError } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, full_name")
+        .eq("user_id", user.id)
+        .maybeSingle()
+      const isMissingUserIdColumn = Boolean(
+        profileByUserIdError?.message?.includes("column profiles.user_id does not exist")
+      )
+      if (!isMissingUserIdColumn && profileByUserId) {
+        existingFirstName = typeof profileByUserId.first_name === "string" ? profileByUserId.first_name : null
+        existingLastName = typeof profileByUserId.last_name === "string" ? profileByUserId.last_name : null
+        existingFullName = typeof profileByUserId.full_name === "string" ? profileByUserId.full_name : null
+      }
+    }
+
+    const nextFirstName =
+      "first_name" in updates ? String(updates.first_name ?? "").trim() || null : existingFirstName
+    const nextLastName =
+      "last_name" in updates ? String(updates.last_name ?? "").trim() || null : existingLastName
+    const explicitFullName = "full_name" in updates ? String(updates.full_name ?? "").trim() : ""
+    const syncedFullName = buildFullName(nextFirstName, nextLastName) || explicitFullName || existingFullName || "Member"
+    updates.full_name = syncedFullName
+    if ("first_name" in updates) {
+      updates.first_name = nextFirstName
+    }
+    if ("last_name" in updates) {
+      updates.last_name = nextLastName
+    }
   }
 
   let updateError: { message: string } | null = null

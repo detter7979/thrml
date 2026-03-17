@@ -32,7 +32,8 @@ function SignupForm() {
   const searchParams = useSearchParams()
   const requestedNext = sanitizeNextPath(searchParams.get("next"), null)
   const [step, setStep] = useState<SignupStep>(1)
-  const [fullName, setFullName] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [phone, setPhone] = useState("")
@@ -53,6 +54,7 @@ function SignupForm() {
     if (/[^A-Za-z0-9]/.test(password)) score += 1
     return score
   }, [password])
+  const fullName = `${firstName} ${lastName}`.trim()
 
   function getPostSignupDestination() {
     if (requestedNext) return requestedNext
@@ -95,6 +97,10 @@ function SignupForm() {
 
   async function handleStepOne(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!firstName.trim()) {
+      setError("Please enter your first name.")
+      return
+    }
     if (!signupTermsAccepted) {
       setError("Please accept the Terms of Service and Privacy Policy.")
       return
@@ -121,6 +127,8 @@ function SignupForm() {
       options: {
         data: {
           full_name: fullName,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
           ui_intent: intent,
           phone: formatPhoneNumber(phone) || null,
         },
@@ -144,6 +152,8 @@ function SignupForm() {
       const profilePayload: Record<string, unknown> = {
         id: userId,
         full_name: fullName,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         ui_intent: intent,
         phone: formatPhoneNumber(phone) || null,
         phone_verified: false,
@@ -222,9 +232,27 @@ function SignupForm() {
     >
       {step === 1 ? (
         <form onSubmit={handleSignup} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Full name</Label>
-            <Input placeholder="Your name" value={fullName} onChange={(event) => setFullName(event.target.value)} required />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>First name</Label>
+              <Input
+                placeholder="First"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                autoComplete="given-name"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Last name</Label>
+              <Input
+                placeholder="Last"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                autoComplete="family-name"
+                required
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Email</Label>

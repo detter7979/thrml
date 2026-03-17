@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
+import { buildFullName, splitFullName } from "@/lib/name-utils"
 import { calculateBookingTotal, getPricePerPerson, type PricingTiers } from "@/lib/pricing"
 
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -32,6 +33,8 @@ interface BookingFlowClientProps {
   initialEndTime: string
   profileDefaults: {
     fullName: string
+    firstName?: string
+    lastName?: string
     email: string
     phone: string
   }
@@ -279,7 +282,17 @@ export function BookingFlowClient({
   cancellationPolicy,
 }: BookingFlowClientProps) {
   const [step, setStep] = useState(1)
-  const [guestDetails, setGuestDetails] = useState(profileDefaults)
+  const [guestDetails, setGuestDetails] = useState(() => {
+    const splitName = splitFullName(profileDefaults.fullName)
+    const firstName = profileDefaults.firstName ?? splitName.firstName
+    const lastName = profileDefaults.lastName ?? splitName.lastName
+    return {
+      ...profileDefaults,
+      firstName,
+      lastName,
+      fullName: buildFullName(firstName, lastName) || profileDefaults.fullName,
+    }
+  })
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [bookingId, setBookingId] = useState<string | null>(null)
   const [paymentError, setPaymentError] = useState<string | null>(null)
@@ -588,13 +601,39 @@ export function BookingFlowClient({
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="guest-full-name">Full name</Label>
+                <Label htmlFor="guest-first-name">First name</Label>
                 <Input
-                  id="guest-full-name"
-                  value={guestDetails.fullName}
+                  id="guest-first-name"
+                  value={guestDetails.firstName ?? ""}
                   onChange={(event) =>
-                    setGuestDetails((current) => ({ ...current, fullName: event.target.value }))
+                    setGuestDetails((current) => {
+                      const firstName = event.target.value
+                      return {
+                        ...current,
+                        firstName,
+                        fullName: buildFullName(firstName, current.lastName),
+                      }
+                    })
                   }
+                  autoComplete="given-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="guest-last-name">Last name</Label>
+                <Input
+                  id="guest-last-name"
+                  value={guestDetails.lastName ?? ""}
+                  onChange={(event) =>
+                    setGuestDetails((current) => {
+                      const lastName = event.target.value
+                      return {
+                        ...current,
+                        lastName,
+                        fullName: buildFullName(current.firstName, lastName),
+                      }
+                    })
+                  }
+                  autoComplete="family-name"
                 />
               </div>
               <div className="space-y-2">

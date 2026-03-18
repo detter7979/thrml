@@ -777,7 +777,10 @@ export function DashboardListingsClient({
                                           </button>
                                         </div>
                                         <div className="flex items-center justify-between gap-2 rounded-md bg-[#FFF9F3] p-2">
-                                          <p className="font-mono text-sm tracking-[0.2em] text-[#C75B3A]">
+                                          <p
+                                            className="text-sm tracking-[0.2em] text-[#C75B3A]"
+                                            style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+                                          >
                                             {showCodeByBooking[booking.id]
                                               ? codeByBooking[booking.id] ?? booking.access_code ?? "Pending"
                                               : "••••"}
@@ -822,7 +825,8 @@ export function DashboardListingsClient({
                                             }))
                                           }
                                           placeholder="Update code input field"
-                                          className="h-8 w-full min-w-0 rounded-md border border-[#E5DDD6] px-2 text-xs font-mono"
+                                          className="h-8 w-full min-w-0 rounded-md border border-[#E5DDD6] px-2 text-xs"
+                                          style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
                                         />
                                         <div className="flex flex-wrap gap-2">
                                           <Button

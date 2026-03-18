@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { GoogleAnalytics } from "@next/third-parties/google";
-import { DM_Sans, DM_Serif_Display, Geist_Mono } from "next/font/google";
+import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import Script from "next/script";
 import { CookieConsent } from "@/components/cookie-consent";
 import { MetaPixel } from "@/components/meta-pixel";
@@ -17,11 +16,6 @@ const dmSerifDisplay = DM_Serif_Display({
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   metadataBase: new URL("https://usethrml.com"),
   title: {
@@ -30,18 +24,6 @@ export const metadata: Metadata = {
   },
   description:
     "thrml is a peer-to-peer marketplace to book private saunas, cold plunges, float tanks, infrared therapy, and more — hosted by real people in Seattle and Los Angeles.",
-  keywords: [
-    "private sauna rental",
-    "cold plunge booking",
-    "float tank near me",
-    "infrared therapy session",
-    "book wellness space",
-    "private wellness rental",
-    "sauna rental Seattle",
-    "cold plunge Los Angeles",
-    "biohacking near me",
-    "contrast therapy booking",
-  ],
   openGraph: {
     type: "website",
     siteName: "thrml",
@@ -51,7 +33,7 @@ export const metadata: Metadata = {
     url: "https://usethrml.com",
     images: [
       {
-        url: "/opengraph-image",
+        url: "https://usethrml.com/opengraph-image",
         width: 1200,
         height: 630,
         alt: "thrml — Private Wellness Spaces",
@@ -64,7 +46,7 @@ export const metadata: Metadata = {
     title: "thrml — Book Private Saunas, Cold Plunges & Wellness Spaces",
     description:
       "Book private saunas, cold plunges, float tanks and more — hosted by people in your city.",
-    images: ["/opengraph-image"],
+    images: ["https://usethrml.com/opengraph-image"],
   },
   robots: {
     index: true,
@@ -93,20 +75,19 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${dmSans.variable} ${dmSerifDisplay.variable} ${geistMono.variable} antialiased`}
+        className={`${dmSans.variable} ${dmSerifDisplay.variable} antialiased`}
       >
         {children}
         <Script
           id="ga-consent-default"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('consent', 'default', {
+              window.dataLayer.push(['consent', 'default', {
                 analytics_storage: 'denied',
                 wait_for_update: 2000
-              });
+              }]);
             `,
           }}
         />
@@ -114,14 +95,15 @@ export default function RootLayout({
           src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsId}`}
           strategy="afterInteractive"
         />
-        <Script id="google-ads-init" strategy="afterInteractive">
+        <Script id="google-tag-init" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
             gtag('config', '${googleAdsId}');
+            gtag('config', '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-L20J7S2M51"}');
           `}
         </Script>
-        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID!} />
         <MetaPixel />
         <CookieConsent />
       </body>

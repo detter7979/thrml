@@ -1,7 +1,7 @@
 "use client"
 
-import { motion } from "framer-motion"
 import Link from "next/link"
+import Image from "next/image"
 
 import { SaveButton } from "@/components/listings/SaveButton"
 import { Badge } from "@/components/ui/badge"
@@ -40,20 +40,19 @@ export function ListingCard({
     : `/listings/${listing.id}`
 
   return (
-    <motion.div
-      whileHover={{ y: -4, scale: 1.01 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 400, damping: 25 }}
-    >
+    <div className="transition-transform duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] active:scale-[0.98]">
       <Link href={listingHref} className="card-base group block p-3">
         <div className="relative mb-3 h-44 w-full overflow-hidden rounded-xl bg-warm-100">
           {listing.photoUrl ? (
-            <img
+            <Image
               src={listing.photoUrl}
               alt={`${listing.title} in ${
                 listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
               }`}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              sizes="(max-width: 767px) 100vw, (max-width: 1280px) 50vw, 33vw"
+              loading="lazy"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-warm-600">No photo</div>
@@ -96,6 +95,6 @@ export function ListingCard({
           </div>
         </div>
       </Link>
-    </motion.div>
+    </div>
   )
 }

@@ -21,7 +21,12 @@ export function AccessCodeCard({ code }: { code: string | null }) {
     <div className="w-full max-w-[220px] shrink-0 rounded-lg border border-[#F1D4BA] bg-[#FFF4E8] p-2">
       <p className="text-[10px] uppercase tracking-[0.16em] text-[#C75B3A]">Access code</p>
       <div className="mt-1 flex items-center justify-between gap-2">
-        <p className="font-mono text-sm tracking-[0.2em] text-[#C75B3A]">{code ?? "Pending"}</p>
+        <p
+          className="text-sm tracking-[0.2em] text-[#C75B3A]"
+          style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+        >
+          {code ?? "Pending"}
+        </p>
         {code ? (
           <button
             type="button"

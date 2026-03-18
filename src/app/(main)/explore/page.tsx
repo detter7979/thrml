@@ -9,6 +9,13 @@ export const metadata: Metadata = {
     "Browse and book private saunas, cold plunges, infrared rooms, float tanks and more in Seattle, Los Angeles, and beyond.",
   alternates: { canonical: "https://usethrml.com/explore" },
   robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    title: "Explore Private Wellness Spaces",
+    description: "Browse and book private saunas, cold plunges, infrared rooms, float tanks and more.",
+    url: "https://usethrml.com/explore",
+    images: [{ url: "https://usethrml.com/opengraph-image", width: 1200, height: 630 }],
+  },
 }
 
 export default async function ExplorePage() {

@@ -16,7 +16,12 @@ export default function MessagesError({
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center p-8 text-center">
       <p className="mb-2 text-sm text-neutral-500">Something went wrong loading your messages.</p>
-      <p className="mb-6 text-xs font-mono text-red-400">{error.message}</p>
+      <p
+        className="mb-6 text-xs text-red-400"
+        style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+      >
+        {error.message}
+      </p>
       <button onClick={reset} className="text-sm text-[#C4623A] underline">
         Try again
       </button>

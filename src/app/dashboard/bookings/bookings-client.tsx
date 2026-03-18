@@ -858,7 +858,10 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                     </p>
                                     <div className="mt-2 rounded-lg bg-[#F5EFE9] p-3">
                                       <div className="mt-1 flex items-center justify-between gap-2">
-                                        <p className="font-mono text-lg tracking-[0.15em] text-[#5D4D41]">
+                                        <p
+                                          className="text-lg tracking-[0.15em] text-[#5D4D41]"
+                                          style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+                                        >
                                           {booking.access_code ?? "Code will be shared shortly"}
                                         </p>
                                         {booking.access_code ? (
@@ -1075,7 +1078,10 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                   {(accessType === "code" || accessType === "lockbox") && releaseState.released ? (
                                     <div className="rounded-lg border border-[#E9DFD3] bg-[#FCFAF7] p-3">
                                       <div className="flex items-center justify-between gap-2">
-                                        <p className="font-mono text-lg tracking-[0.15em] text-[#5D4D41]">
+                                        <p
+                                          className="text-lg tracking-[0.15em] text-[#5D4D41]"
+                                          style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+                                        >
                                           {booking.access_code ?? "Code will be shared shortly"}
                                         </p>
                                         {booking.access_code ? (

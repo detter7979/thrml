@@ -336,7 +336,7 @@ export function HomePageClient() {
             fill
             className="object-cover"
             style={{ objectPosition: heroImage.objectPosition }}
-            sizes="100vw"
+            sizes="(max-width: 767px) 0px, (max-width: 1280px) 100vw, 100vw"
             priority
             loading="eager"
             placeholder="blur"

@@ -798,7 +798,7 @@ export function EditListingClient({
                 value={form.accessCodeTemplate}
                 maxLength={20}
                 placeholder={accessCodePlaceholder}
-                className="font-mono"
+                style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
                 onChange={(event) => {
                   const nextValue = event.target.value.slice(0, 20)
                   setForm((current) => ({ ...current, accessCodeTemplate: nextValue }))

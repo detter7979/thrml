@@ -453,26 +453,38 @@ export default async function ListingDetailPage({
       : Number(listing.price_solo ?? 0)
   const listingSchema = {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+    "@type": "Service",
     name: listing.title,
     description: listing.description,
     url: `https://usethrml.com/listings/${listing.id}`,
     image: safePhotos.map((photo) => photo.url),
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: listing.city,
-      addressRegion: listing.state,
-      addressCountry: "US",
+    serviceType: (listing.service_type ?? "wellness").replace(/_/g, " "),
+    areaServed: {
+      "@type": "City",
+      name: listing.city ?? "Seattle",
     },
-    priceRange: `From $${lowestPrice}`,
-    aggregateRating:
-      Number(ratingsRow?.avg_overall ?? 0) > 0
-        ? {
+    provider: {
+      "@type": "Person",
+      name: "thrml Host",
+    },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "USD",
+      price: String(lowestPrice),
+      availability: "https://schema.org/InStock",
+      url: `https://usethrml.com/listings/${listing.id}`,
+    },
+    ...(Number(ratingsRow?.avg_overall ?? 0) > 0
+      ? {
+          aggregateRating: {
             "@type": "AggregateRating",
             ratingValue: Number(ratingsRow?.avg_overall ?? 0),
             reviewCount: Number(ratingsRow?.review_count ?? 0),
-          }
-        : undefined,
+            bestRating: "5",
+            worstRating: "1",
+          },
+        }
+      : {}),
   }
 
   return (

@@ -145,7 +145,7 @@ export function AdminSettingsClient() {
             ["instant_book_enabled", "Instant book enabled"],
             ["new_host_signups_enabled", "New host signups enabled"],
             ["maintenance_mode", "Maintenance mode"],
-          ] as Array<[SettingKey, string]>
+          ] as Array<[BooleanSettingKey, string]>
         ).map(([key, label]) => (
           <div key={key} className="rounded-xl border border-[#D9CBB8] bg-[#FCF8F3] p-4">
             <div className="flex items-center justify-between gap-3">

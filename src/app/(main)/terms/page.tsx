@@ -1,3 +1,11 @@
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "Read thrml's Terms of Service governing use of our peer-to-peer wellness space marketplace.",
+  alternates: { canonical: "https://usethrml.com/terms" },
+}
+
 export default function TermsPage() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-12 text-[#1A1410] md:px-8">

@@ -225,7 +225,12 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
                       className="size-4 accent-[#C75B3A]"
                     />
                   </td>
-                  <td className="px-3 py-2 font-mono text-[#7A6553]">{row.id.slice(0, 8)}</td>
+                  <td
+                    className="px-3 py-2 text-[#7A6553]"
+                    style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+                  >
+                    {row.id.slice(0, 8)}
+                  </td>
                   <td className="px-3 py-2 text-[#2A2118]">{row.title ?? "Untitled listing"}</td>
                   <td className="px-3 py-2 text-[#6E5B49]">{row.service_type ?? "—"}</td>
                   <td className="px-3 py-2 text-[#6E5B49]">{row.host_name ?? "—"}</td>

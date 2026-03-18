@@ -279,8 +279,18 @@ export function AdminEarningsClient({ initialRows }: { initialRows: EarningsRow[
               filteredRows.map((row) => (
                 <tr key={row.id} className="border-b border-[#E4D8C8] hover:bg-[#EFE3D3]/50">
                   <td className="px-3 py-2 text-[#6E5B49]">{row.session_date ?? "—"}</td>
-                  <td className="px-3 py-2 font-mono text-[#2A2118]">{row.id.slice(0, 8)}</td>
-                  <td className="px-3 py-2 font-mono text-[#6E5B49]">{row.listing_id?.slice(0, 8) ?? "—"}</td>
+                  <td
+                    className="px-3 py-2 text-[#2A2118]"
+                    style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+                  >
+                    {row.id.slice(0, 8)}
+                  </td>
+                  <td
+                    className="px-3 py-2 text-[#6E5B49]"
+                    style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+                  >
+                    {row.listing_id?.slice(0, 8) ?? "—"}
+                  </td>
                   <td className="px-3 py-2 text-[#6E5B49] max-w-[140px] truncate">{row.listing_title ?? "—"}</td>
                   <td className="px-3 py-2 text-[#6E5B49]">{row.guest_name ?? "—"}</td>
                   <td className="px-3 py-2 text-center text-[#2A2118]">{row.guest_count ?? "—"}</td>

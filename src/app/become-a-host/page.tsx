@@ -1,11 +1,19 @@
 import { Suspense } from "react"
+import type { Metadata } from "next"
 
 import { BecomeAHostClient } from "./become-a-host-client"
 
-export const metadata = {
-  title: "Become a Host | thrml",
+export const metadata: Metadata = {
+  title: "Become a Host — List Your Wellness Space",
   description:
-    "Earn passive income from your sauna, cold plunge, or wellness space. List on thrml in minutes.",
+    "Earn passive income by listing your private sauna, cold plunge, or wellness space on thrml. Free to list. You keep 88%.",
+  alternates: { canonical: "https://usethrml.com/become-a-host" },
+  openGraph: {
+    type: "website",
+    title: "Become a thrml Host",
+    description: "List your private wellness space and start earning. Free to list.",
+    url: "https://usethrml.com/become-a-host",
+  },
 }
 
 export default function BecomeAHostPage() {

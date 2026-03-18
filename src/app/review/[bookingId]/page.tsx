@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/server"
 
 type Params = { bookingId: string }
 
+export const metadata = {
+  robots: { index: false, follow: false },
+}
+
 function failRedirect(): never {
   redirect(`/dashboard/bookings?toast=${encodeURIComponent("This booking can't be reviewed")}`)
 }

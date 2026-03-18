@@ -1,3 +1,11 @@
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "Learn how thrml collects, uses, and protects your personal information.",
+  alternates: { canonical: "https://usethrml.com/privacy" },
+}
+
 export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-12 text-[#1A1410] md:px-8">

@@ -190,7 +190,12 @@ export function AdminBookingsClient({
             ) : (
               filteredRows.map((row) => (
                 <tr key={row.id} className="border-b border-[#E4D8C8] hover:bg-[#EFE3D3]/50">
-                  <td className="px-3 py-2 font-mono text-[#7A6553]">{row.id.slice(0, 8)}</td>
+                  <td
+                    className="px-3 py-2 text-[#7A6553]"
+                    style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace' }}
+                  >
+                    {row.id.slice(0, 8)}
+                  </td>
                   <td className="px-3 py-2 text-[#6E5B49]">{row.guest_name ?? "—"}</td>
                   <td className="px-3 py-2 text-[#6E5B49]">{row.host_name ?? "—"}</td>
                   <td className="px-3 py-2 text-[#6E5B49]">

@@ -486,6 +486,7 @@ export function ExploreClient() {
       .from("listings")
       .select(selectClause)
       .eq("is_active", true)
+      .eq("is_deleted", false)
       .order("is_featured", { ascending: false })
       .limit(120)
 

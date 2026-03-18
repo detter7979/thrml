@@ -789,6 +789,63 @@ export async function sendHostBookingRequestEmail(booking: BookingRequestEmailPa
   })
 }
 
+export async function sendHostBookingRequestReminderEmail(
+  booking: BookingRequestEmailPayload & { urgency: "24h" | "12h" | "2h" }
+) {
+  if (!booking.host_email) return { sent: false, error: "Missing host email" }
+  const title = booking.listing_title ?? "Your listing"
+  const dateLabel = formatLongDate(booking.session_date)
+  const timeLabel = formatTimeRange(booking.session_date, booking.start_time, booking.end_time)
+  const deadlineLabel = formatDateTime(booking.confirmation_deadline)
+  const bookingUrl = `${APP_URL}/dashboard/listings?highlight=${booking.booking_id}`
+  const urgencyLine =
+    booking.urgency === "2h"
+      ? "Urgent: this request expires in about 2 hours."
+      : booking.urgency === "12h"
+        ? "Reminder: this request still needs your confirmation."
+        : "Reminder: this booking request is awaiting your confirmation and expires within 24 hours."
+  const subjectPrefix =
+    booking.urgency === "2h" ? "Urgent reminder" : booking.urgency === "12h" ? "Reminder" : "24-hour reminder"
+  const subject = `${subjectPrefix} — confirm booking request for ${title}`
+
+  const html = `
+    <p>Hi ${firstName(booking.host_name)},</p>
+    <p>${urgencyLine}</p>
+    <p>
+      <strong>${title}</strong><br/>
+      Guest: ${booking.guest_name ?? "Guest"}<br/>
+      Date: ${dateLabel}<br/>
+      Time: ${timeLabel}<br/>
+      Guests: ${Number(booking.guest_count ?? 1)}<br/>
+      You'd receive: ${formatMoney(Number(booking.host_payout ?? 0))}
+    </p>
+    <p>Respond by <strong>${deadlineLabel}</strong> to confirm and keep this booking.</p>
+    <p><a href="${bookingUrl}">Confirm booking →</a></p>
+  `
+  const text = [
+    `Hi ${firstName(booking.host_name)},`,
+    "",
+    urgencyLine,
+    `${title}`,
+    `Guest: ${booking.guest_name ?? "Guest"}`,
+    `Date: ${dateLabel}`,
+    `Time: ${timeLabel}`,
+    `Guests: ${Number(booking.guest_count ?? 1)}`,
+    `You'd receive: ${formatMoney(Number(booking.host_payout ?? 0))}`,
+    `Respond by ${deadlineLabel} to confirm and keep this booking.`,
+    `Confirm booking: ${bookingUrl}`,
+  ].join("\n")
+
+  return sendEmail({
+    to: booking.host_email,
+    subject,
+    html,
+    text,
+    userId: booking.host_id ?? null,
+    preferenceKey: "new_booking",
+  })
+}
+
 export async function sendGuestBookingRequestReceivedEmail(booking: BookingRequestEmailPayload) {
   if (!booking.guest_email) return { sent: false, error: "Missing guest email" }
   const title = booking.listing_title ?? "Your session"

@@ -91,6 +91,7 @@ export default async function BookingConfirmationPage({
     .from("listings")
     .select("title, city, service_type, listing_photos(url, order_index)")
     .eq("id", booking.listing_id)
+    .eq("is_deleted", false)
     .single()
 
   const title = listing?.title ?? "thrml Session"

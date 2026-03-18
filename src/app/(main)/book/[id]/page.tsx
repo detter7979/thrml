@@ -84,6 +84,7 @@ export default async function BookingPage({
     .from("listings")
     .select("id, title, service_type, is_active, capacity, price_solo, price_2, price_3, price_4plus, min_duration_override_minutes, max_duration_override_minutes, fixed_session_minutes, instant_book, cancellation_policy, listing_photos(url, order_index)")
     .eq("id", id)
+    .eq("is_deleted", false)
     .single()
 
   if (error || !listing) {

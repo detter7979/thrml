@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
       "id, host_id, title, description, service_type, sauna_type, session_type, is_active, is_featured, is_draft, fixed_session_price, price_solo, price_2, price_3, price_4plus, location, location_address, location_city, location_state, city, state, country, lat, lng, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
     )
     .eq("is_active", true)
+    .eq("is_deleted", false)
     .eq("is_draft", false)
     .order("is_featured", { ascending: false })
     .order("created_at", { ascending: false })

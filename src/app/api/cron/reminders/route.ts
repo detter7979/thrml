@@ -4,11 +4,13 @@ import {
   sendGuest24HourReminder,
   sendGuestEntryInstructionsEmail,
   sendGuestOnsiteReminder,
+  sendHostBookingRequestReminderEmail,
   sendHost24HourReminder,
   sendHostOnsiteReminder,
 } from "@/lib/emails"
 import { sendPostSessionEmails } from "@/lib/emails/post-session"
 import { sendAccessCode } from "@/lib/access/send-access-code"
+import { sendAutomatedBookingHostConfirmationReminderMessage } from "@/lib/automated-messages"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type BookingRow = {
@@ -45,6 +47,21 @@ type ProfileRow = {
   full_name: string | null
 }
 
+type PendingHostBookingRow = {
+  id: string
+  guest_id: string
+  host_id: string
+  listing_id: string | null
+  session_date: string | null
+  start_time: string | null
+  end_time: string | null
+  guest_count: number | null
+  total_charged: number | null
+  host_payout: number | null
+  confirmation_deadline: string | null
+  automated_messages_sent: string[] | null
+}
+
 function parseSessionStart(booking: Pick<BookingRow, "session_date" | "start_time">) {
   if (!booking.session_date || !booking.start_time) return null
   const parsed = new Date(`${booking.session_date}T${booking.start_time}`)
@@ -71,6 +88,19 @@ function formatTimeLabel(sessionDate: string | null, time: string | null) {
   const parsed = new Date(`${sessionDate}T${time}`)
   if (Number.isNaN(parsed.getTime())) return "TBD"
   return parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+}
+
+function formatDeadlineLabel(value: string | null) {
+  if (!value) return "soon"
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return "soon"
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed)
 }
 
 async function getEmailMap(userIds: string[]) {
@@ -291,12 +321,131 @@ export async function GET(request: NextRequest) {
     if (result.sent) postSession += 1
   }
 
+  const { data: pendingHostRaw, error: pendingHostError } = await supabase
+    .from("bookings")
+    .select(
+      "id, guest_id, host_id, listing_id, session_date, start_time, end_time, guest_count, total_charged, host_payout, confirmation_deadline, automated_messages_sent"
+    )
+    .eq("status", "pending_host")
+    .not("confirmation_deadline", "is", null)
+
+  if (pendingHostError) {
+    return NextResponse.json({ error: pendingHostError.message }, { status: 500 })
+  }
+
+  let hostConfirmationReminders = 0
+  const pendingHostBookings = (pendingHostRaw ?? []) as PendingHostBookingRow[]
+  if (pendingHostBookings.length) {
+    const pendingListingIds = Array.from(
+      new Set(pendingHostBookings.map((item) => item.listing_id).filter(Boolean))
+    ) as string[]
+    const pendingProfileIds = Array.from(
+      new Set(pendingHostBookings.flatMap((item) => [item.guest_id, item.host_id]))
+    )
+    const [{ data: pendingListingsRaw }, { data: pendingProfilesRaw }, pendingEmailMap] = await Promise.all([
+      pendingListingIds.length
+        ? supabase.from("listings").select("id, title, service_type").in("id", pendingListingIds)
+        : Promise.resolve({ data: [] as Array<{ id: string; title: string | null; service_type: string | null }> }),
+      pendingProfileIds.length
+        ? supabase.from("profiles").select("id, full_name").in("id", pendingProfileIds)
+        : Promise.resolve({ data: [] as ProfileRow[] }),
+      getEmailMap(pendingProfileIds),
+    ])
+    const pendingListingMap = new Map<
+      string,
+      { id: string; title: string | null; service_type: string | null }
+    >((pendingListingsRaw ?? []).map((row) => [row.id as string, row as { id: string; title: string | null; service_type: string | null }]))
+    const pendingProfileMap = new Map<string, ProfileRow>(
+      (pendingProfilesRaw ?? []).map((row) => [row.id, row as ProfileRow])
+    )
+    const twentyFourHoursMs = 24 * 60 * 60 * 1000
+
+    for (const booking of pendingHostBookings) {
+      const deadline = booking.confirmation_deadline ? new Date(booking.confirmation_deadline) : null
+      if (!deadline || Number.isNaN(deadline.getTime())) continue
+      const msUntilDeadline = deadline.getTime() - now.getTime()
+      if (msUntilDeadline <= 0) continue
+
+      const tags = new Set(booking.automated_messages_sent ?? [])
+      const reminder =
+        msUntilDeadline <= twentyFourHoursMs && !tags.has("request_to_book_reminder_24h")
+          ? { tag: "request_to_book_reminder_24h" as const, urgency: "24h" as const }
+          : null
+      if (!reminder) continue
+
+      const listing = booking.listing_id ? pendingListingMap.get(booking.listing_id) : null
+      const hostEmail = pendingEmailMap.get(booking.host_id) ?? null
+      if (!listing || !hostEmail) continue
+
+      const hostName = pendingProfileMap.get(booking.host_id)?.full_name ?? null
+      const guestName = pendingProfileMap.get(booking.guest_id)?.full_name ?? null
+      const deadlineLabel = formatDeadlineLabel(booking.confirmation_deadline)
+      const hostFirstName = hostName?.split(" ")[0] ?? "Host"
+
+      try {
+        const [emailResult, messageResult] = await Promise.allSettled([
+          sendHostBookingRequestReminderEmail({
+            urgency: reminder.urgency,
+            booking_id: booking.id,
+            listing_title: listing.title ?? "Your listing",
+            listing_id: booking.listing_id,
+            service_type: listing.service_type ?? "sauna",
+            session_date: booking.session_date,
+            start_time: booking.start_time,
+            end_time: booking.end_time,
+            guest_count: Number(booking.guest_count ?? 1),
+            total_charged: Number(booking.total_charged ?? 0),
+            host_payout: Number(booking.host_payout ?? 0),
+            guest_id: booking.guest_id,
+            guest_name: guestName,
+            guest_email: null,
+            host_id: booking.host_id,
+            host_name: hostName,
+            host_email: hostEmail,
+            confirmation_deadline: booking.confirmation_deadline,
+          }),
+          sendAutomatedBookingHostConfirmationReminderMessage({
+            bookingId: booking.id,
+            listingId: listing.id,
+            listingTitle: listing.title ?? "your listing",
+            guestId: booking.guest_id,
+            hostId: booking.host_id,
+            hostName: hostFirstName,
+            deadlineLabel,
+            urgency: reminder.urgency,
+          }),
+        ])
+
+        const emailSent = emailResult.status === "fulfilled" && Boolean(emailResult.value?.sent)
+        const messageSent = messageResult.status === "fulfilled"
+        if (emailSent && messageSent) {
+          tags.add(reminder.tag)
+          await supabase
+            .from("bookings")
+            .update({ automated_messages_sent: Array.from(tags) })
+            .eq("id", booking.id)
+          hostConfirmationReminders += 1
+        } else {
+          console.warn("[cron/reminders] host confirmation reminder incomplete", {
+            bookingId: booking.id,
+            urgency: reminder.urgency,
+            emailSent,
+            messageSent,
+          })
+        }
+      } catch (error) {
+        console.error(`[cron/reminders] host confirmation reminder failed for ${booking.id}`, error)
+      }
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     processed: {
       reminders_24h: reminders24h,
       access_codes: accessCodes,
       post_session: postSession,
+      host_confirmation_reminders: hostConfirmationReminders,
     },
   })
 }

@@ -101,6 +101,7 @@ async function fetchListingById(id: string) {
       "id, title, description, city, state, service_type, price_solo, fixed_session_price, session_type, listing_photos(url, order_index)"
     )
     .eq("id", id)
+    .eq("is_deleted", false)
     .single()
 
   return listing
@@ -189,6 +190,7 @@ export default async function ListingDetailPage({
         "id, host_id, title, description, service_type, sauna_type, is_active, location, location_address, location_city, location_state, city, state, country, capacity, price_solo, fixed_session_price, price_2, price_3, price_4plus, min_duration_override_minutes, max_duration_override_minutes, fixed_session_minutes, service_attributes, service_duration_min, service_duration_max, service_duration_unit, amenities, house_rules, cancellation_policy, availability, listing_photos(url, order_index), listing_blackout_dates(blackout_date)"
       )
       .eq("id", id)
+      .eq("is_deleted", false)
       .single(),
     supabase
       .from("availability")

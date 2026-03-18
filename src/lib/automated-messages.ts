@@ -316,6 +316,34 @@ export async function sendAutomatedBookingRequestSentMessage(params: {
   })
 }
 
+export async function sendAutomatedBookingHostConfirmationReminderMessage(params: {
+  bookingId: string
+  listingId: string
+  listingTitle: string
+  guestId: string
+  hostId: string
+  hostName: string
+  deadlineLabel: string
+  urgency: "24h" | "12h" | "2h"
+}) {
+  const urgencyLabel =
+    params.urgency === "2h" ? "Soon" : params.urgency === "12h" ? "Reminder" : "24-hour reminder"
+  const messageType =
+    params.urgency === "2h"
+      ? "automated_booking_host_confirmation_reminder_2h"
+      : params.urgency === "12h"
+        ? "automated_booking_host_confirmation_reminder_12h"
+        : "automated_booking_host_confirmation_reminder_24h"
+  return sendAutomatedSystemMessage({
+    bookingId: params.bookingId,
+    listingId: params.listingId,
+    guestId: params.guestId,
+    hostId: params.hostId,
+    messageType,
+    body: `${urgencyLabel}: ${params.hostName}, please confirm this booking request for ${params.listingTitle} by ${params.deadlineLabel} to avoid automatic cancellation.`,
+  })
+}
+
 export async function sendAutomatedBookingConfirmedByHostMessage(params: {
   bookingId: string
   listingId: string

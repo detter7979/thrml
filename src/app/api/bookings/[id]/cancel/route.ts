@@ -123,7 +123,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
 
   const cancelledBy = parsed.data.cancelled_by
   const isGuestRequester = cancelledBy === "guest" && booking.guest_id === session.user.id
-  const isHostRequester = cancelledBy === "host" && booking.host_id === session.user.id
+  let isHostRequester = cancelledBy === "host" && booking.host_id === session.user.id
+  if (!isGuestRequester && !isHostRequester && cancelledBy === "host") {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", session.user.id)
+      .maybeSingle()
+    if (profile?.is_admin) {
+      isHostRequester = true
+    }
+  }
   if (!isGuestRequester && !isHostRequester) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }

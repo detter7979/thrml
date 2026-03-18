@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Facebook, Link2, Mail, MoreHorizontal, Share2 } from "lucide-react"
+import { Check, Facebook, Link2, Mail, MessageCircle, MoreHorizontal, Share2 } from "lucide-react"
 import { useMemo, useState, type MouseEvent } from "react"
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -20,6 +20,7 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
   const [copied, setCopied] = useState(false)
   const [open, setOpen] = useState(false)
   const canUseNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function"
+  const facebookAppId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID?.trim()
 
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined") return `/listings/${listing.id}`
@@ -67,8 +68,28 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
       content_type: "listing",
       item_id: listing.id,
     })
+    const facebookShareUrl = facebookAppId
+      ? `https://www.facebook.com/dialog/share?app_id=${encodeURIComponent(facebookAppId)}&display=popup&href=${encodeURIComponent(shareUrl)}&redirect_uri=${encodeURIComponent(shareUrl)}`
+      : `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
     window.open(
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+      facebookShareUrl,
+      "_blank",
+      "noopener,noreferrer"
+    )
+  }
+
+  function handleMessenger(event: MouseEvent<HTMLButtonElement>) {
+    stopCardNavigation(event)
+    trackGaEvent("share", {
+      method: "messenger",
+      content_type: "listing",
+      item_id: listing.id,
+    })
+    const messengerShareUrl = facebookAppId
+      ? `https://www.facebook.com/dialog/send?app_id=${encodeURIComponent(facebookAppId)}&link=${encodeURIComponent(shareUrl)}&redirect_uri=${encodeURIComponent(shareUrl)}`
+      : `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
+    window.open(
+      messengerShareUrl,
       "_blank",
       "noopener,noreferrer"
     )
@@ -133,6 +154,10 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
           <button type="button" className={rowClass} onClick={handleFacebook}>
             <Facebook className="size-4" />
             Share on Facebook
+          </button>
+          <button type="button" className={rowClass} onClick={handleMessenger}>
+            <MessageCircle className="size-4" />
+            Share on Messenger
           </button>
           {canUseNativeShare ? (
             <button type="button" className={rowClass} onClick={handleNativeShare}>

@@ -368,7 +368,7 @@ function BookingDetailSheet({
             >
               <div className="h-1 w-10 rounded-full bg-[#E5DDD6]" />
             </div>
-            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
               {children}
             </div>
           </motion.div>
@@ -743,7 +743,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                               </div>
                             )}
                             <Link
-                              href={`/explore?listing_id=${booking.listing_id ?? ""}`}
+                              href={`/listings/${booking.listing_id ?? ""}`}
                               className="rounded-xl bg-[#C75B3A] px-3 py-2 text-sm text-white"
                             >
                               Book again
@@ -1160,18 +1160,26 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 Cancellation policy: {cancellation.open ? "Standard · Free cancellation until 24h before session" : "Standard · Non-refundable window"}
                               </p>
                             </section>
-                            <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] mt-4 flex gap-2 border-t border-[#F0E8E0] bg-white py-3">
+                            <div className="mt-4 space-y-3 border-t border-[#F0E8E0] pt-3">
                               {cancellation.open ? (
-                                <Button
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() => void cancelBooking(booking.id, "guest_cancelled_request")}
-                                >
-                                  Cancel booking
-                                </Button>
+                                <div className="flex items-center gap-1 text-xs text-[#7A6A5D]">
+                                  <span>Need to cancel?</span>
+                                  <CancelModal
+                                    booking={{
+                                      id: booking.id,
+                                      session_date: booking.session_date,
+                                      start_time: booking.start_time,
+                                      end_time: booking.end_time,
+                                      listing_title: booking.listings?.title ?? null,
+                                      service_fee: booking.service_fee,
+                                    }}
+                                    userRole={userRole}
+                                    onConfirm={({ reason }) => cancelBooking(booking.id, reason)}
+                                  />
+                                </div>
                               ) : null}
                               {booking.status === "completed" && !booking.review_submitted ? (
-                                <Button asChild className="flex-1 bg-[#C75B3A] text-white hover:bg-[#b44f31]">
+                                <Button asChild className="w-full bg-[#C75B3A] text-white hover:bg-[#b44f31]">
                                   <Link href={`/review/${booking.id}?from=dashboard`}>Leave a review</Link>
                                 </Button>
                               ) : null}

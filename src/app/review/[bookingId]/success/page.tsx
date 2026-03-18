@@ -52,6 +52,12 @@ export default async function ReviewSuccessPage({ params }: { params: Promise<Pa
 
         <div className="mt-8 space-y-3">
           <Link
+            href="/dashboard/bookings"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-[#D9CCBD] bg-white px-4 py-3 text-sm font-medium text-[#3F342B] transition hover:bg-[#FAF5EF]"
+          >
+            ← Back to bookings
+          </Link>
+          <Link
             href={reviewHref}
             className="inline-flex w-full items-center justify-center rounded-xl bg-[#1F1712] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#120d0a]"
           >

@@ -94,6 +94,7 @@ export function DashboardShell({
   const mobileHeaderSubtitle = isHost
     ? `${activeListingsCount} active listing${activeListingsCount === 1 ? "" : "s"}`
     : `${upcomingBookingsCount} upcoming session${upcomingBookingsCount === 1 ? "" : "s"}`
+  const dashboardPrimaryCtaHref = !isHost || !hasListings ? "/become-a-host" : "/dashboard/listings/new"
 
   const initials = fullNameValue
     .split(" ")
@@ -453,34 +454,15 @@ export function DashboardShell({
           )}
         </nav>
 
-        <div className="px-4 pb-1">
-          <div className="mb-3 border-t border-[#EEE4D9] pt-3">
-            <div className="space-y-1 text-sm">
-              {!isHost ? (
-                <Link
-                  href="/become-a-host"
-                  className="block font-medium text-[#8B4513] transition hover:text-[#6F3410]"
-                >
-                  🏠 Become a host
-                </Link>
-              ) : null}
-              <Link
-                href="/explore"
-                className="block text-[#6D5E51] transition hover:text-[#2C2420]"
-              >
-                ← Back to explore
-              </Link>
-            </div>
-          </div>
-        </div>
-
         <div className="p-4 pt-2">
-          <Button asChild className="h-11 w-full rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]">
-            <Link href="/dashboard/listings/new">
-              <PlusCircle className="mr-2 size-4" />
-              List a new space
-            </Link>
-          </Button>
+          <div className="space-y-3 border-t border-[#EEE4D9] pt-4">
+            <Button asChild className="h-11 w-full rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]">
+              <Link href={dashboardPrimaryCtaHref}>
+                <PlusCircle className="mr-2 size-4" />
+                Host a space
+              </Link>
+            </Button>
+          </div>
         </div>
       </aside>
 

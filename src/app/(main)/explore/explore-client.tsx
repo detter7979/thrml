@@ -4,7 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css"
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Layers,
   List,
@@ -305,6 +305,7 @@ function sortListings(items: ListingResult[], sort: SortKey) {
 
 export function ExploreClient() {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const mapRef = useRef<MapRef | null>(null)
   const listRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -407,6 +408,10 @@ export function ExploreClient() {
     []
   )
   const [serviceDraft, setServiceDraft] = useState<string[]>(initialFilters.serviceTypes)
+  const currentExploreUrl = useMemo(() => {
+    const params = searchParams.toString()
+    return params ? `${pathname}?${params}` : pathname
+  }, [pathname, searchParams])
 
   useEffect(() => {
     setCenter((current) =>
@@ -914,8 +919,7 @@ export function ExploreClient() {
   }
 
   function openListingFromCard(listingId: string) {
-    const fromPath = `${window.location.pathname}${window.location.search}`
-    router.push(`/listings/${listingId}?from=${encodeURIComponent(fromPath)}`)
+    router.push(`/listings/${listingId}?from=${encodeURIComponent(currentExploreUrl)}`)
   }
 
   const mapPanel = (
@@ -1153,8 +1157,7 @@ export function ExploreClient() {
           setActiveSource((prev) => (prev === "hover" ? null : prev))
         }}
         onClick={() => {
-          const fromPath = `${window.location.pathname}${window.location.search}`
-          router.push(`/listings/${listing.id}?from=${encodeURIComponent(fromPath)}`)
+          router.push(`/listings/${listing.id}?from=${encodeURIComponent(currentExploreUrl)}`)
         }}
         className={cn(
           "group cursor-pointer rounded-2xl border border-transparent bg-white p-3 shadow-[0_6px_16px_rgba(26,20,16,0.06)] transition-all duration-150",

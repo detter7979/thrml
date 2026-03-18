@@ -23,7 +23,13 @@ const itemVariants: Variants = {
   },
 }
 
-export function ListingGrid({ listings }: { listings: ListingCardData[] }) {
+export function ListingGrid({
+  listings,
+  fromPath,
+}: {
+  listings: ListingCardData[]
+  fromPath?: string
+}) {
   if (!listings.length) {
     return <p className="type-label">No listings found.</p>
   }
@@ -37,7 +43,7 @@ export function ListingGrid({ listings }: { listings: ListingCardData[] }) {
     >
       {listings.map((listing) => (
         <motion.div key={listing.id} variants={itemVariants}>
-          <ListingCard listing={listing} />
+          <ListingCard listing={listing} fromPath={fromPath} />
         </motion.div>
       ))}
     </motion.div>

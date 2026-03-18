@@ -26,13 +26,18 @@ export type ListingCardData = {
 export function ListingCard({
   listing,
   onSavedChange,
+  fromPath,
 }: {
   listing: ListingCardData
   onSavedChange?: (saved: boolean) => void
+  fromPath?: string
 }) {
   const reviewCount = Number(listing.reviewCount ?? 0)
   const hasRating =
     reviewCount >= 1 && typeof listing.rating === "number" && Number.isFinite(listing.rating)
+  const listingHref = fromPath
+    ? `/listings/${listing.id}?from=${encodeURIComponent(fromPath)}`
+    : `/listings/${listing.id}`
 
   return (
     <motion.div
@@ -40,7 +45,7 @@ export function ListingCard({
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
     >
-      <Link href={`/listings/${listing.id}`} className="card-base group block p-3">
+      <Link href={listingHref} className="card-base group block p-3">
         <div className="relative mb-3 h-44 w-full overflow-hidden rounded-xl bg-warm-100">
           {listing.photoUrl ? (
             <img

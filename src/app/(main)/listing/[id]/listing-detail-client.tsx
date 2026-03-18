@@ -1227,16 +1227,12 @@ export function ListingDetailClient({
                 router.push(backToResultsPath)
                 return
               }
-              if (window.history.length > 1) {
-                router.back()
-                return
-              }
               router.push("/explore")
             }}
             className="inline-flex min-h-[44px] items-center gap-1 rounded-md text-sm font-medium text-[#5D4D41]"
           >
             <ChevronLeft className="size-4" />
-            Back to results
+            {backToResultsPath ? "Back to results" : "Explore spaces"}
           </button>
           <div className="space-y-2">
             <div>

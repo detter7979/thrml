@@ -174,7 +174,7 @@ export default async function BookingConfirmationPage({
           </a>
         </Button>
         <Button variant="outline" asChild>
-          <Link href={query.listingId ? `/listings/${query.listingId}` : "/"}>Back to listing</Link>
+          <Link href={`/listings/${booking.listing_id}`}>Back to listing</Link>
         </Button>
       </div>
     </div>

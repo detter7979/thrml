@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
+import { AnimatePresence, motion } from "framer-motion"
 import { Check, ChevronRight } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -17,19 +18,32 @@ function DropdownMenuTrigger(props: React.ComponentProps<typeof DropdownMenuPrim
 function DropdownMenuContent({
   className,
   sideOffset = 8,
+  children,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
     <DropdownMenuPrimitive.Portal>
-      <DropdownMenuPrimitive.Content
-        data-slot="dropdown-menu-content"
-        sideOffset={sideOffset}
-        className={cn(
-          "z-[300] min-w-[220px] overflow-hidden rounded-xl border bg-white p-1.5 text-sm shadow-lg",
-          className
-        )}
-        {...props}
-      />
+      <AnimatePresence>
+        <DropdownMenuPrimitive.Content
+          data-slot="dropdown-menu-content"
+          sideOffset={sideOffset}
+          asChild
+          className={cn(
+            "z-[300] min-w-[220px] overflow-hidden rounded-xl border bg-white p-1.5 text-sm shadow-lg",
+            className
+          )}
+          {...props}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -4 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30, duration: 0.15 }}
+          >
+            {children}
+          </motion.div>
+        </DropdownMenuPrimitive.Content>
+      </AnimatePresence>
     </DropdownMenuPrimitive.Portal>
   )
 }

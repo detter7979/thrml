@@ -368,9 +368,7 @@ function BookingDetailSheet({
             >
               <div className="h-1 w-10 rounded-full bg-[#E5DDD6]" />
             </div>
-            <div
-              className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
-            >
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
               {children}
             </div>
           </motion.div>
@@ -1013,7 +1011,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 </div>
                               </div>
                             </div>
-                            <section className="space-y-2">
+                            <section className="mt-3 space-y-2">
                               <p>📅 Date: {booking.session_date ? new Date(`${booking.session_date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
                               <p>⏰ Time: {formatDateTime(booking).split(" · ")[1] ?? "TBD"}</p>
                               <p>👥 Guests: {booking.guest_count ?? 1} person{Number(booking.guest_count ?? 1) === 1 ? "" : "s"}</p>
@@ -1162,7 +1160,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 Cancellation policy: {cancellation.open ? "Standard · Free cancellation until 24h before session" : "Standard · Non-refundable window"}
                               </p>
                             </section>
-                            <div className="sticky bottom-0 mt-4 flex gap-2 border-t border-[#F0E8E0] bg-white py-3">
+                            <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] mt-4 flex gap-2 border-t border-[#F0E8E0] bg-white py-3">
                               {cancellation.open ? (
                                 <Button
                                   variant="outline"

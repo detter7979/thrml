@@ -68,6 +68,7 @@ import { trackGaEvent } from "@/lib/analytics/ga"
 import { roundUpTo30 } from "@/lib/slots"
 import { createClient } from "@/lib/supabase/client"
 import type { BookingModel } from "@/lib/service-types"
+import { useScrollReveal } from "@/hooks/useScrollReveal"
 
 interface HostProfile {
   id: string
@@ -1030,6 +1031,7 @@ export function ListingDetailClient({
   backToResultsPath = null,
 }: ListingDetailProps) {
   const router = useRouter()
+  const detailRef = useScrollReveal<HTMLDivElement>()
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest")
   const [chipFilter, setChipFilter] = useState<number | null>(null)
   const [summaryFilter, setSummaryFilter] = useState<number | null>(null)
@@ -1385,16 +1387,16 @@ export function ListingDetailClient({
 
         </section>
 
-        <div className="grid gap-10 md:grid-cols-[minmax(0,2fr)_380px]">
+        <div ref={detailRef} className="grid gap-10 md:grid-cols-[minmax(0,2fr)_380px]">
           <main className="space-y-8">
-            <section className="space-y-3 border-b pb-8">
+            <section className="space-y-3 border-b pb-8 reveal">
               <h2 className="type-h2">{aboutHeading}</h2>
               <p className="whitespace-pre-wrap text-muted-foreground">
                 {description || "No description provided yet."}
               </p>
             </section>
 
-            <section className="space-y-4 border-b pb-8">
+            <section className="space-y-4 border-b pb-8 reveal stagger-3">
               <div className="flex items-center justify-between">
                 <h2 className="type-h2">Hosted by</h2>
                 {host?.is_superhost ? <Badge>Superhost</Badge> : null}
@@ -1521,7 +1523,7 @@ export function ListingDetailClient({
             ) : null}
 
             {filteredAmenities.length ? (
-              <section className="space-y-4 border-b pb-8">
+              <section className="space-y-4 border-b pb-8 reveal stagger-1">
                 <h2 className="type-h2">Amenities</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {filteredAmenities.map((amenity) => {
@@ -1583,7 +1585,7 @@ export function ListingDetailClient({
               </section>
             ) : null}
 
-            <section id="reviews" className="space-y-4 scroll-mt-28 pb-2">
+            <section id="reviews" className="space-y-4 scroll-mt-28 pb-2 reveal stagger-2">
               <div className="flex items-center justify-between gap-4">
                 <h2 className="font-serif text-[22px] text-[#1A1410]">
                   ★ {avgRating ? avgRating.toFixed(2) : "0.00"} · {ratings.review_count || reviews.length} reviews

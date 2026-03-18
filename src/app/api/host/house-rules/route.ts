@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
-import { sanitizeText } from "@/lib/sanitize"
 import { createClient } from "@/lib/supabase/server"
+
+export const runtime = "nodejs"
 
 const payloadSchema = z
   .object({
@@ -10,6 +11,16 @@ const payloadSchema = z
     applyToListings: z.boolean().optional().default(true),
   })
   .strict()
+
+function sanitizeRule(input: string): string {
+  if (!input) return ""
+  // Keep rules plain-text to avoid HTML/script content while preserving readability.
+  return input
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -29,7 +40,7 @@ export async function PATCH(req: NextRequest) {
 
     const uniqueRules: string[] = []
     for (const rule of parsed.data.houseRules) {
-      const normalized = sanitizeText(rule)
+      const normalized = sanitizeRule(rule)
       if (!normalized) continue
       if (!uniqueRules.includes(normalized)) uniqueRules.push(normalized)
     }

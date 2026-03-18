@@ -12,6 +12,7 @@ import {
   Users,
   X,
 } from "lucide-react"
+import { motion } from "framer-motion"
 import MapboxMap, {
   Layer,
   Marker,
@@ -1233,7 +1234,7 @@ export function ExploreClient() {
       <div className="sticky top-0 z-30 border-b border-[#F0E8E0] bg-[#FAF7F4]">
           <div className="relative z-30 px-4 py-3 md:px-6">
           <div className="flex items-center gap-2 md:justify-between md:gap-3">
-            <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto md:overflow-visible">
+            <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto snap-x-pills md:overflow-visible">
               <div className="flex w-max items-center gap-2 whitespace-nowrap pl-1 md:w-full md:flex-wrap md:gap-2.5 md:whitespace-normal md:pl-0">
             <Popover
               open={openFilter === "service"}
@@ -1263,9 +1264,12 @@ export function ExploreClient() {
                   {serviceTypeOptions.map((serviceType) => {
                     const active = serviceDraft.includes(serviceType.id)
                     return (
-                      <button
+                      <motion.button
                         key={serviceType.id}
                         type="button"
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.97 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
                         onClick={() => toggleServiceTypeDraft(serviceType.id)}
                         className={`flex w-full items-center justify-between rounded-lg border px-2 py-2 text-left text-xs ${
                           active ? "border-[#C75B3A] bg-[#FFF5F0] text-[#C75B3A]" : "border-transparent hover:bg-[#FAF6F1]"
@@ -1275,7 +1279,7 @@ export function ExploreClient() {
                           {serviceType.icon} {serviceType.display_name}
                         </span>
                         <span>{active ? "✓" : ""}</span>
-                      </button>
+                      </motion.button>
                     )
                   })}
                 </div>

@@ -22,6 +22,7 @@ import {
 } from "@/lib/service-types"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { SERVICE_TYPES, type ServiceType } from "@/lib/constants/service-types"
+import { useScrollReveal } from "@/hooks/useScrollReveal"
 
 type ListingApiRow = {
   id: string
@@ -65,6 +66,9 @@ export function HomePageClient() {
   const [loading, setLoading] = useState(true)
   const [showScrollCue, setShowScrollCue] = useState(true)
   const newsletterInputRef = useRef<HTMLInputElement>(null)
+  const trendingRef = useScrollReveal<HTMLElement>()
+  const listingsRef = useScrollReveal<HTMLElement>()
+  const newsletterRef = useScrollReveal<HTMLDivElement>()
 
   useEffect(() => {
     let cancelled = false
@@ -496,11 +500,11 @@ export function HomePageClient() {
       </section>
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 md:px-8">
-        <section className="space-y-3">
-          <h2 className="type-h2">Trending</h2>
+        <section ref={trendingRef} className="space-y-3">
+          <h2 className="type-h2 reveal">Trending</h2>
           <div className="grid gap-3 md:grid-cols-3">
-            {trendingCategories.map((category) => (
-              <div key={category.id} className="card-base p-4">
+            {trendingCategories.map((category, i) => (
+              <div key={category.id} className={`card-base p-4 reveal stagger-${Math.min(i + 1, 5) as 1 | 2 | 3 | 4 | 5}`}>
                 <p className="font-medium">
                   {category.emoji} {category.label}
                 </p>
@@ -512,9 +516,9 @@ export function HomePageClient() {
           </div>
         </section>
 
-        <section className="space-y-3 pb-10 md:pb-14">
-          <h2 className="type-h2">Wellness spaces near you</h2>
-          <div className="flex gap-2 overflow-x-auto pb-1">
+        <section ref={listingsRef} className="space-y-3 pb-10 md:pb-14">
+          <h2 className="type-h2 reveal">Wellness spaces near you</h2>
+          <div className="flex gap-2 overflow-x-auto pb-1 snap-x-pills">
             <button
               type="button"
               onClick={() => setFilter("all")}
@@ -559,13 +563,13 @@ export function HomePageClient() {
       </main>
 
       <section className="bg-[#1A1410] py-16 md:py-20">
-        <div className="mx-auto max-w-6xl px-4 md:px-8">
+        <div ref={newsletterRef} className="mx-auto max-w-6xl px-4 md:px-8">
           <div className="max-w-3xl space-y-5">
-            <p className="text-xs tracking-[0.22em] text-[#C75B3A]">THRML JOURNAL</p>
-            <h3 className="font-serif text-3xl leading-tight text-[#F5EFE8] md:text-4xl">
+            <p className="text-xs tracking-[0.22em] text-[#C75B3A] reveal">THRML JOURNAL</p>
+            <h3 className="font-serif text-3xl leading-tight text-[#F5EFE8] md:text-4xl reveal stagger-1">
               Weekly wellness rituals, new spaces, and recovery inspiration.
             </h3>
-            <p className="max-w-xl text-sm text-white/65">
+            <p className="max-w-xl text-sm text-white/65 reveal stagger-2">
               Join the newsletter for curated recommendations and private-space drops in your city.
             </p>
 
@@ -576,44 +580,46 @@ export function HomePageClient() {
               </div>
             ) : (
               <form onSubmit={handleNewsletterSubmit} className="w-full max-w-xl space-y-2">
-                {/* Honeypot - hidden from real users, bots will fill this */}
-                <input
-                  type="text"
-                  name="website"
-                  autoComplete="off"
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  style={{ display: "none" }}
-                />
-                <div className="flex w-full items-center gap-3 flex-col sm:flex-row sm:items-stretch">
-                  <div className="w-full flex-1">
-                    <input
-                      ref={newsletterInputRef}
-                      type="email"
-                      value={newsletterEmail}
-                      onChange={(event) => {
-                        setNewsletterEmail(event.target.value)
-                        if (newsletterError) setNewsletterError(null)
-                      }}
-                      placeholder="Enter your email"
+                <div className="reveal stagger-3">
+                  {/* Honeypot - hidden from real users, bots will fill this */}
+                  <input
+                    type="text"
+                    name="website"
+                    autoComplete="off"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    style={{ display: "none" }}
+                  />
+                  <div className="flex w-full items-center gap-3 flex-col sm:flex-row sm:items-stretch">
+                    <div className="w-full flex-1">
+                      <input
+                        ref={newsletterInputRef}
+                        type="email"
+                        value={newsletterEmail}
+                        onChange={(event) => {
+                          setNewsletterEmail(event.target.value)
+                          if (newsletterError) setNewsletterError(null)
+                        }}
+                        placeholder="Enter your email"
+                        disabled={newsletterStatus === "loading"}
+                        className="h-14 w-full rounded-full border border-white/20 bg-white px-6 text-base text-[#1A1410] outline-none placeholder:text-[#8E8176] focus:border-[#C75B3A] disabled:cursor-not-allowed disabled:opacity-70"
+                      />
+                    </div>
+                    <Button
+                      type="submit"
                       disabled={newsletterStatus === "loading"}
-                      className="h-14 w-full rounded-full border border-white/20 bg-white px-6 text-base text-[#1A1410] outline-none placeholder:text-[#8E8176] focus:border-[#C75B3A] disabled:cursor-not-allowed disabled:opacity-70"
-                    />
+                      className="h-14 w-full rounded-full bg-[#C75B3A] px-8 text-base text-white hover:bg-[#B45033] sm:w-auto md:h-14 disabled:cursor-not-allowed disabled:opacity-80"
+                    >
+                      {newsletterStatus === "loading" ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="size-4 animate-spin" />
+                          Subscribing...
+                        </span>
+                      ) : (
+                        "Subscribe"
+                      )}
+                    </Button>
                   </div>
-                  <Button
-                    type="submit"
-                    disabled={newsletterStatus === "loading"}
-                    className="h-14 w-full rounded-full bg-[#C75B3A] px-8 text-base text-white hover:bg-[#B45033] sm:w-auto md:h-14 disabled:cursor-not-allowed disabled:opacity-80"
-                  >
-                    {newsletterStatus === "loading" ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="size-4 animate-spin" />
-                        Subscribing...
-                      </span>
-                    ) : (
-                      "Subscribe"
-                    )}
-                  </Button>
                 </div>
                 {newsletterError ? (
                   <p className="px-1 text-sm text-[#F1B8A8]">{newsletterError}</p>

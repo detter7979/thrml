@@ -48,12 +48,19 @@ function hasAnyMarketingOptIn(preferences: NotificationPreferences) {
 const PROFILE_NAME_OVERRIDE_KEY = "thrml.profileNameOverride"
 
 async function parseJsonResponse<T>(response: Response): Promise<T | null> {
-  const contentType = response.headers.get("content-type") ?? ""
-  if (!contentType.toLowerCase().includes("application/json")) {
-    return null
-  }
+  const contentType = (response.headers.get("content-type") ?? "").toLowerCase()
   try {
-    return (await response.json()) as T
+    const body = await response.text()
+    if (!body) return null
+    // Some gateways return JSON with non-standard content types (for example, application/problem+json).
+    if (
+      contentType.includes("json") ||
+      body.trim().startsWith("{") ||
+      body.trim().startsWith("[")
+    ) {
+      return JSON.parse(body) as T
+    }
+    return null
   } catch {
     return null
   }

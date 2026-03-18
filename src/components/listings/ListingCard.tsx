@@ -1,3 +1,6 @@
+"use client"
+
+import { motion } from "framer-motion"
 import Link from "next/link"
 
 import { SaveButton } from "@/components/listings/SaveButton"
@@ -32,56 +35,62 @@ export function ListingCard({
     reviewCount >= 1 && typeof listing.rating === "number" && Number.isFinite(listing.rating)
 
   return (
-    <Link href={`/listings/${listing.id}`} className="card-base group block p-3">
-      <div className="relative mb-3 h-44 w-full overflow-hidden rounded-xl bg-warm-100">
-        {listing.photoUrl ? (
-          <img
-            src={listing.photoUrl}
-            alt={`${listing.title} in ${
-              listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
-            }`}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-sm text-warm-600">No photo</div>
-        )}
-        <div className="absolute top-3 right-3">
-          <SaveButton
-            listingId={listing.id}
-            listingMeta={{
-              serviceType: listing.serviceTypeId ?? null,
-              city: listing.city ?? null,
-            }}
-            initialSaved={listing.initialSaved}
-            variant="card"
-            onSavedChange={onSavedChange}
-          />
-        </div>
-      </div>
-      <div className="space-y-1">
-        {listing.serviceTypeName ? (
-          <Badge variant="secondary">
-            <span className="mr-1">{listing.serviceTypeIcon ?? "✨"}</span>
-            {listing.serviceTypeName}
-          </Badge>
-        ) : null}
-        <p className="font-medium">{listing.title}</p>
-        <p className="type-label">{listing.location}</p>
-        <div className="flex items-center justify-between">
-          <p className="type-price">
-            {listing.bookingModel === "fixed_session"
-              ? `$${listing.priceSolo}/session`
-              : `from $${listing.priceSolo}/person/hr`}
-          </p>
-          {hasRating ? (
-            <p className="text-sm text-[#5C4D40]">
-              ★ {Number(listing.rating).toFixed(1)} ({reviewCount})
-            </p>
+    <motion.div
+      whileHover={{ y: -4, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+    >
+      <Link href={`/listings/${listing.id}`} className="card-base group block p-3">
+        <div className="relative mb-3 h-44 w-full overflow-hidden rounded-xl bg-warm-100">
+          {listing.photoUrl ? (
+            <img
+              src={listing.photoUrl}
+              alt={`${listing.title} in ${
+                listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
+              }`}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
           ) : (
-            <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+            <div className="flex h-full items-center justify-center text-sm text-warm-600">No photo</div>
           )}
+          <div className="absolute top-3 right-3">
+            <SaveButton
+              listingId={listing.id}
+              listingMeta={{
+                serviceType: listing.serviceTypeId ?? null,
+                city: listing.city ?? null,
+              }}
+              initialSaved={listing.initialSaved}
+              variant="card"
+              onSavedChange={onSavedChange}
+            />
+          </div>
         </div>
-      </div>
-    </Link>
+        <div className="space-y-1">
+          {listing.serviceTypeName ? (
+            <Badge variant="secondary">
+              <span className="mr-1">{listing.serviceTypeIcon ?? "✨"}</span>
+              {listing.serviceTypeName}
+            </Badge>
+          ) : null}
+          <p className="font-medium">{listing.title}</p>
+          <p className="type-label">{listing.location}</p>
+          <div className="flex items-center justify-between">
+            <p className="type-price">
+              {listing.bookingModel === "fixed_session"
+                ? `$${listing.priceSolo}/session`
+                : `from $${listing.priceSolo}/person/hr`}
+            </p>
+            {hasRating ? (
+              <p className="text-sm text-[#5C4D40]">
+                ★ {Number(listing.rating).toFixed(1)} ({reviewCount})
+              </p>
+            ) : (
+              <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+            )}
+          </div>
+        </div>
+      </Link>
+    </motion.div>
   )
 }

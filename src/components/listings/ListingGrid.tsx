@@ -1,4 +1,26 @@
+"use client"
+
+import { motion } from "framer-motion"
+
 import { ListingCard, type ListingCardData } from "@/components/listings/ListingCard"
+
+const containerVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.07,
+    },
+  },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 28 },
+  },
+}
 
 export function ListingGrid({ listings }: { listings: ListingCardData[] }) {
   if (!listings.length) {
@@ -6,10 +28,17 @@ export function ListingGrid({ listings }: { listings: ListingCardData[] }) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <motion.div
+      className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {listings.map((listing) => (
-        <ListingCard key={listing.id} listing={listing} />
+        <motion.div key={listing.id} variants={itemVariants}>
+          <ListingCard listing={listing} />
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -196,194 +197,203 @@ export function BecomeAHostClient() {
       <main className="flex flex-1 flex-col items-center justify-start px-6 pt-4 pb-12">
         <div className="w-full max-w-lg space-y-6">
           <ProgressBar step={step} />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ type: "spring", stiffness: 380, damping: 32 }}
+            >
+              {step === 1 ? (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h1 className="font-serif text-3xl leading-tight text-[#1A1410]">
+                      Earn from your space.
+                      <br />
+                      We handle the rest.
+                    </h1>
+                    <p className="text-sm leading-relaxed text-neutral-500">
+                      Thrml connects you with guests looking for private wellness experiences. Set your
+                      price, your hours, and your rules - we take care of bookings and payments.
+                    </p>
+                  </div>
 
-          {step === 1 ? (
-            <div className="animate-[fadeSlideIn_0.3s_ease_both] space-y-6">
-              <div className="space-y-2">
-                <h1 className="font-serif text-3xl leading-tight text-[#1A1410]">
-                  Earn from your space.
-                  <br />
-                  We handle the rest.
-                </h1>
-                <p className="text-sm leading-relaxed text-neutral-500">
-                  Thrml connects you with guests looking for private wellness experiences. Set your
-                  price, your hours, and your rules - we take care of bookings and payments.
-                </p>
-              </div>
+                  <HowItWorksAnimation />
 
-              <HowItWorksAnimation />
-
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                  <p className="text-lg font-semibold text-[#1A1410]">88%</p>
-                  <p className="text-xs text-neutral-400">You keep per booking</p>
-                </div>
-                <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                  <p className="text-lg font-semibold text-[#1A1410]">2 days</p>
-                  <p className="text-xs text-neutral-400">Stripe payout time</p>
-                </div>
-                <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                  <p className="text-lg font-semibold text-[#1A1410]">Free</p>
-                  <p className="text-xs text-neutral-400">To list your space</p>
-                </div>
-              </div>
-
-              <Button
-                className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530]"
-                onClick={handleStep1Continue}
-              >
-                Get started →
-              </Button>
-            </div>
-          ) : null}
-
-          {step === 2 ? (
-            <div className="animate-[fadeSlideIn_0.3s_ease_both] space-y-6">
-              <div className="space-y-2">
-                <h1 className="font-serif text-3xl text-[#1A1410]">A few ground rules</h1>
-                <p className="text-sm leading-relaxed text-neutral-500">
-                  Thrml hosts share a commitment to quality experiences. These are not complicated
-                  - they are just good hosting.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {GROUND_RULES.map((rule) => (
-                  <div
-                    key={rule.title}
-                    className="flex items-start gap-3 rounded-xl border border-neutral-100 bg-white p-4"
-                  >
-                    <span className="mt-0.5 shrink-0 text-xl">{rule.icon}</span>
-                    <div>
-                      <p className="text-sm font-medium text-[#1A1410]">{rule.title}</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-neutral-500">{rule.body}</p>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
+                      <p className="text-lg font-semibold text-[#1A1410]">88%</p>
+                      <p className="text-xs text-neutral-400">You keep per booking</p>
+                    </div>
+                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
+                      <p className="text-lg font-semibold text-[#1A1410]">2 days</p>
+                      <p className="text-xs text-neutral-400">Stripe payout time</p>
+                    </div>
+                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
+                      <p className="text-lg font-semibold text-[#1A1410]">Free</p>
+                      <p className="text-xs text-neutral-400">To list your space</p>
                     </div>
                   </div>
-                ))}
-              </div>
 
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#E7DED3] bg-white p-4">
-                <Checkbox
-                  checked={rulesAccepted}
-                  onCheckedChange={(checked) => setRulesAccepted(Boolean(checked))}
-                  className="mt-0.5"
-                />
-                <span className="text-sm leading-relaxed text-[#1A1410]">
-                  I understand and agree to host responsibly on Thrml.
-                </span>
-              </label>
-
-              <Button
-                className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530] disabled:opacity-40"
-                onClick={handleRulesAccept}
-                disabled={!rulesAccepted}
-              >
-                Agree and continue →
-              </Button>
-
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="w-full text-center text-xs text-neutral-400 hover:text-neutral-600"
-              >
-                ← Back
-              </button>
-            </div>
-          ) : null}
-
-          {step === 3 ? (
-            <div className="animate-[fadeSlideIn_0.3s_ease_both] space-y-6">
-              <div className="space-y-2">
-                <h1 className="font-serif text-3xl text-[#1A1410]">Host agreement</h1>
-                <p className="text-sm leading-relaxed text-neutral-500">
-                  A brief summary of what you are agreeing to as a Thrml host.
-                </p>
-              </div>
-
-              <div className="max-h-72 space-y-4 overflow-y-auto rounded-xl border border-neutral-100 bg-white p-5 text-sm leading-relaxed text-[#2F241E]">
-                <div className="space-y-1">
-                  <p className="font-semibold">Independent host status</p>
-                  <p className="text-xs text-neutral-500">
-                    You are an independent host, not an employee or agent of Thrml. You are
-                    responsible for the operation, safety, and condition of your space and the
-                    experiences you provide.
-                  </p>
+                  <Button
+                    className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530]"
+                    onClick={handleStep1Continue}
+                  >
+                    Get started →
+                  </Button>
                 </div>
-                <div className="space-y-1">
-                  <p className="font-semibold">Space safety and compliance</p>
-                  <p className="text-xs text-neutral-500">
-                    You confirm your space is safe, functional, and legally permitted for the
-                    activities listed. You are responsible for ensuring your space meets any
-                    applicable local regulations.
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="font-semibold">Insurance recommendation</p>
-                  <p className="text-xs text-neutral-500">
-                    Thrml does not provide insurance coverage for hosts or guests. We strongly
-                    recommend carrying appropriate property and liability insurance for short-term
-                    wellness space rental activities. Consult an insurance professional to confirm
-                    your coverage.
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="font-semibold">Accurate listings</p>
-                  <p className="text-xs text-neutral-500">
-                    You agree to represent your space accurately and update your listing if
-                    anything material changes. Misleading listings may result in removal from the
-                    platform.
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="font-semibold">Platform payments</p>
-                  <p className="text-xs text-neutral-500">
-                    All payments must be processed through Thrml. Accepting payment outside the
-                    platform is a violation of the Host Terms and may result in account suspension.
-                  </p>
-                </div>
-                <p className="border-t border-neutral-100 pt-3 text-xs text-neutral-400">
-                  By agreeing, you also accept Thrml&apos;s{" "}
-                  <Link href="/terms" target="_blank" className="underline">
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link href="/privacy" target="_blank" className="underline">
-                    Privacy Policy
-                  </Link>
-                  . Version: {HOST_TERMS_VERSION}
-                </p>
-              </div>
+              ) : null}
 
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#E7DED3] bg-white p-4">
-                <Checkbox
-                  checked={termsAccepted}
-                  onCheckedChange={(checked) => setTermsAccepted(Boolean(checked))}
-                  className="mt-0.5"
-                />
-                <span className="text-sm leading-relaxed text-[#1A1410]">
-                  I accept the Thrml Host Terms and confirm I have read the agreement above.
-                </span>
-              </label>
+              {step === 2 ? (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h1 className="font-serif text-3xl text-[#1A1410]">A few ground rules</h1>
+                    <p className="text-sm leading-relaxed text-neutral-500">
+                      Thrml hosts share a commitment to quality experiences. These are not complicated
+                      - they are just good hosting.
+                    </p>
+                  </div>
 
-              {error ? <p className="text-sm text-red-500">{error}</p> : null}
+                  <div className="space-y-3">
+                    {GROUND_RULES.map((rule) => (
+                      <div
+                        key={rule.title}
+                        className="flex items-start gap-3 rounded-xl border border-neutral-100 bg-white p-4"
+                      >
+                        <span className="mt-0.5 shrink-0 text-xl">{rule.icon}</span>
+                        <div>
+                          <p className="text-sm font-medium text-[#1A1410]">{rule.title}</p>
+                          <p className="mt-0.5 text-xs leading-relaxed text-neutral-500">{rule.body}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-              <Button
-                className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530] disabled:opacity-40"
-                onClick={handleTermsAccept}
-                disabled={!termsAccepted || saving}
-              >
-                {saving ? "Saving..." : "Start my listing →"}
-              </Button>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#E7DED3] bg-white p-4">
+                    <Checkbox
+                      checked={rulesAccepted}
+                      onCheckedChange={(checked) => setRulesAccepted(Boolean(checked))}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm leading-relaxed text-[#1A1410]">
+                      I understand and agree to host responsibly on Thrml.
+                    </span>
+                  </label>
 
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="w-full text-center text-xs text-neutral-400 hover:text-neutral-600"
-              >
-                ← Back
-              </button>
-            </div>
-          ) : null}
+                  <Button
+                    className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530] disabled:opacity-40"
+                    onClick={handleRulesAccept}
+                    disabled={!rulesAccepted}
+                  >
+                    Agree and continue →
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="w-full text-center text-xs text-neutral-400 hover:text-neutral-600"
+                  >
+                    ← Back
+                  </button>
+                </div>
+              ) : null}
+
+              {step === 3 ? (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h1 className="font-serif text-3xl text-[#1A1410]">Host agreement</h1>
+                    <p className="text-sm leading-relaxed text-neutral-500">
+                      A brief summary of what you are agreeing to as a Thrml host.
+                    </p>
+                  </div>
+
+                  <div className="max-h-72 space-y-4 overflow-y-auto rounded-xl border border-neutral-100 bg-white p-5 text-sm leading-relaxed text-[#2F241E]">
+                    <div className="space-y-1">
+                      <p className="font-semibold">Independent host status</p>
+                      <p className="text-xs text-neutral-500">
+                        You are an independent host, not an employee or agent of Thrml. You are
+                        responsible for the operation, safety, and condition of your space and the
+                        experiences you provide.
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-semibold">Space safety and compliance</p>
+                      <p className="text-xs text-neutral-500">
+                        You confirm your space is safe, functional, and legally permitted for the
+                        activities listed. You are responsible for ensuring your space meets any
+                        applicable local regulations.
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-semibold">Insurance recommendation</p>
+                      <p className="text-xs text-neutral-500">
+                        Thrml does not provide insurance coverage for hosts or guests. We strongly
+                        recommend carrying appropriate property and liability insurance for short-term
+                        wellness space rental activities. Consult an insurance professional to confirm
+                        your coverage.
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-semibold">Accurate listings</p>
+                      <p className="text-xs text-neutral-500">
+                        You agree to represent your space accurately and update your listing if
+                        anything material changes. Misleading listings may result in removal from the
+                        platform.
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-semibold">Platform payments</p>
+                      <p className="text-xs text-neutral-500">
+                        All payments must be processed through Thrml. Accepting payment outside the
+                        platform is a violation of the Host Terms and may result in account suspension.
+                      </p>
+                    </div>
+                    <p className="border-t border-neutral-100 pt-3 text-xs text-neutral-400">
+                      By agreeing, you also accept Thrml&apos;s{" "}
+                      <Link href="/terms" target="_blank" className="underline">
+                        Terms of Service
+                      </Link>{" "}
+                      and{" "}
+                      <Link href="/privacy" target="_blank" className="underline">
+                        Privacy Policy
+                      </Link>
+                      . Version: {HOST_TERMS_VERSION}
+                    </p>
+                  </div>
+
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#E7DED3] bg-white p-4">
+                    <Checkbox
+                      checked={termsAccepted}
+                      onCheckedChange={(checked) => setTermsAccepted(Boolean(checked))}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm leading-relaxed text-[#1A1410]">
+                      I accept the Thrml Host Terms and confirm I have read the agreement above.
+                    </span>
+                  </label>
+
+                  {error ? <p className="text-sm text-red-500">{error}</p> : null}
+
+                  <Button
+                    className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530] disabled:opacity-40"
+                    onClick={handleTermsAccept}
+                    disabled={!termsAccepted || saving}
+                  >
+                    {saving ? "Saving..." : "Start my listing →"}
+                  </Button>
+
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="w-full text-center text-xs text-neutral-400 hover:text-neutral-600"
+                  >
+                    ← Back
+                  </button>
+                </div>
+              ) : null}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

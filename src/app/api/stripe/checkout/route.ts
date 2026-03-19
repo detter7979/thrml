@@ -191,6 +191,21 @@ async function reserveSlotAtomically(params: {
   return { ok: true as const, slotId }
 }
 
+function isNoDoubleBookingConstraintError(error: unknown) {
+  const message =
+    typeof (error as { message?: unknown })?.message === "string"
+      ? (error as { message: string }).message
+      : ""
+  const code =
+    typeof (error as { code?: unknown })?.code === "string"
+      ? (error as { code: string }).code
+      : ""
+  return (
+    code === "23505" &&
+    (message.includes("no_double_booking") || message.includes("duplicate key value"))
+  )
+}
+
 export async function POST(req: NextRequest) {
   try {
     const ip = requestIp(req)
@@ -533,6 +548,53 @@ export async function POST(req: NextRequest) {
 
     if (bookingError || !booking) {
       await admin.from("booked_slots").delete().eq("id", slotReservation.slotId)
+      if (isNoDoubleBookingConstraintError(bookingError)) {
+        const { data: existingBooking } = await admin
+          .from("bookings")
+          .select("id, stripe_payment_intent_id, status")
+          .eq("listing_id", listingId)
+          .eq("guest_id", user.id)
+          .eq("session_date", normalizedDate)
+          .eq("start_time", startTime)
+          .eq("end_time", endTime)
+          .in("status", ["pending", "pending_host", "confirmed", "completed"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (existingBooking?.id && existingBooking.stripe_payment_intent_id) {
+          try {
+            const existingIntent = await stripe.paymentIntents.retrieve(
+              existingBooking.stripe_payment_intent_id
+            )
+            if (existingIntent.client_secret) {
+              console.log("[stripe/checkout] Resuming existing booking after duplicate insert", {
+                bookingId: existingBooking.id,
+                paymentIntentId: existingIntent.id,
+                status: existingBooking.status,
+              })
+              return NextResponse.json({
+                clientSecret: existingIntent.client_secret,
+                bookingId: existingBooking.id,
+              })
+            }
+          } catch (resumeError) {
+            console.error("[stripe/checkout] Failed to resume existing payment intent", {
+              bookingId: existingBooking.id,
+              paymentIntentId: existingBooking.stripe_payment_intent_id,
+              error: resumeError instanceof Error ? resumeError.message : String(resumeError),
+            })
+          }
+        }
+
+        return NextResponse.json(
+          {
+            error:
+              "This time slot already has an active booking attempt. Please refresh and try another available time.",
+          },
+          { status: 409 }
+        )
+      }
       console.error("[stripe/checkout] Failed creating booking", {
         bookingError: bookingError?.message ?? null,
       })

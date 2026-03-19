@@ -22,15 +22,38 @@ export function useScrollReveal<T extends HTMLElement = HTMLElement>(options?: I
         ...options,
       }
     )
+    const observedTargets = new WeakSet<Element>()
 
-    const targets: Element[] = [...el.querySelectorAll(".reveal, .reveal-scale")]
-    if (el.classList.contains("reveal") || el.classList.contains("reveal-scale")) {
-      targets.push(el)
+    const observeTarget = (target: Element) => {
+      if (observedTargets.has(target)) return
+      observedTargets.add(target)
+      observer.observe(target)
     }
 
-    targets.forEach((target) => observer.observe(target))
+    const collectTargets = (target: Element) => {
+      if (target.matches(".reveal, .reveal-scale")) {
+        observeTarget(target)
+      }
+      target.querySelectorAll(".reveal, .reveal-scale").forEach((child) => observeTarget(child))
+    }
 
-    return () => observer.disconnect()
+    collectTargets(el)
+
+    // Watch for reveal nodes added after initial render (e.g. async listing cards).
+    const mutationObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (!(node instanceof Element)) return
+          collectTargets(node)
+        })
+      })
+    })
+    mutationObserver.observe(el, { childList: true, subtree: true })
+
+    return () => {
+      mutationObserver.disconnect()
+      observer.disconnect()
+    }
   }, [options])
 
   return ref

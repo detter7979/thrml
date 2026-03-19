@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -604,10 +605,10 @@ export function EditListingClient({
                         checked ? "border-[#C75B3A] bg-[#FFF3EC]" : "border-[#E9DFD3] bg-white"
                       }`}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={checked}
-                        onChange={() =>
+                        className="border-[#D9CBB8] data-[state=checked]:border-[#C75B3A] data-[state=checked]:bg-[#C75B3A] data-[state=checked]:text-white"
+                        onCheckedChange={() =>
                           setForm((current) => {
                             const nextAmenities = checked
                               ? current.amenities.filter((item) => item !== amenity)
@@ -723,10 +724,10 @@ export function EditListingClient({
               <p className="text-xs text-[#6D5E51]">{selectedCancellationPolicy.description}</p>
             </div>
             <label className="flex items-center gap-2 rounded-xl border border-[#E9DFD3] bg-white px-3 py-2 text-sm">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={form.instantBook}
-                onChange={(event) => setForm((s) => ({ ...s, instantBook: event.target.checked }))}
+                className="border-[#D9CBB8] data-[state=checked]:border-[#C75B3A] data-[state=checked]:bg-[#C75B3A] data-[state=checked]:text-white"
+                onCheckedChange={(checked) => setForm((s) => ({ ...s, instantBook: Boolean(checked) }))}
               />
               Instant book
             </label>
@@ -849,6 +850,7 @@ export function EditListingClient({
                   <input
                     type="radio"
                     name="access-code-type"
+                    className="accent-[#C75B3A]"
                     checked={form.accessCodeType === option.key}
                     onChange={() => void handleAccessCodeTypeChange(option.key)}
                   />
@@ -950,6 +952,7 @@ export function EditListingClient({
                   <input
                     type="radio"
                     name="access-send-timing"
+                    className="accent-[#C75B3A]"
                     checked={form.accessCodeSendTiming === key}
                     onChange={() => void handleSendTimingChange(key)}
                   />

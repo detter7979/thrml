@@ -40,7 +40,7 @@ export function ListingCard({
     : `/listings/${listing.id}`
 
   return (
-    <div className="transition-transform duration-200 ease-out hover:-translate-y-1 hover:scale-[1.01] active:scale-[0.98]">
+    <div className="transition-transform duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1">
       <Link href={listingHref} className="card-base group block p-3">
         <div className="relative mb-3 h-44 w-full overflow-hidden rounded-xl bg-warm-100">
           {listing.photoUrl ? (
@@ -50,7 +50,7 @@ export function ListingCard({
                 listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
               }`}
               fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              className="object-cover transition-transform duration-[380ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
               sizes="(max-width: 767px) 100vw, (max-width: 1280px) 50vw, 33vw"
               loading="lazy"
             />
@@ -77,7 +77,7 @@ export function ListingCard({
               {listing.serviceTypeName}
             </Badge>
           ) : null}
-          <p className="font-medium">{listing.title}</p>
+          <p className="truncate font-medium">{listing.title}</p>
           <p className="type-label">{listing.location}</p>
           <div className="flex items-center justify-between">
             <p className="type-price">

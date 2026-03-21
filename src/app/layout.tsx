@@ -8,12 +8,16 @@ import "./globals.css";
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
   subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: true,
 });
 
 const dmSerifDisplay = DM_Serif_Display({
   variable: "--font-dm-serif-display",
   weight: "400",
   subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {

@@ -27,10 +27,12 @@ export function ListingCard({
   listing,
   onSavedChange,
   fromPath,
+  imageHighPriority = false,
 }: {
   listing: ListingCardData
   onSavedChange?: (saved: boolean) => void
   fromPath?: string
+  imageHighPriority?: boolean
 }) {
   const reviewCount = Number(listing.reviewCount ?? 0)
   const hasRating =
@@ -42,7 +44,7 @@ export function ListingCard({
   return (
     <div className="transition-transform duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1">
       <Link href={listingHref} className="card-base group block p-3">
-        <div className="relative mb-3 h-44 w-full overflow-hidden rounded-xl bg-warm-100">
+        <div className="relative mb-3 h-44 w-full shrink-0 overflow-hidden rounded-xl bg-warm-100">
           {listing.photoUrl ? (
             <Image
               src={listing.photoUrl}
@@ -51,8 +53,10 @@ export function ListingCard({
               }`}
               fill
               className="object-cover transition-transform duration-[380ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
-              sizes="(max-width: 767px) 100vw, (max-width: 1280px) 50vw, 33vw"
-              loading="lazy"
+              sizes="(max-width: 640px) min(100vw, 420px), (max-width: 1280px) min(50vw, 520px), min(33vw, 380px)"
+              loading={imageHighPriority ? "eager" : "lazy"}
+              priority={imageHighPriority}
+              {...(imageHighPriority ? { fetchPriority: "high" as const } : {})}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-warm-600">No photo</div>

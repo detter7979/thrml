@@ -328,37 +328,51 @@ export function HomePageClient() {
 
   return (
     <div className="min-h-screen bg-warm-50">
-      <section className="relative bg-[#1A1410] pt-24 pb-8 md:min-h-[100svh] md:pt-0 md:pb-0">
-        <div className="absolute inset-0 hidden md:block">
+      <section className="relative min-h-[100svh] bg-[#1A1410] pt-24 pb-8 md:min-h-[100svh] md:pt-0 md:pb-0">
+        <div className="pointer-events-none absolute inset-0 hidden md:block">
           <Image
             src={heroImage.url}
             alt={heroImage.alt}
             fill
-            className="object-cover"
+            className="pointer-events-none object-cover"
             style={{ objectPosition: heroImage.objectPosition }}
             sizes="(max-width: 767px) 0px, (max-width: 1280px) 100vw, 100vw"
             priority
+            fetchPriority="high"
             loading="eager"
             placeholder="blur"
             blurDataURL={blurDataURL}
           />
           <div
-            className="absolute inset-0"
+            className="pointer-events-none absolute inset-0"
             style={{
               background:
                 "linear-gradient(to right, rgba(26,20,16,0.78) 0%, rgba(26,20,16,0.78) 45%, rgba(26,20,16,0.42) 50%, rgba(26,20,16,0.1) 58%, rgba(26,20,16,0) 66%)",
             }}
           />
         </div>
-        <div
-          className="absolute inset-0 md:hidden"
-          style={{
-            backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 100%), url('${heroImage.url}')`,
-            backgroundSize: "cover",
-            backgroundPosition: heroImage.objectPosition,
-          }}
-        />
-        <div className="relative z-20 hidden md:grid md:min-h-[100svh] md:grid-cols-[60%_40%]">
+        <div className="pointer-events-none absolute inset-0 md:hidden">
+          <Image
+            src={heroImage.url}
+            alt={heroImage.alt}
+            fill
+            className="pointer-events-none object-cover"
+            style={{ objectPosition: heroImage.objectPosition }}
+            sizes="100vw"
+            priority
+            fetchPriority="high"
+            loading="eager"
+            placeholder="blur"
+            blurDataURL={blurDataURL}
+          />
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 100%)",
+            }}
+          />
+        </div>
+        <div className="relative z-20 hidden pointer-events-auto md:grid md:min-h-[100svh] md:grid-cols-[60%_40%]">
           <div className="flex items-center px-6 py-14 md:px-16">
             <div className="w-full max-w-[640px]">
               <p className="hero-anim-in hero-delay-0 mb-5 text-xs font-semibold tracking-[0.24em] text-[#E8A58F]">
@@ -424,7 +438,7 @@ export function HomePageClient() {
           <div />
         </div>
 
-        <div className="px-5 pt-2 pb-10 md:hidden">
+        <div className="relative z-20 px-5 pt-2 pb-10 pointer-events-auto md:hidden">
           <p className="hero-anim-in hero-delay-0 mb-5 text-xs font-semibold tracking-[0.24em] text-[#E8A58F]">
             PRIVATE WELLNESS · ON DEMAND
           </p>
@@ -556,7 +570,7 @@ export function HomePageClient() {
               ))}
             </div>
           ) : (
-            <ListingGrid listings={filteredListings} />
+            <ListingGrid listings={filteredListings} fromPath="/" />
           )}
         </section>
 

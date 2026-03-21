@@ -1,27 +1,11 @@
 "use client"
 
-import "mapbox-gl/dist/mapbox-gl.css"
-
+import dynamic from "next/dynamic"
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import {
-  Layers,
-  List,
-  Map as MapIcon,
-  Users,
-  X,
-} from "lucide-react"
-import { motion } from "framer-motion"
-import MapboxMap, {
-  Layer,
-  Marker,
-  NavigationControl,
-  Popup,
-  Source,
-  type MapRef,
-  type ViewState,
-} from "react-map-gl/mapbox"
+import { Layers, List, Map as MapIcon, Users } from "lucide-react"
+import type { MapRef, ViewState } from "react-map-gl/mapbox"
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
@@ -35,6 +19,14 @@ import { formatServiceType, getServiceType, SERVICE_TYPES } from "@/lib/constant
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+
+const ExploreMapPanelDynamic = dynamic(
+  () => import("./explore-map-panel").then((m) => m.ExploreMapPanel),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full animate-pulse bg-[#E8E4DE]" aria-hidden />,
+  }
+)
 
 type ViewMode = "split" | "list" | "map"
 type SortKey =
@@ -110,17 +102,6 @@ const DEFAULT_FILTERS: Filters = {
 }
 const NEARBY_FALLBACK_MILES = 150
 const TAP_MOVE_THRESHOLD_PX = 10
-const SERVICE_COLORS: Record<string, string> = {
-  sauna: "#E85D3A",
-  cold_plunge: "#3A8BC7",
-  hot_tub: "#B27A4A",
-  infrared: "#C75B8A",
-  float_tank: "#5B7AC7",
-  pemf: "#C7A83A",
-  hyperbaric: "#3AC76B",
-  halotherapy: "#C7C73A",
-}
-
 function hasPublishedRating(reviewCount: number, rating: number) {
   return reviewCount >= 1 && Number.isFinite(rating)
 }
@@ -923,220 +904,68 @@ export function ExploreClient() {
     router.push(`/listings/${listingId}?from=${encodeURIComponent(currentExploreUrl)}`)
   }
 
-  const mapPanel = (
-    <div className="relative h-full w-full">
-      <MapboxMap
-        ref={mapRef}
-        mapboxAccessToken={token}
-        initialViewState={{ latitude: center.lat, longitude: center.lng, zoom: 12 }}
-        mapStyle="mapbox://styles/mapbox/light-v11"
-        onClick={() => {
-          setActiveId(null)
-          setActiveSource(null)
-        }}
-        onMoveEnd={(event) => {
-          onMapMoveEnd(event.viewState)
-        }}
-      >
-        <NavigationControl position="top-right" />
+  function handleMapRecenter() {
+    if (!navigator.geolocation) {
+      setGeoError("Location is unavailable in this browser.")
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const next = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }
+        setGeoError(null)
+        setLocationLabel("Near me")
+        setCenter(next)
+        setSearchCenter(next)
+        setOriginCenter(next)
+        mapRef.current?.flyTo({ center: [next.lng, next.lat], zoom: 12 })
+      },
+      () => {
+        setGeoError("Couldn’t access your location. Check browser permissions.")
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
 
-        <div className="absolute top-3 left-3 z-20">
-          <button
-            type="button"
-            onClick={() => {
-              if (!navigator.geolocation) {
-                setGeoError("Location is unavailable in this browser.")
-                return
-              }
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  const next = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude,
-                  }
-                  setGeoError(null)
-                  setLocationLabel("Near me")
-                  setCenter(next)
-                  setSearchCenter(next)
-                  setOriginCenter(next)
-                  mapRef.current?.flyTo({ center: [next.lng, next.lat], zoom: 12 })
-                },
-                () => {
-                  setGeoError("Couldn’t access your location. Check browser permissions.")
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-              )
-            }}
-            className="rounded-full bg-white px-3 py-2 text-sm shadow"
-          >
-            📍 Recenter
-          </button>
-          {geoError ? <p className="mt-2 rounded bg-white px-2 py-1 text-xs text-rose-600 shadow">{geoError}</p> : null}
-        </div>
-
-        {shouldShowSearchArea ? (
-          <div className="absolute right-3 bottom-4 z-20">
-            <button
-              type="button"
-              onClick={() => {
-                setOriginCenter(center)
-                setSearchCenter(center)
-              }}
-              className="rounded-full bg-[#C75B3A] px-4 py-2 text-sm text-white shadow"
-            >
-              Search this area
-            </button>
-          </div>
-        ) : null}
-
-        {loading ? (
-          <div className="pointer-events-none absolute inset-0 z-10">
-            {new Array(8).fill(null).map((_, i) => (
-              <span
-                key={i}
-                className="absolute size-4 animate-pulse rounded-full bg-zinc-300/70"
-                style={{ left: `${12 + ((i * 11) % 70)}%`, top: `${18 + ((i * 9) % 60)}%` }}
-              />
-            ))}
-          </div>
-        ) : null}
-
-        {useClusters ? (
-          <Source
-            id="explore-points"
-            type="geojson"
-            data={mapGeoJson() as never}
-            cluster
-            clusterRadius={45}
-          >
-            <Layer
-              id="clusters"
-              type="circle"
-              filter={["has", "point_count"]}
-              paint={{ "circle-color": "#C75B3A", "circle-radius": 20 }}
-            />
-            <Layer
-              id="cluster-count"
-              type="symbol"
-              filter={["has", "point_count"]}
-              layout={{ "text-field": "{point_count_abbreviated}", "text-size": 12 }}
-              paint={{ "text-color": "#ffffff" }}
-            />
-            <Layer
-              id="unclustered"
-              type="circle"
-              filter={["!", ["has", "point_count"]]}
-              paint={{ "circle-color": "#1A1410", "circle-radius": 6 }}
-            />
-          </Source>
-        ) : (
-          modeListings.slice(0, 50).map((item) => {
-            const isHovered = activeId === item.id && activeSource === "hover"
-            const isActive = activeId === item.id && activeSource === "pin"
-            return (
-              <Marker
-                key={item.id}
-                longitude={item.lng}
-                latitude={item.lat}
-                anchor="bottom"
-                style={{ zIndex: isActive ? 50 : isHovered ? 20 : 1 }}
-              >
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setActiveId(item.id)
-                    setActiveSource("pin")
-                  }}
-                  className={`rounded-full px-2.5 py-1.5 text-[13px] transition-all ${
-                    isActive
-                      ? "z-20 scale-[1.15] bg-[#C75B3A] text-white"
-                      : isHovered
-                        ? "z-20 scale-110 bg-[#B44D31] text-white"
-                        : "bg-white text-[#2C2420]"
-                  }`}
-                  style={{
-                    border: isActive || isHovered ? "none" : "1px solid #E5DDD6",
-                    boxShadow: isActive ? "0 2px 8px rgba(139,69,19,0.35)" : "none",
-                  }}
-                >
-                  <span
-                    className="mr-1 inline-block size-2 rounded-full"
-                    style={{ backgroundColor: SERVICE_COLORS[item.serviceType] ?? "#E85D3A" }}
-                  />
-                  ${Math.round(item.priceSolo)}
-                </button>
-              </Marker>
-            )
-          })
-        )}
-
-        {popupListing ? (
-          <Popup
-            longitude={popupListing.lng}
-            latitude={popupListing.lat}
-            anchor="top"
-            closeButton={false}
-            offset={28}
-            onClose={() => {
-              setActiveId(null)
-              setActiveSource(null)
-            }}
-          >
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => openListingFromCard(popupListing.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault()
-                  openListingFromCard(popupListing.id)
-                }
-              }}
-              className="relative w-[220px] overflow-hidden rounded-xl bg-white text-left shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
-            >
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  event.preventDefault()
-                  setActiveId(null)
-                  setActiveSource(null)
-                }}
-                className="absolute top-2 right-2 z-10 rounded-full bg-white/90 p-1"
-              >
-                <X className="size-3" />
-              </button>
-              <div className="relative h-[120px] w-full">
-                {popupListing.photoUrl ? (
-                  <Image src={popupListing.photoUrl} alt={popupListing.title} fill className="object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center bg-[#F3E7DC] text-2xl">
-                    {popupListing.serviceIcon}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-1 p-3 text-xs">
-                <p className="line-clamp-1 font-serif text-[13px]">{popupListing.title}</p>
-                <p className="text-muted-foreground">
-                  {hasPublishedRating(popupListing.reviewCount, popupListing.rating)
-                    ? `★ ${popupListing.rating.toFixed(1)} (${popupListing.reviewCount})`
-                    : "New"}{" "}
-                  · {popupListing.serviceLabel} · {popupListing.distanceMiles.toFixed(1)} mi
-                </p>
-                <p className="font-medium text-[#C75B3A]">
-                  ${Math.round(popupListing.priceSolo)}{" "}
-                  {popupListing.sessionType === "fixed_session" ? "/session" : "/pp/hr"}
-                </p>
-              </div>
-            </div>
-          </Popup>
-        ) : null}
-      </MapboxMap>
-    </div>
+  const exploreMapPanel = (
+    <ExploreMapPanelDynamic
+      mapRef={mapRef}
+      token={token}
+      center={center}
+      clusterGeoJson={mapGeoJson()}
+      useClusters={useClusters}
+      markerListings={useClusters ? [] : modeListings.slice(0, 50)}
+      activeId={activeId}
+      activeSource={activeSource}
+      onMapBackgroundClick={() => {
+        setActiveId(null)
+        setActiveSource(null)
+      }}
+      onMoveEnd={onMapMoveEnd}
+      loading={loading}
+      shouldShowSearchArea={shouldShowSearchArea}
+      onSearchThisArea={() => {
+        setOriginCenter(center)
+        setSearchCenter(center)
+      }}
+      geoError={geoError}
+      onRecenter={handleMapRecenter}
+      onMarkerSelect={(id) => {
+        setActiveId(id)
+        setActiveSource("pin")
+      }}
+      popupListing={popupListing}
+      onClosePopup={() => {
+        setActiveId(null)
+        setActiveSource(null)
+      }}
+      onOpenListingFromPopup={openListingFromCard}
+    />
   )
 
-  const listCard = (listing: ListingResult, large = false) => {
+  const listCard = (listing: ListingResult, large = false, imageHighPriority = false) => {
     const active = listing.id === activeId
     return (
       <div
@@ -1172,9 +1001,20 @@ export function ExploreClient() {
           large ? "grid grid-cols-[140px_1fr_96px] gap-4" : "grid grid-cols-[96px_1fr_86px] gap-3"
         )}
       >
-        <div className={`relative overflow-hidden rounded-xl ${large ? "h-[140px]" : "h-24"}`}>
+        <div
+          className={`relative shrink-0 overflow-hidden rounded-xl ${large ? "h-[140px] w-[140px]" : "h-24 w-24"}`}
+        >
           {listing.photoUrl ? (
-            <Image src={listing.photoUrl} alt={listing.title} fill className="object-cover" />
+            <Image
+              src={listing.photoUrl}
+              alt={listing.title}
+              fill
+              className="object-cover"
+              sizes={large ? "(max-width: 767px) 42vw, 140px" : "96px"}
+              loading={imageHighPriority ? "eager" : "lazy"}
+              priority={imageHighPriority}
+              {...(imageHighPriority ? { fetchPriority: "high" as const } : {})}
+            />
           ) : (
             <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#F1E5D8] to-[#ECD8C7] text-2xl">
               {listing.serviceIcon}
@@ -1268,14 +1108,11 @@ export function ExploreClient() {
                   {serviceTypeOptions.map((serviceType) => {
                     const active = serviceDraft.includes(serviceType.id)
                     return (
-                      <motion.button
+                      <button
                         key={serviceType.id}
                         type="button"
-                        whileHover={{ scale: 1.04 }}
-                        whileTap={{ scale: 0.97 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
                         onClick={() => toggleServiceTypeDraft(serviceType.id)}
-                        className={`flex w-full items-center justify-between rounded-lg border px-2 py-2 text-left text-xs ${
+                        className={`flex w-full items-center justify-between rounded-lg border px-2 py-2 text-left text-xs transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98] ${
                           active ? "border-[#C75B3A] bg-[#FFF5F0] text-[#C75B3A]" : "border-transparent hover:bg-[#FAF6F1]"
                         }`}
                       >
@@ -1283,7 +1120,7 @@ export function ExploreClient() {
                           {serviceType.icon} {serviceType.display_name}
                         </span>
                         <span>{active ? "✓" : ""}</span>
-                      </motion.button>
+                      </button>
                     )
                   })}
                 </div>
@@ -1574,7 +1411,7 @@ export function ExploreClient() {
                         <div key={i} className="h-[112px] animate-pulse rounded-2xl bg-white/70" />
                       ))
                     : modeListings.length
-                      ? modeListings.map((listing) => listCard(listing))
+                      ? modeListings.map((listing, index) => listCard(listing, false, index === 0))
                       : (
                         <div className="rounded-2xl bg-white p-8 text-center">
                           <p className="font-serif text-2xl">No spaces found in this area</p>
@@ -1589,7 +1426,7 @@ export function ExploreClient() {
                       )}
                 </div>
               </div>
-              <div className="relative">{mapPanel}</div>
+              <div className="relative">{exploreMapPanel}</div>
             </div>
           ) : null}
 
@@ -1621,7 +1458,7 @@ export function ExploreClient() {
                   ? new Array(9).fill(null).map((_, i) => (
                       <div key={i} className="h-[170px] animate-pulse rounded-2xl bg-white/70" />
                     ))
-                  : listings.map((listing) => listCard(listing, true))}
+                  : listings.map((listing, index) => listCard(listing, true, index === 0))}
               </div>
               {!isMobile ? (
                 <button
@@ -1637,7 +1474,7 @@ export function ExploreClient() {
 
           {viewMode === "map" ? (
             <div className="relative h-[calc(100%-58px)]">
-              {mapPanel}
+              {exploreMapPanel}
               {isMobile ? (
                 <>
                   <div
@@ -1676,9 +1513,16 @@ export function ExploreClient() {
                         className="w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl bg-white p-3 text-left shadow-[0_4px_20px_rgba(0,0,0,0.12)]"
                       >
                         <div className="flex gap-3">
-                          <div className="relative h-20 w-24 overflow-hidden rounded-xl">
+                          <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl">
                             {listing.photoUrl ? (
-                              <Image src={listing.photoUrl} alt={listing.title} fill className="object-cover" />
+                              <Image
+                                src={listing.photoUrl}
+                                alt={listing.title}
+                                fill
+                                className="object-cover"
+                                sizes="96px"
+                                loading="lazy"
+                              />
                             ) : (
                               <div className="flex h-full items-center justify-center bg-[#F3E8DE] text-2xl">
                                 {listing.serviceIcon}
@@ -1748,9 +1592,16 @@ export function ExploreClient() {
                             }}
                             className="w-40 shrink-0 overflow-hidden rounded-xl border bg-white text-left"
                           >
-                            <div className="relative h-20">
+                            <div className="relative h-20 w-full shrink-0 overflow-hidden">
                               {listing.photoUrl ? (
-                                <Image src={listing.photoUrl} alt={listing.title} fill className="object-cover" />
+                                <Image
+                                  src={listing.photoUrl}
+                                  alt={listing.title}
+                                  fill
+                                  className="object-cover"
+                                  sizes="160px"
+                                  loading="lazy"
+                                />
                               ) : (
                                 <div className="flex h-full items-center justify-center bg-[#F3E8DE] text-2xl">
                                   {listing.serviceIcon}

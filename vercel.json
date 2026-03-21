@@ -11,6 +11,18 @@
     {
       "path": "/api/cron/expire-booked-slots",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/sync-ga4",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-meta",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-bookings",
+      "schedule": "0 2 * * *"
     }
   ]
 }

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Home,
   Inbox,
+  LineChart,
   Settings,
   UserRound,
   Users,
@@ -14,6 +15,7 @@ import {
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Overview", icon: BarChart3 },
+  { href: "/admin/analytics", label: "Analytics", icon: LineChart },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin/listings", label: "Listings", icon: Home },
   { href: "/admin/users", label: "Users", icon: Users },

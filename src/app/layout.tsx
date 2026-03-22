@@ -78,6 +78,10 @@ export default function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+      </head>
       <body
         className={`${dmSans.variable} ${dmSerifDisplay.variable} antialiased`}
       >
@@ -95,11 +99,12 @@ export default function RootLayout({
             `,
           }}
         />
+        {/* Defer gtag until after load — cuts main-thread work during FCP/LCP (PageSpeed / TBT). */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsId}`}
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
-        <Script id="google-tag-init" strategy="afterInteractive">
+        <Script id="google-tag-init" strategy="lazyOnload">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}

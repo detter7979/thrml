@@ -36,6 +36,18 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "framer-motion",
+      "date-fns",
+      "recharts",
+      "radix-ui",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-checkbox",
+      "@radix-ui/react-switch",
+    ],
+  },
   images: {
     remotePatterns: [
       {

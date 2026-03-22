@@ -1,11 +1,15 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 import Image from "next/image"
 import { CheckCircle2, ChevronDown, Loader2, MapPin } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-import { ListingGrid } from "@/components/listings/ListingGrid"
+const ListingGrid = dynamic(
+  () => import("@/components/listings/ListingGrid").then((m) => m.ListingGrid),
+  { ssr: true }
+)
 import { trackMetaEvent } from "@/components/meta-pixel"
 import { Button } from "@/components/ui/button"
 import {

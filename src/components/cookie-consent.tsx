@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 
+import { COOKIE_CONSENT_ACCEPTED_EVENT } from "@/components/analytics/google-tag-loader"
+
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void
@@ -42,6 +44,7 @@ export function CookieConsent() {
         newValue: "accepted",
       })
     )
+    window.dispatchEvent(new Event(COOKIE_CONSENT_ACCEPTED_EVENT))
     enableAnalytics()
     setVisible(false)
   }

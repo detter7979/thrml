@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import Script from "next/script";
+import { GoogleTagLoader } from "@/components/analytics/google-tag-loader";
 import { CookieConsent } from "@/components/cookie-consent";
 import { MetaPixel } from "@/components/meta-pixel";
 import "./globals.css";
@@ -72,16 +73,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Hardcoded fallback ensures tag always renders even if env var is
-  // undefined at build time. The ID is public and safe to hardcode.
-  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18014799415";
-
   return (
     <html lang="en">
-      <head>
-        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
-      </head>
       <body
         className={`${dmSans.variable} ${dmSerifDisplay.variable} antialiased`}
       >
@@ -99,20 +92,7 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* Defer gtag until after load — cuts main-thread work during FCP/LCP (PageSpeed / TBT). */}
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsId}`}
-          strategy="lazyOnload"
-        />
-        <Script id="google-tag-init" strategy="lazyOnload">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${googleAdsId}');
-            gtag('config', '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-L20J7S2M51"}');
-          `}
-        </Script>
+        <GoogleTagLoader />
         <MetaPixel />
         <CookieConsent />
       </body>

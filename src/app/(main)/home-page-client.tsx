@@ -341,6 +341,7 @@ export function HomePageClient() {
             className="pointer-events-none object-cover"
             style={{ objectPosition: heroImage.objectPosition }}
             sizes="(max-width: 767px) 0px, (max-width: 1280px) 100vw, 100vw"
+            quality={68}
             priority
             fetchPriority="high"
             loading="eager"
@@ -363,6 +364,7 @@ export function HomePageClient() {
             className="pointer-events-none object-cover"
             style={{ objectPosition: heroImage.objectPosition }}
             sizes="100vw"
+            quality={68}
             priority
             fetchPriority="high"
             loading="eager"

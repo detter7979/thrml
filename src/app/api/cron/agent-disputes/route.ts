@@ -21,13 +21,18 @@ export async function GET(req: NextRequest) {
   const supabase = createAdminClient()
   const results = { evaluated: 0, auto_resolved: 0, flagged_human: 0, errors: 0 }
 
+  // Load active policy — if is_active is false the agent is disabled
   const { data: policyRow } = await supabase
     .from("agent_policies")
-    .select("content")
+    .select("content, is_active")
     .eq("policy_key", "dispute_resolution_v1")
-    .eq("is_active", true)
     .maybeSingle()
-  const policyText = policyRow?.content ?? "No policy found — flag all for human review."
+
+  if (!policyRow?.is_active) {
+    return NextResponse.json({ ok: true, message: "Dispute agent is disabled — skipping run" })
+  }
+
+  const policyText = policyRow.content ?? "No policy found — flag all for human review."
 
   const { data: tickets } = await supabase
     .from("support_requests")

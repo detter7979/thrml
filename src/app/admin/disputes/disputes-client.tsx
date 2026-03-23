@@ -117,6 +117,28 @@ export function DisputesDashboardClient({ initialTickets, stats, policy: initial
   const [policyEditing, setPolicyEditing] = useState(false)
   const [policySaving, setPolicySaving] = useState(false)
   const [policyError, setPolicyError] = useState<string | null>(null)
+  const [agentEnabled, setAgentEnabled] = useState<boolean>(initialPolicy?.is_active !== false)
+  const [agentToggling, setAgentToggling] = useState(false)
+
+  async function toggleAgent() {
+    setAgentToggling(true)
+    try {
+      const next = !agentEnabled
+      const res = await fetch("/api/admin/disputes/policy", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: next }),
+      })
+      if (res.ok) {
+        setAgentEnabled(next)
+      } else {
+        const d = (await res.json().catch(() => ({}))) as { error?: string }
+        alert(d.error ?? "Toggle failed")
+      }
+    } finally {
+      setAgentToggling(false)
+    }
+  }
 
   const [tableRows, setTableRows] = useState<TicketWithDecision[]>([])
   const [tableTotal, setTableTotal] = useState(0)
@@ -248,10 +270,29 @@ export function DisputesDashboardClient({ initialTickets, stats, policy: initial
   return (
     <div className="px-4 py-8 text-[#2A2118] md:px-8">
       <header className="mb-8 border-b border-[#DCCDBA] pb-6">
-        <h1 className="font-serif text-2xl lowercase tracking-tight md:text-3xl">disputes</h1>
-        <p className="mt-1 max-w-2xl text-sm text-[#6E5B49]">
-          Agent classifications, human queue, and dispute policy. Changes to policy apply on the next agent run.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-2xl lowercase tracking-tight md:text-3xl">disputes</h1>
+            <p className="mt-1 max-w-2xl text-sm text-[#6E5B49]">
+              Agent classifications, human queue, and dispute policy. Changes to policy apply on the next agent run.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={agentToggling}
+            onClick={() => void toggleAgent()}
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${
+              agentEnabled
+                ? "bg-emerald-100 text-emerald-900 ring-1 ring-emerald-300 hover:bg-emerald-200"
+                : "bg-rose-100 text-rose-900 ring-1 ring-rose-300 hover:bg-rose-200"
+            }`}
+          >
+            <span
+              className={`inline-block size-2.5 rounded-full ${agentEnabled ? "bg-emerald-500" : "bg-rose-500"}`}
+            />
+            {agentToggling ? "Saving…" : agentEnabled ? "Agent ON" : "Agent OFF"}
+          </button>
+        </div>
       </header>
 
       <section className="mb-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -265,6 +306,13 @@ export function DisputesDashboardClient({ initialTickets, stats, policy: initial
         />
         <StatCard label="Avg resolution time (7 days)" value={avgLabel} />
       </section>
+
+      {!agentEnabled && (
+        <div className="mb-8 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-900">
+          <strong>Dispute agent is OFF.</strong> New support tickets will not be automatically classified or resolved.
+          All tickets will remain in <em>open</em> status until you turn the agent back on or resolve them manually.
+        </div>
+      )}
 
       <section className="mb-12">
         <h2 className="mb-4 font-medium text-lg">Pending human review</h2>

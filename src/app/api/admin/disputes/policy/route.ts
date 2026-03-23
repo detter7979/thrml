@@ -8,11 +8,11 @@ export async function GET() {
   const { error, admin } = await requireAdminApi()
   if (error || !admin) return error
 
+  // Fetch regardless of is_active so the dashboard can show the toggle state
   const { data, error: qErr } = await admin
     .from("agent_policies")
     .select("id, policy_key, content, version, is_active, updated_at, created_at")
     .eq("policy_key", POLICY_KEY)
-    .eq("is_active", true)
     .maybeSingle()
 
   if (qErr) {
@@ -28,23 +28,26 @@ export async function PATCH(req: NextRequest) {
   const { error, admin } = await requireAdminApi()
   if (error || !admin) return error
 
-  let body: { content?: unknown }
+  let body: { content?: unknown; is_active?: unknown }
   try {
-    body = (await req.json()) as { content?: unknown }
+    body = (await req.json()) as { content?: unknown; is_active?: unknown }
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
+  const isActiveToggle = typeof body.is_active === "boolean" ? body.is_active : undefined
   const content = typeof body.content === "string" ? body.content : null
-  if (content === null || content.length < 1) {
-    return NextResponse.json({ error: "content is required" }, { status: 400 })
+
+  // Allow toggling is_active without requiring content
+  if (isActiveToggle === undefined && (content === null || content.length < 1)) {
+    return NextResponse.json({ error: "content or is_active is required" }, { status: 400 })
   }
 
+  // Fetch the row regardless of current is_active state
   const { data: row, error: fetchErr } = await admin
     .from("agent_policies")
     .select("id, version")
     .eq("policy_key", POLICY_KEY)
-    .eq("is_active", true)
     .maybeSingle()
 
   if (fetchErr) {
@@ -57,9 +60,12 @@ export async function PATCH(req: NextRequest) {
   const nextVersion = typeof row.version === "number" ? row.version + 1 : 1
 
   const patchPayload: Record<string, unknown> = {
-    content,
     updated_at: new Date().toISOString(),
-    version: nextVersion,
+  }
+  if (isActiveToggle !== undefined) patchPayload.is_active = isActiveToggle
+  if (content !== null) {
+    patchPayload.content = content
+    patchPayload.version = nextVersion
   }
 
   let upd = await admin.from("agent_policies").update(patchPayload).eq("id", row.id).select("*").maybeSingle()

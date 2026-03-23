@@ -33,7 +33,6 @@ export default async function AdminDisputesPage() {
     .from("agent_policies")
     .select("*")
     .eq("policy_key", "dispute_resolution_v1")
-    .eq("is_active", true)
     .maybeSingle()
 
   const [todayOpenRes, pendingHumanRes, autoResolvedRes, activeTicketsRes, avgSampleRes] =

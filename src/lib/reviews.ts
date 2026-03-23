@@ -44,6 +44,18 @@ export function normalizePhotoUrls(value: unknown, max = 3): string[] {
   return urls.slice(0, max)
 }
 
+/** Keeps only http(s) URLs so we do not rely on Zod's strict URL regex (which can reject valid browser/Supabase URLs). */
+export function sanitizeReviewPhotoUrls(value: unknown, max = 3): string[] {
+  return normalizePhotoUrls(value, max).filter((url) => {
+    try {
+      const parsed = new URL(url)
+      return parsed.protocol === "https:" || parsed.protocol === "http:"
+    } catch {
+      return false
+    }
+  })
+}
+
 export function extractServiceIcon(serviceType: string | null) {
   const key = (serviceType ?? "sauna").toLowerCase()
   return getServiceType(key)?.emoji ?? "🔥"

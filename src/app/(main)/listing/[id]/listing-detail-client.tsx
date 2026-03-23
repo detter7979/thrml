@@ -59,7 +59,9 @@ import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { calculateBookingTotal, getPricePerPerson, type PricingTiers } from "@/lib/pricing"
+import { usePlatformFeePercents } from "@/contexts/platform-fees-context"
+import { calculateFees } from "@/lib/fees"
+import { calculateBookingSubtotal, getPricePerPerson, type PricingTiers } from "@/lib/pricing"
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
 import { SPEC_CONFIG } from "@/lib/constants/specs"
@@ -155,7 +157,8 @@ function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value)
 }
 
@@ -480,6 +483,7 @@ function BookingWidget({
   hostPayoutsReady: boolean
   cancellationPolicy: string | null
 }) {
+  const feePercents = usePlatformFeePercents()
   const router = useRouter()
   const supabase = createClient()
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
@@ -515,10 +519,13 @@ function BookingWidget({
   const blackoutDateSet = useMemo(() => new Set(blackoutDates), [blackoutDates])
   const policy = getCancellationPolicy(cancellationPolicy)
 
-  const totals = useMemo(
-    () => calculateBookingTotal(pricing, guestCount, chargeDurationHours),
-    [pricing, guestCount, chargeDurationHours]
-  )
+  const totals = useMemo(() => {
+    const sub = calculateBookingSubtotal(pricing, guestCount, chargeDurationHours)
+    return {
+      ...sub,
+      ...calculateFees(sub.subtotal, feePercents.guestFeePercent, feePercents.hostFeePercent),
+    }
+  }, [pricing, guestCount, chargeDurationHours, feePercents.guestFeePercent, feePercents.hostFeePercent])
 
   const tiers = useMemo(
     () => [
@@ -753,13 +760,13 @@ function BookingWidget({
       listing_title: listingTitle,
       service_type: serviceTypeId,
       city,
-      value: totals.total,
+      value: totals.guestTotal,
       currency: "USD",
     })
     trackMetaEvent("InitiateCheckout", {
       content_ids: [listingId],
       content_type: "product",
-      value: totals.total,
+      value: totals.guestTotal,
       currency: "USD",
       num_items: 1,
     }, {
@@ -964,16 +971,18 @@ function BookingWidget({
 
         <div className="space-y-2 rounded-lg border p-3 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Subtotal</span>
+            <span className="text-muted-foreground">Space subtotal</span>
             <span>{formatMoney(totals.subtotal)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Service fee (12%)</span>
-            <span>{formatMoney(totals.serviceFee)}</span>
+            <span className="text-muted-foreground">
+              Service fee ({feePercents.guestFeePercent}%)
+            </span>
+            <span>{formatMoney(totals.guestFee)}</span>
           </div>
           <div className="flex justify-between border-t pt-2 font-semibold">
             <span>Total</span>
-            <span>{formatMoney(totals.total)}</span>
+            <span>{formatMoney(totals.guestTotal)}</span>
           </div>
         </div>
 

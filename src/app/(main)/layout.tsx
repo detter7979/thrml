@@ -2,15 +2,22 @@ import type { ReactNode } from "react"
 import Link from "next/link"
 import { Facebook, Instagram } from "lucide-react"
 
+import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
+import { getPlatformFeePercentsCached } from "@/lib/fees"
 import { Navbar } from "@/components/shared/Navbar"
+import { createAdminClient } from "@/lib/supabase/admin"
 
-export default function MainLayout({ children }: { children: ReactNode }) {
+export default async function MainLayout({ children }: { children: ReactNode }) {
   const currentYear = new Date().getFullYear()
+  const admin = createAdminClient()
+  const feePercents = await getPlatformFeePercentsCached(admin)
 
   return (
     <div className="min-h-screen bg-warm-50">
       <Navbar />
-      <main>{children}</main>
+      <PlatformFeesProvider initialPercents={feePercents}>
+        <main>{children}</main>
+      </PlatformFeesProvider>
       <footer className="border-t border-white/10 bg-[#1A1410] text-white/75">
         <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
           <div className="grid gap-10 md:grid-cols-4">
@@ -123,3 +130,4 @@ export default function MainLayout({ children }: { children: ReactNode }) {
     </div>
   )
 }
+

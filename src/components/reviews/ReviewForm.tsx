@@ -132,7 +132,7 @@ export function ReviewForm({ bookingId, listingId, userId, initialRating = 0 }: 
   )
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-7">
+    <form noValidate onSubmit={handleSubmit} className="space-y-7">
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-[#1A1410]">Overall experience</h2>
         <StarRating

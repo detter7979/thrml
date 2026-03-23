@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { z } from "zod"
 
-import { calculateBookingTotal } from "@/lib/pricing"
+import { calculateFees, fetchPlatformFeePercents } from "@/lib/fees"
+import { calculateBookingSubtotal } from "@/lib/pricing"
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
 import { roundUpTo30 } from "@/lib/slots"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -425,7 +426,13 @@ export async function POST(req: NextRequest) {
     }
 
     const chargeDurationHours = sessionType === "fixed_session" ? 1 : durationHours
-    const pricing = calculateBookingTotal(listing, guestCount, chargeDurationHours)
+    const subtotalRow = calculateBookingSubtotal(listing, guestCount, chargeDurationHours)
+    const feePercents = await fetchPlatformFeePercents(admin)
+    const fees = calculateFees(
+      subtotalRow.subtotal,
+      feePercents.guestFeePercent,
+      feePercents.hostFeePercent
+    )
     const isInstantBook = Boolean((listing as Record<string, unknown>).is_instant_book ?? (listing as Record<string, unknown>).instant_book)
     const confirmationDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
@@ -532,11 +539,14 @@ export async function POST(req: NextRequest) {
         end_time: endTime,
         duration_hours: durationHours,
         guest_count: guestCount,
-        price_per_person: pricing.pricePerPerson,
-        subtotal: pricing.subtotal,
-        service_fee: pricing.serviceFee,
-        host_payout: pricing.hostPayout,
-        total_charged: pricing.total,
+        price_per_person: subtotalRow.pricePerPerson,
+        subtotal: fees.subtotal,
+        guest_fee: fees.guestFee,
+        host_fee: fees.hostFee,
+        guest_total: fees.guestTotal,
+        service_fee: fees.guestFee,
+        host_payout: fees.hostPayout,
+        total_charged: fees.guestTotal,
         status: isInstantBook ? "pending" : "pending_host",
         confirmation_deadline: isInstantBook ? null : confirmationDeadline,
         waiver_version: waiver_version.trim(),
@@ -613,7 +623,7 @@ export async function POST(req: NextRequest) {
       .eq("id", slotReservation.slotId)
 
     const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
-      amount: Math.round(pricing.total * 100),
+      amount: Math.round(fees.guestTotal * 100),
       currency: "usd",
       capture_method: isInstantBook ? "automatic" : "manual",
       metadata: {
@@ -627,7 +637,7 @@ export async function POST(req: NextRequest) {
     if (!isMockHost && host?.stripe_account_id) {
       paymentIntentParams.transfer_data = {
         destination: host.stripe_account_id,
-        amount: Math.round(pricing.hostPayout * 100),
+        amount: Math.round(fees.hostPayout * 100),
       }
     }
 

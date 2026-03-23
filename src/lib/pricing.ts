@@ -5,12 +5,9 @@ export interface PricingTiers {
   price_4plus?: number
 }
 
-export interface BookingTotals {
+export interface BookingSubtotal {
   pricePerPerson: number
   subtotal: number
-  serviceFee: number
-  hostPayout: number
-  total: number
 }
 
 export interface DurationOption {
@@ -49,19 +46,16 @@ export function getPricePerPerson(tiers: PricingTiers, guestCount: number): numb
   return tiers.price_4plus ?? tiers.price_3 ?? tiers.price_2 ?? tiers.price_solo
 }
 
-export function calculateBookingTotal(
+export function calculateBookingSubtotal(
   tiers: PricingTiers,
   guestCount: number,
   durationHours: number
-): BookingTotals {
+): BookingSubtotal {
   const safeGuests = Math.max(1, guestCount)
   const safeDuration = Math.max(0, durationHours)
 
   const pricePerPerson = getPricePerPerson(tiers, safeGuests)
   const subtotal = pricePerPerson * safeGuests * safeDuration
-  const serviceFee = subtotal * 0.12
-  const hostPayout = subtotal * 0.92
-  const total = subtotal + serviceFee
 
-  return { pricePerPerson, subtotal, serviceFee, hostPayout, total }
+  return { pricePerPerson, subtotal }
 }

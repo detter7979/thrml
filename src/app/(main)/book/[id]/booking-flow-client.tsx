@@ -15,7 +15,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
 import { buildFullName, splitFullName } from "@/lib/name-utils"
-import { calculateBookingTotal, getPricePerPerson, type PricingTiers } from "@/lib/pricing"
+import { usePlatformFeePercents } from "@/contexts/platform-fees-context"
+import { calculateFees } from "@/lib/fees"
+import { calculateBookingSubtotal, getPricePerPerson, type PricingTiers } from "@/lib/pricing"
 
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null
@@ -66,7 +68,8 @@ function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value)
 }
 
@@ -281,6 +284,7 @@ export function BookingFlowClient({
   instantBook,
   cancellationPolicy,
 }: BookingFlowClientProps) {
+  const feePercents = usePlatformFeePercents()
   const [step, setStep] = useState(1)
   const [guestDetails, setGuestDetails] = useState(() => {
     const splitName = splitFullName(profileDefaults.fullName)
@@ -338,15 +342,24 @@ export function BookingFlowClient({
     ]
   )
 
-  const totals = useMemo(
-    () =>
-      calculateBookingTotal(
-        pricing,
-        payload.guestCount,
-        durationConstraints.sessionType === "fixed_session" ? 1 : payload.durationHours
-      ),
-    [durationConstraints.sessionType, payload.durationHours, payload.guestCount, pricing]
-  )
+  const totals = useMemo(() => {
+    const sub = calculateBookingSubtotal(
+      pricing,
+      payload.guestCount,
+      durationConstraints.sessionType === "fixed_session" ? 1 : payload.durationHours
+    )
+    return {
+      ...sub,
+      ...calculateFees(sub.subtotal, feePercents.guestFeePercent, feePercents.hostFeePercent),
+    }
+  }, [
+    durationConstraints.sessionType,
+    feePercents.guestFeePercent,
+    feePercents.hostFeePercent,
+    payload.durationHours,
+    payload.guestCount,
+    pricing,
+  ])
 
   const createCheckoutIntent = useCallback(async (waiverVersionOverride?: string) => {
     if (checkoutInitInFlightRef.current) {
@@ -564,16 +577,18 @@ export function BookingFlowClient({
                     <span>{formatMoney(getPricePerPerson(pricing, payload.guestCount))}</span>
                   </div>
                   <div className="mt-2 flex justify-between">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-muted-foreground">Space subtotal</span>
                     <span>{formatMoney(totals.subtotal)}</span>
                   </div>
                   <div className="mt-1 flex justify-between">
-                    <span className="text-muted-foreground">Service fee (12%)</span>
-                    <span>{formatMoney(totals.serviceFee)}</span>
+                    <span className="text-muted-foreground">
+                      Service fee ({feePercents.guestFeePercent}%)
+                    </span>
+                    <span>{formatMoney(totals.guestFee)}</span>
                   </div>
                   <div className="mt-2 flex justify-between border-t pt-2 font-semibold">
                     <span>Total</span>
-                    <span>{formatMoney(totals.total)}</span>
+                    <span>{formatMoney(totals.guestTotal)}</span>
                   </div>
                 </div>
 

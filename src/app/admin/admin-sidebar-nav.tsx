@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import type { LucideIcon } from "lucide-react"
 import {
   BarChart3,
   CalendarDays,
@@ -13,7 +14,11 @@ import {
   Users,
 } from "lucide-react"
 
-const NAV_ITEMS = [
+type NavItem =
+  | { href: string; label: string; icon: LucideIcon }
+  | { href: string; label: string; emoji: string }
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Overview", icon: BarChart3 },
   { href: "/admin/analytics", label: "Analytics", icon: LineChart },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
@@ -21,6 +26,8 @@ const NAV_ITEMS = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/earnings", label: "Earnings", icon: BarChart3 },
   { href: "/admin/messages", label: "Messages", icon: Inbox },
+  { href: "/admin/disputes", label: "Disputes", emoji: "⚖️" },
+  { href: "/admin/agent", label: "Agent", emoji: "🤖" },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
@@ -33,7 +40,15 @@ export function AdminSidebarNav() {
         const active =
           pathname === item.href ||
           (item.href !== "/admin" && pathname.startsWith(item.href))
-        const Icon = item.icon
+        const icon =
+          "emoji" in item ? (
+            <span className="flex size-4 items-center justify-center text-sm" aria-hidden>
+              {item.emoji}
+            </span>
+          ) : (() => {
+              const Icon = item.icon
+              return <Icon className="size-4" />
+            })()
         return (
           <Link
             key={item.href}
@@ -44,7 +59,7 @@ export function AdminSidebarNav() {
                 : "text-[#5B4A3A] hover:bg-[#DED0BE] hover:text-[#1F170F]"
             }`}
           >
-            <Icon className="size-4" />
+            {icon}
             {item.label}
           </Link>
         )

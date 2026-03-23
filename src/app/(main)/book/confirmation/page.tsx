@@ -33,7 +33,8 @@ function formatMoney(value: number | null) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value ?? 0)
 }
 
@@ -79,7 +80,7 @@ export default async function BookingConfirmationPage({
   const { data: booking, error } = await supabase
     .from("bookings")
     .select(
-      "id, listing_id, session_date, start_time, end_time, guest_count, total_charged, access_code, status"
+      "id, listing_id, session_date, start_time, end_time, guest_count, subtotal, guest_fee, service_fee, guest_total, total_charged, access_code, status"
     )
     .eq("id", bookingId)
     .eq("guest_id", user.id)
@@ -110,6 +111,11 @@ export default async function BookingConfirmationPage({
   )}`
   const awaitingHost = booking.status === "pending_host"
   const shouldTrackPurchase = booking.status === "confirmed" || booking.status === "completed"
+  const subtotal = Number(booking.subtotal ?? 0)
+  const guestFee = Number(booking.guest_fee ?? booking.service_fee ?? 0)
+  const totalPaid = Number(booking.guest_total ?? booking.total_charged ?? 0)
+  const serviceFeePercentLabel =
+    subtotal > 0 ? String(Math.round((guestFee / subtotal) * 1000) / 10) : "—"
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-10 md:px-8">
@@ -117,7 +123,7 @@ export default async function BookingConfirmationPage({
         <BookingConfirmationTracker
           bookingId={booking.id}
           listingId={booking.listing_id}
-          totalAmount={Number(booking.total_charged ?? 0)}
+          totalAmount={totalPaid}
           serviceType={typeof listing?.service_type === "string" ? listing.service_type : null}
           city={typeof listing?.city === "string" ? listing.city : null}
           userEmail={user.email ?? null}
@@ -156,11 +162,20 @@ export default async function BookingConfirmationPage({
                   {formatBookingDateTime(booking.session_date, booking.start_time, booking.end_time)}
                 </p>
                 <p className="text-muted-foreground">{booking.guest_count} guests</p>
-                <p className="type-price">
-                  {awaitingHost
-                    ? `Authorization hold: ${formatMoney(booking.total_charged)}`
-                    : `Total paid: ${formatMoney(booking.total_charged)}`}
-                </p>
+                <div className="space-y-1 rounded-lg border border-[#EDE8E2] bg-[#FCFAF7] p-3 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Space subtotal</span>
+                    <span className="text-[#1A1410]">{formatMoney(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Service fee ({serviceFeePercentLabel}%)</span>
+                    <span className="text-[#1A1410]">{formatMoney(guestFee)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-[#EDE8E2] pt-2 font-semibold text-[#1A1410]">
+                    <span>{awaitingHost ? "Authorization hold" : "Total"}</span>
+                    <span>{formatMoney(totalPaid)}</span>
+                  </div>
+                </div>
               </div>
               {!awaitingHost ? <AccessCodeCard code={booking.access_code} /> : null}
             </div>

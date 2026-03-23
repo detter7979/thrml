@@ -23,6 +23,14 @@
     {
       "path": "/api/cron/sync-bookings",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/agent-evaluate",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/agent-disputes",
+      "schedule": "0 * * * *"
     }
   ]
 }

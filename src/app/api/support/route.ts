@@ -27,6 +27,24 @@ type ValidSupportPayload = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+const DISPUTE_AGENT_SUBJECTS = [
+  "Access & Entry",
+  "Booking & Cancellation",
+  "Payment & Refunds",
+  "Safety Concern",
+] as const
+
+function triggerDisputeAgent(subject: string) {
+  if (!DISPUTE_AGENT_SUBJECTS.includes(subject as (typeof DISPUTE_AGENT_SUBJECTS)[number])) return
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")
+  const secret = process.env.CRON_SECRET
+  if (!base || !secret) return
+  const agentUrl = `${base}/api/cron/agent-disputes`
+  fetch(agentUrl, { headers: { "x-cron-secret": secret } }).catch((err) => {
+    console.error("[api/support] dispute agent trigger failed", err)
+  })
+}
+
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? sanitizeText(value) : ""
 }
@@ -172,6 +190,8 @@ export async function POST(req: NextRequest) {
       savedPriority = (data.priority as "urgent" | "high" | "normal") ?? priority
       submittedAt = typeof data.created_at === "string" ? data.created_at : submittedAt
     }
+
+    triggerDisputeAgent(subject)
 
     const confirmationEmail = buildSupportConfirmationEmail({
       name,

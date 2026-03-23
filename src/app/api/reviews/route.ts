@@ -4,17 +4,18 @@ import { z } from "zod"
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
 import { sanitizeText } from "@/lib/sanitize"
 import { sendHostNewReviewNotification } from "@/lib/emails"
-import { normalizePhotoUrls, normalizeSubRatings } from "@/lib/reviews"
+import { normalizeSubRatings, sanitizeReviewPhotoUrls } from "@/lib/reviews"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 const reviewSchema = z.object({
   bookingId: z.string().uuid(),
-  listingId: z.string().uuid().optional(),
+  listingId: z.string().uuid().nullish(),
   ratingOverall: z.number().int().min(1).max(5),
-  ratings: z.record(z.string(), z.number().int().min(1).max(5)).optional(),
+  /** Accept any JSON values; normalizeSubRatings keeps only 1–5 for known keys. */
+  ratings: z.record(z.string(), z.unknown()).optional(),
   comment: z.string().max(1000).nullable().optional(),
-  photoUrls: z.array(z.string().url()).max(3).optional(),
+  photoUrls: z.array(z.string()).max(3).optional(),
   recommend: z.boolean().nullable().optional(),
 })
 
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
   }
 
   const subRatings = normalizeSubRatings(parsed.data.ratings ?? {})
-  const photoUrls = normalizePhotoUrls(parsed.data.photoUrls ?? [])
+  const photoUrls = sanitizeReviewPhotoUrls(parsed.data.photoUrls ?? [])
   const recommend = parsed.data.recommend ?? null
   const listingId = booking.listing_id
 

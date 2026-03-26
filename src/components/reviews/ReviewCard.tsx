@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react"
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { isLikelyValidAvatarUrl } from "@/lib/avatar-url"
+
 type ReviewItem = {
   id: string
   rating_overall: number
@@ -27,9 +30,14 @@ type ReviewCardProps = {
 
 function initials(name: string) {
   const parts = name.trim().split(" ").filter(Boolean)
-  if (!parts.length) return "G"
+  if (!parts.length) return ""
   if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase()
-  return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`.toUpperCase()
+  return `${parts[0].slice(0, 1)}${parts[parts.length - 1].slice(0, 1)}`.toUpperCase()
+}
+
+function initialsForReview(fullName: string | null | undefined) {
+  const raw = (fullName ?? "").trim()
+  return raw ? initials(raw) : ""
 }
 
 function displayName(fullName: string | null | undefined) {
@@ -76,6 +84,9 @@ export function ReviewCard({ review, isHostView = false, onResponded, highlightP
   const [localHostResponse, setLocalHostResponse] = useState(review.host_response ?? null)
   const [localRespondedAt, setLocalRespondedAt] = useState(review.host_responded_at ?? null)
 
+  const avatarUrlRaw = (review.profile?.avatar_url ?? "").trim()
+  const avatarUrlSafe = isLikelyValidAvatarUrl(avatarUrlRaw) ? avatarUrlRaw : ""
+
   const hasAllSubRatings = useMemo(() => {
     const values = [
       review.rating_cleanliness,
@@ -89,6 +100,7 @@ export function ReviewCard({ review, isHostView = false, onResponded, highlightP
   const longComment = (review.comment ?? "").length > 200
   const shownComment = expanded || !longComment ? review.comment ?? "" : `${(review.comment ?? "").slice(0, 200)}...`
   const guestName = displayName(review.profile?.full_name ?? null)
+  const avatarInitials = initialsForReview(review.profile?.full_name ?? null)
   const hostFirstName = (review.host_name ?? "Host").split(" ")[0] ?? "Host"
 
   async function postResponse() {
@@ -123,13 +135,14 @@ export function ReviewCard({ review, isHostView = false, onResponded, highlightP
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          {review.profile?.avatar_url ? (
-            <img src={review.profile.avatar_url} alt={guestName} className="size-8 rounded-full object-cover" />
-          ) : (
-            <div className="flex size-8 items-center justify-center rounded-full bg-[#ECE2D6] text-xs font-semibold text-[#6E5F52]">
-              {initials(guestName)}
-            </div>
-          )}
+          <Avatar className="size-8 shrink-0">
+            {avatarUrlSafe ? (
+              <AvatarImage key={avatarUrlSafe} src={avatarUrlSafe} alt="" className="object-cover" />
+            ) : null}
+            <AvatarFallback className="bg-[#D4CAC2] text-[11px] font-semibold tracking-tight text-[#5C514A]">
+              {avatarInitials || "\u00A0"}
+            </AvatarFallback>
+          </Avatar>
           <p className="text-sm font-medium text-[#1A1410]">{guestName}</p>
         </div>
         <p className="text-xs text-[#8A7A6D]">{relativeDate(review.created_at)}</p>

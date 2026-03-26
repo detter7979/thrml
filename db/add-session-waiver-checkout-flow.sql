@@ -1,5 +1,8 @@
 -- Session-level waiver acceptance tracking and waiver templates.
 -- Safe to run multiple times.
+--
+-- waiver_templates.service_type must match listings.service_type and public.service_types.id
+-- so the app can resolve display_name for acknowledgments and pick the correct waiver body.
 
 alter table if exists public.bookings
 add column if not exists waiver_accepted boolean not null default false,

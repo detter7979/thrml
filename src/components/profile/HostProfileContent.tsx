@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react"
 
 import { ListingCard, type ListingCardData } from "@/components/listings/ListingCard"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { isLikelyValidAvatarUrl } from "@/lib/avatar-url"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
@@ -164,27 +165,30 @@ export async function HostProfileContent({
     : { data: [] as Array<Record<string, unknown>> }
 
   let reviewRows: Array<Record<string, unknown>> = []
-  const reviewsPrimary = allListingIds.length
-    ? await admin
-        .from("reviews")
-        .select(
-          "id, listing_id, reviewer_id, rating_overall, rating_cleanliness, rating_accuracy, rating_communication, rating_value, comment, created_at"
-        )
-        .in("listing_id", allListingIds)
-        .eq("is_published", true)
-        .order("created_at", { ascending: false })
-    : { data: [] as Array<Record<string, unknown>>, error: null }
-
-  if (reviewsPrimary.error) {
-    const legacyReviews = allListingIds.length
-      ? await admin
+  const [reviewsPrimary, listingReviewsModern] = await Promise.all([
+    allListingIds.length
+      ? admin
+          .from("reviews")
+          .select(
+            "id, listing_id, reviewer_id, rating_overall, rating_cleanliness, rating_accuracy, rating_communication, rating_value, comment, created_at"
+          )
+          .in("listing_id", allListingIds)
+          .eq("is_published", true)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null as null }),
+    allListingIds.length
+      ? admin
           .from("listing_reviews")
           .select("id, listing_id, guest_id, rating, rating_overall, comment, created_at, sub_ratings")
           .in("listing_id", allListingIds)
+          .eq("is_published", true)
           .order("created_at", { ascending: false })
-      : { data: [] as Array<Record<string, unknown>> }
+      : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+  ])
 
-    reviewRows = (legacyReviews.data ?? []).map((row) => {
+  const modernReviewRows = listingReviewsModern.data ?? []
+  if (modernReviewRows.length > 0) {
+    reviewRows = modernReviewRows.map((row) => {
       const subRatings =
         typeof row.sub_ratings === "object" && row.sub_ratings ? (row.sub_ratings as Record<string, unknown>) : {}
       return {
@@ -200,7 +204,7 @@ export async function HostProfileContent({
         created_at: row.created_at,
       }
     })
-  } else {
+  } else if (!reviewsPrimary.error) {
     reviewRows = (reviewsPrimary.data ?? []) as Array<Record<string, unknown>>
   }
 
@@ -522,17 +526,19 @@ export async function HostProfileContent({
                 <article key={review.id} className="border-b border-[#EFE7DE] pb-4 last:border-b-0">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      {review.guestAvatarUrl ? (
-                        <img
-                          src={review.guestAvatarUrl}
-                          alt={review.guestName}
-                          className="size-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex size-8 items-center justify-center rounded-full bg-[#ECE2D6] text-xs font-semibold text-[#6E5F52]">
-                          {initials(review.guestName)}
-                        </div>
-                      )}
+                      <Avatar className="size-8 shrink-0">
+                        {isLikelyValidAvatarUrl(review.guestAvatarUrl ?? "") ? (
+                          <AvatarImage
+                            key={review.guestAvatarUrl ?? ""}
+                            src={review.guestAvatarUrl!}
+                            alt=""
+                            className="object-cover"
+                          />
+                        ) : null}
+                        <AvatarFallback className="bg-[#D4CAC2] text-[11px] font-semibold tracking-tight text-[#5C514A]">
+                          {initials(review.guestName) || "\u00A0"}
+                        </AvatarFallback>
+                      </Avatar>
                       <p className="text-sm font-medium text-[#1A1410]">{review.guestName}</p>
                     </div>
                     <p className="text-xs text-[#8A7A6D]">{formatMonthYear(review.createdAt)}</p>

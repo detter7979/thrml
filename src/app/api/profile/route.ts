@@ -13,6 +13,7 @@ const updateSchema = z
     terms_accepted: z.boolean().optional(),
     terms_accepted_at: z.string().datetime().optional(),
     terms_version: z.string().trim().max(32).optional(),
+    privacy_version: z.string().trim().max(32).optional(),
     waiver_accepted: z.boolean().optional(),
     newsletter_opted_in: z.boolean().optional(),
     newsletter_opted_in_at: z.string().datetime().optional(),

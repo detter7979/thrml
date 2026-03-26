@@ -198,11 +198,15 @@ export function DashboardListingsClient({
   }, [listings])
 
   async function cancelBooking(bookingId: string, reason?: string) {
-    await fetch(`/api/bookings/${bookingId}/cancel`, {
+    const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cancelled_by: "host", reason }),
     })
+    const payload = (await response.json().catch(() => ({}))) as { error?: string }
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Unable to cancel booking")
+    }
     router.refresh()
   }
 

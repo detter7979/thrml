@@ -14,6 +14,7 @@ import {
 } from "@/lib/emails"
 import { sendPostSessionEmails } from "@/lib/emails/post-session"
 import { sendGA4Event } from "@/lib/analytics/measurement-protocol"
+import { mergeBookingLegalException, resolveActiveWaiverVersionForServiceType } from "@/lib/waiver-templates"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
       const { data: booking } = await supabase
         .from("bookings")
         .select(
-          "id, status, access_code, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, total_charged, host_payout, automated_messages_sent"
+          "id, status, access_code, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, total_charged, host_payout, automated_messages_sent, waiver_version, waiver_accepted, metadata"
         )
         .eq("id", bookingId)
         .maybeSingle()
@@ -93,13 +94,77 @@ export async function POST(req: NextRequest) {
         bookingId,
       })
 
+      let waiverVerified = false
+      let waiverException: Record<string, unknown> | null = null
+
+      if (booking?.listing_id) {
+        const { data: listingWaiverRow } = await supabase
+          .from("listings")
+          .select("service_type")
+          .eq("id", booking.listing_id)
+          .maybeSingle()
+        const serviceType =
+          typeof listingWaiverRow?.service_type === "string" ? listingWaiverRow.service_type.trim() : ""
+        const activeVersion = await resolveActiveWaiverVersionForServiceType(supabase, serviceType)
+        const bookingVersion = typeof booking.waiver_version === "string" ? booking.waiver_version.trim() : ""
+        const consentOk = booking.waiver_accepted === true
+
+        if (!consentOk) {
+          waiverException = {
+            title: "Legal Exception",
+            reason: "missing_waiver_consent",
+            booking_waiver_accepted: booking.waiver_accepted ?? null,
+          }
+        } else if (!bookingVersion) {
+          waiverException = {
+            title: "Legal Exception",
+            reason: "missing_waiver_version",
+          }
+        } else if (!activeVersion) {
+          waiverException = {
+            title: "Legal Exception",
+            reason: "no_active_waiver_template",
+            service_type: serviceType || null,
+            booking_waiver_version: bookingVersion,
+          }
+        } else if (bookingVersion !== activeVersion) {
+          waiverException = {
+            title: "Legal Exception",
+            reason: "waiver_version_mismatch",
+            booking_waiver_version: bookingVersion,
+            active_waiver_version: activeVersion,
+            service_type: serviceType || null,
+          }
+        } else {
+          waiverVerified = true
+        }
+      } else if (booking) {
+        waiverException = {
+          title: "Legal Exception",
+          reason: "missing_listing_id",
+        }
+      }
+
+      const now = new Date().toISOString()
+      const confirmUpdate: Record<string, unknown> = {
+        status: "confirmed",
+      }
+      if (waiverVerified) {
+        confirmUpdate.waiver_accepted = true
+        confirmUpdate.waiver_accepted_at = now
+      }
+      if (waiverException) {
+        confirmUpdate.metadata = mergeBookingLegalException(booking?.metadata, waiverException)
+        console.error("[Legal Exception]", {
+          bookingId,
+          paymentIntentId: pi.id,
+          ...waiverException,
+        })
+      }
+
       const { data: statusTransition, error: bookingUpdateError } = await supabase
         .from("bookings")
-        .update({
-          status: "confirmed",
-          waiver_accepted: true,
-          waiver_accepted_at: new Date().toISOString(),
-        })
+        .update(confirmUpdate)
         .eq("id", bookingId)
         .neq("status", "confirmed")
         .select("id")

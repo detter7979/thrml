@@ -4,6 +4,7 @@ import { z } from "zod"
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
 import { sanitizeText } from "@/lib/sanitize"
 import { sendHostNewReviewNotification } from "@/lib/emails"
+import { shouldMarkBookingCompleted } from "@/lib/booking-session"
 import { normalizeSubRatings, sanitizeReviewPhotoUrls } from "@/lib/reviews"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -45,14 +46,40 @@ export async function POST(req: NextRequest) {
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, guest_id, host_id, listing_id, status")
+    .select("id, guest_id, host_id, listing_id, status, session_date, start_time, end_time")
     .eq("id", parsed.data.bookingId)
     .maybeSingle()
 
   if (!booking || booking.guest_id !== user.id) {
     return NextResponse.json({ error: "Booking not found" }, { status: 404 })
   }
-  if (booking.status !== "completed") {
+
+  let bookingStatus = typeof booking.status === "string" ? booking.status : ""
+  if (bookingStatus === "confirmed" && shouldMarkBookingCompleted(booking)) {
+    const { data: transitioned } = await admin
+      .from("bookings")
+      .update({ status: "completed" })
+      .eq("id", parsed.data.bookingId)
+      .eq("guest_id", user.id)
+      .eq("status", "confirmed")
+      .select("id")
+      .maybeSingle()
+    if (transitioned?.id) {
+      bookingStatus = "completed"
+    } else {
+      const { data: fresh } = await supabase
+        .from("bookings")
+        .select("status")
+        .eq("id", parsed.data.bookingId)
+        .eq("guest_id", user.id)
+        .maybeSingle()
+      if (fresh && typeof fresh.status === "string" && fresh.status === "completed") {
+        bookingStatus = "completed"
+      }
+    }
+  }
+
+  if (bookingStatus !== "completed") {
     return NextResponse.json({ error: "Only completed bookings can be reviewed" }, { status: 409 })
   }
 

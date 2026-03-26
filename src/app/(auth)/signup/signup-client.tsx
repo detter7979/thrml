@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { createClient } from "@/lib/supabase/client"
@@ -161,7 +162,8 @@ function SignupForm() {
         avatar_url: avatarUrl,
         terms_accepted: true,
         terms_accepted_at: new Date().toISOString(),
-        terms_version: "v1.0",
+        terms_version: LEGAL_VERSIONS.TERMS,
+        privacy_version: LEGAL_VERSIONS.PRIVACY,
         newsletter_opted_in: signupNewsletterOptIn,
         newsletter_opted_in_at: signupNewsletterOptIn ? new Date().toISOString() : null,
         notification_preferences: {

@@ -16,8 +16,10 @@ import {
   Star,
 } from "lucide-react"
 
+import { BookingReviewDialog } from "@/components/booking/BookingReviewDialog"
 import { CancelModal } from "@/components/booking/CancelModal"
 import { Button } from "@/components/ui/button"
+import { guestCompletedTabBooking } from "@/lib/booking-session"
 import { resolveInstructions } from "@/lib/constants/access-types"
 import { formatServiceType, getServiceType } from "@/lib/constants/service-types"
 
@@ -123,6 +125,10 @@ function isCancellationOpen(booking: BookingRecord) {
   return { open: diffMs > 0, hoursRemaining: Math.floor(diffMs / (1000 * 60 * 60)) }
 }
 
+function canLeaveGuestReview(booking: BookingRecord) {
+  return guestCompletedTabBooking(booking) && !(booking.review || booking.review_submitted)
+}
+
 function formatCancellationWindow(hoursRemaining: number) {
   const totalHours = Math.max(0, Math.floor(hoursRemaining))
   const days = Math.floor(totalHours / 24)
@@ -143,13 +149,6 @@ function getRefundSummary(booking: BookingRecord) {
     return `Refunded $${amount.toFixed(0)} on ${new Date(booking.refunded_at).toLocaleDateString()}`
   }
   return "No refund issued"
-}
-
-function within48Hours(value: string | null | undefined) {
-  if (!value) return false
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return false
-  return Date.now() - date.getTime() < 48 * 60 * 60 * 1000
 }
 
 function formatDateTime(booking: BookingRecord) {
@@ -393,12 +392,22 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
   const [copiedBookingId, setCopiedBookingId] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [houseRulesExpandedByBooking, setHouseRulesExpandedByBooking] = useState<Record<string, boolean>>({})
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false)
+  const [reviewDialogBooking, setReviewDialogBooking] = useState<BookingRecord | null>(null)
+  const [reviewDialogInitialStars, setReviewDialogInitialStars] = useState(0)
+
+  function openReviewDialog(booking: BookingRecord, initialStars: number) {
+    if (!booking.listing_id) return
+    setReviewDialogBooking(booking)
+    setReviewDialogInitialStars(initialStars)
+    setReviewDialogOpen(true)
+  }
 
   async function loadBookings() {
     setLoading(true)
     setLoadError(null)
     try {
-      const response = await fetch("/api/bookings")
+      const response = await fetch("/api/bookings", { cache: "no-store" })
       if (response.status === 401) {
         window.location.href = "/login"
         return
@@ -443,42 +452,15 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
     const cancelled: BookingRecord[] = []
 
     for (const booking of bookings) {
-      if (booking.status === "cancelled") {
+      if (booking.status === "cancelled" || booking.status === "declined") {
         cancelled.push(booking)
         continue
       }
-      if (booking.status === "declined") {
-        cancelled.push(booking)
-        continue
-      }
-
-      if (booking.status === "completed") {
+      if (guestCompletedTabBooking(booking, now)) {
         completed.push(booking)
         continue
       }
-
-      const date = parseSessionDate(booking.session_date)
-      if (!date) {
-        if (booking.status === "pending" || booking.status === "pending_host" || booking.status === "confirmed") {
-          upcoming.push(booking)
-        }
-        continue
-      }
-
-      if (booking.status !== "pending" && booking.status !== "pending_host" && booking.status !== "confirmed") {
-        if (date >= new Date(now.toDateString())) {
-          upcoming.push(booking)
-        } else {
-          completed.push(booking)
-        }
-        continue
-      }
-
-      if (date >= new Date(now.toDateString())) {
-        upcoming.push(booking)
-      } else {
-        completed.push(booking)
-      }
+      upcoming.push(booking)
     }
 
     upcoming.sort((a, b) => (a.session_date ?? "").localeCompare(b.session_date ?? ""))
@@ -497,11 +479,15 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
   const visible = activeTab === "upcoming" ? grouped.upcoming : activeTab === "completed" ? grouped.completed : grouped.cancelled
 
   async function cancelBooking(bookingId: string, reason?: string) {
-    await fetch(`/api/bookings/${bookingId}/cancel`, {
+    const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cancelled_by: userRole, reason }),
     })
+    const payload = (await response.json().catch(() => ({}))) as { error?: string }
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Unable to cancel booking")
+    }
     await loadBookings()
   }
 
@@ -716,32 +702,26 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                             {booking.review || booking.review_submitted ? (
                               <div className="text-right">
                                 <p className="text-xs text-[#8A796B]">You rated this ★{Math.max(1, booking.review?.rating ?? 0)}</p>
-                                {within48Hours(booking.review?.created_at ?? null) && booking.review ? (
-                                  <Link
-                                    href={`/review/${booking.id}?from=dashboard&edit=${booking.review.id}`}
-                                    className="text-xs text-[#6A5A4D] underline"
-                                  >
-                                    Edit review →
-                                  </Link>
-                                ) : null}
                               </div>
-                            ) : (
+                            ) : canLeaveGuestReview(booking) ? (
                               <div className="space-y-1">
                                 <p className="text-[14px] text-[#8B7A6D]">How was your session?</p>
+                                <p className="text-[11px] text-[#A8988A]">Tap a star to rate and add an optional note.</p>
                                 <div className="flex items-center gap-1">
                                   {[1, 2, 3, 4, 5].map((star) => (
-                                    <Link
+                                    <button
                                       key={star}
-                                      href={`/review/${booking.id}?from=dashboard&initial_rating=${star}`}
+                                      type="button"
                                       aria-label={`Rate ${star} stars`}
-                                      className="text-[#CDBFB0] hover:text-[#F5A76C]"
+                                      onClick={() => openReviewDialog(booking, star)}
+                                      className="rounded-sm text-[#CDBFB0] transition-colors hover:text-[#F5A76C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5A76C]/40"
                                     >
                                       <Star className="size-6" />
-                                    </Link>
+                                    </button>
                                   ))}
                                 </div>
                               </div>
-                            )}
+                            ) : null}
                             <Link
                               href={`/listings/${booking.listing_id ?? ""}`}
                               className="rounded-xl bg-[#C75B3A] px-3 py-2 text-sm text-white"
@@ -1184,9 +1164,13 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                   />
                                 </div>
                               ) : null}
-                              {booking.status === "completed" && !booking.review_submitted ? (
-                                <Button asChild className="w-full bg-[#C75B3A] text-white hover:bg-[#b44f31]">
-                                  <Link href={`/review/${booking.id}?from=dashboard`}>Leave a review</Link>
+                              {canLeaveGuestReview(booking) ? (
+                                <Button
+                                  type="button"
+                                  className="w-full bg-[#C75B3A] text-white hover:bg-[#b44f31]"
+                                  onClick={() => openReviewDialog(booking, 0)}
+                                >
+                                  Leave a review
                                 </Button>
                               ) : null}
                             </div>
@@ -1201,6 +1185,37 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
           </section>
         ) : null}
       </div>
+      {reviewDialogBooking?.listing_id ? (
+        <BookingReviewDialog
+          open={reviewDialogOpen}
+          onOpenChange={setReviewDialogOpen}
+          bookingId={reviewDialogBooking.id}
+          listingId={reviewDialogBooking.listing_id}
+          listingTitle={reviewDialogBooking.listings?.title ?? ""}
+          initialStars={reviewDialogInitialStars}
+          onSuccess={({ reviewId, rating, comment }) => {
+            const id = reviewDialogBooking.id
+            setBookings((prev) =>
+              prev.map((b) =>
+                b.id === id
+                  ? {
+                      ...b,
+                      status: "completed",
+                      review_submitted: true,
+                      review: {
+                        id: reviewId,
+                        rating,
+                        comment,
+                        created_at: new Date().toISOString(),
+                      },
+                    }
+                  : b
+              )
+            )
+            setToastMessage("Your review was posted. Thank you!")
+          }}
+        />
+      ) : null}
       {toastMessage ? (
         <div className="fixed right-4 bottom-4 z-50 rounded-xl border border-[#ECDCCF] bg-white px-4 py-3 text-sm text-[#5E4E42] shadow-lg">
           {toastMessage}

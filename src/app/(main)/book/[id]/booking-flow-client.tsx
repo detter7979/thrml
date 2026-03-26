@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
+import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { buildFullName, splitFullName } from "@/lib/name-utils"
 import { usePlatformFeePercents } from "@/contexts/platform-fees-context"
 import { calculateFees } from "@/lib/fees"
@@ -108,8 +109,10 @@ function PaymentStep({
   payload,
   bookingId,
   acceptedTerms,
+  acceptedDisclaimers,
   newsletterChecked,
   onAcceptedTermsChange,
+  onAcceptedDisclaimersChange,
   onNewsletterCheckedChange,
   onLegalAccepted,
   instantBook,
@@ -118,8 +121,10 @@ function PaymentStep({
   payload: CheckoutPayload
   bookingId: string
   acceptedTerms: boolean
+  acceptedDisclaimers: boolean
   newsletterChecked: boolean
   onAcceptedTermsChange: (checked: boolean) => void
+  onAcceptedDisclaimersChange: (checked: boolean) => void
   onNewsletterCheckedChange: (checked: boolean) => void
   onLegalAccepted: () => Promise<void>
   instantBook: boolean
@@ -133,6 +138,7 @@ function PaymentStep({
   const [legalError, setLegalError] = useState<string | null>(null)
   const [paymentUiError, setPaymentUiError] = useState<string | null>(null)
   const termsRowRef = useRef<HTMLLabelElement | null>(null)
+  const disclaimersRowRef = useRef<HTMLLabelElement | null>(null)
   const policy = getCancellationPolicy(cancellationPolicy)
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -142,11 +148,12 @@ function PaymentStep({
       listingId: payload.listingId,
       newsletterOptIn: payload.newsletterOptIn,
     })
-    const missingRequired = !acceptedTerms
+    const missingRequired = !acceptedTerms || !acceptedDisclaimers
     if (missingRequired) {
-      setLegalError("Please accept the terms to continue")
-      if (!acceptedTerms && termsRowRef.current) {
-        termsRowRef.current.animate(
+      setLegalError("Please accept the terms and disclaimers to continue")
+      const shake = (node: HTMLElement | null) => {
+        if (!node) return
+        node.animate(
           [
             { transform: "translateX(0px)" },
             { transform: "translateX(-6px)" },
@@ -156,6 +163,8 @@ function PaymentStep({
           { duration: 260, easing: "ease-in-out" }
         )
       }
+      if (!acceptedTerms) shake(termsRowRef.current)
+      if (!acceptedDisclaimers) shake(disclaimersRowRef.current)
       return
     }
 
@@ -239,6 +248,24 @@ function PaymentStep({
                 </span>
               </label>
 
+              <label
+                ref={disclaimersRowRef}
+                className="flex min-h-11 items-start gap-3 rounded-md px-1 py-2"
+              >
+                <Checkbox
+                  checked={acceptedDisclaimers}
+                  onCheckedChange={(checked) => onAcceptedDisclaimersChange(Boolean(checked))}
+                />
+                <span className="text-[13px] leading-5 text-[#1A1410]">
+                  I have read and agree to the{" "}
+                  <Link href="/disclaimer" target="_blank" rel="noopener noreferrer" className="underline">
+                    Disclaimers
+                  </Link>
+                  .
+                  <span className="ml-1 text-destructive">*</span>
+                </span>
+              </label>
+
               <label className="flex min-h-11 items-start gap-3 rounded-md px-1 py-2">
                 <Checkbox
                   checked={newsletterChecked}
@@ -302,6 +329,7 @@ export function BookingFlowClient({
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [isLoadingPayment, setIsLoadingPayment] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [acceptedDisclaimers, setAcceptedDisclaimers] = useState(false)
   const [acceptedWaiverVersion, setAcceptedWaiverVersion] = useState<string | null>(null)
   const [waiverModalOpen, setWaiverModalOpen] = useState(false)
   const [newsletterChecked, setNewsletterChecked] = useState(true)
@@ -327,10 +355,11 @@ export function BookingFlowClient({
       durationHours: initialDurationHours,
       waiver_version: acceptedWaiverVersion ?? "",
       waiverAccepted: Boolean(acceptedWaiverVersion),
-      disclaimersAccepted: true,
+      disclaimersAccepted: acceptedDisclaimers,
       newsletterOptIn: newsletterChecked,
     }),
     [
+      acceptedDisclaimers,
       initialDate,
       initialDurationHours,
       initialEndTime,
@@ -370,6 +399,10 @@ export function BookingFlowClient({
       ...payload,
       waiver_version: waiverVersionOverride ?? payload.waiver_version,
       waiverAccepted: Boolean(waiverVersionOverride ?? payload.waiver_version),
+    }
+    if (!requestPayload.disclaimersAccepted) {
+      setPaymentError("Please accept the Disclaimers to continue.")
+      return
     }
     if (!requestPayload.waiver_version.trim()) {
       setPaymentError("Waiver acceptance required")
@@ -470,9 +503,11 @@ export function BookingFlowClient({
       setWaiverModalOpen(true)
       return
     }
+    if (!acceptedDisclaimers) return
     console.log("[booking-flow] triggering createCheckoutIntent")
     void createCheckoutIntent()
   }, [
+    acceptedDisclaimers,
     acceptedWaiverVersion,
     bookingId,
     clientSecret,
@@ -498,7 +533,8 @@ export function BookingFlowClient({
       body: JSON.stringify({
         terms_accepted: true,
         terms_accepted_at: new Date().toISOString(),
-        terms_version: "v1.0",
+        terms_version: LEGAL_VERSIONS.TERMS,
+        privacy_version: LEGAL_VERSIONS.PRIVACY,
       }),
     })
   }
@@ -506,9 +542,6 @@ export function BookingFlowClient({
   function handleWaiverAccept(version: string) {
     setAcceptedWaiverVersion(version)
     setWaiverModalOpen(false)
-    if (step === 3 && !clientSecret && !bookingId && !isLoadingPayment) {
-      void createCheckoutIntent(version)
-    }
   }
 
   function handleWaiverDecline() {
@@ -714,14 +747,41 @@ export function BookingFlowClient({
                 payload={payload}
                 bookingId={bookingId}
                 acceptedTerms={acceptedTerms}
+                acceptedDisclaimers={acceptedDisclaimers}
                 newsletterChecked={newsletterChecked}
                 onAcceptedTermsChange={handleTermsChange}
+                onAcceptedDisclaimersChange={setAcceptedDisclaimers}
                 onNewsletterCheckedChange={setNewsletterChecked}
                 onLegalAccepted={persistLegalAcceptance}
                 instantBook={instantBook}
                 cancellationPolicy={cancellationPolicy}
               />
             </Elements>
+          ) : acceptedWaiverVersion && !acceptedDisclaimers ? (
+            <Card className="card-base">
+              <CardContent className="space-y-4 pt-6">
+                <p className="text-sm font-medium text-[#1A1410]">Before secure payment</p>
+                <label className="flex min-h-11 items-start gap-3 rounded-md px-1 py-2">
+                  <Checkbox
+                    checked={acceptedDisclaimers}
+                    onCheckedChange={(checked) => setAcceptedDisclaimers(Boolean(checked))}
+                  />
+                  <span className="text-[13px] leading-5 text-[#1A1410]">
+                    I have read and agree to the{" "}
+                    <Link href="/disclaimer" target="_blank" rel="noopener noreferrer" className="underline">
+                      Disclaimers
+                    </Link>
+                    .
+                    <span className="ml-1 text-destructive">*</span>
+                  </span>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  You must accept the Disclaimers before we set up payment. You&apos;ll confirm Terms of Service on the
+                  next screen.
+                </p>
+                {paymentError ? <p className="text-sm text-destructive">{paymentError}</p> : null}
+              </CardContent>
+            </Card>
           ) : (
             <Card className="card-base">
               <CardContent className="space-y-3">

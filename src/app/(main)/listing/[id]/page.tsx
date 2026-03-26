@@ -166,6 +166,114 @@ function fallbackPhoto(index: number) {
   return `https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=1200&q=80&sig=${index}`
 }
 
+function mapLegacyReviewsTableRows(reviewRows: Record<string, unknown>[]): ReviewRecord[] {
+  return reviewRows.map((row) => {
+    const metadata =
+      typeof row.metadata === "object" && row.metadata ? (row.metadata as Record<string, unknown>) : {}
+    const recommendedRaw = metadata.recommended
+    return {
+      id: typeof row.id === "string" ? row.id : "",
+      rating_overall: Number(row.rating_overall ?? 0),
+      rating_cleanliness: Number.isFinite(Number(row.rating_cleanliness))
+        ? Number(row.rating_cleanliness)
+        : null,
+      rating_accuracy: Number.isFinite(Number(row.rating_accuracy)) ? Number(row.rating_accuracy) : null,
+      rating_communication: Number.isFinite(Number(row.rating_communication))
+        ? Number(row.rating_communication)
+        : null,
+      rating_value: Number.isFinite(Number(row.rating_value)) ? Number(row.rating_value) : null,
+      comment: typeof row.comment === "string" ? row.comment : null,
+      photo_urls: normalizePhotoUrls(row.photo_urls),
+      host_response: typeof row.host_response === "string" ? row.host_response : null,
+      host_responded_at: typeof row.host_responded_at === "string" ? row.host_responded_at : null,
+      created_at: typeof row.created_at === "string" ? row.created_at : null,
+      profile:
+        Array.isArray(row.profiles) && row.profiles[0] && typeof row.profiles[0] === "object"
+          ? {
+              full_name:
+                typeof (row.profiles[0] as Record<string, unknown>).full_name === "string"
+                  ? ((row.profiles[0] as Record<string, unknown>).full_name as string)
+                  : null,
+              avatar_url:
+                typeof (row.profiles[0] as Record<string, unknown>).avatar_url === "string"
+                  ? ((row.profiles[0] as Record<string, unknown>).avatar_url as string)
+                  : null,
+            }
+          : null,
+      recommended:
+        typeof recommendedRaw === "boolean"
+          ? recommendedRaw
+          : recommendedRaw === "true"
+            ? true
+            : recommendedRaw === "false"
+              ? false
+              : null,
+    }
+  })
+}
+
+async function mapListingReviewsToRecords(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  reviewRows: Record<string, unknown>[]
+): Promise<ReviewRecord[]> {
+  return Promise.all(
+    reviewRows.map(async (review) => {
+      const reviewId = typeof review.id === "string" ? review.id : ""
+      const subRatings = normalizeSubRatings(
+        review.sub_ratings ??
+          (typeof review.metadata === "object" && review.metadata
+            ? (review.metadata as Record<string, unknown>).sub_ratings
+            : {})
+      )
+      const metadata =
+        typeof review.metadata === "object" && review.metadata
+          ? (review.metadata as Record<string, unknown>)
+          : {}
+      const { data: guestProfile } =
+        typeof review.guest_id === "string"
+          ? await supabase
+              .from("profiles")
+              .select("full_name, avatar_url")
+              .eq("id", review.guest_id)
+              .single()
+          : { data: null as null }
+
+      const recommendedRaw = metadata.recommend
+      return {
+        id: reviewId,
+        rating_overall: Number(review.rating_overall ?? review.rating ?? 0),
+        rating_cleanliness: subRatings.cleanliness ?? null,
+        rating_accuracy: subRatings.accuracy ?? null,
+        rating_communication: subRatings.communication ?? null,
+        rating_value: subRatings.value ?? null,
+        comment: typeof review.comment === "string" ? review.comment : null,
+        photo_urls: normalizePhotoUrls(
+          review.photo_urls ??
+            (typeof review.metadata === "object" && review.metadata
+              ? (review.metadata as Record<string, unknown>).photo_urls
+              : [])
+        ),
+        host_response: typeof review.host_response === "string" ? review.host_response : null,
+        host_responded_at:
+          typeof review.host_responded_at === "string" ? review.host_responded_at : null,
+        created_at: typeof review.created_at === "string" ? review.created_at : null,
+        profile: {
+          full_name: guestProfile?.full_name ?? "Guest",
+          avatar_url: guestProfile?.avatar_url ?? null,
+        },
+        recommended:
+          typeof recommendedRaw === "boolean"
+            ? recommendedRaw
+            : recommendedRaw === "true"
+              ? true
+              : recommendedRaw === "false"
+                ? false
+                : null,
+      }
+    })
+  )
+}
+
 export default async function ListingDetailPage({
   params,
   searchParams,
@@ -279,7 +387,7 @@ export default async function ListingDetailPage({
   const host = hostStripeProfile
   const isMockHost = host?.stripe_account_id?.startsWith("acct_mock_")
 
-  const [{ data: ratingsRow }, reviewsResult] = await Promise.all([
+  const [{ data: ratingsRow, error: ratingsError }, reviewsResult, listingReviewsResult] = await Promise.all([
     supabase.from("listing_ratings").select("avg_overall, review_count").eq("listing_id", id).maybeSingle(),
     supabase
       .from("reviews")
@@ -289,116 +397,41 @@ export default async function ListingDetailPage({
       .eq("listing_id", id)
       .eq("is_published", true)
       .order("created_at", { ascending: false }),
-  ])
-
-  let reviews: ReviewRecord[] = []
-  if (!reviewsResult.error) {
-    reviews = ((reviewsResult.data ?? []) as Record<string, unknown>[]).map((row) => {
-      const metadata =
-        typeof row.metadata === "object" && row.metadata ? (row.metadata as Record<string, unknown>) : {}
-      const recommendedRaw = metadata.recommended
-      return {
-        id: typeof row.id === "string" ? row.id : "",
-        rating_overall: Number(row.rating_overall ?? 0),
-        rating_cleanliness: Number.isFinite(Number(row.rating_cleanliness))
-          ? Number(row.rating_cleanliness)
-          : null,
-        rating_accuracy: Number.isFinite(Number(row.rating_accuracy)) ? Number(row.rating_accuracy) : null,
-        rating_communication: Number.isFinite(Number(row.rating_communication))
-          ? Number(row.rating_communication)
-          : null,
-        rating_value: Number.isFinite(Number(row.rating_value)) ? Number(row.rating_value) : null,
-        comment: typeof row.comment === "string" ? row.comment : null,
-        photo_urls: normalizePhotoUrls(row.photo_urls),
-        host_response: typeof row.host_response === "string" ? row.host_response : null,
-        host_responded_at: typeof row.host_responded_at === "string" ? row.host_responded_at : null,
-        created_at: typeof row.created_at === "string" ? row.created_at : null,
-        profile:
-          Array.isArray(row.profiles) && row.profiles[0] && typeof row.profiles[0] === "object"
-            ? {
-                full_name:
-                  typeof (row.profiles[0] as Record<string, unknown>).full_name === "string"
-                    ? ((row.profiles[0] as Record<string, unknown>).full_name as string)
-                    : null,
-                avatar_url:
-                  typeof (row.profiles[0] as Record<string, unknown>).avatar_url === "string"
-                    ? ((row.profiles[0] as Record<string, unknown>).avatar_url as string)
-                    : null,
-              }
-            : null,
-        recommended:
-          typeof recommendedRaw === "boolean"
-            ? recommendedRaw
-            : recommendedRaw === "true"
-              ? true
-              : recommendedRaw === "false"
-                ? false
-                : null,
-      }
-    })
-  } else {
-    const { data: fallbackReviews } = await supabase
+    supabase
       .from("listing_reviews")
       .select(
         "id, guest_id, rating, rating_overall, comment, photo_urls, host_response, host_responded_at, created_at, sub_ratings, metadata"
       )
       .eq("listing_id", id)
-      .order("created_at", { ascending: false })
+      .eq("is_published", true)
+      .order("created_at", { ascending: false }),
+  ])
 
-    reviews = await Promise.all(
-      ((fallbackReviews ?? []) as Record<string, unknown>[]).map(async (review) => {
-        const reviewId = typeof review.id === "string" ? review.id : ""
-        const subRatings = normalizeSubRatings(
-          review.sub_ratings ??
-            (typeof review.metadata === "object" && review.metadata
-              ? (review.metadata as Record<string, unknown>).sub_ratings
-              : {})
-        )
-        const metadata =
-          typeof review.metadata === "object" && review.metadata
-            ? (review.metadata as Record<string, unknown>)
-            : {}
-        const { data: guestProfile } = review.guest_id
-          ? await supabase
-              .from("profiles")
-              .select("full_name, avatar_url")
-              .eq("id", review.guest_id)
-              .single()
-          : { data: null as null }
+  const listingReviewsRows = (listingReviewsResult.data ?? []) as Record<string, unknown>[]
+  const legacyReviewsRows = (reviewsResult.data ?? []) as Record<string, unknown>[]
 
-        return {
-          id: reviewId,
-          rating_overall: Number(review.rating_overall ?? review.rating ?? 0),
-          rating_cleanliness: subRatings.cleanliness ?? null,
-          rating_accuracy: subRatings.accuracy ?? null,
-          rating_communication: subRatings.communication ?? null,
-          rating_value: subRatings.value ?? null,
-          comment: typeof review.comment === "string" ? review.comment : null,
-          photo_urls: normalizePhotoUrls(
-            review.photo_urls ??
-              (typeof review.metadata === "object" && review.metadata
-                ? (review.metadata as Record<string, unknown>).photo_urls
-                : [])
-          ),
-          host_response: typeof review.host_response === "string" ? review.host_response : null,
-          host_responded_at:
-            typeof review.host_responded_at === "string" ? review.host_responded_at : null,
-          created_at: typeof review.created_at === "string" ? review.created_at : null,
-          profile: {
-            full_name: guestProfile?.full_name ?? "Guest",
-            avatar_url: guestProfile?.avatar_url ?? null,
-          },
-          recommended:
-            typeof metadata.recommend === "boolean"
-              ? metadata.recommend
-              : metadata.recommend === "true"
-                ? true
-                : metadata.recommend === "false"
-                  ? false
-                  : null,
-        }
-      })
-    )
+  let reviews: ReviewRecord[] = []
+  if (listingReviewsRows.length > 0) {
+    reviews = await mapListingReviewsToRecords(supabase, listingReviewsRows)
+  } else if (!reviewsResult.error && legacyReviewsRows.length > 0) {
+    reviews = mapLegacyReviewsTableRows(legacyReviewsRows)
+  } else if (!reviewsResult.error) {
+    reviews = []
+  } else {
+    reviews = await mapListingReviewsToRecords(supabase, listingReviewsRows)
+  }
+
+  const ratingsFromRow = {
+    avg_overall: Number((ratingsRow as Record<string, unknown> | null)?.avg_overall ?? 0),
+    review_count: Number((ratingsRow as Record<string, unknown> | null)?.review_count ?? 0),
+  }
+  let displayRatings = ratingsFromRow
+  if ((ratingsError || displayRatings.review_count === 0) && reviews.length > 0) {
+    const sum = reviews.reduce((acc, r) => acc + r.rating_overall, 0)
+    displayRatings = {
+      avg_overall: Math.round((sum / reviews.length + Number.EPSILON) * 100) / 100,
+      review_count: reviews.length,
+    }
   }
 
   const photos =
@@ -474,12 +507,12 @@ export default async function ListingDetailPage({
       availability: "https://schema.org/InStock",
       url: `https://usethrml.com/listings/${listing.id}`,
     },
-    ...(Number(ratingsRow?.avg_overall ?? 0) > 0
+    ...(displayRatings.avg_overall > 0
       ? {
           aggregateRating: {
             "@type": "AggregateRating",
-            ratingValue: Number(ratingsRow?.avg_overall ?? 0),
-            reviewCount: Number(ratingsRow?.review_count ?? 0),
+            ratingValue: displayRatings.avg_overall,
+            reviewCount: displayRatings.review_count,
             bestRating: "5",
             worstRating: "1",
           },
@@ -553,10 +586,7 @@ export default async function ListingDetailPage({
         }
         photos={safePhotos}
         reviews={reviews}
-        ratings={{
-          avg_overall: Number((ratingsRow as Record<string, unknown> | null)?.avg_overall ?? 0),
-          review_count: Number((ratingsRow as Record<string, unknown> | null)?.review_count ?? reviews.length),
-        }}
+        ratings={displayRatings}
         isHostView={Boolean(isHost)}
         pricing={pricing}
         availability={availabilityPayload}

@@ -2,7 +2,9 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 
 import { ReviewForm } from "@/components/reviews/ReviewForm"
+import { shouldMarkBookingCompleted } from "@/lib/booking-session"
 import { extractServiceIcon, formatSessionDate } from "@/lib/reviews"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 type Params = { bookingId: string }
@@ -41,11 +43,43 @@ export default async function ReviewPage({
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("id, guest_id, host_id, listing_id, status, session_date, duration_hours, guest_count, review_requested_at")
+    .select(
+      "id, guest_id, host_id, listing_id, status, session_date, start_time, end_time, duration_hours, guest_count, review_requested_at"
+    )
     .eq("id", bookingId)
     .maybeSingle()
 
-  if (!booking || booking.guest_id !== user.id || booking.status !== "completed" || !booking.listing_id) {
+  if (!booking || booking.guest_id !== user.id || !booking.listing_id) {
+    failRedirect()
+  }
+
+  let bookingStatus = typeof booking.status === "string" ? booking.status : ""
+  if (bookingStatus === "confirmed" && shouldMarkBookingCompleted(booking)) {
+    const admin = createAdminClient()
+    const { data: transitioned } = await admin
+      .from("bookings")
+      .update({ status: "completed" })
+      .eq("id", bookingId)
+      .eq("guest_id", user.id)
+      .eq("status", "confirmed")
+      .select("id")
+      .maybeSingle()
+    if (transitioned?.id) {
+      bookingStatus = "completed"
+    } else {
+      const { data: fresh } = await supabase
+        .from("bookings")
+        .select("status")
+        .eq("id", bookingId)
+        .eq("guest_id", user.id)
+        .maybeSingle()
+      if (fresh && typeof fresh.status === "string" && fresh.status === "completed") {
+        bookingStatus = "completed"
+      }
+    }
+  }
+
+  if (bookingStatus !== "completed") {
     failRedirect()
   }
 

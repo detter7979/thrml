@@ -19,6 +19,7 @@ import { requireAuth } from "@/lib/auth-check"
 import { rateLimit } from "@/lib/rate-limit"
 import { stripe } from "@/lib/stripe"
 import { createAdminClient } from "@/lib/supabase/admin"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 type Params = { id: string }
 
@@ -35,6 +36,39 @@ type RefundPreview = {
 function parseMissingColumn(errorMessage: string) {
   const match = errorMessage.match(/'([^']+)' column/i)
   return match?.[1] ?? null
+}
+
+/** Updates a booking to cancelled; drops unknown columns until PostgREST accepts the payload (legacy DBs). */
+async function updateBookingCancellation(
+  admin: SupabaseClient,
+  bookingId: string,
+  onlyIfStatus: string,
+  updatePayload: Record<string, unknown>
+): Promise<{ data: { id: string } | null; error: { message: string } | null }> {
+  const payload: Record<string, unknown> = { ...updatePayload }
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { data, error } = await admin
+      .from("bookings")
+      .update(payload)
+      .eq("id", bookingId)
+      .eq("status", onlyIfStatus)
+      .select("id")
+      .maybeSingle()
+
+    if (!error) {
+      return { data, error: null }
+    }
+
+    const missingColumn = parseMissingColumn(error.message ?? "")
+    if (missingColumn && missingColumn in payload) {
+      delete payload[missingColumn]
+      continue
+    }
+
+    return { data: null, error: { message: error.message ?? "Unable to update booking" } }
+  }
+
+  return { data: null, error: { message: "Unable to update booking" } }
 }
 
 function normalizePolicyKey(policy: string | null | undefined): CancellationPolicy {
@@ -174,9 +208,96 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
       }
     }
 
-    const { error: pendingCancelError } = await admin
-      .from("bookings")
-      .update({
+    const guestCancelPayload: Record<string, unknown> = {
+      status: "cancelled",
+      cancelled_by: cancelledBy,
+      cancelled_at: new Date().toISOString(),
+      cancellation_reason: parsed.data.reason ?? null,
+      refund_amount: 0,
+      refund_status: "none",
+      stripe_refund_id: null,
+      refunded_amount: 0,
+      refunded_at: null,
+    }
+    const { data: pendingHostUpdated, error: pendingHostUpdateError } = await updateBookingCancellation(
+      admin,
+      id,
+      "pending_host",
+      guestCancelPayload
+    )
+    if (pendingHostUpdateError) {
+      return NextResponse.json({ error: pendingHostUpdateError.message }, { status: 500 })
+    }
+    if (!pendingHostUpdated) {
+      return NextResponse.json(
+        { error: "Booking could not be cancelled. It may have already been updated." },
+        { status: 409 }
+      )
+    }
+
+    await admin.from("booked_slots").delete().eq("booking_id", id)
+    return NextResponse.json({
+      refund_amount: 0,
+      refund_status: "none",
+      policy_applied: "pending_host_guest_cancelled",
+    })
+  }
+
+  if (booking.status === "pending" && cancelledBy === "guest") {
+    const paymentIntentId =
+      typeof booking.stripe_payment_intent_id === "string" ? booking.stripe_payment_intent_id : null
+    if (paymentIntentId) {
+      let pi: { status: string }
+      try {
+        pi = await stripe.paymentIntents.retrieve(paymentIntentId)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unable to verify payment status"
+        return NextResponse.json({ error: message }, { status: 500 })
+      }
+      if (pi.status !== "succeeded") {
+        if (pi.status !== "canceled") {
+          try {
+            await stripe.paymentIntents.cancel(paymentIntentId)
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to cancel payment"
+            return NextResponse.json({ error: message }, { status: 500 })
+          }
+        }
+        const pendingGuestPayload: Record<string, unknown> = {
+          status: "cancelled",
+          cancelled_by: cancelledBy,
+          cancelled_at: new Date().toISOString(),
+          cancellation_reason: parsed.data.reason ?? null,
+          refund_amount: 0,
+          refund_status: "none",
+          stripe_refund_id: null,
+          refunded_amount: 0,
+          refunded_at: null,
+        }
+        const { data: pendingGuestUpdated, error: pendingGuestUpdateError } = await updateBookingCancellation(
+          admin,
+          id,
+          "pending",
+          pendingGuestPayload
+        )
+        if (pendingGuestUpdateError) {
+          return NextResponse.json({ error: pendingGuestUpdateError.message }, { status: 500 })
+        }
+        if (!pendingGuestUpdated) {
+          return NextResponse.json(
+            { error: "Booking could not be cancelled. It may have already been updated." },
+            { status: 409 }
+          )
+        }
+        await admin.from("booked_slots").delete().eq("booking_id", id)
+        return NextResponse.json({
+          refund_amount: 0,
+          refund_status: "none",
+          policy_applied: "pending_instant_guest_cancelled",
+        })
+      }
+    } else {
+      const pendingNoPiPayload: Record<string, unknown> = {
         status: "cancelled",
         cancelled_by: cancelledBy,
         cancelled_at: new Date().toISOString(),
@@ -186,19 +307,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
         stripe_refund_id: null,
         refunded_amount: 0,
         refunded_at: null,
+      }
+      const { data: pendingGuestUpdated, error: pendingNoPiError } = await updateBookingCancellation(
+        admin,
+        id,
+        "pending",
+        pendingNoPiPayload
+      )
+      if (pendingNoPiError) {
+        return NextResponse.json({ error: pendingNoPiError.message }, { status: 500 })
+      }
+      if (!pendingGuestUpdated) {
+        return NextResponse.json(
+          { error: "Booking could not be cancelled. It may have already been updated." },
+          { status: 409 }
+        )
+      }
+      await admin.from("booked_slots").delete().eq("booking_id", id)
+      return NextResponse.json({
+        refund_amount: 0,
+        refund_status: "none",
+        policy_applied: "pending_instant_guest_cancelled",
       })
-      .eq("id", id)
-      .eq("status", "pending_host")
-    if (pendingCancelError) {
-      return NextResponse.json({ error: pendingCancelError.message }, { status: 500 })
     }
-
-    await admin.from("booked_slots").delete().eq("booking_id", id)
-    return NextResponse.json({
-      refund_amount: 0,
-      refund_status: "none",
-      policy_applied: "pending_host_guest_cancelled",
-    })
   }
 
   let refund: { id: string } | null = null

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { shouldMarkBookingCompleted } from "@/lib/booking-session"
 import { requireAuth } from "@/lib/auth-check"
 import { rateLimit } from "@/lib/rate-limit"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -26,27 +27,6 @@ function isMissingColumnError(message: string) {
       normalized.includes("column") &&
       normalized.includes("schema cache"))
   )
-}
-
-function parseSessionEnd(booking: BookingRow) {
-  const sessionDate = typeof booking.session_date === "string" ? booking.session_date : null
-  if (!sessionDate) return null
-  const endTime =
-    typeof booking.end_time === "string" && booking.end_time
-      ? booking.end_time
-      : typeof booking.start_time === "string" && booking.start_time
-        ? booking.start_time
-        : "23:59"
-  const parsed = new Date(`${sessionDate}T${endTime}`)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-function shouldMarkCompleted(booking: BookingRow, now: Date) {
-  const status = typeof booking.status === "string" ? booking.status : ""
-  if (status !== "confirmed") return false
-  const endsAt = parseSessionEnd(booking)
-  if (!endsAt) return false
-  return endsAt.getTime() < now.getTime()
 }
 
 export async function GET(req: NextRequest) {
@@ -89,7 +69,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error }, { status: 500 })
   let bookings = bookingRows as BookingRow[]
   const now = new Date()
-  const toComplete = bookings.filter((booking) => shouldMarkCompleted(booking, now))
+  const toComplete = bookings.filter((booking) => shouldMarkBookingCompleted(booking, now))
   const completedIds = toComplete
     .map((booking) => (typeof booking.id === "string" ? booking.id : null))
     .filter((value): value is string => Boolean(value))

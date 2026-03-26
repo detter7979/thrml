@@ -10,9 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
+import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { createClient } from "@/lib/supabase/client"
-
-const HOST_TERMS_VERSION = "host-v1.0-2026-03"
 const TOTAL_STEPS = 3
 
 function ProgressBar({ step }: { step: number }) {
@@ -161,14 +160,14 @@ export function BecomeAHostClient() {
           .update({
             host_terms_accepted: true,
             host_terms_accepted_at: new Date().toISOString(),
-            host_terms_version: HOST_TERMS_VERSION,
+            host_terms_version: LEGAL_VERSIONS.HOST_AGREEMENT,
           })
           .eq("id", user.id)
       }
 
       trackGaEvent("host_onboarding_complete", {
         step: 3,
-        terms_version: HOST_TERMS_VERSION,
+        terms_version: LEGAL_VERSIONS.HOST_AGREEMENT,
       })
       trackMetaEvent("Lead", {
         content_name: "host_onboarding_complete",
@@ -358,7 +357,7 @@ export function BecomeAHostClient() {
                       <Link href="/privacy" target="_blank" className="underline">
                         Privacy Policy
                       </Link>
-                      . Version: {HOST_TERMS_VERSION}
+                      . Version: {LEGAL_VERSIONS.HOST_AGREEMENT}
                     </p>
                   </div>
 

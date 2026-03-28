@@ -484,40 +484,58 @@ export default async function ListingDetailPage({
     sessionTypeConstraint === "fixed_session"
       ? Number(listing.fixed_session_price ?? listing.price_solo ?? 0)
       : Number(listing.price_solo ?? 0)
+  const serviceTypeLabel = (listing.service_type ?? "wellness").replace(/_/g, " ")
   const listingSchema = {
     "@context": "https://schema.org",
-    "@type": "Service",
-    name: listing.title,
-    description: listing.description,
-    url: `https://usethrml.com/listings/${listing.id}`,
-    image: safePhotos.map((photo) => photo.url),
-    serviceType: (listing.service_type ?? "wellness").replace(/_/g, " "),
-    areaServed: {
-      "@type": "City",
-      name: listing.city ?? "Seattle",
-    },
-    provider: {
-      "@type": "Person",
-      name: "thrml Host",
-    },
-    offers: {
-      "@type": "Offer",
-      priceCurrency: "USD",
-      price: String(lowestPrice),
-      availability: "https://schema.org/InStock",
-      url: `https://usethrml.com/listings/${listing.id}`,
-    },
-    ...(displayRatings.avg_overall > 0
-      ? {
-          aggregateRating: {
-            "@type": "AggregateRating",
-            ratingValue: displayRatings.avg_overall,
-            reviewCount: displayRatings.review_count,
-            bestRating: "5",
-            worstRating: "1",
+    "@graph": [
+      {
+        "@type": "Service",
+        "@id": `https://usethrml.com/listings/${listing.id}`,
+        name: listing.title,
+        description:
+          listing.description ??
+          `Book a private ${serviceTypeLabel} session in ${listing.city ?? "your city"}.`,
+        url: `https://usethrml.com/listings/${listing.id}`,
+        image: safePhotos[0]?.url ?? "https://usethrml.com/og-image.png",
+        provider: {
+          "@type": "LocalBusiness",
+          name: "thrml",
+          url: "https://usethrml.com",
+        },
+        areaServed: {
+          "@type": "City",
+          name: listing.city ?? "Seattle",
+        },
+        offers: {
+          "@type": "Offer",
+          priceCurrency: "USD",
+          price: lowestPrice,
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            priceCurrency: "USD",
+            price: lowestPrice,
+            unitText: sessionTypeConstraint === "fixed_session" ? "SESSION" : "HOUR",
           },
-        }
-      : {}),
+          availability: "https://schema.org/InStock",
+          seller: {
+            "@type": "LocalBusiness",
+            name: "thrml",
+            url: "https://usethrml.com",
+          },
+        },
+        ...(displayRatings.avg_overall > 0 && displayRatings.review_count > 0
+          ? {
+              aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: displayRatings.avg_overall,
+                reviewCount: displayRatings.review_count,
+                bestRating: 5,
+                worstRating: 1,
+              },
+            }
+          : {}),
+      },
+    ],
   }
 
   return (

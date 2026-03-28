@@ -14,7 +14,7 @@ import {
   SERVICE_CANONICAL_SLUG,
   type LocalListingRow,
 } from "@/lib/seo/local-service-landing"
-import type { ServiceType } from "@/lib/constants/service-types"
+import { getServiceType, type ServiceType } from "@/lib/constants/service-types"
 
 type PageParams = { service: string; city: string }
 
@@ -77,35 +77,23 @@ function buildJsonLd(args: {
   path: string
   copy: ReturnType<typeof getLocalSeoCopy>
   serviceType: ServiceType
-  citySlug: string
   cityDisplay: string
   listings: LocalListingRow[]
 }) {
-  const { origin, path, copy, serviceType, citySlug, cityDisplay, listings } = args
+  const { origin, path, copy, serviceType, cityDisplay, listings } = args
   const pageUrl = `${origin}${path}`
+  const serviceLabel = getServiceType(serviceType)?.label ?? serviceType.replace(/_/g, " ")
+  const serviceLabelLower = serviceLabel.toLowerCase()
 
-  const itemListElements = listings.slice(0, 24).map((row, index) => {
-    const card = mapRowToListingCard(row)
+  const collectionItemElements = listings.slice(0, 10).map((row, index) => {
     const listingUrl = `${origin}/listings/${row.id}`
-    const price = String(card.priceSolo)
+    const name =
+      typeof row.title === "string" && row.title.trim() ? row.title : "Wellness space"
     return {
       "@type": "ListItem",
       position: index + 1,
       url: listingUrl,
-      item: {
-        "@type": "Product",
-        name: card.title,
-        description: typeof row.description === "string" ? row.description.slice(0, 500) : undefined,
-        image: card.photoUrl ?? undefined,
-        url: listingUrl,
-        offers: {
-          "@type": "Offer",
-          priceCurrency: "USD",
-          price,
-          availability: "https://schema.org/InStock",
-          url: listingUrl,
-        },
-      },
+      name,
     }
   })
 
@@ -136,34 +124,18 @@ function buildJsonLd(args: {
         },
       },
       {
-        "@type": "WebPage",
+        "@type": "CollectionPage",
         "@id": `${pageUrl}#webpage`,
         url: pageUrl,
-        name: copy.title,
-        description: copy.description,
+        name: `Private ${serviceLabel} rentals in ${cityDisplay}`,
+        description: `Book private ${serviceLabelLower} sessions hosted by real people in ${cityDisplay}. No memberships required.`,
         isPartOf: { "@id": `${origin}/#website` },
-        about: {
-          "@type": "Service",
-          name: copy.h1,
-          areaServed: {
-            "@type": "City",
-            name: cityDisplay,
-          },
-          serviceType: serviceType.replace(/_/g, " "),
-          provider: { "@id": `${origin}/#organization` },
+        mainEntity: {
+          "@type": "ItemList",
+          numberOfItems: collectionItemElements.length,
+          itemListElement: collectionItemElements,
         },
       },
-      ...(itemListElements.length
-        ? [
-            {
-              "@type": "ItemList",
-              "@id": `${pageUrl}#itemlist`,
-              name: `${copy.h1} — listings`,
-              numberOfItems: itemListElements.length,
-              itemListElement: itemListElements,
-            },
-          ]
-        : []),
       {
         "@type": "FAQPage",
         "@id": `${pageUrl}#faq`,
@@ -205,7 +177,6 @@ export default async function LocalServiceCityPage({ params }: { params: Promise
     path,
     copy,
     serviceType: resolved.serviceType,
-    citySlug,
     cityDisplay,
     listings: rows,
   })

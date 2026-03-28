@@ -24,7 +24,7 @@ const dmSerifDisplay = DM_Serif_Display({
 export const metadata: Metadata = {
   metadataBase: new URL("https://usethrml.com"),
   title: {
-    default: "thrml — Book Private Saunas, Cold Plunges & Wellness Spaces",
+    default: "thrml — Book Private Wellness Spaces",
     template: "%s | thrml",
   },
   description:

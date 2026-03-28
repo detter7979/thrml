@@ -78,16 +78,98 @@ In the event of a merger, acquisition, or sale of substantially all of thrml's a
 
 4. Cookies and Tracking
 We use cookies and similar technologies to maintain sessions, remember preferences, and analyze platform usage. You can control cookie settings through your browser, but disabling cookies may affect platform functionality.
-We do not use cookies for cross-site behavioral advertising or sell data to ad networks.
+We do not use cookies for cross-site behavioral advertising or sell data to ad networks.`}
+      </div>
 
-5. Data Retention
-We retain your information for as long as your account is active or as needed to provide services. After account deletion:
-Account and profile data is deleted within 30 days
-Booking and transaction records may be retained for up to 7 years for financial and legal compliance purposes
-Messages may be retained for up to 2 years for dispute resolution purposes
-Anonymized analytics data may be retained indefinitely
+      <section id="data-retention" className="mt-8 text-sm leading-relaxed text-[#2F241E]">
+        <h2 className="text-base font-semibold text-[#1A1410]">5. Data Retention</h2>
 
-6. Your Rights and Choices
+        <p className="mt-3">
+          We retain your personal data only for as long as necessary to provide our services, meet legal obligations,
+          resolve disputes, and enforce our agreements. The table below summarises our standard retention periods.
+        </p>
+
+        <div className="mt-5 overflow-x-auto rounded-xl border border-[#E8DDD6]">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-[#E8DDD6] bg-[#FAF6F2]">
+                <th className="px-4 py-3 text-left font-medium text-[#5F5148]">Data type</th>
+                <th className="px-4 py-3 text-left font-medium text-[#5F5148]">Retention period</th>
+                <th className="px-4 py-3 text-left font-medium text-[#5F5148]">Reason</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#F0E8E2]">
+              <tr className="bg-white">
+                <td className="px-4 py-3 text-[#2F241E]">Account &amp; profile data</td>
+                <td className="px-4 py-3 text-[#2F241E]">Deleted within 30 days of account deletion</td>
+                <td className="px-4 py-3 text-[#5F5148]">User-requested deletion</td>
+              </tr>
+              <tr className="bg-[#FAF6F2]">
+                <td className="px-4 py-3 text-[#2F241E]">Booking &amp; transaction records</td>
+                <td className="px-4 py-3 text-[#2F241E]">Up to 7 years</td>
+                <td className="px-4 py-3 text-[#5F5148]">Financial and legal compliance (IRS, state tax)</td>
+              </tr>
+              <tr className="bg-white">
+                <td className="px-4 py-3 text-[#2F241E]">Messages between users</td>
+                <td className="px-4 py-3 text-[#2F241E]">Up to 2 years</td>
+                <td className="px-4 py-3 text-[#5F5148]">Dispute resolution</td>
+              </tr>
+              <tr className="bg-[#FAF6F2]">
+                <td className="px-4 py-3 text-[#2F241E]">Payment method data</td>
+                <td className="px-4 py-3 text-[#2F241E]">Managed by Stripe — not stored by thrml</td>
+                <td className="px-4 py-3 text-[#5F5148]">See Stripe's privacy policy</td>
+              </tr>
+              <tr className="bg-white">
+                <td className="px-4 py-3 text-[#2F241E]">Analytics data (GA4)</td>
+                <td className="px-4 py-3 text-[#2F241E]">14 months (Google's default retention)</td>
+                <td className="px-4 py-3 text-[#5F5148]">Platform improvement; only collected with your consent</td>
+              </tr>
+              <tr className="bg-[#FAF6F2]">
+                <td className="px-4 py-3 text-[#2F241E]">Advertising data (Meta Pixel)</td>
+                <td className="px-4 py-3 text-[#2F241E]">Up to 180 days (Meta's default)</td>
+                <td className="px-4 py-3 text-[#5F5148]">Ad performance measurement; only collected with your consent</td>
+              </tr>
+              <tr className="bg-white">
+                <td className="px-4 py-3 text-[#2F241E]">Cookies &amp; session data</td>
+                <td className="px-4 py-3 text-[#2F241E]">
+                  Session cookies expire when you close your browser; persistent cookies up to 12 months
+                </td>
+                <td className="px-4 py-3 text-[#5F5148]">Authentication and preference memory</td>
+              </tr>
+              <tr className="bg-[#FAF6F2]">
+                <td className="px-4 py-3 text-[#2F241E]">Support &amp; dispute records</td>
+                <td className="px-4 py-3 text-[#2F241E]">Up to 3 years</td>
+                <td className="px-4 py-3 text-[#5F5148]">Legal protection and platform integrity</td>
+              </tr>
+              <tr className="bg-white">
+                <td className="px-4 py-3 text-[#2F241E]">Anonymised analytics</td>
+                <td className="px-4 py-3 text-[#2F241E]">Indefinite</td>
+                <td className="px-4 py-3 text-[#5F5148]">Aggregate product insights (no personal identifiers)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p className="mt-4">
+          <strong>Early deletion requests:</strong> You may request early deletion of your data at any time by
+          contacting{" "}
+          <a href="mailto:hello@usethrml.com" className="text-[#C4623A] underline hover:text-[#b05530]">
+            hello@usethrml.com
+          </a>
+          . We will action your request within 30 days, subject to the legal retention requirements noted above.
+          Deletion of booking and transaction records may not be possible where retention is required for tax or legal
+          compliance.
+        </p>
+
+        <p className="mt-3">
+          <strong>Third-party retention:</strong> Data processed by our service providers (Stripe, Google, Meta,
+          Supabase, Resend) is subject to their own data retention policies. We encourage you to review each
+          provider's privacy policy for details.
+        </p>
+      </section>
+
+      <div className="mt-8 whitespace-pre-line text-sm leading-relaxed text-[#2F241E]">
+        {`6. Your Rights and Choices
 Depending on your location, you may have the following rights regarding your personal data:
 Access: Request a copy of the personal information we hold about you
 Correction: Request correction of inaccurate or incomplete information

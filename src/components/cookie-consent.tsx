@@ -66,9 +66,9 @@ export function CookieConsent() {
         <div className="flex-1">
           <p className="mb-1 text-sm font-medium text-neutral-900">We use cookies</p>
           <p className="text-xs leading-relaxed text-neutral-500">
-            We use analytics cookies to understand how people use Thrml and improve the experience. We never sell your
-            data.{" "}
-            <a href="/privacy" className="text-neutral-600 underline hover:text-neutral-900">
+            We use analytics cookies (retained up to 14 months) to understand how people use thrml and improve the
+            experience. We never sell your data.{" "}
+            <a href="/privacy#data-retention" className="text-neutral-600 underline hover:text-neutral-900">
               Privacy Policy
             </a>
           </p>

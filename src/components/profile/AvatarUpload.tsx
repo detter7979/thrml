@@ -136,7 +136,7 @@ export function AvatarUpload({
         type="button"
         onClick={() => inputRef.current?.click()}
         className="group relative inline-flex size-24 items-center justify-center overflow-hidden rounded-full border border-[#E7DED3] bg-[#F3ECE5] text-lg font-semibold text-[#5D4E42]"
-        aria-label="Upload avatar"
+        aria-label="Upload profile photo"
         disabled={isUploading}
       >
         {currentAvatarUrl ? (

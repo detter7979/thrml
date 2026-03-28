@@ -177,8 +177,13 @@ export function ReviewCard({ review, isHostView = false, onResponded, highlightP
 
       {review.photo_urls?.length ? (
         <div className="mt-3 flex gap-2 overflow-x-auto">
-          {review.photo_urls.slice(0, 6).map((url) => (
-            <button type="button" key={url} onClick={() => setLightboxUrl(url)}>
+          {review.photo_urls.slice(0, 6).map((url, index) => (
+            <button
+              type="button"
+              key={url}
+              aria-label={`View review photo ${index + 1}`}
+              onClick={() => setLightboxUrl(url)}
+            >
               <img src={url} alt="Review photo" className="h-[60px] w-[60px] rounded-lg object-cover" />
             </button>
           ))}
@@ -188,6 +193,7 @@ export function ReviewCard({ review, isHostView = false, onResponded, highlightP
       {lightboxUrl ? (
         <button
           type="button"
+          aria-label="Close enlarged photo"
           onClick={() => setLightboxUrl(null)}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
         >
@@ -214,6 +220,7 @@ export function ReviewCard({ review, isHostView = false, onResponded, highlightP
                 value={reply}
                 onChange={(event) => setReply(event.target.value.slice(0, 500))}
                 placeholder="Write a thoughtful response..."
+                aria-label="Write a response to this review"
                 className="min-h-[90px] w-full rounded-xl border border-[#E5D9CC] bg-white p-3 text-sm outline-none"
               />
               <div className="flex items-center justify-between">

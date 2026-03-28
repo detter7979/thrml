@@ -1180,6 +1180,7 @@ export function ExploreClient() {
                     min={0}
                     max={PRICE_MAX_ANY}
                     value={filters.priceMin}
+                    aria-label="Minimum price per person"
                     onChange={(event) =>
                       updateFilter(
                         "priceMin",
@@ -1193,6 +1194,7 @@ export function ExploreClient() {
                     min={0}
                     max={PRICE_MAX_ANY}
                     value={filters.priceMax}
+                    aria-label="Maximum price per person"
                     onChange={(event) =>
                       updateFilter(
                         "priceMax",

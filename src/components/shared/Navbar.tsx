@@ -278,7 +278,10 @@ export function Navbar() {
           {loggedIn ? (
             <DropdownMenu open={isUserMenuOpen} onOpenChange={setIsUserMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-full border border-current/20 px-2 py-1">
+                <button
+                  className="flex items-center gap-2 rounded-full border border-current/20 px-2 py-1"
+                  aria-label={`Account menu for ${userName ?? "Member"}`}
+                >
                   <Avatar size="sm">
                     <AvatarImage src={avatarUrl ?? undefined} alt={userName ?? "Member"} />
                     <AvatarFallback>{initials}</AvatarFallback>
@@ -504,6 +507,7 @@ export function Navbar() {
                       <button
                         type="button"
                         className="text-left"
+                        aria-label="Sign out of your account"
                         onClick={async () => {
                           closeMobileNav()
                           await handleSignOut()

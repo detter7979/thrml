@@ -255,6 +255,7 @@ export function MessageInput({
         value={value}
         rows={1}
         maxLength={1200}
+        aria-label="Type a message"
         onChange={(event) => void trackTyping(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
@@ -284,6 +285,7 @@ export function MessageInput({
         {value.length > 200 ? <span className="text-[11px] text-[#8C7B6E]">{value.length}/1200</span> : null}
         <Button
           size="icon"
+          aria-label="Send message"
           className="h-9 w-9 rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]"
           disabled={!value.trim().length || sending}
           onClick={() => void submit()}

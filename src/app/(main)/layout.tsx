@@ -16,7 +16,7 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
     <div className="min-h-screen bg-warm-50">
       <Navbar />
       <PlatformFeesProvider initialPercents={feePercents}>
-        <main>{children}</main>
+        <main id="main-content">{children}</main>
       </PlatformFeesProvider>
       <footer className="border-t border-white/10 bg-[#1A1410] text-white/75">
         <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">

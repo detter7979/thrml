@@ -407,6 +407,7 @@ export function HomePageClient() {
                   value={location}
                   onChange={(event) => setLocation(event.target.value)}
                   placeholder="Seattle, Ballard"
+                  aria-label="Search wellness spaces"
                   className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#1A1410] outline-none"
                 />
                 <div className="hidden sm:block">
@@ -472,6 +473,7 @@ export function HomePageClient() {
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
                 placeholder="Seattle, Ballard"
+                aria-label="Search wellness spaces"
                 className="h-full min-w-0 flex-1 border-0 bg-transparent px-1 text-[16px] text-[#1A1410] outline-none"
               />
             </div>
@@ -604,6 +606,7 @@ export function HomePageClient() {
                   {/* Honeypot - hidden from real users, bots will fill this */}
                   <input
                     type="text"
+                    id="newsletter-honeypot"
                     name="website"
                     autoComplete="off"
                     tabIndex={-1}
@@ -621,6 +624,7 @@ export function HomePageClient() {
                           if (newsletterError) setNewsletterError(null)
                         }}
                         placeholder="Enter your email"
+                        aria-label="Email for newsletter"
                         disabled={newsletterStatus === "loading"}
                         className="h-14 w-full rounded-full border border-white/20 bg-white px-6 text-base text-[#1A1410] outline-none placeholder:text-[#8E8176] focus:border-[#C75B3A] disabled:cursor-not-allowed disabled:opacity-70"
                       />

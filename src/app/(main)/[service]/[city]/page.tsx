@@ -18,7 +18,8 @@ import { getServiceType, type ServiceType } from "@/lib/constants/service-types"
 
 type PageParams = { service: string; city: string }
 
-export const revalidate = 900
+/** Always query Supabase at request time so we never ship a build-time empty grid from CI. */
+export const dynamic = "force-dynamic"
 
 export function generateStaticParams() {
   return [
@@ -49,6 +50,9 @@ export async function generateMetadata({
   const path = `/${resolved.canonicalSlug}/${citySlug}`
   const url = `${origin}${path}`
 
+  const rows = await fetchListingsForLocalLanding(resolved.serviceType, cityDisplay, citySlug)
+  const hasListings = rows.length > 0
+
   return {
     title: { absolute: copy.title },
     description: copy.description,
@@ -65,7 +69,7 @@ export async function generateMetadata({
       title: copy.title,
       description: copy.description,
     },
-    robots: { index: true, follow: true },
+    robots: hasListings ? { index: true, follow: true } : { index: false, follow: true },
     other: {
       "geo.placename": cityDisplay,
     },
@@ -166,7 +170,7 @@ export default async function LocalServiceCityPage({ params }: { params: Promise
 
   const cityDisplay = citySlugToDisplayName(citySlug)
   const copy = getLocalSeoCopy(resolved.serviceType, citySlug)
-  const rows = await fetchListingsForLocalLanding(resolved.serviceType, cityDisplay)
+  const rows = await fetchListingsForLocalLanding(resolved.serviceType, cityDisplay, citySlug)
   const cards = rows.map(mapRowToListingCard)
   const origin = getAppOrigin()
   const path = `/${resolved.canonicalSlug}/${citySlug}`
@@ -214,7 +218,12 @@ export default async function LocalServiceCityPage({ params }: { params: Promise
           </div>
 
           {cards.length ? (
-            <ListingGrid listings={cards} fromPath={fromPath} prioritizeFirstImage />
+            <ListingGrid
+              listings={cards}
+              fromPath={fromPath}
+              prioritizeFirstImage
+              enableScrollReveal={false}
+            />
           ) : (
             <div className="card-base rounded-2xl border border-dashed border-warm-200 bg-white/80 p-10 text-center">
               <h3 className="font-serif text-xl text-[#1A1410]">{copy.emptyStateTitle}</h3>

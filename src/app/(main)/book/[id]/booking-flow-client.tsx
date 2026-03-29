@@ -1,6 +1,13 @@
 "use client"
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js"
@@ -63,6 +70,7 @@ interface CheckoutPayload {
   waiverAccepted: boolean
   disclaimersAccepted: boolean
   newsletterOptIn: boolean
+  applyReferralCredit: boolean
 }
 
 function formatMoney(value: number) {
@@ -333,6 +341,9 @@ export function BookingFlowClient({
   const [acceptedWaiverVersion, setAcceptedWaiverVersion] = useState<string | null>(null)
   const [waiverModalOpen, setWaiverModalOpen] = useState(false)
   const [newsletterChecked, setNewsletterChecked] = useState(true)
+  const [referralWalletCents, setReferralWalletCents] = useState(0)
+  const [applyReferralCredit, setApplyReferralCredit] = useState(false)
+  const referralStatsLoadedRef = useRef(false)
   const checkoutInitInFlightRef = useRef(false)
 
   useEffect(() => {
@@ -357,6 +368,7 @@ export function BookingFlowClient({
       waiverAccepted: Boolean(acceptedWaiverVersion),
       disclaimersAccepted: acceptedDisclaimers,
       newsletterOptIn: newsletterChecked,
+      applyReferralCredit: applyReferralCredit && referralWalletCents > 0,
     }),
     [
       acceptedDisclaimers,
@@ -368,6 +380,8 @@ export function BookingFlowClient({
       listingId,
       acceptedWaiverVersion,
       newsletterChecked,
+      applyReferralCredit,
+      referralWalletCents,
     ]
   )
 
@@ -390,10 +404,29 @@ export function BookingFlowClient({
     pricing,
   ])
 
+  const ensureReferralWalletLoaded = useCallback(async () => {
+    if (referralStatsLoadedRef.current) return
+    const res = await fetch("/api/referral/stats")
+    if (!res.ok) return
+    referralStatsLoadedRef.current = true
+    const j = (await res.json()) as { walletBalanceCents?: number }
+    const w = Number(j.walletBalanceCents ?? 0)
+    setReferralWalletCents(w)
+    setApplyReferralCredit((current) => current || w > 0)
+  }, [])
+
+  useEffect(() => {
+    if (step >= 2) {
+      void ensureReferralWalletLoaded()
+    }
+  }, [ensureReferralWalletLoaded, step])
+
   const createCheckoutIntent = useCallback(async (waiverVersionOverride?: string) => {
     if (checkoutInitInFlightRef.current) {
       return
     }
+
+    await ensureReferralWalletLoaded()
 
     const requestPayload = {
       ...payload,
@@ -478,7 +511,7 @@ export function BookingFlowClient({
       }
       setIsLoadingPayment(false)
     }
-  }, [payload])
+  }, [ensureReferralWalletLoaded, payload])
 
   useEffect(() => {
     console.log("[booking-flow] step=3 effect evaluation", {
@@ -707,6 +740,19 @@ export function BookingFlowClient({
                 }
               />
             </div>
+
+            {referralWalletCents > 0 ? (
+              <label className="flex min-h-11 items-start gap-3 rounded-lg border border-[#E7DED3] bg-[#FCFAF7] p-4">
+                <Checkbox
+                  checked={applyReferralCredit}
+                  onCheckedChange={(checked) => setApplyReferralCredit(Boolean(checked))}
+                />
+                <span className="text-[13px] leading-5 text-[#1A1410]">
+                  Apply {formatMoney(referralWalletCents / 100)} referral credit at checkout (up to what Stripe and
+                  host payouts allow).
+                </span>
+              </label>
+            ) : null}
 
             {paymentError ? <p className="text-sm text-destructive">{paymentError}</p> : null}
 

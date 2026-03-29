@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   BarChart3,
   CalendarDays,
+  Gift,
   Home,
   Inbox,
   LineChart,
@@ -24,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin/listings", label: "Listings", icon: Home },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/referrals", label: "Referrals", icon: Gift },
   { href: "/admin/earnings", label: "Earnings", icon: BarChart3 },
   { href: "/admin/messages", label: "Messages", icon: Inbox },
   { href: "/admin/disputes", label: "Disputes", emoji: "⚖️" },

@@ -178,6 +178,16 @@ function SignupForm() {
         if (!missingColumn || !(missingColumn in profilePayload)) break
         delete profilePayload[missingColumn]
       }
+
+      const refCookie = document.cookie.split("; ").find((c) => c.startsWith("thrml_ref="))
+      const refCode = refCookie ? decodeURIComponent(refCookie.split("=").slice(1).join("=")) : null
+      if (refCode && userId) {
+        await fetch("/api/referral/record", {
+          method: "POST",
+          body: JSON.stringify({ userId, code: refCode }),
+          headers: { "Content-Type": "application/json" },
+        })
+      }
     }
 
     setLoading(false)

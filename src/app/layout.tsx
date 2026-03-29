@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import Script from "next/script";
+import { Suspense } from "react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { GoogleTagLoader } from "@/components/analytics/google-tag-loader";
 import { CookieConsent } from "@/components/cookie-consent";
 import { MetaPixel } from "@/components/meta-pixel";
+import { ReferralCapture } from "@/components/ReferralCapture";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -86,6 +88,9 @@ export default function RootLayout({
           Skip to main content
         </a>
         {children}
+        <Suspense fallback={null}>
+          <ReferralCapture />
+        </Suspense>
         <Script
           id="ga-consent-default"
           strategy="afterInteractive"

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { recordReferral } from "@/lib/referral"
 import { sanitizeNextPath } from "@/lib/security"
 import { createClient } from "@/lib/supabase/server"
 
@@ -12,9 +13,7 @@ function loginFallbackUrl(requestUrl: URL, next: string | null) {
   return loginUrl
 }
 
-async function resolvePostAuthRedirect(requestUrl: URL, next: string | null) {
-  if (next) return NextResponse.redirect(new URL(next, requestUrl.origin))
-
+async function resolvePostAuthRedirect(request: NextRequest, requestUrl: URL, next: string | null) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -23,6 +22,13 @@ async function resolvePostAuthRedirect(requestUrl: URL, next: string | null) {
   if (!user) {
     return NextResponse.redirect(loginFallbackUrl(requestUrl, next))
   }
+
+  const refRaw = request.cookies.get("thrml_ref")?.value
+  if (refRaw) {
+    await recordReferral(user.id, decodeURIComponent(refRaw))
+  }
+
+  if (next) return NextResponse.redirect(new URL(next, requestUrl.origin))
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -72,7 +78,7 @@ export async function GET(request: NextRequest) {
       if (type === "email_change" && !next) {
         return NextResponse.redirect(new URL("/dashboard/account?email_change=confirmed", requestUrl.origin))
       }
-      return resolvePostAuthRedirect(requestUrl, next)
+      return resolvePostAuthRedirect(request, requestUrl, next)
     }
 
     return NextResponse.redirect(loginFallbackUrl(requestUrl, next))
@@ -82,7 +88,7 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return resolvePostAuthRedirect(requestUrl, next)
+      return resolvePostAuthRedirect(request, requestUrl, next)
     }
     return NextResponse.redirect(loginFallbackUrl(requestUrl, next))
   }

@@ -16,6 +16,7 @@ import { sendPostSessionEmails } from "@/lib/emails/post-session"
 import { sendGA4Event } from "@/lib/analytics/measurement-protocol"
 import { mergeBookingLegalException, resolveActiveWaiverVersionForServiceType } from "@/lib/waiver-templates"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
+import { processReferralConversion } from "@/lib/referral"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
       const { data: booking } = await supabase
         .from("bookings")
         .select(
-          "id, status, access_code, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, total_charged, host_payout, automated_messages_sent, waiver_version, waiver_accepted, metadata"
+          "id, status, access_code, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, total_charged, host_payout, automated_messages_sent, waiver_version, waiver_accepted, metadata, referral_credit_applied_cents"
         )
         .eq("id", bookingId)
         .maybeSingle()
@@ -195,6 +196,24 @@ export async function POST(req: NextRequest) {
           bookingId: booking.id,
           paymentIntentId: pi.id,
         })
+      }
+
+      if (!bookingUpdateError && newlyConfirmed && booking?.guest_id) {
+        void processReferralConversion(booking.guest_id, booking.id)
+        const appliedCredit = Number(booking.referral_credit_applied_cents ?? 0)
+        if (appliedCredit > 0) {
+          const { error: walletDebitError } = await supabase.rpc("increment_referral_credit", {
+            p_user_id: booking.guest_id,
+            p_amount_cents: -appliedCredit,
+          })
+          if (walletDebitError) {
+            console.error("[stripe/webhook] referral wallet debit failed", {
+              bookingId: booking.id,
+              guestId: booking.guest_id,
+              error: walletDebitError.message,
+            })
+          }
+        }
       }
 
       if (!bookingUpdateError && booking?.id && booking.guest_id && booking.host_id && booking.listing_id) {

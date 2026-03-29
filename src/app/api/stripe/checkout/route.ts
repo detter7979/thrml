@@ -24,6 +24,7 @@ const checkoutSchema = z.object({
   }),
   disclaimersAccepted: z.boolean(),
   newsletterOptIn: z.boolean().optional().default(false),
+  applyReferralCredit: z.boolean().optional().default(false),
 })
 
 function toMinutes(value: string) {
@@ -258,6 +259,7 @@ export async function POST(req: NextRequest) {
       waiverAccepted,
       disclaimersAccepted,
       newsletterOptIn,
+      applyReferralCredit,
     } = parsed.data
 
     const normalizedDate = parseIsoDate(sessionDate)
@@ -435,6 +437,27 @@ export async function POST(req: NextRequest) {
       feePercents.guestFeePercent,
       feePercents.hostFeePercent
     )
+    const STRIPE_MIN_CHARGE_CENTS = 50
+    let referralCreditAppliedCents = 0
+    if (applyReferralCredit) {
+      const { data: guestWalletProfile } = await admin
+        .from("profiles")
+        .select("referral_credit_cents")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      const walletCents = Math.max(0, Number(guestWalletProfile?.referral_credit_cents ?? 0))
+      const dueCents = Math.round(fees.guestTotal * 100)
+      const hostPayoutCents = Math.round(fees.hostPayout * 100)
+      const maxForHost = Math.max(0, dueCents - hostPayoutCents)
+      const maxForStripe =
+        dueCents >= STRIPE_MIN_CHARGE_CENTS ? Math.max(0, dueCents - STRIPE_MIN_CHARGE_CENTS) : 0
+      const creditCents = Math.min(walletCents, maxForHost, maxForStripe)
+      if (creditCents > 0) {
+        referralCreditAppliedCents = creditCents
+        fees.guestTotal = (dueCents - creditCents) / 100
+      }
+    }
     const isInstantBook = Boolean((listing as Record<string, unknown>).is_instant_book ?? (listing as Record<string, unknown>).instant_book)
     const confirmationDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
@@ -549,6 +572,7 @@ export async function POST(req: NextRequest) {
         service_fee: fees.guestFee,
         host_payout: fees.hostPayout,
         total_charged: fees.guestTotal,
+        referral_credit_applied_cents: referralCreditAppliedCents,
         status: isInstantBook ? "pending" : "pending_host",
         confirmation_deadline: isInstantBook ? null : confirmationDeadline,
         waiver_version: waiver_version.trim(),
@@ -681,6 +705,8 @@ export async function POST(req: NextRequest) {
     const finalResponse = {
       clientSecret: paymentIntent.client_secret,
       bookingId: booking.id,
+      appliedReferralCreditCents: referralCreditAppliedCents,
+      guestTotalAfterCredit: fees.guestTotal,
     }
     console.log("[stripe/checkout] Sending successful response", finalResponse)
     return NextResponse.json(finalResponse)

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   CalendarDays,
+  Gift,
   Heart,
   Home,
   Landmark,
@@ -62,6 +63,7 @@ export function DashboardShell({
     { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
     { href: "/dashboard/listings", label: "Listings", icon: Sparkles },
     { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+    { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
   ]
   const hostDesktopSecondaryItems = [
     { href: "/dashboard/earnings", label: "Earnings", icon: Landmark },
@@ -72,6 +74,7 @@ export function DashboardShell({
     { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
     { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
     { href: "/dashboard/saved", label: "Saved spaces", icon: Heart },
+    { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
   ]
   const desktopItems = isHost ? hostDesktopPrimaryItems : guestDesktopItems
   const mobileItems = isHost
@@ -80,6 +83,7 @@ export function DashboardShell({
         { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
         { href: "/dashboard/listings", label: "Listings", icon: LayoutGrid },
         { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
+        { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
         { href: "/dashboard/account", label: "Account", icon: UserCircle },
       ]
     : [
@@ -87,6 +91,7 @@ export function DashboardShell({
         { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
         { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
         { href: "/dashboard/saved", label: "Saved spaces", icon: Heart },
+        { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
         { href: "/dashboard/account", label: "Account", icon: User },
       ]
   const isOverviewPage = pathname === "/dashboard"

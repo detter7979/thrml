@@ -254,6 +254,88 @@ export type LocalListingRow = {
   listing_ratings: { avg_overall: number | null; review_count: number | null }[] | null
 }
 
+/** Center + radius for local landing when hosts rely on map pins more than normalized city fields. */
+const LOCAL_LANDING_GEO_BY_SLUG: Record<string, { lat: number; lng: number; radiusMiles: number }> = {
+  seattle: { lat: 47.6062, lng: -122.3321, radiusMiles: 65 },
+}
+
+/**
+ * Puget Sound cities matched for `/saunas/seattle` (etc.) so suburbs don’t disappear
+ * when `city`/`location_city` don’t contain the word "Seattle".
+ */
+const SEATTLE_METRO_TEXT_CITIES = [
+  "Bellevue",
+  "Bothell",
+  "Burien",
+  "Edmonds",
+  "Everett",
+  "Federal Way",
+  "Issaquah",
+  "Kent",
+  "Kirkland",
+  "Lynnwood",
+  "Mercer Island",
+  "Olympia",
+  "Redmond",
+  "Renton",
+  "Sammamish",
+  "SeaTac",
+  "Shoreline",
+  "Tacoma",
+  "Tukwila",
+  "Woodinville",
+] as const
+
+const LOCAL_LANDING_SELECT =
+  "id, title, description, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
+
+/** Same row shape but without rating embed (older DBs / schema drift). */
+const LOCAL_LANDING_SELECT_MINIMAL =
+  "id, title, description, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index)"
+
+type LocalListingQueryRow = LocalListingRow & {
+  is_featured?: boolean | null
+  created_at?: string | null
+}
+
+/** PostgREST ilike: * is wildcard (avoids % encoding in filters). */
+function buildCityTextOrFilter(cityDisplayName: string): string {
+  const safeCity = cityDisplayName.replace(/"/g, "")
+  const ilikeCore = `*${safeCity}*`
+  const ilikePattern = /[^a-zA-Z0-9]/.test(safeCity) ? `"${ilikeCore}"` : ilikeCore
+  return [
+    `city.ilike.${ilikePattern}`,
+    `location_city.ilike.${ilikePattern}`,
+    `location.ilike.${ilikePattern}`,
+    `location_address.ilike.${ilikePattern}`,
+  ].join(",")
+}
+
+function mergeLocalLandingRows(rows: LocalListingQueryRow[]): LocalListingRow[] {
+  const seen = new Set<string>()
+  const out: LocalListingQueryRow[] = []
+  for (const row of rows) {
+    if (seen.has(row.id)) continue
+    seen.add(row.id)
+    out.push(row)
+  }
+  out.sort((a, b) => {
+    const fa = a.is_featured ? 1 : 0
+    const fb = b.is_featured ? 1 : 0
+    if (fb !== fa) return fb - fa
+    const ta = new Date(a.created_at ?? 0).getTime()
+    const tb = new Date(b.created_at ?? 0).getTime()
+    return tb - ta
+  })
+  return out
+}
+
+/** DB `service_type` values shown on this SEO URL (sauna landings include infrared saunas). */
+function serviceTypesForLocalLanding(serviceType: ServiceType): string[] {
+  if (serviceType === "sauna") return ["sauna", "infrared"]
+  return [serviceType]
+}
+
 export function mapRowToListingCard(row: LocalListingRow): ListingCardData {
   const city =
     typeof row.city === "string"
@@ -307,37 +389,85 @@ export function mapRowToListingCard(row: LocalListingRow): ListingCardData {
 }
 
 /**
- * Active listings in a city (matches `city` or `location_city`, case-insensitive) and service type.
+ * Active listings for a local SEO page: service type match plus city text match
+ * (`city`, `location_city`, `location`, `location_address`) and/or a known metro bbox
+ * (see `LOCAL_LANDING_GEO_BY_SLUG`) when the URL slug has configured coordinates.
  */
 export async function fetchListingsForLocalLanding(
   serviceType: ServiceType,
-  cityDisplayName: string
+  cityDisplayName: string,
+  citySlug?: string
 ): Promise<LocalListingRow[]> {
   const supabase = await createClient()
-  // PostgREST accepts * as wildcard in ilike filters (avoids % URL-encoding issues).
-  const safeCity = cityDisplayName.replace(/"/g, "")
-  const ilikeCore = `*${safeCity}*`
-  const ilikePattern = /[^a-zA-Z0-9]/.test(safeCity) ? `"${ilikeCore}"` : ilikeCore
+  const slugKey = citySlug?.trim().toLowerCase() ?? ""
+  const textOrClauses =
+    slugKey === "seattle"
+      ? [buildCityTextOrFilter(cityDisplayName), ...SEATTLE_METRO_TEXT_CITIES.map((c) => buildCityTextOrFilter(c))]
+      : [buildCityTextOrFilter(cityDisplayName)]
+  const typeFilter = serviceTypesForLocalLanding(serviceType)
 
-  const { data, error } = await supabase
-    .from("listings")
-    .select(
-      "id, title, description, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
-    )
-    .eq("is_active", true)
-    .eq("is_draft", false)
-    .eq("is_deleted", false)
-    .eq("service_type", serviceType)
-    .or(`city.ilike.${ilikePattern},location_city.ilike.${ilikePattern}`)
-    .order("is_featured", { ascending: false })
-    .order("created_at", { ascending: false })
+  const base = (select: string) =>
+    supabase
+      .from("listings")
+      .select(select)
+      .eq("is_active", true)
+      .eq("is_deleted", false)
+      // Match Explore: it does not filter `is_draft`, so omit here so local pages stay consistent.
 
-  if (error) {
-    console.error("[local landing] listings query failed", error.message)
-    return []
+  async function runTextQueryWithOr(
+    select: typeof LOCAL_LANDING_SELECT | typeof LOCAL_LANDING_SELECT_MINIMAL,
+    orClause: string
+  ): Promise<LocalListingQueryRow[]> {
+    const { data, error } = await base(select)
+      .in("service_type", typeFilter)
+      .or(orClause)
+      .order("is_featured", { ascending: false })
+      .order("created_at", { ascending: false })
+    if (error) {
+      if (select === LOCAL_LANDING_SELECT) {
+        console.warn("[local landing] text query failed, retry without ratings embed", error.message)
+        return runTextQueryWithOr(LOCAL_LANDING_SELECT_MINIMAL, orClause)
+      }
+      console.error("[local landing] text listings query failed", error.message)
+      return []
+    }
+    return (data ?? []) as unknown as LocalListingQueryRow[]
   }
 
-  return (data ?? []) as LocalListingRow[]
+  async function runGeoQuery(
+    select: typeof LOCAL_LANDING_SELECT | typeof LOCAL_LANDING_SELECT_MINIMAL,
+    g: NonNullable<(typeof LOCAL_LANDING_GEO_BY_SLUG)[string]>
+  ): Promise<LocalListingQueryRow[]> {
+    const delta = g.radiusMiles / 69
+    const { data, error } = await base(select)
+      .in("service_type", typeFilter)
+      .gte("lat", g.lat - delta)
+      .lte("lat", g.lat + delta)
+      .gte("lng", g.lng - delta)
+      .lte("lng", g.lng + delta)
+      .order("is_featured", { ascending: false })
+      .order("created_at", { ascending: false })
+    if (error) {
+      if (select === LOCAL_LANDING_SELECT) {
+        console.warn("[local landing] geo query failed, retry without ratings embed", error.message)
+        return runGeoQuery(LOCAL_LANDING_SELECT_MINIMAL, g)
+      }
+      console.error("[local landing] geo listings query failed", error.message)
+      return []
+    }
+    return (data ?? []) as unknown as LocalListingQueryRow[]
+  }
+
+  const textRowSets = await Promise.all(
+    textOrClauses.map((clause) => runTextQueryWithOr(LOCAL_LANDING_SELECT, clause))
+  )
+  const textRows = textRowSets.flat()
+
+  const geo =
+    slugKey && LOCAL_LANDING_GEO_BY_SLUG[slugKey] ? LOCAL_LANDING_GEO_BY_SLUG[slugKey] : undefined
+  const geoRows = geo ? await runGeoQuery(LOCAL_LANDING_SELECT, geo) : []
+
+  return mergeLocalLandingRows([...textRows, ...geoRows])
 }
 
 export function getAppOrigin(): string {

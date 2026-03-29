@@ -1421,7 +1421,7 @@ export function ListingDetailClient({
                           <p className="text-[17px] font-semibold text-[#1A1410]">{hostName}</p>
                           <p className="text-sm text-muted-foreground">Hosted since {hostYear}</p>
                           {showHostAsNew ? (
-                            <span className="mt-1 inline-flex rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+                            <span className="mt-1 inline-flex rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New</span>
                           ) : (
                             <p className="mt-1 text-sm text-muted-foreground">★ {hostAverageRating.toFixed(1)} ({hostTotalReviews})</p>
                           )}
@@ -1471,7 +1471,7 @@ export function ListingDetailClient({
                         <p className="text-[17px] font-semibold text-[#1A1410]">{hostName}</p>
                         <p className="text-sm text-muted-foreground">Hosted since {hostYear}</p>
                         {showHostAsNew ? (
-                          <span className="mt-1 inline-flex rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+                          <span className="mt-1 inline-flex rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New</span>
                         ) : (
                           <p className="mt-1 text-sm text-muted-foreground">★ {hostAverageRating.toFixed(1)} ({hostTotalReviews})</p>
                         )}

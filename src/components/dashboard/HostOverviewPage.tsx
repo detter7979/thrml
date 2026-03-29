@@ -389,7 +389,7 @@ async function IdentityCardSection({ userId }: { userId: string }) {
           <p className="truncate text-lg font-semibold text-[#1A1410]">{data.profile.name}</p>
           <div className="mt-0.5 flex items-center gap-2 text-sm text-[#6D5E51]">
             {showNewRating ? (
-              <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+              <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New</span>
             ) : (
               <span>★ {rating.toFixed(1)} ({data.profile.totalReviews})</span>
             )}

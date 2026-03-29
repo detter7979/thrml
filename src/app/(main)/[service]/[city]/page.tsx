@@ -194,7 +194,7 @@ export default async function LocalServiceCityPage({ params }: { params: Promise
 
       <article className="mx-auto max-w-6xl px-4 py-10 md:px-8 md:py-14">
         <header className="mx-auto max-w-3xl text-center">
-          <p className="type-label mb-3 text-warm-600">thrml · {cityDisplay}</p>
+          <p className="type-label mb-3 text-[#6b5346]">thrml · {cityDisplay}</p>
           <h1 className="font-serif text-4xl leading-tight text-[#1A1410] md:text-5xl">{copy.h1}</h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-warm-700">{copy.subtitle}</p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -212,7 +212,7 @@ export default async function LocalServiceCityPage({ params }: { params: Promise
             <h2 id="listings-heading" className="font-serif text-2xl text-[#1A1410] md:text-3xl">
               Available in {cityDisplay}
             </h2>
-            <p className="text-sm text-warm-600">
+            <p className="text-sm text-[#6b5346]">
               {cards.length} {cards.length === 1 ? "space" : "spaces"} match this search
             </p>
           </div>

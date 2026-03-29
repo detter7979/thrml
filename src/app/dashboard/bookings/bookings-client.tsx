@@ -205,7 +205,7 @@ function serviceTypePill(serviceType: string | null) {
   if (key === "infrared") return `${base} bg-rose-100 text-rose-700`
   if (key === "float_tank") return `${base} bg-indigo-100 text-indigo-700`
   if (key === "hot_tub") return `${base} bg-[#F3ECE3] text-[#6D5E51]`
-  return `${base} bg-[#FDEBDD] text-[#C75B3A]`
+  return `${base} bg-[#FDEBDD] text-[#8B3A20]`
 }
 
 function downloadIcs(booking: BookingRecord) {
@@ -691,7 +691,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                           {serviceEmoji(booking.listings?.service_type ?? null)} {serviceName(booking.listings?.service_type ?? null)}
                         </span>
                         {isToday(booking.session_date) ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">
                             <span className="size-1.5 animate-pulse rounded-full bg-[#C75B3A]" />
                             Today
                           </span>

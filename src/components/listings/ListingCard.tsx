@@ -94,7 +94,7 @@ export function ListingCard({
                 ★ {Number(listing.rating).toFixed(1)} ({reviewCount})
               </p>
             ) : (
-              <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+              <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New</span>
             )}
           </div>
         </div>

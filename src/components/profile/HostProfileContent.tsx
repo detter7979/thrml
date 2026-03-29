@@ -428,7 +428,7 @@ export async function HostProfileContent({
               ) : null}
               <p className="text-sm text-[#4D3F34]">
                 {showNewRating ? (
-                  <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#C75B3A]">New</span>
+                  <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New</span>
                 ) : (
                   <>
                     <span className="font-medium">★ {overallRating.toFixed(1)}</span>

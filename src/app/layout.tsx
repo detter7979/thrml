@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import Script from "next/script";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { GoogleTagLoader } from "@/components/analytics/google-tag-loader";
 import { CookieConsent } from "@/components/cookie-consent";
 import { MetaPixel } from "@/components/meta-pixel";
@@ -101,6 +102,7 @@ export default function RootLayout({
         <GoogleTagLoader />
         <MetaPixel />
         <CookieConsent />
+        <SpeedInsights />
       </body>
     </html>
   );

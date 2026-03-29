@@ -33,10 +33,13 @@ import {
 } from "@/lib/constants/cancellation-policies"
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
 import { SERVICE_TYPES } from "@/lib/constants/service-types"
+import { trackGaEvent } from "@/lib/analytics/ga"
+import { getGa4ClientIdForMp } from "@/lib/analytics/ga-client-id"
 import { sanitizeText } from "@/lib/sanitize"
 import { createClient } from "@/lib/supabase/client"
 import { getPricePerPerson } from "@/lib/pricing"
 import type { ServiceTypeId } from "@/lib/service-types"
+import { getFacebookPixelCookies, trackMetaEvent } from "@/components/meta-pixel"
 
 const saunaTypes = ["Finnish", "Infrared", "Steam", "Barrel", "Wood-Fired"] as const
 const cancellationPolicies = ["flexible", "moderate", "strict"] as const
@@ -344,6 +347,43 @@ export function HostNewListingClient({
   const [hasStripeAccount, setHasStripeAccount] = useState(initialHasStripeAccount)
   const [showMoreAmenities, setShowMoreAmenities] = useState(false)
   const allowNavigationRef = useRef(false)
+  const hostOnboardingPhase2TrackedRef = useRef(false)
+
+  useEffect(() => {
+    if (hostOnboardingPhase2TrackedRef.current) return
+    hostOnboardingPhase2TrackedRef.current = true
+
+    const eventId = crypto.randomUUID()
+    const { fbp, fbc } = getFacebookPixelCookies()
+
+    trackMetaEvent(
+      "host_onboarding_started",
+      { content_name: "Host Onboarding", event_id: eventId },
+      { eventId, sendServer: false, custom: true }
+    )
+
+    void fetch("/api/events/host-onboarding-started", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        event_id: eventId,
+        ...(fbp ? { fbp } : {}),
+        ...(fbc ? { fbc } : {}),
+      }),
+    }).catch(() => undefined)
+
+    trackGaEvent("host_onboarding_started", {
+      event_category: "host_funnel",
+      event_label: "step_1",
+    })
+
+    const w = window as { gtag?: (...args: unknown[]) => void }
+    if (w.gtag) {
+      // TODO(Google Ads): Phase 2 host funnel — set `send_to` when the conversion action exists, then uncomment:
+      // w.gtag("event", "conversion", { send_to: "AW-CONVERSION_ID/CONVERSION_LABEL_PHASE2" })
+    }
+  }, [])
 
   const {
     register,
@@ -869,6 +909,45 @@ export function HostNewListingClient({
     if (photosError) {
       setPhotoError(photosError.message)
       return
+    }
+
+    const listingCreatedEventId = crypto.randomUUID()
+    const listingGaClientId = getGa4ClientIdForMp(userId)
+    const listingPixelCookies = getFacebookPixelCookies()
+
+    trackMetaEvent(
+      "listing_created",
+      {
+        content_name: "New Listing",
+        content_type: "product",
+        content_id: listing.id,
+        event_id: listingCreatedEventId,
+      },
+      { eventId: listingCreatedEventId, sendServer: false, custom: true }
+    )
+
+    void fetch("/api/events/listing-created", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        event_id: listingCreatedEventId,
+        listing_id: listing.id,
+        client_id: listingGaClientId,
+        ...listingPixelCookies,
+      }),
+    }).catch(() => undefined)
+
+    trackGaEvent("listing_created", {
+      event_category: "host_funnel",
+      event_label: "listing_published",
+      listing_id: listing.id,
+    })
+
+    const win = window as { gtag?: (...args: unknown[]) => void }
+    if (win.gtag) {
+      // TODO(Google Ads): Phase 3 listing published — set `send_to` when the conversion action exists, then uncomment:
+      // win.gtag("event", "conversion", { send_to: "AW-CONVERSION_ID/CONVERSION_LABEL_PHASE3" })
     }
 
     allowNavigationRef.current = true

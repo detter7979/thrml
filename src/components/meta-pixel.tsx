@@ -15,6 +15,8 @@ type QueuedMetaEvent = {
   eventName: string
   params?: Record<string, unknown>
   eventId?: string
+  /** Non-standard event names must use fbq("trackCustom", ...). */
+  custom?: boolean
 }
 
 declare global {
@@ -53,8 +55,13 @@ export function MetaPixel() {
       if (!window.fbq || !window.__thrmlMetaQueue?.length) return
       const queue = [...window.__thrmlMetaQueue]
       window.__thrmlMetaQueue = []
-      queue.forEach(({ eventName, params, eventId }) => {
-        window.fbq?.("track", eventName, params, eventId ? { eventID: eventId } : undefined)
+      queue.forEach(({ eventName, params, eventId, custom }) => {
+        const eventIdOpt = eventId ? { eventID: eventId } : undefined
+        if (custom) {
+          window.fbq?.("trackCustom", eventName, params, eventIdOpt)
+        } else {
+          window.fbq?.("track", eventName, params, eventIdOpt)
+        }
       })
     }, 300)
 
@@ -89,6 +96,16 @@ function getCookieValue(cookieName: string): string | undefined {
   return match ? decodeURIComponent(match[1]) : undefined
 }
 
+/** _fbp / _fbc for Meta CAPI payloads (browser only). */
+export function getFacebookPixelCookies(): { fbp?: string; fbc?: string } {
+  const fbp = getCookieValue("_fbp")
+  const fbc = getCookieValue("_fbc")
+  return {
+    ...(fbp ? { fbp } : {}),
+    ...(fbc ? { fbc } : {}),
+  }
+}
+
 export function trackMetaEvent(
   eventName: string,
   params?: Record<string, unknown>,
@@ -96,18 +113,25 @@ export function trackMetaEvent(
     eventId?: string
     userData?: MetaUserData
     sendServer?: boolean
+    custom?: boolean
   }
 ) {
   if (typeof window === "undefined") return
 
   const eventId =
     options?.eventId ?? (typeof params?.event_id === "string" ? (params.event_id as string) : undefined)
+  const custom = Boolean(options?.custom)
 
   if (window.fbq) {
-    window.fbq("track", eventName, params, eventId ? { eventID: eventId } : undefined)
+    const eventIdOpt = eventId ? { eventID: eventId } : undefined
+    if (custom) {
+      window.fbq("trackCustom", eventName, params, eventIdOpt)
+    } else {
+      window.fbq("track", eventName, params, eventIdOpt)
+    }
   } else {
     window.__thrmlMetaQueue = window.__thrmlMetaQueue ?? []
-    window.__thrmlMetaQueue.push({ eventName, params, eventId })
+    window.__thrmlMetaQueue.push({ eventName, params, eventId, custom })
   }
 
   if (options?.sendServer === false) return

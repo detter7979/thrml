@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "event_id is required" }, { status: 400 })
   }
 
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "922697217019242"
   const accessToken = process.env.META_CONVERSIONS_API_TOKEN
   if (!pixelId || !accessToken) {
     console.warn("[Meta CAPI host_onboarding_started] Missing pixel id or META_CONVERSIONS_API_TOKEN")

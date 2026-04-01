@@ -1,5 +1,11 @@
+"use client"
+
 import Link from "next/link"
 import { CalendarDays, Heart, MessageCircle, Settings, Sparkles } from "lucide-react"
+
+import { trackMetaEvent } from "@/components/meta-pixel"
+import { trackGaEvent } from "@/lib/analytics/ga"
+import { trackBecomeHostClick } from "@/lib/tracking/google-ads"
 
 type GuestOverviewPageProps = {
   canHost: boolean
@@ -71,7 +77,25 @@ export function GuestOverviewPage({ canHost }: GuestOverviewPageProps) {
           <p className="mt-1 text-sm text-[#6D5E51]">
             Share your wellness space and start accepting bookings.
           </p>
-          <Link href="/become-a-host" className="mt-3 inline-flex text-sm font-medium text-[#8B4513] hover:underline">
+          <Link
+            href="/become-a-host"
+            className="mt-3 inline-flex text-sm font-medium text-[#8B4513] hover:underline"
+            onClick={() => {
+              trackBecomeHostClick("/become-a-host", "guest_dashboard")
+              trackMetaEvent(
+                "become_host_click",
+                {
+                  content_name: "become_a_host",
+                  source: "guest_dashboard",
+                },
+                { custom: true }
+              )
+              trackGaEvent("become_host_click", {
+                source: "guest_dashboard",
+                destination: "/become-a-host",
+              })
+            }}
+          >
             Start hosting →
           </Link>
         </section>

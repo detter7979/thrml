@@ -40,10 +40,10 @@ export async function POST(req: NextRequest) {
   })
   if (limited) return limited
 
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "922697217019242"
   const accessToken = process.env.META_CONVERSIONS_API_TOKEN
   if (!pixelId || !accessToken) {
-    console.warn("[Meta CAPI] Missing NEXT_PUBLIC_META_PIXEL_ID or META_CONVERSIONS_API_TOKEN")
+    console.warn("[Meta CAPI] Missing META_CONVERSIONS_API_TOKEN")
     return NextResponse.json({ ok: false, skipped: true }, { status: 202 })
   }
 

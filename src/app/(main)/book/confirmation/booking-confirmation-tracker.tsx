@@ -28,7 +28,7 @@ export function BookingConfirmationTracker({
 }: BookingConfirmationTrackerProps) {
   useEffect(() => {
     const purchaseEventId = `purchase_${bookingId}`
-    const googleAdsIdRaw = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim()
+    const googleAdsIdRaw = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18014799415").trim()
     const googleAdsId = googleAdsIdRaw && /^AW-\d+$/.test(googleAdsIdRaw) ? googleAdsIdRaw : null
 
     // GA4 purchase (client-side — deduplicates against server-side MP event).

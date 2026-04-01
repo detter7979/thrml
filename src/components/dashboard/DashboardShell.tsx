@@ -20,6 +20,9 @@ import { useEffect, useState, type ReactNode } from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { trackMetaEvent } from "@/components/meta-pixel"
+import { trackBecomeHostClick } from "@/lib/tracking/google-ads"
+import { trackGaEvent } from "@/lib/analytics/ga"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -462,7 +465,34 @@ export function DashboardShell({
         <div className="p-4 pt-2">
           <div className="space-y-3 border-t border-[#EEE4D9] pt-4">
             <Button asChild className="h-11 w-full rounded-full bg-[#C75B3A] text-white hover:bg-[#B44D31]">
-              <Link href={dashboardPrimaryCtaHref}>
+              <Link
+                href={dashboardPrimaryCtaHref}
+                onClick={() => {
+                  if (!isHost || !hasListings) {
+                    // Non-host path → /become-a-host (Phase 1 become_host_click)
+                    trackBecomeHostClick("/become-a-host", "dashboard_sidebar")
+                    trackMetaEvent(
+                      "become_host_click",
+                      {
+                        content_name: "become_a_host",
+                        source: "dashboard_sidebar",
+                      },
+                      { custom: true }
+                    )
+                    trackGaEvent("become_host_click", {
+                      source: "dashboard_sidebar",
+                      destination: "/become-a-host",
+                    })
+                  } else {
+                    // Existing host path → /dashboard/listings/new
+                    // Phase 2 host_onboarding_started fires on mount of destination — no additional event needed here
+                    trackGaEvent("new_listing_click", {
+                      source: "dashboard_sidebar",
+                      destination: "/dashboard/listings/new",
+                    })
+                  }
+                }}
+              >
                 <PlusCircle className="mr-2 size-4" />
                 Host a space
               </Link>

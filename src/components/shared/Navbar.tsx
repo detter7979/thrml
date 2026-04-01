@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { trackMetaEvent } from "@/components/meta-pixel"
 import { trackBecomeHostClick } from "@/lib/tracking/google-ads"
 import { createClient } from "@/lib/supabase/client"
 
@@ -348,6 +349,14 @@ export function Navbar() {
                       href="/become-a-host"
                       onClick={() => {
                         trackBecomeHostClick("/become-a-host")
+                        trackMetaEvent(
+                          "become_host_click",
+                          {
+                            content_name: "become_a_host",
+                            source: "nav",
+                          },
+                          { custom: true }
+                        )
                         closeUserMenu()
                       }}
                     >
@@ -375,7 +384,17 @@ export function Navbar() {
               >
                 <Link
                   href="/become-a-host"
-                  onClick={() => trackBecomeHostClick("/become-a-host")}
+                  onClick={() => {
+                    trackBecomeHostClick("/become-a-host")
+                    trackMetaEvent(
+                      "become_host_click",
+                      {
+                        content_name: "become_a_host",
+                        source: "nav",
+                      },
+                      { custom: true }
+                    )
+                  }}
                 >
                   Become a host
                 </Link>
@@ -492,6 +511,14 @@ export function Navbar() {
                             className="text-[#FFAB90] font-medium"
                             onClick={() => {
                               trackBecomeHostClick("/become-a-host")
+                              trackMetaEvent(
+                                "become_host_click",
+                                {
+                                  content_name: "become_a_host",
+                                  source: "nav",
+                                },
+                                { custom: true }
+                              )
                               closeMobileNav()
                             }}
                           >
@@ -540,6 +567,14 @@ export function Navbar() {
                         className="text-[#FFAB90] font-medium"
                         onClick={() => {
                           trackBecomeHostClick("/become-a-host")
+                          trackMetaEvent(
+                            "become_host_click",
+                            {
+                              content_name: "become_a_host",
+                              source: "nav",
+                            },
+                            { custom: true }
+                          )
                           closeMobileNav()
                         }}
                       >

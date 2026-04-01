@@ -10,11 +10,11 @@ export async function sendGA4Event({
   clientId: string
   events: GA4MPEvent[]
 }): Promise<void> {
-  const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+  const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-L20J7S2M51"
   const apiSecret = process.env.GA4_MEASUREMENT_PROTOCOL_SECRET
 
   if (!measurementId || !apiSecret) {
-    console.warn("[GA4 MP] Missing NEXT_PUBLIC_GA_MEASUREMENT_ID or GA4_MEASUREMENT_PROTOCOL_SECRET")
+    console.warn("[GA4 MP] Missing GA4_MEASUREMENT_PROTOCOL_SECRET")
     return
   }
 

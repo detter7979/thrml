@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   const clientId = typeof body.client_id === "string" && body.client_id.length > 0 ? body.client_id : user.id
 
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "922697217019242"
   const accessToken = process.env.META_CONVERSIONS_API_TOKEN
 
   const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()

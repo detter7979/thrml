@@ -26,7 +26,7 @@ const securityHeaders = [
       "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://api.mapbox.com https://*.tiles.mapbox.com https://www.facebook.com https://www.googleadservices.com https://googleads.g.doubleclick.net",
       "font-src 'self'",
       "frame-src https://js.stripe.com https://hooks.stripe.com https://td.doubleclick.net",
-      "connect-src 'self' https://*.supabase.co https://api.stripe.com https://www.google-analytics.com https://connect.facebook.net https://www.facebook.com https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com https://www.google.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://va.vercel-scripts.com",
+      "connect-src 'self' https://*.supabase.co https://api.stripe.com https://www.google-analytics.com https://connect.facebook.net https://www.facebook.com https://graph.facebook.com https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com https://www.google.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://va.vercel-scripts.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",

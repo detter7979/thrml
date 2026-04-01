@@ -27,7 +27,7 @@ declare global {
 }
 
 export function MetaPixel() {
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "922697217019242"
   const [consented, setConsented] = useState(false)
 
   useEffect(() => {

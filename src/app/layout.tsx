@@ -7,6 +7,7 @@ import { GoogleTagLoader } from "@/components/analytics/google-tag-loader";
 import { CookieConsent } from "@/components/cookie-consent";
 import { MetaPixel } from "@/components/meta-pixel";
 import { ReferralCapture } from "@/components/ReferralCapture";
+import { SmoothScrollProvider } from "@/components/providers/SmoothScrollProvider";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -77,9 +78,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="overflow-x-hidden">
       <body
-        className={`${dmSans.variable} ${dmSerifDisplay.variable} antialiased`}
+        className={`${dmSans.variable} ${dmSerifDisplay.variable} min-w-0 overflow-x-hidden antialiased`}
       >
         <a
           href="#main-content"
@@ -87,7 +88,7 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        {children}
+        <SmoothScrollProvider>{children}</SmoothScrollProvider>
         <Suspense fallback={null}>
           <ReferralCapture />
         </Suspense>

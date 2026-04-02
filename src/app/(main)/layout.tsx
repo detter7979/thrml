@@ -4,6 +4,7 @@ import { Facebook, Instagram } from "lucide-react"
 
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { getPlatformFeePercentsCached } from "@/lib/fees"
+import { MainContentMotion } from "@/components/shared/MainContentMotion"
 import { Navbar } from "@/components/shared/Navbar"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -16,7 +17,9 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
     <div className="min-h-screen bg-warm-50">
       <Navbar />
       <PlatformFeesProvider initialPercents={feePercents}>
-        <main id="main-content">{children}</main>
+        <main id="main-content" className="min-w-0 overflow-x-hidden">
+          <MainContentMotion>{children}</MainContentMotion>
+        </main>
       </PlatformFeesProvider>
       <footer className="border-t border-white/10 bg-[#1A1410] text-white/75">
         <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">

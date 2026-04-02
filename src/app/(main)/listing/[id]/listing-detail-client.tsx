@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { motion, useReducedMotion } from "framer-motion"
 import {
   Apple,
   Armchair,
@@ -71,6 +72,28 @@ import { roundUpTo30 } from "@/lib/slots"
 import { createClient } from "@/lib/supabase/client"
 import type { BookingModel } from "@/lib/service-types"
 import { useScrollReveal } from "@/hooks/useScrollReveal"
+import {
+  CASCADE_TRANSITION,
+  listingCascadeDelay,
+  listingHeroLayoutId,
+} from "@/lib/motion-system"
+
+function DetailCascade({ step, children }: { step: number; children: React.ReactNode }) {
+  const reduce = useReducedMotion()
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: reduce ? 0 : CASCADE_TRANSITION.duration,
+        ease: CASCADE_TRANSITION.ease,
+        delay: reduce ? 0 : listingCascadeDelay(step),
+      }}
+    >
+      {children}
+    </motion.div>
+  )
+}
 
 interface HostProfile {
   id: string
@@ -458,6 +481,8 @@ function BookingWidget({
   canReserve,
   hostPayoutsReady,
   cancellationPolicy,
+  cascadePricingDelay,
+  cascadeCtaDelay,
 }: {
   pricing: PricingTiers
   listingId: string
@@ -482,8 +507,11 @@ function BookingWidget({
   canReserve: boolean
   hostPayoutsReady: boolean
   cancellationPolicy: string | null
+  cascadePricingDelay?: number
+  cascadeCtaDelay?: number
 }) {
   const feePercents = usePlatformFeePercents()
+  const reduceMotion = useReducedMotion()
   const router = useRouter()
   const supabase = createClient()
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
@@ -811,9 +839,29 @@ function BookingWidget({
     }
   }
 
+  const pricingBlockMotion = {
+    initial: reduceMotion ? false : { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: {
+      duration: reduceMotion ? 0 : CASCADE_TRANSITION.duration,
+      ease: CASCADE_TRANSITION.ease,
+      delay: reduceMotion ? 0 : (cascadePricingDelay ?? 0),
+    },
+  }
+  const ctaBlockMotion = {
+    initial: reduceMotion ? false : { opacity: 0, y: 10 },
+    animate: { opacity: 1, y: 0 },
+    transition: {
+      duration: reduceMotion ? 0 : CASCADE_TRANSITION.duration,
+      ease: CASCADE_TRANSITION.ease,
+      delay: reduceMotion ? 0 : (cascadeCtaDelay ?? 0),
+    },
+  }
+
   return (
     <Card className="card-base gap-4 py-4">
       <CardContent className="space-y-4 px-4">
+        <motion.div {...pricingBlockMotion} className="space-y-4">
         {!canReserve ? (
           <div className="rounded-lg border border-[#E6DDD3] bg-[#F8F4EF] p-3 text-sm text-[#5E4E42]">
             This listing is no longer accepting new bookings.
@@ -985,7 +1033,9 @@ function BookingWidget({
             <span>{formatMoney(totals.guestTotal)}</span>
           </div>
         </div>
+        </motion.div>
 
+        <motion.div {...ctaBlockMotion} className="space-y-2">
         {canReserve && hostPayoutsReady ? (
           <Button className="btn-primary w-full" onClick={handleReserve} disabled={!selectedSlots.length}>
             Reserve
@@ -1000,6 +1050,7 @@ function BookingWidget({
           <span>🛡</span>
           <span>{policy.tagline}</span>
         </div>
+        </motion.div>
       </CardContent>
     </Card>
   )
@@ -1040,6 +1091,7 @@ export function ListingDetailClient({
   backToResultsPath = null,
 }: ListingDetailProps) {
   const router = useRouter()
+  const reduceMotion = useReducedMotion()
   const detailRef = useScrollReveal<HTMLDivElement>()
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest")
   const [chipFilter, setChipFilter] = useState<number | null>(null)
@@ -1204,6 +1256,19 @@ export function ListingDetailClient({
       ? `/listings/${id}?from=${encodeURIComponent(backToResultsPath)}`
       : `/listings/${id}`
 
+  const heroMotionProps =
+    photos.length > 0
+      ? {
+          layoutId: listingHeroLayoutId(id),
+          initial: reduceMotion ? false : { opacity: 0 },
+          animate: { opacity: 1 },
+          transition: {
+            opacity: { duration: reduceMotion ? 0 : 0.18 },
+            layout: { duration: reduceMotion ? 0 : 0.32, ease: CASCADE_TRANSITION.ease },
+          },
+        }
+      : null
+
   useEffect(() => {
     trackGaEvent("view_item", {
       listing_id: id,
@@ -1228,55 +1293,8 @@ export function ListingDetailClient({
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
-        <section className="mb-6 space-y-3 border-b pb-6">
-          <button
-            type="button"
-            onClick={() => {
-              if (backToResultsPath && backToResultsPath.startsWith("/explore")) {
-                router.push(backToResultsPath)
-                return
-              }
-              router.push("/explore")
-            }}
-            className="inline-flex min-h-[44px] items-center gap-1 rounded-md text-sm font-medium text-[#5D4D41]"
-          >
-            <ChevronLeft className="size-4" />
-            {backToResultsPath ? "Back to results" : "Explore spaces"}
-          </button>
-          <div className="space-y-2">
-            <div>
-              <h1 className="type-h1">{title}</h1>
-              <p className="type-label">{locationLabel}</p>
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">
-                  <span className="mr-1">{serviceTypeIcon}</span>
-                  {serviceTypeName}
-                </Badge>
-                {saunaType ? <Badge variant="secondary">{saunaType}</Badge> : null}
-                {capacity ? <Badge variant="secondary">Up to {capacity} guests</Badge> : null}
-              </div>
-              <div className="flex shrink-0 items-center justify-end gap-4">
-                <ShareButton
-                  variant="detail"
-                  listing={{
-                    id,
-                    title,
-                    service_type: serviceTypeId,
-                  }}
-                />
-                <SaveButton
-                  listingId={id}
-                  variant="detail"
-                  listingMeta={{ serviceType: serviceTypeId, city }}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-8">
+        <DetailCascade step={0}>
+          <section className="mb-8">
           <div className="md:hidden">
             <div
               className="no-scrollbar -mx-4 flex snap-x snap-mandatory overflow-x-auto"
@@ -1288,11 +1306,21 @@ export function ListingDetailClient({
             >
               {photos.map((photo, index) => (
                 <div key={`${photo.url}-${index}`} className="w-full shrink-0 snap-start">
-                  <img
-                    src={photo.url}
-                    alt={`${title} — photo ${index + 1}`}
-                    className="aspect-[4/3] w-full object-cover object-center"
-                  />
+                  {index === 0 && heroMotionProps ? (
+                    <motion.div {...heroMotionProps} className="aspect-[4/3] w-full overflow-hidden">
+                      <img
+                        src={photo.url}
+                        alt={`${title} — photo ${index + 1}`}
+                        className="h-full w-full object-cover object-center"
+                      />
+                    </motion.div>
+                  ) : (
+                    <img
+                      src={photo.url}
+                      alt={`${title} — photo ${index + 1}`}
+                      className="aspect-[4/3] w-full object-cover object-center"
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -1313,31 +1341,61 @@ export function ListingDetailClient({
           </div>
           <div className="hidden md:block">
             {photos.length === 1 ? (
-            <div className="overflow-hidden rounded-2xl">
+            heroMotionProps ? (
+            <motion.div {...heroMotionProps} className="overflow-hidden rounded-2xl">
               <img
                 src={photos[0].url}
                 alt={`${title} — photo 1`}
                 className="aspect-[16/9] w-full object-cover object-center"
               />
-            </div>
+            </motion.div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl">
+                <img
+                  src={photos[0].url}
+                  alt={`${title} — photo 1`}
+                  className="aspect-[16/9] w-full object-cover object-center"
+                />
+              </div>
+            )
             ) : photos.length === 2 ? (
             <div className="grid grid-cols-2 gap-2 overflow-hidden rounded-2xl">
-              {photos.slice(0, 2).map((photo, index) => (
-                <img
-                  key={`${photo.url}-${index}`}
-                  src={photo.url}
-                  alt={`${title} — photo ${index + 1}`}
-                  className="aspect-[4/3] w-full object-cover object-center"
-                />
-              ))}
+              {photos.slice(0, 2).map((photo, index) =>
+                index === 0 && heroMotionProps ? (
+                  <motion.div key={`${photo.url}-${index}`} {...heroMotionProps} className="overflow-hidden rounded-xl">
+                    <img
+                      src={photo.url}
+                      alt={`${title} — photo ${index + 1}`}
+                      className="aspect-[4/3] w-full object-cover object-center"
+                    />
+                  </motion.div>
+                ) : (
+                  <img
+                    key={`${photo.url}-${index}`}
+                    src={photo.url}
+                    alt={`${title} — photo ${index + 1}`}
+                    className="aspect-[4/3] w-full object-cover object-center"
+                  />
+                ),
+              )}
             </div>
           ) : (
             <div className="relative grid max-h-[480px] grid-cols-[3fr_2fr] gap-2 overflow-hidden rounded-2xl">
+              {heroMotionProps ? (
+              <motion.div {...heroMotionProps} className="relative min-h-0 overflow-hidden rounded-2xl">
               <img
                 src={galleryPhotos[0]?.url}
                 alt={`${title} — photo 1`}
                 className="aspect-[4/3] h-full w-full object-cover object-center"
               />
+              </motion.div>
+              ) : (
+              <img
+                src={galleryPhotos[0]?.url}
+                alt={`${title} — photo 1`}
+                className="aspect-[4/3] h-full w-full object-cover object-center"
+              />
+              )}
               <div className="grid gap-2">
                 {galleryPhotos.slice(1, 3).map((photo, index) => (
                   <img
@@ -1391,15 +1449,68 @@ export function ListingDetailClient({
           </Dialog>
 
         </section>
+        </DetailCascade>
+
+        <section className="mb-6 space-y-4 border-b pb-6">
+          <DetailCascade step={1}>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (backToResultsPath && backToResultsPath.startsWith("/explore")) {
+                    router.push(backToResultsPath)
+                    return
+                  }
+                  router.push("/explore")
+                }}
+                className="inline-flex min-h-[44px] items-center gap-1 rounded-md text-sm font-medium text-[#5D4D41]"
+              >
+                <ChevronLeft className="size-4" />
+                {backToResultsPath ? "Back to results" : "Explore spaces"}
+              </button>
+              <h1 className="type-h1">{title}</h1>
+            </div>
+          </DetailCascade>
+          <DetailCascade step={2}>
+            <p className="type-label">{locationLabel}</p>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">
+                  <span className="mr-1">{serviceTypeIcon}</span>
+                  {serviceTypeName}
+                </Badge>
+                {saunaType ? <Badge variant="secondary">{saunaType}</Badge> : null}
+                {capacity ? <Badge variant="secondary">Up to {capacity} guests</Badge> : null}
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-4">
+                <ShareButton
+                  variant="detail"
+                  listing={{
+                    id,
+                    title,
+                    service_type: serviceTypeId,
+                  }}
+                />
+                <SaveButton
+                  listingId={id}
+                  variant="detail"
+                  listingMeta={{ serviceType: serviceTypeId, city }}
+                />
+              </div>
+            </div>
+          </DetailCascade>
+        </section>
 
         <div ref={detailRef} className="grid gap-10 md:grid-cols-[minmax(0,2fr)_380px]">
           <main className="space-y-8">
-            <section className="space-y-3 border-b pb-8 reveal">
+            <DetailCascade step={4}>
+            <section className="space-y-3 border-b pb-8">
               <h2 className="type-h2">{aboutHeading}</h2>
               <p className="whitespace-pre-wrap text-muted-foreground">
                 {description || "No description provided yet."}
               </p>
             </section>
+            </DetailCascade>
 
             <section className="space-y-4 border-b pb-8 reveal stagger-3">
               <div className="flex items-center justify-between">
@@ -1692,6 +1803,8 @@ export function ListingDetailClient({
                 canReserve={canReserve}
                 hostPayoutsReady={hostPayoutsReady}
                 cancellationPolicy={cancellationPolicy}
+                cascadePricingDelay={listingCascadeDelay(3)}
+                cascadeCtaDelay={listingCascadeDelay(5)}
               />
             </div>
           </aside>
@@ -1703,11 +1816,14 @@ export function ListingDetailClient({
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">from</p>
-            <p className="font-semibold">{formatMoney(pricing.price_solo)} / person / hr</p>
-          </div>
-          <Sheet>
+          <DetailCascade step={3}>
+            <div>
+              <p className="text-sm text-muted-foreground">from</p>
+              <p className="font-semibold">{formatMoney(pricing.price_solo)} / person / hr</p>
+            </div>
+          </DetailCascade>
+          <DetailCascade step={5}>
+            <Sheet>
             <SheetTrigger asChild>
               <Button className="btn-primary" disabled={!canReserve || !hostPayoutsReady}>
                 {canReserve && !hostPayoutsReady ? "Notify me" : "Reserve"}
@@ -1738,10 +1854,13 @@ export function ListingDetailClient({
                   canReserve={canReserve}
                   hostPayoutsReady={hostPayoutsReady}
                   cancellationPolicy={cancellationPolicy}
+                  cascadePricingDelay={listingCascadeDelay(3)}
+                  cascadeCtaDelay={listingCascadeDelay(5)}
                 />
               </div>
             </SheetContent>
           </Sheet>
+          </DetailCascade>
         </div>
       </div>
     </div>

@@ -19,10 +19,6 @@ export const CASCADE_TRANSITION = {
 export const CASCADE_STAGGER_S = 0.055
 export const CASCADE_LEAD_S = 0.05
 
-export function listingHeroLayoutId(listingId: string) {
-  return `listing-hero-${listingId}`
-}
-
 export function listingCascadeDelay(step: number) {
   return CASCADE_LEAD_S + step * CASCADE_STAGGER_S
 }

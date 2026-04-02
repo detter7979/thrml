@@ -20,6 +20,8 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
   const lenisRef = useRef<Lenis | null>(null)
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+
     if (prefersReducedMotion) {
       lenisRef.current?.destroy()
       lenisRef.current = null

@@ -274,6 +274,42 @@ async function mapListingReviewsToRecords(
   )
 }
 
+function trimStr(value: unknown): string {
+  return typeof value === "string" ? value.trim() : ""
+}
+
+/** Prefer city/state/country once each; avoids "Pasadena, CA, US, Pasadena, CA" when legacy + geo columns match. */
+function buildListingLocationLabel(listing: {
+  city?: unknown
+  state?: unknown
+  country?: unknown
+  location_city?: unknown
+  location_state?: unknown
+  location?: unknown
+  location_address?: unknown
+}): string {
+  const city = trimStr(listing.city) || trimStr(listing.location_city)
+  const state = trimStr(listing.state) || trimStr(listing.location_state)
+  const country = trimStr(listing.country)
+
+  const segments: string[] = []
+  const seen = new Set<string>()
+  for (const part of [city, state, country]) {
+    if (!part) continue
+    const key = part.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    segments.push(part)
+  }
+
+  if (segments.length > 0) {
+    return segments.join(", ")
+  }
+
+  const fallback = trimStr(listing.location) || trimStr(listing.location_address)
+  return fallback.length > 0 ? fallback : "Location provided after booking"
+}
+
 export default async function ListingDetailPage({
   params,
   searchParams,
@@ -448,13 +484,7 @@ export default async function ListingDetailPage({
     ? photos
     : [0, 1, 2, 3, 4].map((index) => ({ url: fallbackPhoto(index), order_index: index }))
 
-  const locationLabel =
-    [listing.city, listing.state, listing.country, listing.location_city, listing.location_state]
-      .filter((part: unknown): part is string => typeof part === "string" && part.length > 0)
-      .join(", ") ||
-    listing.location ||
-    listing.location_address ||
-    "Location provided after booking"
+  const locationLabel = buildListingLocationLabel(listing)
 
   const pricing: PricingTiers = {
     price_solo: Number(listing.price_solo ?? 0),

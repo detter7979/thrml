@@ -6,7 +6,6 @@ import { motion, useReducedMotion } from "framer-motion"
 
 import { SaveButton } from "@/components/listings/SaveButton"
 import { Badge } from "@/components/ui/badge"
-import { listingHeroLayoutId } from "@/lib/motion-system"
 
 const MotionLink = motion.create(Link)
 
@@ -47,7 +46,6 @@ export function ListingCard({
     ? `/listings/${listing.id}?from=${encodeURIComponent(fromPath)}`
     : `/listings/${listing.id}`
   const reduce = useReducedMotion()
-  const heroLayoutId = listing.photoUrl ? listingHeroLayoutId(listing.id) : undefined
 
   return (
     <MotionLink
@@ -57,10 +55,7 @@ export function ListingCard({
       whileTap={reduce ? undefined : { scale: 0.97 }}
       transition={tapSpring}
     >
-      <motion.div
-        layoutId={heroLayoutId}
-        className="relative mb-3 h-44 w-full shrink-0 overflow-hidden rounded-xl bg-warm-100"
-      >
+      <div className="relative mb-3 h-44 w-full shrink-0 overflow-hidden rounded-xl bg-warm-100">
         {listing.photoUrl ? (
           <Image
             src={listing.photoUrl}
@@ -89,7 +84,7 @@ export function ListingCard({
             onSavedChange={onSavedChange}
           />
         </div>
-      </motion.div>
+      </div>
       <div className="space-y-1">
         {listing.serviceTypeName ? (
           <Badge variant="secondary">

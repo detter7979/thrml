@@ -7,7 +7,6 @@ import { motion, useReducedMotion } from "framer-motion"
 import {
   Apple,
   Armchair,
-  ChevronLeft,
   ArrowDownToLine,
   Bed,
   BookOpen,
@@ -15,6 +14,7 @@ import {
   Car,
   CheckCircle,
   ChevronDown,
+  ChevronLeft,
   ChevronUp,
   ClipboardList,
   Coffee,
@@ -72,11 +72,7 @@ import { roundUpTo30 } from "@/lib/slots"
 import { createClient } from "@/lib/supabase/client"
 import type { BookingModel } from "@/lib/service-types"
 import { useScrollReveal } from "@/hooks/useScrollReveal"
-import {
-  CASCADE_TRANSITION,
-  listingCascadeDelay,
-  listingHeroLayoutId,
-} from "@/lib/motion-system"
+import { CASCADE_TRANSITION, listingCascadeDelay } from "@/lib/motion-system"
 
 function DetailCascade({ step, children }: { step: number; children: React.ReactNode }) {
   const reduce = useReducedMotion()
@@ -1211,6 +1207,9 @@ export function ListingDetailClient({
       halotherapy: "About this salt room",
     }[serviceTypeId] ?? "About this space"
 
+  const sectionHeadingClass =
+    "font-sans text-xl font-semibold leading-snug tracking-tight text-[#1A1410] md:text-2xl"
+
   const hasSpecs = Boolean(
     serviceAttributes &&
       Object.values(serviceAttributes).some((value) => value !== null && value !== "" && value !== undefined)
@@ -1256,15 +1255,19 @@ export function ListingDetailClient({
       ? `/listings/${id}?from=${encodeURIComponent(backToResultsPath)}`
       : `/listings/${id}`
 
+  const exploreBackHref =
+    backToResultsPath && backToResultsPath.startsWith("/explore") ? backToResultsPath : "/explore"
+  const exploreBackLabel =
+    backToResultsPath && backToResultsPath.startsWith("/explore") ? "Back to results" : "Explore spaces"
+
   const heroMotionProps =
     photos.length > 0
       ? {
-          layoutId: listingHeroLayoutId(id),
           initial: reduceMotion ? false : { opacity: 0 },
           animate: { opacity: 1 },
           transition: {
             opacity: { duration: reduceMotion ? 0 : 0.18 },
-            layout: { duration: reduceMotion ? 0 : 0.32, ease: CASCADE_TRANSITION.ease },
+            ease: CASCADE_TRANSITION.ease,
           },
         }
       : null
@@ -1292,9 +1295,21 @@ export function ListingDetailClient({
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0">
-      <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <div className="mx-auto max-w-7xl px-4 pb-8 pt-6 sm:px-5 md:px-8 md:pt-7">
         <DetailCascade step={0}>
           <section className="mb-8">
+            <div className="mb-4 md:mb-5">
+              <Link
+                href={exploreBackHref}
+                className="group inline-flex min-h-[44px] items-center gap-0.5 text-sm font-medium text-[#5D4D41] transition-colors hover:text-[#3d3229] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C75B3A]/35 focus-visible:ring-offset-2"
+              >
+                <ChevronLeft
+                  className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:-translate-x-0.5"
+                  aria-hidden
+                />
+                {exploreBackLabel}
+              </Link>
+            </div>
           <div className="md:hidden">
             <div
               className="no-scrollbar -mx-4 flex snap-x snap-mandatory overflow-x-auto"
@@ -1451,70 +1466,65 @@ export function ListingDetailClient({
         </section>
         </DetailCascade>
 
-        <section className="mb-6 space-y-4 border-b pb-6">
-          <DetailCascade step={1}>
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => {
-                  if (backToResultsPath && backToResultsPath.startsWith("/explore")) {
-                    router.push(backToResultsPath)
-                    return
-                  }
-                  router.push("/explore")
-                }}
-                className="inline-flex min-h-[44px] items-center gap-1 rounded-md text-sm font-medium text-[#5D4D41]"
-              >
-                <ChevronLeft className="size-4" />
-                {backToResultsPath ? "Back to results" : "Explore spaces"}
-              </button>
-              <h1 className="type-h1">{title}</h1>
-            </div>
-          </DetailCascade>
-          <DetailCascade step={2}>
-            <p className="type-label">{locationLabel}</p>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">
-                  <span className="mr-1">{serviceTypeIcon}</span>
-                  {serviceTypeName}
-                </Badge>
-                {saunaType ? <Badge variant="secondary">{saunaType}</Badge> : null}
-                {capacity ? <Badge variant="secondary">Up to {capacity} guests</Badge> : null}
+        <section className="border-b border-[#E5DDD6] pb-6 mb-10">
+          <div className="flex flex-col gap-2">
+            <DetailCascade step={1}>
+              <h1 className="font-serif text-2xl font-normal leading-tight tracking-tight text-[#1A1410] md:text-3xl lg:text-4xl">
+                {title}
+              </h1>
+            </DetailCascade>
+            <DetailCascade step={2}>
+              <div className="flex flex-col gap-3">
+                <p className="type-label">{locationLabel}</p>
+                <div className="flex items-start justify-between gap-3 sm:gap-4">
+                  <div className="flex min-w-0 flex-wrap gap-2">
+                    <Badge variant="secondary">
+                      <span className="mr-1">{serviceTypeIcon}</span>
+                      {serviceTypeName}
+                    </Badge>
+                    {saunaType ? <Badge variant="secondary">{saunaType}</Badge> : null}
+                    {capacity ? (
+                      <Badge variant="secondary">Up to {capacity} guests</Badge>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center justify-end gap-3 sm:gap-4">
+                    <ShareButton
+                      variant="detail"
+                      listing={{
+                        id,
+                        title,
+                        service_type: serviceTypeId,
+                      }}
+                    />
+                    <SaveButton
+                      listingId={id}
+                      variant="detail"
+                      listingMeta={{ serviceType: serviceTypeId, city }}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="flex shrink-0 items-center justify-end gap-4">
-                <ShareButton
-                  variant="detail"
-                  listing={{
-                    id,
-                    title,
-                    service_type: serviceTypeId,
-                  }}
-                />
-                <SaveButton
-                  listingId={id}
-                  variant="detail"
-                  listingMeta={{ serviceType: serviceTypeId, city }}
-                />
-              </div>
-            </div>
-          </DetailCascade>
+            </DetailCascade>
+          </div>
         </section>
 
-        <div ref={detailRef} className="grid gap-10 md:grid-cols-[minmax(0,2fr)_380px]">
-          <main className="space-y-8">
+        <div
+          ref={detailRef}
+          className="grid gap-6 md:grid-cols-[minmax(0,2fr)_380px] md:gap-8 lg:gap-10"
+        >
+          <main className="flex min-w-0 flex-col gap-10">
             <DetailCascade step={4}>
-            <section className="space-y-3 border-b pb-8">
-              <h2 className="type-h2">{aboutHeading}</h2>
-              <p className="whitespace-pre-wrap text-muted-foreground">
+            <section className="space-y-6 border-b border-[#E5DDD6] pb-6">
+              <h2 className={sectionHeadingClass}>{aboutHeading}</h2>
+              <p className="max-w-prose whitespace-pre-wrap text-muted-foreground">
                 {description || "No description provided yet."}
               </p>
             </section>
             </DetailCascade>
 
-            <section className="space-y-4 border-b pb-8 reveal stagger-3">
-              <div className="flex items-center justify-between">
-                <h2 className="type-h2">Hosted by</h2>
+            <section className="space-y-6 border-b border-[#E5DDD6] pb-6 reveal stagger-3">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className={sectionHeadingClass}>Hosted by</h2>
                 {host?.is_superhost ? <Badge>Superhost</Badge> : null}
               </div>
               {host?.id ? (
@@ -1617,8 +1627,8 @@ export function ListingDetailClient({
             </section>
 
             {specRows.length ? (
-              <section className="space-y-4 border-b pb-8">
-                <h2 className="type-h2">Specs</h2>
+              <section className="space-y-6 border-b border-[#E5DDD6] pb-6">
+                <h2 className={sectionHeadingClass}>Specs</h2>
                 <div className={specsGridClass}>
                   {specRows.map((row) => (
                     <div key={row.label} className="rounded-xl border border-[#EFE5DA] bg-[#FCFAF7] p-3">
@@ -1639,8 +1649,8 @@ export function ListingDetailClient({
             ) : null}
 
             {filteredAmenities.length ? (
-              <section className="space-y-4 border-b pb-8 reveal stagger-1">
-                <h2 className="type-h2">Amenities</h2>
+              <section className="space-y-6 border-b border-[#E5DDD6] pb-6 reveal stagger-1">
+                <h2 className={sectionHeadingClass}>Amenities</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {filteredAmenities.map((amenity) => {
                     const Icon = amenityIcon(amenity)
@@ -1655,9 +1665,9 @@ export function ListingDetailClient({
               </section>
             ) : null}
 
-            <section className="space-y-4 border-b pb-8">
-              <h2 className="type-h2">House rules</h2>
-              <ul className="space-y-2 text-muted-foreground">
+            <section className="space-y-6 border-b border-[#E5DDD6] pb-6">
+              <h2 className={sectionHeadingClass}>House rules</h2>
+              <ul className="max-w-prose space-y-2 text-muted-foreground">
                 {houseRules.map((rule, index) => (
                   <li key={`${rule}-${index}`} className="flex gap-2">
                     <span>•</span>
@@ -1668,9 +1678,9 @@ export function ListingDetailClient({
             </section>
 
             {hasCancellationPolicy ? (
-              <section className="space-y-4 border-b pb-8">
-                <h2 className="type-h2">Cancellation policy</h2>
-                <p className="text-sm text-[#5D4D41]">{policy.description}</p>
+              <section className="space-y-6 border-b border-[#E5DDD6] pb-6">
+                <h2 className={sectionHeadingClass}>Cancellation policy</h2>
+                <p className="max-w-prose text-sm text-[#5D4D41]">{policy.description}</p>
                 <div className="rounded-lg border border-[#E5DDD6] bg-[#FCFAF7] p-4">
                   <ul className="space-y-2 text-sm text-[#4B3F36]">
                     <li className="flex gap-2">
@@ -1694,16 +1704,16 @@ export function ListingDetailClient({
                     {showFullCancellationPolicy ? "Show less ▴" : "Show full policy ▾"}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="max-w-prose text-xs text-muted-foreground">
                   Cancellation windows are calculated from the session start time in the local timezone of the
                   listing.
                 </p>
               </section>
             ) : null}
 
-            <section id="reviews" className="space-y-4 scroll-mt-28 pb-2 reveal stagger-2">
+            <section id="reviews" className="space-y-6 scroll-mt-28 pb-6 reveal stagger-2">
               <div className="flex items-center justify-between gap-4">
-                <h2 className="font-serif text-[22px] text-[#1A1410]">
+                <h2 className={sectionHeadingClass}>
                   ★ {avgRating ? avgRating.toFixed(2) : "0.00"} · {ratings.review_count || reviews.length} reviews
                 </h2>
                 <button
@@ -1812,7 +1822,7 @@ export function ListingDetailClient({
       </div>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E5DDD6] bg-background/95 px-4 py-3 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E5DDD6] bg-background/95 px-4 py-3 backdrop-blur sm:px-5 md:hidden"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">

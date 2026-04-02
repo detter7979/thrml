@@ -1074,8 +1074,14 @@ export function ExploreClient() {
     transform: `translateY(calc(${mapOnlyTranslate} + ${sheetDrag}px))`,
   }
   return (
-    <div className={viewMode === "list" ? "min-h-[calc(100svh-88px)] bg-[#F7F3EE]" : "h-[calc(100svh-88px)] overflow-hidden bg-[#F7F3EE]"}>
-      <div className="sticky top-0 z-30 border-b border-[#F0E8E0] bg-[#FAF7F4]">
+    <div
+      className={
+        viewMode === "list"
+          ? "min-h-[calc(100svh-88px)] bg-[#F7F3EE]"
+          : "flex h-[calc(100svh-88px)] flex-col overflow-hidden bg-[#F7F3EE]"
+      }
+    >
+      <div className="sticky top-0 z-30 shrink-0 border-b border-[#F0E8E0] bg-[#FAF7F4]">
           <div className="relative z-30 px-4 py-3 md:px-6">
           <div className="flex items-center gap-2 md:justify-between md:gap-3">
             <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto snap-x-pills md:overflow-visible">
@@ -1405,8 +1411,12 @@ export function ExploreClient() {
       {!error ? (
         <>
           {viewMode === "split" ? (
-            <div className="grid h-[calc(100%-58px)] grid-cols-1 md:grid-cols-[45%_55%]">
-              <div className="overflow-y-auto bg-[#F7F3EE] p-4">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[45%_55%] md:grid-rows-1">
+                <div
+                  className="min-h-0 overflow-y-auto overscroll-y-contain bg-[#F7F3EE] p-4 [-webkit-overflow-scrolling:touch]"
+                  data-lenis-prevent
+                >
                 <div className="space-y-3">
                   {loading
                     ? new Array(8).fill(null).map((_, i) => (
@@ -1427,8 +1437,11 @@ export function ExploreClient() {
                         </div>
                       )}
                 </div>
+                </div>
+              <div className="relative h-full min-h-[240px] md:min-h-0">
+                {exploreMapPanel}
               </div>
-              <div className="relative">{exploreMapPanel}</div>
+            </div>
             </div>
           ) : null}
 
@@ -1475,8 +1488,8 @@ export function ExploreClient() {
           ) : null}
 
           {viewMode === "map" ? (
-            <div className="relative h-[calc(100%-58px)]">
-              {exploreMapPanel}
+            <div className="relative min-h-0 flex-1">
+              <div className="h-full min-h-[50vh]">{exploreMapPanel}</div>
               {isMobile ? (
                 <>
                   <div
@@ -1567,7 +1580,10 @@ export function ExploreClient() {
                   <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-zinc-300" />
                   <div className="p-3">
                     {sheetExpanded ? (
-                      <div className="h-[calc(50vh-44px)] space-y-2 overflow-y-auto">
+                      <div
+                        className="h-[calc(50vh-44px)] space-y-2 overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]"
+                        data-lenis-prevent
+                      >
                         {modeListings.map((listing) => listCard(listing))}
                       </div>
                     ) : (

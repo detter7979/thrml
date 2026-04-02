@@ -72,7 +72,6 @@ export function HomePageClient() {
   const newsletterInputRef = useRef<HTMLInputElement>(null)
   const trendingRef = useScrollReveal<HTMLElement>()
   const listingsRef = useScrollReveal<HTMLElement>()
-  const newsletterRef = useScrollReveal<HTMLDivElement>()
 
   useEffect(() => {
     let cancelled = false
@@ -585,14 +584,16 @@ export function HomePageClient() {
       </main>
 
       <section className="bg-[#1A1410] py-16 md:py-20">
-        <div ref={newsletterRef} className="mx-auto max-w-6xl px-4 md:px-8">
+        <div className="mx-auto max-w-6xl px-4 md:px-8">
           <div className="max-w-3xl space-y-5">
-            <p className="text-xs tracking-[0.22em] text-[#C75B3A] reveal">THRML JOURNAL</p>
-            <h3 className="font-serif text-3xl leading-tight text-[#F5EFE8] md:text-4xl reveal stagger-1">
-              Weekly wellness rituals, new spaces, and recovery inspiration.
+            <p className="text-xs tracking-[0.22em] text-[#C75B3A]">THRML field guide</p>
+            <h3 className="font-serif text-3xl leading-tight text-[#F5EFE8] md:text-4xl">
+              Saunas you didn&apos;t know existed, plunges tucked into ordinary blocks, rituals that fit
+              real evenings.
             </h3>
-            <p className="max-w-xl text-sm text-white/65 reveal stagger-2">
-              Join the newsletter for curated recommendations and private-space drops in your city.
+            <p className="max-w-xl text-sm text-white/65">
+              Irregular dispatches: new space drops, host introductions, recovery ideas, and
+              neighborhood-by-neighborhood picks.
             </p>
 
             {newsletterStatus === "success" ? (
@@ -602,7 +603,7 @@ export function HomePageClient() {
               </div>
             ) : (
               <form onSubmit={handleNewsletterSubmit} className="w-full max-w-xl space-y-2">
-                <div className="reveal stagger-3">
+                <div>
                   {/* Honeypot - hidden from real users, bots will fill this */}
                   <input
                     type="text"
@@ -648,7 +649,9 @@ export function HomePageClient() {
                 {newsletterError ? (
                   <p className="px-1 text-sm text-[#F1B8A8]">{newsletterError}</p>
                 ) : (
-                  <p className="px-1 text-xs text-white/50">No spam. Unsubscribe anytime.</p>
+                  <p className="px-1 text-xs text-white/50">
+                    If it ever feels like noise, we&apos;ll miss you—and we&apos;ll mean it.
+                  </p>
                 )}
               </form>
             )}

@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useRef, type ReactNode } from "react"
 import { MotionConfig, useReducedMotion } from "framer-motion"
-import Lenis from "lenis"
-import "lenis/dist/lenis.css"
+
+import type Lenis from "lenis"
 
 const LenisContext = createContext<React.MutableRefObject<Lenis | null> | null>(null)
 
@@ -14,6 +14,7 @@ export function useLenisRef(): React.MutableRefObject<Lenis | null> | null {
 
 /**
  * Smooth, inertial scrolling. Lenis updates native scroll, so Framer Motion `useScroll` stays aligned.
+ * Lenis is loaded via dynamic `import()` so it is not on the critical JS path.
  */
 export function SmoothScrollProvider({ children }: { children: ReactNode }) {
   const prefersReducedMotion = useReducedMotion()
@@ -28,23 +29,30 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const instance = new Lenis({
-      lerp: 0.08,
-      smoothWheel: true,
-      touchMultiplier: 1.5,
-    })
-    lenisRef.current = instance
+    let cancelled = false
+    let rafId = 0
 
-    let raf = 0
-    function frame(time: number) {
-      instance.raf(time)
-      raf = requestAnimationFrame(frame)
-    }
-    raf = requestAnimationFrame(frame)
+    void Promise.all([import("lenis"), import("lenis/dist/lenis.css")]).then(([lenisMod]) => {
+      if (cancelled || typeof window === "undefined") return
+      const LenisCtor = lenisMod.default
+      const instance = new LenisCtor({
+        lerp: 0.08,
+        smoothWheel: true,
+        touchMultiplier: 1.5,
+      })
+      lenisRef.current = instance
+
+      function frame(time: number) {
+        instance.raf(time)
+        rafId = requestAnimationFrame(frame)
+      }
+      rafId = requestAnimationFrame(frame)
+    })
 
     return () => {
-      cancelAnimationFrame(raf)
-      instance.destroy()
+      cancelled = true
+      cancelAnimationFrame(rafId)
+      lenisRef.current?.destroy()
       lenisRef.current = null
     }
   }, [prefersReducedMotion])

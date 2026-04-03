@@ -18,8 +18,8 @@ import { getServiceType, type ServiceType } from "@/lib/constants/service-types"
 
 type PageParams = { service: string; city: string }
 
-/** Always query Supabase at request time so we never ship a build-time empty grid from CI. */
-export const dynamic = "force-dynamic"
+/** ISR: cache RSC payload at the edge; still uses Supabase when revalidating. */
+export const revalidate = 60
 
 export function generateStaticParams() {
   return [

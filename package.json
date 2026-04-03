@@ -3,12 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "browserslist": [
-    "chrome >= 120",
-    "edge >= 120",
-    "firefox >= 121",
-    "safari >= 17",
-    "ios >= 17",
-    "not dead"
+    "> 0.5%",
+    "last 2 versions",
+    "not dead",
+    "not IE 11"
   ],
   "scripts": {
     "dev": "next dev",

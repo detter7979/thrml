@@ -1,8 +1,10 @@
+import { cache } from "react"
+
 import type { ServiceType } from "@/lib/constants/service-types"
 import { getServiceType } from "@/lib/constants/service-types"
 import type { ListingCardData } from "@/components/listings/ListingCard"
 import { getFallbackServiceType } from "@/lib/service-types"
-import { createClient } from "@/lib/supabase/server"
+import { createPublicReadSupabase } from "@/lib/supabase/public-read"
 
 export type LocalLandingFaqItem = {
   question: string
@@ -236,7 +238,6 @@ export function getLocalSeoCopy(serviceType: ServiceType, citySlug: string): Loc
 export type LocalListingRow = {
   id: string
   title: string | null
-  description: string | null
   service_type: string | null
   session_type: string | null
   location: string | null
@@ -286,12 +287,14 @@ const SEATTLE_METRO_TEXT_CITIES = [
   "Woodinville",
 ] as const
 
+const LOCAL_LANDING_LIMIT = 250
+
 const LOCAL_LANDING_SELECT =
-  "id, title, description, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
+  "id, title, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
 
 /** Same row shape but without rating embed (older DBs / schema drift). */
 const LOCAL_LANDING_SELECT_MINIMAL =
-  "id, title, description, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index)"
+  "id, title, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index)"
 
 type LocalListingQueryRow = LocalListingRow & {
   is_featured?: boolean | null
@@ -393,82 +396,100 @@ export function mapRowToListingCard(row: LocalListingRow): ListingCardData {
  * (`city`, `location_city`, `location`, `location_address`) and/or a known metro bbox
  * (see `LOCAL_LANDING_GEO_BY_SLUG`) when the URL slug has configured coordinates.
  */
-export async function fetchListingsForLocalLanding(
+async function fetchListingsForLocalLandingImpl(
   serviceType: ServiceType,
   cityDisplayName: string,
   citySlug?: string
 ): Promise<LocalListingRow[]> {
-  const supabase = await createClient()
-  const slugKey = citySlug?.trim().toLowerCase() ?? ""
-  const textOrClauses =
-    slugKey === "seattle"
-      ? [buildCityTextOrFilter(cityDisplayName), ...SEATTLE_METRO_TEXT_CITIES.map((c) => buildCityTextOrFilter(c))]
-      : [buildCityTextOrFilter(cityDisplayName)]
-  const typeFilter = serviceTypesForLocalLanding(serviceType)
+  const dev = process.env.NODE_ENV === "development"
+  if (dev) console.time("[local landing] total")
 
-  const base = (select: string) =>
-    supabase
-      .from("listings")
-      .select(select)
-      .eq("is_active", true)
-      .eq("is_deleted", false)
-      // Match Explore: it does not filter `is_draft`, so omit here so local pages stay consistent.
+  try {
+    if (dev) console.time("[local landing] public supabase client")
+    const supabase = createPublicReadSupabase()
+    if (dev) console.timeEnd("[local landing] public supabase client")
 
-  async function runTextQueryWithOr(
-    select: typeof LOCAL_LANDING_SELECT | typeof LOCAL_LANDING_SELECT_MINIMAL,
-    orClause: string
-  ): Promise<LocalListingQueryRow[]> {
-    const { data, error } = await base(select)
-      .in("service_type", typeFilter)
-      .or(orClause)
-      .order("is_featured", { ascending: false })
-      .order("created_at", { ascending: false })
-    if (error) {
-      if (select === LOCAL_LANDING_SELECT) {
-        console.warn("[local landing] text query failed, retry without ratings embed", error.message)
-        return runTextQueryWithOr(LOCAL_LANDING_SELECT_MINIMAL, orClause)
+    const slugKey = citySlug?.trim().toLowerCase() ?? ""
+    /** One PostgREST `.or()` (comma = OR) — avoids N round-trips for Seattle metro. */
+    const metroCities =
+      slugKey === "seattle" ? [cityDisplayName, ...SEATTLE_METRO_TEXT_CITIES] : [cityDisplayName]
+    const textOrFilter = metroCities.map(buildCityTextOrFilter).join(",")
+    const typeFilter = serviceTypesForLocalLanding(serviceType)
+
+    const base = (select: string) =>
+      supabase
+        .from("listings")
+        .select(select)
+        .eq("is_active", true)
+        .eq("is_deleted", false)
+        .limit(LOCAL_LANDING_LIMIT)
+
+    async function runTextQueryWithOr(
+      select: typeof LOCAL_LANDING_SELECT | typeof LOCAL_LANDING_SELECT_MINIMAL,
+      orClause: string
+    ): Promise<LocalListingQueryRow[]> {
+      if (dev) console.time("[local landing] text query")
+      const { data, error } = await base(select)
+        .in("service_type", typeFilter)
+        .or(orClause)
+        .order("is_featured", { ascending: false })
+        .order("created_at", { ascending: false })
+      if (dev) console.timeEnd("[local landing] text query")
+      if (error) {
+        if (select === LOCAL_LANDING_SELECT) {
+          console.warn("[local landing] text query failed, retry without ratings embed", error.message)
+          return runTextQueryWithOr(LOCAL_LANDING_SELECT_MINIMAL, orClause)
+        }
+        console.error("[local landing] text listings query failed", error.message)
+        return []
       }
-      console.error("[local landing] text listings query failed", error.message)
-      return []
+      return (data ?? []) as unknown as LocalListingQueryRow[]
     }
-    return (data ?? []) as unknown as LocalListingQueryRow[]
-  }
 
-  async function runGeoQuery(
-    select: typeof LOCAL_LANDING_SELECT | typeof LOCAL_LANDING_SELECT_MINIMAL,
-    g: NonNullable<(typeof LOCAL_LANDING_GEO_BY_SLUG)[string]>
-  ): Promise<LocalListingQueryRow[]> {
-    const delta = g.radiusMiles / 69
-    const { data, error } = await base(select)
-      .in("service_type", typeFilter)
-      .gte("lat", g.lat - delta)
-      .lte("lat", g.lat + delta)
-      .gte("lng", g.lng - delta)
-      .lte("lng", g.lng + delta)
-      .order("is_featured", { ascending: false })
-      .order("created_at", { ascending: false })
-    if (error) {
-      if (select === LOCAL_LANDING_SELECT) {
-        console.warn("[local landing] geo query failed, retry without ratings embed", error.message)
-        return runGeoQuery(LOCAL_LANDING_SELECT_MINIMAL, g)
+    async function runGeoQuery(
+      select: typeof LOCAL_LANDING_SELECT | typeof LOCAL_LANDING_SELECT_MINIMAL,
+      g: NonNullable<(typeof LOCAL_LANDING_GEO_BY_SLUG)[string]>
+    ): Promise<LocalListingQueryRow[]> {
+      const delta = g.radiusMiles / 69
+      if (dev) console.time("[local landing] geo query")
+      const { data, error } = await base(select)
+        .in("service_type", typeFilter)
+        .gte("lat", g.lat - delta)
+        .lte("lat", g.lat + delta)
+        .gte("lng", g.lng - delta)
+        .lte("lng", g.lng + delta)
+        .order("is_featured", { ascending: false })
+        .order("created_at", { ascending: false })
+      if (dev) console.timeEnd("[local landing] geo query")
+      if (error) {
+        if (select === LOCAL_LANDING_SELECT) {
+          console.warn("[local landing] geo query failed, retry without ratings embed", error.message)
+          return runGeoQuery(LOCAL_LANDING_SELECT_MINIMAL, g)
+        }
+        console.error("[local landing] geo listings query failed", error.message)
+        return []
       }
-      console.error("[local landing] geo listings query failed", error.message)
-      return []
+      return (data ?? []) as unknown as LocalListingQueryRow[]
     }
-    return (data ?? []) as unknown as LocalListingQueryRow[]
+
+    const geo =
+      slugKey && LOCAL_LANDING_GEO_BY_SLUG[slugKey] ? LOCAL_LANDING_GEO_BY_SLUG[slugKey] : undefined
+
+    if (dev) console.time("[local landing] parallel text+geo")
+    const [textRows, geoRows] = await Promise.all([
+      runTextQueryWithOr(LOCAL_LANDING_SELECT, textOrFilter),
+      geo ? runGeoQuery(LOCAL_LANDING_SELECT, geo) : Promise.resolve([] as LocalListingQueryRow[]),
+    ])
+    if (dev) console.timeEnd("[local landing] parallel text+geo")
+
+    return mergeLocalLandingRows([...textRows, ...geoRows])
+  } finally {
+    if (dev) console.timeEnd("[local landing] total")
   }
-
-  const textRowSets = await Promise.all(
-    textOrClauses.map((clause) => runTextQueryWithOr(LOCAL_LANDING_SELECT, clause))
-  )
-  const textRows = textRowSets.flat()
-
-  const geo =
-    slugKey && LOCAL_LANDING_GEO_BY_SLUG[slugKey] ? LOCAL_LANDING_GEO_BY_SLUG[slugKey] : undefined
-  const geoRows = geo ? await runGeoQuery(LOCAL_LANDING_SELECT, geo) : []
-
-  return mergeLocalLandingRows([...textRows, ...geoRows])
 }
+
+/** Dedupes identical calls in the same RSC request (e.g. generateMetadata + page). */
+export const fetchListingsForLocalLanding = cache(fetchListingsForLocalLandingImpl)
 
 export function getAppOrigin(): string {
   return (process.env.NEXT_PUBLIC_APP_URL ?? "https://usethrml.com").replace(/\/$/, "")

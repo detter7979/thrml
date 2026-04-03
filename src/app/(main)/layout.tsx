@@ -2,9 +2,9 @@ import type { ReactNode } from "react"
 import Link from "next/link"
 import { Facebook, Instagram } from "lucide-react"
 
+import { DeferredMainWithMotion } from "@/components/layout/deferred-motion-boundaries"
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { getPlatformFeePercentsCached } from "@/lib/fees"
-import { MainContentMotion } from "@/components/shared/MainContentMotion"
 import { Navbar } from "@/components/shared/Navbar"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -18,7 +18,7 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
       <Navbar />
       <PlatformFeesProvider initialPercents={feePercents}>
         <main id="main-content" className="min-w-0 overflow-x-hidden">
-          <MainContentMotion>{children}</MainContentMotion>
+          <DeferredMainWithMotion>{children}</DeferredMainWithMotion>
         </main>
       </PlatformFeesProvider>
       <footer className="border-t border-white/10 bg-[#1A1410] text-white/75">

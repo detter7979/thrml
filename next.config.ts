@@ -65,7 +65,49 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    /** Match authenticated / user-specific API surfaces only — keep public routes cacheable. */
+    const privateApiCacheControl = "private, no-store, must-revalidate";
     return [
+      {
+        source: "/api/admin/:path*",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/bookings/:path*",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/profile",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/conversations/:path*",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/messages/:path*",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/saved/:path*",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/referral/:path*",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/stripe/checkout",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/stripe/connect/:path*",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
+      {
+        source: "/api/host/:path*",
+        headers: [{ key: "Cache-Control", value: privateApiCacheControl }],
+      },
       {
         source: "/(.*)",
         headers: securityHeaders,

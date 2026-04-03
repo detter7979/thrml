@@ -5,7 +5,14 @@ import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
-export function StripeConnectBanner({ compact = false }: { compact?: boolean }) {
+export function StripeConnectBanner({
+  compact = false,
+  payoutsActive = false,
+}: {
+  compact?: boolean
+  /** When true, host has completed Stripe onboarding in Supabase — hide the setup CTA. */
+  payoutsActive?: boolean
+}) {
   const [loading, setLoading] = useState(false)
 
   async function startOnboarding() {
@@ -24,6 +31,18 @@ export function StripeConnectBanner({ compact = false }: { compact?: boolean }) 
       window.alert("Something went wrong. Please try again.")
       setLoading(false)
     }
+  }
+
+  if (payoutsActive) {
+    return compact ? (
+      <div className="w-full rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-left text-sm font-medium text-[#166534]">
+        ✓ Payouts active
+      </div>
+    ) : (
+      <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-5 text-sm font-medium text-[#166534]">
+        ✓ Payouts active — your bookings pay out to your connected account.
+      </div>
+    )
   }
 
   if (compact) {

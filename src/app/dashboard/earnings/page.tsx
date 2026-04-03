@@ -209,6 +209,8 @@ export default async function DashboardEarningsPage() {
     }
   }
 
+  const stripeOnboardingComplete = Boolean(profile?.stripe_onboarding_complete)
+
   return (
     <EarningsClient
       rows={normalized}
@@ -225,7 +227,10 @@ export default async function DashboardEarningsPage() {
       }
       ratingSummary={ratingSummary}
       perListingRatings={perListingRatings}
-      stripeConnected={Boolean(isMockHost || profile?.stripe_payouts_enabled)}
+      stripeConnected={Boolean(
+        isMockHost || profile?.stripe_payouts_enabled || stripeOnboardingComplete
+      )}
+      stripeOnboardingComplete={stripeOnboardingComplete}
       stripeAccountId={profile?.stripe_account_id ?? null}
       nextPayoutDate={nextPayoutDate}
       guestOnly={guestOnly}

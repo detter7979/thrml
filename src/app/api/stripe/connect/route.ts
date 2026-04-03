@@ -56,7 +56,18 @@ export async function POST(req: NextRequest) {
     }
 
     const appUrl = getAppUrl(req.nextUrl.origin)
-    const accountLink = await createOnboardingLink(accountId, appUrl)
+    let accountLink: Stripe.Response<Stripe.AccountLink>
+    try {
+      accountLink = await createOnboardingLink(accountId, appUrl)
+    } catch (linkError) {
+      console.error("[stripe/connect] accountLinks.create failed", {
+        accountId,
+        appUrl,
+        error: linkError instanceof Error ? linkError.message : String(linkError),
+        cause: linkError instanceof Error ? linkError.cause : undefined,
+      })
+      throw linkError
+    }
 
     return NextResponse.json({
       url: accountLink.url,
@@ -64,6 +75,7 @@ export async function POST(req: NextRequest) {
       stripeAccountId: accountId,
     })
   } catch (error) {
+    console.error("[stripe/connect] POST unhandled error", error)
     const message = error instanceof Error ? error.message : "Stripe Connect setup failed."
     return NextResponse.json({ error: message }, { status: 500 })
   }

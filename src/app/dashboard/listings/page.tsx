@@ -25,7 +25,7 @@ export default async function DashboardListingsPage() {
   const [{ data: profile }, { data: listings }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("ui_intent, stripe_account_id, stripe_payouts_enabled")
+      .select("ui_intent, stripe_account_id, stripe_payouts_enabled, stripe_onboarding_complete")
       .eq("id", user?.id ?? "")
       .maybeSingle(),
     supabase
@@ -51,7 +51,11 @@ export default async function DashboardListingsPage() {
     (profile?.ui_intent ?? "guest") === "both" ||
     (listings ?? []).length > 0
   const isMockHost = profile?.stripe_account_id?.startsWith("acct_mock_")
-  const payoutsConnected = Boolean(isMockHost || (profile?.stripe_account_id && profile?.stripe_payouts_enabled))
+  const payoutsConnected = Boolean(
+    isMockHost ||
+      (profile?.stripe_account_id &&
+        (profile?.stripe_payouts_enabled || profile?.stripe_onboarding_complete))
+  )
 
   const listingIds = currentListings
     .map((listing) => (typeof listing.id === "string" ? listing.id : null))
@@ -274,7 +278,9 @@ export default async function DashboardListingsPage() {
         </Button>
       </div>
 
-      {hostingEnabled && !payoutsConnected ? <StripeConnectBanner compact /> : null}
+      {hostingEnabled && !payoutsConnected ? (
+        <StripeConnectBanner compact payoutsActive={Boolean(profile?.stripe_onboarding_complete)} />
+      ) : null}
 
       {currentListings.length === 0 ? (
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">

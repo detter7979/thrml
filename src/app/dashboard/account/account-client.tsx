@@ -507,9 +507,9 @@ export function AccountClient({
         throw new Error(data.error ?? "Failed to refresh Stripe status.")
       }
       setConnectStatus({
-        onboardingComplete: Boolean(data.onboarding_complete),
-        payoutsEnabled: Boolean(data.payouts_enabled),
-        chargesEnabled: Boolean(data.charges_enabled),
+        onboardingComplete: Boolean(data.onboarding_complete || stripeOnboardingComplete),
+        payoutsEnabled: Boolean(data.payouts_enabled || stripePayoutsEnabled),
+        chargesEnabled: Boolean(data.charges_enabled || stripeChargesEnabled),
       })
     } catch (error) {
       setStripeError(error instanceof Error ? error.message : "Failed to refresh Stripe status.")
@@ -605,7 +605,13 @@ export function AccountClient({
   }, [stripeAccountId])
   const hasStripeAccount = Boolean(stripeAccountId)
   const isMockHost = stripeAccountId?.startsWith("acct_mock_")
-  const payoutsConnected = Boolean(isMockHost || connectStatus.payoutsEnabled)
+  const payoutsFullyEnabled = Boolean(
+    isMockHost || stripePayoutsEnabled || connectStatus.payoutsEnabled
+  )
+  const showPayoutSuccessSection = payoutsFullyEnabled || stripeOnboardingComplete
+  const showOnboardingPendingSection = Boolean(
+    connectStatus.onboardingComplete && !payoutsFullyEnabled && !stripeOnboardingComplete
+  )
 
   function broadcastProfileNamePreview(nextRawName: string) {
     const nextPreviewName = nextRawName.trim() || savedName || fullName
@@ -832,7 +838,7 @@ export function AccountClient({
           <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">PAYOUT SETTINGS</h2>
           {!hasStripeAccount ? (
             <StripeConnectBanner />
-          ) : payoutsConnected ? (
+          ) : showPayoutSuccessSection ? (
             <div className="space-y-3">
               <div className="rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-sm font-medium text-[#166534]">
                 ✓ Payouts connected
@@ -865,7 +871,7 @@ export function AccountClient({
                 </button>
               </div>
             </div>
-          ) : connectStatus.onboardingComplete ? (
+          ) : showOnboardingPendingSection ? (
             <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-4 text-sm text-[#92400E]">
               Stripe onboarding is submitted. Payouts are still being verified and will activate soon.
             </div>

@@ -32,6 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<Params
   if (limited) return limited
 
   const { id } = await params
+  console.log("stripe route hit", id)
   if (!bookingIdSchema.safeParse(id).success) {
     return NextResponse.json({ error: "Invalid booking id" }, { status: 400 })
   }

@@ -210,6 +210,10 @@ function isNoDoubleBookingConstraintError(error: unknown) {
   )
 }
 
+function listingInstantBook(listing: Record<string, unknown>) {
+  return Boolean(listing.is_instant_book ?? listing.instant_book)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const ip = requestIp(req)
@@ -222,6 +226,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Too many checkout attempts. Please try again soon." }, { status: 429 })
     }
 
+    console.log("stripe route hit", "checkout-start")
     console.log("[stripe/checkout] Request received")
     const supabase = await createClient()
     const admin = createAdminClient()
@@ -458,7 +463,7 @@ export async function POST(req: NextRequest) {
         fees.guestTotal = (dueCents - creditCents) / 100
       }
     }
-    const isInstantBook = Boolean((listing as Record<string, unknown>).is_instant_book ?? (listing as Record<string, unknown>).instant_book)
+    const isInstantBook = listingInstantBook(listing as Record<string, unknown>)
     const confirmationDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 
     const listingAvailability = Array.isArray(listing.availability)
@@ -587,7 +592,7 @@ export async function POST(req: NextRequest) {
       if (isNoDoubleBookingConstraintError(bookingError)) {
         const { data: existingBooking } = await admin
           .from("bookings")
-          .select("id, stripe_payment_intent_id, status")
+          .select("id, stripe_payment_intent_id, status, guest_id, host_id, guest_total, host_payout")
           .eq("listing_id", listingId)
           .eq("guest_id", user.id)
           .eq("session_date", normalizedDate)
@@ -599,27 +604,103 @@ export async function POST(req: NextRequest) {
           .maybeSingle()
 
         if (existingBooking?.id && existingBooking.stripe_payment_intent_id) {
-          try {
-            const existingIntent = await stripe.paymentIntents.retrieve(
-              existingBooking.stripe_payment_intent_id
-            )
-            if (existingIntent.client_secret) {
-              console.log("[stripe/checkout] Resuming existing booking after duplicate insert", {
+          const reusableStatuses = new Set([
+            "requires_payment_method",
+            "requires_confirmation",
+            "requires_action",
+            "processing",
+          ])
+
+          const tryResumeOrReplaceDuplicateBooking = async (): Promise<{
+            clientSecret: string
+            bookingId: string
+          } | null> => {
+            try {
+              const existingIntent = await stripe.paymentIntents.retrieve(
+                existingBooking.stripe_payment_intent_id as string
+              )
+              if (
+                existingIntent.client_secret &&
+                reusableStatuses.has(existingIntent.status)
+              ) {
+                console.log("[stripe/checkout] Resuming existing booking after duplicate insert", {
+                  bookingId: existingBooking.id,
+                  paymentIntentId: existingIntent.id,
+                  status: existingBooking.status,
+                })
+                return {
+                  clientSecret: existingIntent.client_secret,
+                  bookingId: existingBooking.id as string,
+                }
+              }
+              console.log("[stripe/checkout] Existing payment intent not reusable; creating replacement", {
                 bookingId: existingBooking.id,
                 paymentIntentId: existingIntent.id,
-                status: existingBooking.status,
+                status: existingIntent.status,
               })
-              return NextResponse.json({
-                clientSecret: existingIntent.client_secret,
+            } catch (resumeError) {
+              console.error("[stripe/checkout] Failed to resume existing payment intent", {
                 bookingId: existingBooking.id,
+                paymentIntentId: existingBooking.stripe_payment_intent_id,
+                error: resumeError instanceof Error ? resumeError.message : String(resumeError),
               })
             }
-          } catch (resumeError) {
-            console.error("[stripe/checkout] Failed to resume existing payment intent", {
-              bookingId: existingBooking.id,
-              paymentIntentId: existingBooking.stripe_payment_intent_id,
-              error: resumeError instanceof Error ? resumeError.message : String(resumeError),
-            })
+
+            const guestTotalNum = Number(existingBooking.guest_total ?? 0)
+            const hostPayoutNum = Number(existingBooking.host_payout ?? 0)
+            const amountCents = Math.round(guestTotalNum * 100)
+            const hostPayoutCents = Math.round(hostPayoutNum * 100)
+            const resumeSelfBooking =
+              typeof existingBooking.guest_id === "string" &&
+              typeof existingBooking.host_id === "string" &&
+              existingBooking.guest_id === existingBooking.host_id
+            const resumeParams: Stripe.PaymentIntentCreateParams = {
+              amount: amountCents,
+              currency: "usd",
+              capture_method: isInstantBook ? "automatic" : "manual",
+              metadata: {
+                booking_id: existingBooking.id as string,
+                listing_id: listingId,
+                booked_slot_id: slotReservation.slotId,
+                booking_flow: isInstantBook ? "instant_book" : "request_to_book",
+                resumed_after_retrieve_failure: "true",
+              },
+            }
+            if (!isMockHost && host?.stripe_account_id && !resumeSelfBooking) {
+              resumeParams.transfer_data = {
+                destination: host.stripe_account_id,
+                amount: hostPayoutCents,
+              }
+            }
+            try {
+              const replacementIntent = await stripe.paymentIntents.create(resumeParams)
+              const { error: replaceUpdateError } = await admin
+                .from("bookings")
+                .update({ stripe_payment_intent_id: replacementIntent.id })
+                .eq("id", existingBooking.id)
+              if (!replaceUpdateError && replacementIntent.client_secret) {
+                console.log("[stripe/checkout] Replaced expired/invalid payment intent after duplicate insert", {
+                  bookingId: existingBooking.id,
+                  paymentIntentId: replacementIntent.id,
+                })
+                return {
+                  clientSecret: replacementIntent.client_secret,
+                  bookingId: existingBooking.id as string,
+                }
+              }
+              console.error("[stripe/checkout] Failed to persist replacement payment intent", {
+                bookingId: existingBooking.id,
+                replaceUpdateError: replaceUpdateError?.message ?? null,
+              })
+            } catch (replaceError) {
+              console.error("[stripe/checkout] Replacement PaymentIntent failed", replaceError)
+            }
+            return null
+          }
+
+          const resumed = await tryResumeOrReplaceDuplicateBooking()
+          if (resumed) {
+            return NextResponse.json(resumed)
           }
         }
 
@@ -636,6 +717,7 @@ export async function POST(req: NextRequest) {
       })
       return NextResponse.json({ error: "Failed to create booking" }, { status: 500 })
     }
+    console.log("stripe route hit", booking.id)
     console.log("[stripe/checkout] Booking created as pending", {
       bookingId: booking.id,
       status: booking.status,
@@ -647,6 +729,11 @@ export async function POST(req: NextRequest) {
         booking_id: booking.id,
       })
       .eq("id", slotReservation.slotId)
+
+    const isSelfBooking =
+      typeof booking.guest_id === "string" &&
+      typeof booking.host_id === "string" &&
+      booking.guest_id === booking.host_id
 
     const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
       amount: Math.round(fees.guestTotal * 100),
@@ -660,7 +747,7 @@ export async function POST(req: NextRequest) {
       },
     }
 
-    if (!isMockHost && host?.stripe_account_id) {
+    if (!isMockHost && host?.stripe_account_id && !isSelfBooking) {
       paymentIntentParams.transfer_data = {
         destination: host.stripe_account_id,
         amount: Math.round(fees.hostPayout * 100),

@@ -66,6 +66,7 @@ export function EarningsClient({
   ratingSummary,
   perListingRatings,
   stripeConnected,
+  stripeOnboardingComplete,
   stripeAccountId,
   nextPayoutDate,
   guestOnly = false,
@@ -77,6 +78,7 @@ export function EarningsClient({
   ratingSummary: RatingSummary
   perListingRatings: PerListingRating[]
   stripeConnected: boolean
+  stripeOnboardingComplete: boolean
   stripeAccountId: string | null
   nextPayoutDate: string | null
   guestOnly?: boolean
@@ -184,7 +186,7 @@ export function EarningsClient({
       <h1 className="font-serif text-3xl text-[#1A1410]">Earnings</h1>
 
       {!stripeConnected ? (
-        <StripeConnectBanner compact />
+        <StripeConnectBanner compact payoutsActive={stripeOnboardingComplete} />
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3">
           <p className="text-sm text-[#166534]">

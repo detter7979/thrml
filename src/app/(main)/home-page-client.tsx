@@ -27,20 +27,7 @@ import {
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { SERVICE_TYPES, type ServiceType } from "@/lib/constants/service-types"
 import { useScrollReveal } from "@/hooks/useScrollReveal"
-
-type ListingApiRow = {
-  id: string
-  title: string | null
-  location: string | null
-  service_type?: string | null
-  sauna_type?: string | null
-  service_attributes?: Record<string, unknown> | null
-  price_solo: number | null
-  fixed_session_price: number | null
-  session_type?: string | null
-  listing_photos?: { url?: string | null }[]
-  listing_ratings?: { avg_overall?: number | null; review_count?: number | null }[] | null
-}
+import type { HomeListingCardRow } from "@/lib/listings/home-listings"
 
 const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const TRENDING_SERVICE_TYPES = ["sauna", "cold_plunge", "hot_tub"] as const satisfies readonly ServiceType[]
@@ -55,7 +42,12 @@ function formatTrendingPrice(value: number) {
   return Number.isInteger(value) ? `${value}` : value.toFixed(2).replace(/\.00$/, "")
 }
 
-export function HomePageClient() {
+type HomePageClientProps = {
+  initialListings: HomeListingCardRow[]
+  totalActiveListingsCount: number
+}
+
+export function HomePageClient({ initialListings, totalActiveListingsCount }: HomePageClientProps) {
   const router = useRouter()
   const [location, setLocation] = useState("")
   const [heroServiceType, setHeroServiceType] = useState("all")
@@ -65,36 +57,13 @@ export function HomePageClient() {
   const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "loading" | "success">("idle")
   const [newsletterError, setNewsletterError] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>("all")
-  const [listings, setListings] = useState<ListingApiRow[]>([])
+  const [listings] = useState<HomeListingCardRow[]>(initialListings)
   const [serviceTypes, setServiceTypes] = useState<ServiceTypeMeta[]>(FALLBACK_SERVICE_TYPES)
-  const [loading, setLoading] = useState(true)
+  const loading = false
   const [showScrollCue, setShowScrollCue] = useState(true)
   const newsletterInputRef = useRef<HTMLInputElement>(null)
   const trendingRef = useScrollReveal<HTMLElement>()
   const listingsRef = useScrollReveal<HTMLElement>()
-
-  useEffect(() => {
-    let cancelled = false
-    const loadListings = async () => {
-      setLoading(true)
-      try {
-        const response = await fetch("/api/listings")
-        const payload = (await response.json()) as { listings?: ListingApiRow[] }
-        if (!cancelled) {
-          setListings(payload.listings ?? [])
-        }
-      } catch {
-        if (!cancelled) setListings([])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void loadListings()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     const onScroll = () => {
@@ -199,7 +168,6 @@ export function HomePageClient() {
   }, [listings])
 
   const heroTrustItems = useMemo(() => {
-    const totalListings = listings.length
     const ratingRows = listings
       .map((listing) => listing.listing_ratings?.[0] ?? null)
       .filter(
@@ -230,11 +198,11 @@ export function HomePageClient() {
       weighted.reviewCount > 0 ? (weighted.ratingSum / weighted.reviewCount).toFixed(1) : null
 
     return [
-      `🔥 ${totalListings > 0 ? `${totalListings} private spaces` : "New spaces launching soon"}`,
+      `🔥 ${totalActiveListingsCount > 0 ? `${totalActiveListingsCount} private spaces` : "New spaces launching soon"}`,
       `⭐ ${avgRating ? `${avgRating} avg guest rating` : "Guest reviews coming in"}`,
       "🔒 Secure checkout",
     ]
-  }, [listings])
+  }, [listings, totalActiveListingsCount])
 
   const skeletonCards = new Array(6).fill(null)
   const blurDataURL =

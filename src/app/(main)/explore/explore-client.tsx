@@ -19,6 +19,7 @@ import { formatServiceType, getServiceType, SERVICE_TYPES } from "@/lib/constant
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
 
 const ExploreMapPanelDynamic = dynamic(
   () => import("./explore-map-panel").then((m) => m.ExploreMapPanel),
@@ -106,10 +107,13 @@ function hasPublishedRating(reviewCount: number, rating: number) {
   return reviewCount >= 1 && Number.isFinite(rating)
 }
 
-const LISTINGS_SELECT_PRIMARY =
-  "id, title, service_type, session_type, lat, lng, location_city, city, listing_photos(url, order_index), price_solo, fixed_session_price, capacity, instant_book, amenities, is_featured, created_at, availability, listing_ratings(avg_overall, review_count)"
-const LISTINGS_SELECT_NO_RATINGS =
-  "id, title, service_type, session_type, lat, lng, location_city, city, listing_photos(url, order_index), price_solo, fixed_session_price, capacity, instant_book, amenities, is_featured, created_at, availability"
+/** `availability` JSON is large; omit unless "Available today" filter needs it. */
+const LISTINGS_BASE_PRIMARY =
+  "id, title, service_type, session_type, lat, lng, location_city, city, listing_photos(url, order_index), price_solo, fixed_session_price, capacity, instant_book, amenities, is_featured, created_at, listing_ratings(avg_overall, review_count)"
+const LISTINGS_SELECT_PRIMARY = `${LISTINGS_BASE_PRIMARY}, availability`
+const LISTINGS_BASE_NO_RATINGS =
+  "id, title, service_type, session_type, lat, lng, location_city, city, listing_photos(url, order_index), price_solo, fixed_session_price, capacity, instant_book, amenities, is_featured, created_at"
+const LISTINGS_SELECT_NO_RATINGS = `${LISTINGS_BASE_NO_RATINGS}, availability`
 const LISTINGS_SELECT_LEGACY =
   "id, title, service_type, session_type, lat, lng, city, location, listing_photos(url, order_index), price_solo, price_2, price_3, price_4plus, capacity, is_featured, created_at, instant_book, amenities"
 const LISTINGS_SELECT_MINIMAL =
@@ -626,9 +630,16 @@ export function ExploreClient() {
         }
 
         async function runSearch(bounds: Bounds) {
+          const withAvailability = filters.availableToday
           const selectFallbacks = [
-            { select: LISTINGS_SELECT_PRIMARY, supportsPriceFilter: true },
-            { select: LISTINGS_SELECT_NO_RATINGS, supportsPriceFilter: true },
+            {
+              select: withAvailability ? LISTINGS_SELECT_PRIMARY : LISTINGS_BASE_PRIMARY,
+              supportsPriceFilter: true,
+            },
+            {
+              select: withAvailability ? LISTINGS_SELECT_NO_RATINGS : LISTINGS_BASE_NO_RATINGS,
+              supportsPriceFilter: true,
+            },
             { select: LISTINGS_SELECT_LEGACY, supportsPriceFilter: true },
             { select: LISTINGS_SELECT_MINIMAL, supportsPriceFilter: false },
           ]
@@ -649,7 +660,8 @@ export function ExploreClient() {
                   (row): row is Record<string, unknown> =>
                     typeof row === "object" && row !== null && !Array.isArray(row)
                 ),
-                usedFallback: variant.select !== LISTINGS_SELECT_PRIMARY,
+                usedFallback:
+                  variant.select !== (withAvailability ? LISTINGS_SELECT_PRIMARY : LISTINGS_BASE_PRIMARY),
               }
             }
             lastError = searchError
@@ -807,7 +819,7 @@ export function ExploreClient() {
       }
 
       void fetchListings()
-    }, 300)
+    }, 80)
 
     return () => {
       cancelled = true
@@ -1006,7 +1018,10 @@ export function ExploreClient() {
         >
           {listing.photoUrl ? (
             <Image
-              src={listing.photoUrl}
+              src={
+                listingPhotoThumbnailUrl(listing.photoUrl, { width: large ? 320 : 200 }) ||
+                listing.photoUrl
+              }
               alt={listing.title}
               fill
               className="object-cover"
@@ -1531,7 +1546,10 @@ export function ExploreClient() {
                           <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl">
                             {listing.photoUrl ? (
                               <Image
-                                src={listing.photoUrl}
+                                src={
+                                  listingPhotoThumbnailUrl(listing.photoUrl, { width: 240 }) ||
+                                  listing.photoUrl
+                                }
                                 alt={listing.title}
                                 fill
                                 className="object-cover"
@@ -1613,7 +1631,10 @@ export function ExploreClient() {
                             <div className="relative h-20 w-full shrink-0 overflow-hidden">
                               {listing.photoUrl ? (
                                 <Image
-                                  src={listing.photoUrl}
+                                  src={
+                                    listingPhotoThumbnailUrl(listing.photoUrl, { width: 320 }) ||
+                                    listing.photoUrl
+                                  }
                                   alt={listing.title}
                                   fill
                                   className="object-cover"

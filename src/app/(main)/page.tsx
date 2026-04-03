@@ -1,6 +1,10 @@
 import type { Metadata } from "next"
 
+import { getHomeListingsForCards } from "@/lib/listings/home-listings"
+
 import { HomePageClient } from "./home-page-client"
+
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: { absolute: "Book Private Saunas & Cold Plunges | thrml" },
@@ -99,14 +103,16 @@ const siteSchema = {
   ],
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { listings, totalActiveCount } = await getHomeListingsForCards()
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(siteSchema) }}
       />
-      <HomePageClient />
+      <HomePageClient initialListings={listings} totalActiveListingsCount={totalActiveCount} />
     </>
   )
 }

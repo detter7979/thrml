@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion"
 
 import { SaveButton } from "@/components/listings/SaveButton"
 import { Badge } from "@/components/ui/badge"
+import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
 
 const MotionLink = motion.create(Link)
 
@@ -58,7 +59,7 @@ export function ListingCard({
       <div className="relative mb-3 h-44 w-full shrink-0 overflow-hidden rounded-xl bg-warm-100">
         {listing.photoUrl ? (
           <Image
-            src={listing.photoUrl}
+            src={listingPhotoThumbnailUrl(listing.photoUrl) || listing.photoUrl}
             alt={`${listing.title} in ${
               listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
             }`}

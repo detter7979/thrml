@@ -3,6 +3,8 @@
 import "mapbox-gl/dist/mapbox-gl.css"
 
 import Image from "next/image"
+
+import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
 import { X } from "lucide-react"
 import type { RefObject } from "react"
 import MapboxMap, {
@@ -235,7 +237,10 @@ export function ExploreMapPanel({
               <div className="relative h-[120px] w-full shrink-0 bg-[#F3E7DC]">
                 {popupListing.photoUrl ? (
                   <Image
-                    src={popupListing.photoUrl}
+                    src={
+                      listingPhotoThumbnailUrl(popupListing.photoUrl, { width: 440 }) ||
+                      popupListing.photoUrl
+                    }
                     alt={popupListing.title}
                     fill
                     className="object-cover"

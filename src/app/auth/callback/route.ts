@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { sendGuestWelcomeEmail, markOnboardingEmailSent } from "@/lib/emails/onboarding"
 import { recordReferral } from "@/lib/referral"
 import { sanitizeNextPath } from "@/lib/security"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 const OTP_AUTO_SIGN_IN_TYPES = new Set(["signup", "invite", "email", "email_change"])
@@ -26,6 +28,24 @@ async function resolvePostAuthRedirect(request: NextRequest, requestUrl: URL, ne
   const refRaw = request.cookies.get("thrml_ref")?.value
   if (refRaw) {
     await recordReferral(user.id, decodeURIComponent(refRaw))
+  }
+
+  // Fire welcome email for first-time users (covers OAuth + email/OTP flows).
+  // Non-blocking — redirect is not held up if this fails.
+  if (user.email) {
+    const admin = createAdminClient()
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("full_name, onboarding_email_sent")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    if (!profile?.onboarding_email_sent) {
+      const firstName = (profile?.full_name as string | null)?.split(" ")[0] ?? null
+      sendGuestWelcomeEmail({ userId: user.id, email: user.email, firstName })
+        .then((result) => { if (result.sent) markOnboardingEmailSent(user.id) })
+        .catch(() => {})
+    }
   }
 
   if (next) return NextResponse.redirect(new URL(next, requestUrl.origin))

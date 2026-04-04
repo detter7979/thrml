@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { buildSupportConfirmationEmail, buildSupportInternalAlertEmail } from "@/lib/emails/support"
-import { sendEmail } from "@/lib/emails/send"
+import { resolveResendFrom, sendEmail } from "@/lib/emails/send"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
 import { deriveSupportPriority, SUPPORT_SUBJECTS, type SupportSubject } from "@/lib/support"
@@ -214,8 +214,10 @@ export async function POST(req: NextRequest) {
       message,
     })
 
-    const supportRecipient = process.env.SUPPORT_EMAIL?.trim()
-    const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev"
+    const supportRecipient =
+      process.env.SUPPORT_EMAIL?.trim() ||
+      (process.env.NODE_ENV === "production" ? "hello@usethrml.com" : "")
+    const fromAddress = resolveResendFrom()
     const confirmationRecipient =
       process.env.NODE_ENV === "production" ? email : (process.env.RESEND_TEST_TO_EMAIL?.trim() ?? email)
 
@@ -235,6 +237,7 @@ export async function POST(req: NextRequest) {
             subject: internalEmail.subject,
             html: internalEmail.html,
             text: internalEmail.text,
+            replyTo: email,
           })
         : Promise.resolve({ sent: false, error: "SUPPORT_EMAIL not configured" }),
     ])

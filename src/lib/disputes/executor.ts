@@ -159,12 +159,10 @@ export async function executeResolution(
 
     executed = true
 
-    const fromAddress = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev"
     const toAddress =
       process.env.NODE_ENV === "production" ? userEmail : (process.env.RESEND_TEST_TO_EMAIL ?? userEmail)
 
     await sendEmail({
-      from: fromAddress,
       to: toAddress,
       subject: `Your request has been resolved — ${ticketNumber}`,
       html: buildResolutionEmail(userName, ticketNumber, classification),

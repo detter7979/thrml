@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
+import { resolveResendFrom, resolveResendReplyTo } from "@/lib/emails/send"
 import { newsletterWelcomeVariantA as welcomeEmail } from "@/lib/emails/templates"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
@@ -70,7 +71,8 @@ export async function POST(request: NextRequest) {
 
     const resend = new Resend(resendApiKey)
     const emailTemplate = welcomeEmail({ email })
-    const fromAddress = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev"
+    const fromAddress = resolveResendFrom()
+    const replyTo = resolveResendReplyTo()
     const recipient =
       process.env.NODE_ENV === "production" ? email : (process.env.RESEND_TEST_TO_EMAIL?.trim() ?? email)
 
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
         subject: emailTemplate.subject,
         html: emailTemplate.html,
         text: emailTemplate.text,
+        ...(replyTo ? { reply_to: replyTo } : {}),
       })
 
       if (resendError) {

@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
 
     // Manual deploy checklist:
     // 1) Supabase Auth -> Email Templates -> Reset Password is enabled with {{ .ConfirmationURL }}.
-    // 2) Supabase Auth -> SMTP uses Resend (smtp.resend.com:465, username "resend", API key password).
-    // 3) Sender email matches your verified domain (for example notifications@usethermal.com).
+    // 2) Supabase Auth -> SMTP: Resend (smtp.resend.com) or Zoho (e.g. hello@usethrml.com) — use a verified From.
+    // 3) App transactional mail uses Resend from notifications@usethrml.com; replies can go to hello@usethrml.com (Zoho).
     const { error } = await supabase.auth.verifyOtp({
       type: "recovery",
       token_hash: tokenHash,

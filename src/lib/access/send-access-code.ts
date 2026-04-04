@@ -288,7 +288,6 @@ export async function sendAccessCode(
 
     const emailResult = await sendEmail({
       to: guestEmail,
-      from: process.env.RESEND_FROM_EMAIL,
       subject,
       html,
       text,

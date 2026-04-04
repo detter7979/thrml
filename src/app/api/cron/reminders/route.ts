@@ -358,6 +358,7 @@ export async function GET(request: NextRequest) {
     const pendingProfileMap = new Map<string, ProfileRow>(
       (pendingProfilesRaw ?? []).map((row) => [row.id, row as ProfileRow])
     )
+    const twelveHoursMs = 12 * 60 * 60 * 1000
     const twentyFourHoursMs = 24 * 60 * 60 * 1000
 
     for (const booking of pendingHostBookings) {
@@ -367,10 +368,15 @@ export async function GET(request: NextRequest) {
       if (msUntilDeadline <= 0) continue
 
       const tags = new Set(booking.automated_messages_sent ?? [])
+
+      // Prioritise 12h reminder if within that window and not yet sent,
+      // otherwise fall back to the 24h reminder.
       const reminder =
-        msUntilDeadline <= twentyFourHoursMs && !tags.has("request_to_book_reminder_24h")
-          ? { tag: "request_to_book_reminder_24h" as const, urgency: "24h" as const }
-          : null
+        msUntilDeadline <= twelveHoursMs && !tags.has("request_to_book_reminder_12h")
+          ? { tag: "request_to_book_reminder_12h" as const, urgency: "12h" as const }
+          : msUntilDeadline <= twentyFourHoursMs && !tags.has("request_to_book_reminder_24h")
+            ? { tag: "request_to_book_reminder_24h" as const, urgency: "24h" as const }
+            : null
       if (!reminder) continue
 
       const listing = booking.listing_id ? pendingListingMap.get(booking.listing_id) : null

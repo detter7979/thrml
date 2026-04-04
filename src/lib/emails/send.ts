@@ -7,11 +7,29 @@ import {
 } from "@/lib/notification-preferences"
 import { createAdminClient } from "@/lib/supabase/admin"
 
-const FROM_EMAIL = "Thrml <notifications@usethermal.com>"
+/** Verified on Resend; used for all transactional sends unless RESEND_FROM_EMAIL overrides. */
+export const THRML_TRANSACTIONAL_FROM = "Thrml <notifications@usethrml.com>"
+
+/** Replies go to Zoho (hello@); override with RESEND_REPLY_TO. Pass `replyTo: null` to omit. */
+export const THRML_REPLY_TO = "Thrml <hello@usethrml.com>"
+
+export function resolveResendFrom(): string {
+  const override = process.env.RESEND_FROM_EMAIL?.trim()
+  return override && override.length > 0 ? override : THRML_TRANSACTIONAL_FROM
+}
+
+export function resolveResendReplyTo(): string | undefined {
+  const override = process.env.RESEND_REPLY_TO?.trim()
+  if (override === "__none__") return undefined
+  if (override && override.length > 0) return override
+  return THRML_REPLY_TO
+}
 
 export type SendEmailParams = {
   to: string
   from?: string
+  /** Defaults to hello@ (Zoho). Set `null` to skip Reply-To. */
+  replyTo?: string | null
   subject: string
   html: string
   text: string
@@ -136,12 +154,17 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     }
 
     const resend = new Resend(apiKey)
+    const from = params.from ?? resolveResendFrom()
+    const replyTo =
+      params.replyTo === undefined ? resolveResendReplyTo() : params.replyTo === null ? undefined : params.replyTo
+
     const { error } = await resend.emails.send({
-      from: params.from ?? FROM_EMAIL,
+      from,
       to: [params.to],
       subject: params.subject,
       html: params.html,
       text: params.text,
+      ...(replyTo ? { reply_to: replyTo } : {}),
     })
 
     if (error) {

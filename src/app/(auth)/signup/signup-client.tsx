@@ -188,6 +188,9 @@ function SignupForm() {
           headers: { "Content-Type": "application/json" },
         })
       }
+
+      // Fire guest welcome email — idempotent, non-blocking.
+      fetch("/api/events/user-registered", { method: "POST" }).catch(() => {})
     }
 
     setLoading(false)

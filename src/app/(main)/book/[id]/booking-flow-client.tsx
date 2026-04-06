@@ -156,9 +156,8 @@ function PaymentStep({
       listingId: payload.listingId,
       newsletterOptIn: payload.newsletterOptIn,
     })
-    const missingRequired = !acceptedTerms || !acceptedDisclaimers
-    if (missingRequired) {
-      setLegalError("Please accept the terms and disclaimers to continue")
+    if (!acceptedTerms) {
+      setLegalError("Please accept the Terms of Service to continue")
       const shake = (node: HTMLElement | null) => {
         if (!node) return
         node.animate(
@@ -171,8 +170,7 @@ function PaymentStep({
           { duration: 260, easing: "ease-in-out" }
         )
       }
-      if (!acceptedTerms) shake(termsRowRef.current)
-      if (!acceptedDisclaimers) shake(disclaimersRowRef.current)
+      shake(termsRowRef.current)
       return
     }
 
@@ -252,24 +250,6 @@ function PaymentStep({
                     Terms of Service
                   </Link>{" "}
                   and acknowledge this booking is a direct agreement between me and the space owner.
-                  <span className="ml-1 text-destructive">*</span>
-                </span>
-              </label>
-
-              <label
-                ref={disclaimersRowRef}
-                className="flex min-h-11 items-start gap-3 rounded-md px-1 py-2"
-              >
-                <Checkbox
-                  checked={acceptedDisclaimers}
-                  onCheckedChange={(checked) => onAcceptedDisclaimersChange(Boolean(checked))}
-                />
-                <span className="text-[13px] leading-5 text-[#1A1410]">
-                  I have read and agree to the{" "}
-                  <Link href="/disclaimer" target="_blank" rel="noopener noreferrer" className="underline">
-                    Disclaimers
-                  </Link>
-                  .
                   <span className="ml-1 text-destructive">*</span>
                 </span>
               </label>

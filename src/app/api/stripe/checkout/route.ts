@@ -711,8 +711,10 @@ export async function POST(req: NextRequest) {
       }
       console.error("[stripe/checkout] Failed creating booking", {
         bookingError: bookingError?.message ?? null,
+        bookingErrorCode: (bookingError as {code?: string} | null)?.code ?? null,
+        bookingErrorDetails: bookingError ?? null,
       })
-      return NextResponse.json({ error: "Failed to create booking" }, { status: 500 })
+      return NextResponse.json({ error: `Failed to create booking: ${bookingError?.message ?? "unknown"}` }, { status: 500 })
     }
     console.log("stripe route hit", booking.id)
     console.log("[stripe/checkout] Booking created as pending", {

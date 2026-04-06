@@ -1,7 +1,15 @@
 import { NextRequest } from "next/server"
 import Redis from "ioredis"
 
-const redis = process.env.thrml_REDIS_URL ? new Redis(process.env.thrml_REDIS_URL) : null
+const redis = process.env.thrml_REDIS_URL ? new Redis(process.env.thrml_REDIS_URL, {
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+}) : null
+
+// Prevent unhandled 'error' events from crashing the serverless function.
+// All errors are handled inside the try/catch in applyMemoryRateLimit.
+redis?.on("error", () => {})
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i

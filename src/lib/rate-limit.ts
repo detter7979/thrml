@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import Redis from "ioredis"
 
-const redis = process.env.thrml_REDIS_URL ? new Redis(process.env.thrml_REDIS_URL) : null
+const redis = process.env.thrml_REDIS_URL ? new Redis(process.env.thrml_REDIS_URL, {
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  lazyConnect: true,
+}) : null
+
+// Prevent unhandled 'error' events from crashing the serverless function.
+redis?.on("error", () => {})
 
 interface RateLimitOptions {
   maxRequests: number

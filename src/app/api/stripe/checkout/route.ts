@@ -589,7 +589,7 @@ export async function POST(req: NextRequest) {
       if (isNoDoubleBookingConstraintError(bookingError)) {
         const { data: existingBooking } = await admin
           .from("bookings")
-          .select("id, stripe_payment_intent_id, status, guest_id, host_id, guest_total, host_payout")
+          .select("id, stripe_payment_intent_id, status, guest_id, host_id, total_charged, host_payout")
           .eq("listing_id", listingId)
           .eq("guest_id", user.id)
           .eq("session_date", normalizedDate)
@@ -643,7 +643,7 @@ export async function POST(req: NextRequest) {
               })
             }
 
-            const guestTotalNum = Number(existingBooking.guest_total ?? 0)
+            const guestTotalNum = Number(existingBooking.total_charged ?? 0)
             const hostPayoutNum = Number(existingBooking.host_payout ?? 0)
             const amountCents = Math.round(guestTotalNum * 100)
             const hostPayoutCents = Math.round(hostPayoutNum * 100)

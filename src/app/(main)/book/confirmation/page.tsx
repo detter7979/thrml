@@ -80,7 +80,7 @@ export default async function BookingConfirmationPage({
   const { data: booking, error } = await supabase
     .from("bookings")
     .select(
-      "id, listing_id, session_date, start_time, end_time, guest_count, subtotal, guest_fee, service_fee, guest_total, total_charged, access_code, status"
+      "id, listing_id, session_date, start_time, end_time, guest_count, subtotal, service_fee, total_charged, access_code, status"
     )
     .eq("id", bookingId)
     .eq("guest_id", user.id)
@@ -112,8 +112,8 @@ export default async function BookingConfirmationPage({
   const awaitingHost = booking.status === "pending_host"
   const shouldTrackPurchase = booking.status === "confirmed" || booking.status === "completed"
   const subtotal = Number(booking.subtotal ?? 0)
-  const guestFee = Number(booking.guest_fee ?? booking.service_fee ?? 0)
-  const totalPaid = Number(booking.guest_total ?? booking.total_charged ?? 0)
+  const guestFee = Number(booking.service_fee ?? 0)
+  const totalPaid = Number(booking.total_charged ?? 0)
   const serviceFeePercentLabel =
     subtotal > 0 ? String(Math.round((guestFee / subtotal) * 1000) / 10) : "—"
 

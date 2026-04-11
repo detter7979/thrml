@@ -7,6 +7,8 @@
     { "path": "/api/cron/agent-ops",        "schedule": "0 6 * * *" },
     { "path": "/api/cron/agent-inbox",      "schedule": "30 6 * * *" },
     { "path": "/api/cron/agent-digest",     "schedule": "0 7 * * *" },
+    { "path": "/api/cron/agent-social-publish", "schedule": "30 8 * * *" },
+    { "path": "/api/cron/agent-gdrive",     "schedule": "0 4 * * 1" },
     { "path": "/api/cron/reminders",        "schedule": "0 8 * * *" },
     { "path": "/api/cron/send-messages",    "schedule": "0 9 * * *" },
     { "path": "/api/cron/expire-booked-slots", "schedule": "0 10 * * *" },

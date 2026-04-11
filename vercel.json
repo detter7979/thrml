@@ -1,44 +1,19 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/reminders",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/send-messages",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/expire-booked-slots",
-      "schedule": "0 10 * * *"
-    },
-    {
-      "path": "/api/cron/review-requests",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/retarget",
-      "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/cron/sync-ga4",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/sync-meta",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/sync-bookings",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/agent-evaluate",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/agent-disputes",
-      "schedule": "0 3 * * *"
-    }
+    { "path": "/api/cron/agent-evaluate",   "schedule": "0 3 * * *" },
+    { "path": "/api/cron/agent-disputes",   "schedule": "0 3 * * *" },
+    { "path": "/api/cron/agent-finance",    "schedule": "0 4 * * *" },
+    { "path": "/api/cron/agent-social",     "schedule": "0 5 * * *" },
+    { "path": "/api/cron/agent-ops",        "schedule": "0 6 * * *" },
+    { "path": "/api/cron/agent-inbox",      "schedule": "30 6 * * *" },
+    { "path": "/api/cron/agent-digest",     "schedule": "0 7 * * *" },
+    { "path": "/api/cron/reminders",        "schedule": "0 8 * * *" },
+    { "path": "/api/cron/send-messages",    "schedule": "0 9 * * *" },
+    { "path": "/api/cron/expire-booked-slots", "schedule": "0 10 * * *" },
+    { "path": "/api/cron/review-requests",  "schedule": "0 12 * * *" },
+    { "path": "/api/cron/retarget",         "schedule": "0 14 * * *" },
+    { "path": "/api/cron/sync-ga4",         "schedule": "0 2 * * *" },
+    { "path": "/api/cron/sync-meta",        "schedule": "0 2 * * *" },
+    { "path": "/api/cron/sync-bookings",    "schedule": "0 2 * * *" }
   ]
 }

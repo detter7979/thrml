@@ -97,6 +97,13 @@ export async function GET(req: NextRequest) {
 
   const date = yesterday()
   const supabase = createAdminClient()
+  const runStart = Date.now()
+  const { data: runRow } = await supabase
+    .from("agent_runs")
+    .insert({ agent_name: "ads-evaluate", status: "running" })
+    .select("id").single()
+  const runId = runRow?.id ?? null
+
   const results = {
     meta: { decisions: 0, actions: 0, errors: 0 },
     google: { decisions: 0, actions: 0, errors: 0 },
@@ -477,5 +484,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  return NextResponse.json({ ok: true, date, results })
+
+  if (runId) await supabase.from("agent_runs").update({
+    status: "success", completed_at: new Date().toISOString(),
+    duration_ms: Date.now() - runStart, results,
+  }).eq("id", runId)
   return NextResponse.json({ ok: true, date, results })
 }

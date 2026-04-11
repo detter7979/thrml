@@ -20,6 +20,12 @@ export async function GET(req: NextRequest) {
 
   const supabase = createAdminClient()
   const results = { evaluated: 0, auto_resolved: 0, flagged_human: 0, errors: 0 }
+  const runStart = Date.now()
+  const { data: runRow } = await supabase
+    .from("agent_runs")
+    .insert({ agent_name: "disputes", status: "running" })
+    .select("id").single()
+  const runId = runRow?.id ?? null
 
   // Load active policy — if is_active is false the agent is disabled
   const { data: policyRow } = await supabase
@@ -29,6 +35,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle()
 
   if (!policyRow?.is_active) {
+    if (runId) await supabase.from("agent_runs").update({ status: "skipped", completed_at: new Date().toISOString() }).eq("id", runId)
     return NextResponse.json({ ok: true, message: "Dispute agent is disabled — skipping run" })
   }
 
@@ -43,6 +50,7 @@ export async function GET(req: NextRequest) {
     .limit(20)
 
   if (!tickets?.length) {
+    if (runId) await supabase.from("agent_runs").update({ status: "success", completed_at: new Date().toISOString(), duration_ms: Date.now() - runStart, results }).eq("id", runId)
     return NextResponse.json({ ok: true, message: "No open tickets to process", ...results })
   }
 
@@ -260,5 +268,9 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  if (runId) await supabase.from("agent_runs").update({
+    status: "success", completed_at: new Date().toISOString(),
+    duration_ms: Date.now() - runStart, results,
+  }).eq("id", runId)
   return NextResponse.json({ ok: true, ...results })
 }

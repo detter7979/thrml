@@ -120,6 +120,9 @@ Return a JSON object with these exact fields:
 }`
 
       const result = await callAgentJson<SocialBrief>({ skill: "social", prompt, maxTokens: 800 })
+      if (!result) {
+        console.error("[agent-social] Claude returned null for", platform.key, "- check ANTHROPIC_API_KEY in Vercel")
+      }
       if (result) {
         generated.push(result)
         // Write to creative_queue

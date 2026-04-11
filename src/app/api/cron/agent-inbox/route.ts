@@ -27,9 +27,10 @@ async function refreshZohoToken(admin: ReturnType<typeof createAdminClient>): Pr
   const { data: settings } = await admin
     .from("platform_settings")
     .select("key, value")
-    .in("key", ["zoho_refresh_token", "zoho_access_token", "zoho_token_expiry"])
+    .in("key", ["zoho_refresh_token", "zoho_access_token", "zoho_token_expiry",
+                "zoho_client_id", "zoho_client_secret"])
 
-  const byKey = new Map((settings ?? []).map(s => [s.key, s.value as string]))
+  const byKey = new Map((settings ?? []).map(s => [s.key, (s.value as string).replace(/^"|"$/g, "")]))
   const refreshToken = byKey.get("zoho_refresh_token")
   if (!refreshToken) return null
 
@@ -39,8 +40,9 @@ async function refreshZohoToken(admin: ReturnType<typeof createAdminClient>): Pr
     return byKey.get("zoho_access_token") ?? null
   }
 
-  const clientId = process.env.ZOHO_CLIENT_ID
-  const clientSecret = process.env.ZOHO_CLIENT_SECRET
+  // Read client credentials from env first, fall back to Supabase
+  const clientId = process.env.ZOHO_CLIENT_ID ?? byKey.get("zoho_client_id")
+  const clientSecret = process.env.ZOHO_CLIENT_SECRET ?? byKey.get("zoho_client_secret")
   if (!clientId || !clientSecret) return null
 
   const res = await fetch("https://accounts.zoho.com/oauth/v2/token", {
@@ -144,8 +146,13 @@ export async function GET(req: NextRequest) {
   const results = { processed: 0, support: 0, host_inquiry: 0, partnership: 0, spam: 0, other: 0, errors: 0 }
 
   try {
-    // Check if Zoho is configured
-    if (!process.env.ZOHO_CLIENT_ID || !process.env.ZOHO_CLIENT_SECRET) {
+    // Check if Zoho is configured (env or Supabase)
+    const hasEnvCreds = !!(process.env.ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET)
+    const { count: hasSupaCreds } = await admin
+      .from("platform_settings")
+      .select("key", { count: "exact", head: true })
+      .in("key", ["zoho_client_id", "zoho_client_secret"])
+    if (!hasEnvCreds && (hasSupaCreds ?? 0) < 2) {
       if (runId) await admin.from("agent_runs").update({
         status: "skipped", completed_at: new Date().toISOString(),
         results: { reason: "ZOHO_CLIENT_ID or ZOHO_CLIENT_SECRET not set" },

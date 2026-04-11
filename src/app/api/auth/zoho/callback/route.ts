@@ -51,26 +51,39 @@ export async function GET(req: NextRequest) {
     error?: string
   }
 
-  if (tokens.error || !tokens.refresh_token) {
-    return NextResponse.json({ error: `No refresh token returned: ${JSON.stringify(tokens)}` }, { status: 500 })
+  if (tokens.error || !tokens.access_token) {
+    return NextResponse.json({ error: `Token exchange failed: ${JSON.stringify(tokens)}` }, { status: 500 })
   }
 
-  // Store tokens in Supabase platform_settings
-  // value column is jsonb — use to_jsonb() via raw SQL to avoid double-encoding
   const admin = createAdminClient()
   const expiry = Date.now() + (tokens.expires_in ?? 3600) * 1000
 
-  await admin.from("platform_settings").upsert([
-    { key: "zoho_refresh_token", value: tokens.refresh_token },
-    { key: "zoho_access_token",  value: tokens.access_token },
-    { key: "zoho_token_expiry",  value: String(expiry) },
-  ], { onConflict: "key" })
+  // Always store the access token
+  const upsertRows: { key: string; value: unknown }[] = [
+    { key: "zoho_access_token", value: tokens.access_token },
+    { key: "zoho_token_expiry", value: String(expiry) },
+  ]
 
+  // Only store refresh_token if Zoho returned one (first auth or forced re-consent)
+  if (tokens.refresh_token) {
+    upsertRows.push({ key: "zoho_refresh_token", value: tokens.refresh_token })
+  }
+
+  await admin.from("platform_settings").upsert(upsertRows, { onConflict: "key" })
+
+  const hasRefresh = !!tokens.refresh_token
   return new NextResponse(`
     <html><body style="font-family:system-ui;padding:40px;max-width:500px">
-      <h2 style="color:#1A1410">✅ Zoho connected successfully</h2>
-      <p>Refresh token stored in Supabase. The inbox agent will now authenticate automatically.</p>
-      <p style="color:#796A5E;font-size:14px">You can close this tab.</p>
+      <h2 style="color:#1A1410">${hasRefresh ? "✅ Zoho fully connected" : "⚠️ Partial connection — re-consent needed"}</h2>
+      ${hasRefresh
+        ? "<p>Refresh token stored. The inbox agent will authenticate automatically going forward.</p>"
+        : `<p style="color:#C0392B">Zoho did not return a refresh token — this happens when you've already authorized before.</p>
+           <p><strong>To fix:</strong><br>
+           1. Go to <a href="https://accounts.zoho.com/apiauthtoken/nb/create">accounts.zoho.com</a> → My Account → Connected Apps<br>
+           2. Find and revoke "Claude" or your app name<br>
+           3. Then <a href="/api/auth/zoho/authorize?secret=${code ? "USE_YOUR_CRON_SECRET" : ""}">re-authorize here</a></p>`
+      }
+      <p style="color:#796A5E;font-size:13px">You can close this tab.</p>
     </body></html>
   `, { headers: { "Content-Type": "text/html" } })
 }

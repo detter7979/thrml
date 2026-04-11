@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   authUrl.searchParams.set("client_id", clientId)
   authUrl.searchParams.set("response_type", "code")
   authUrl.searchParams.set("access_type", "offline")
+  authUrl.searchParams.set("prompt", "consent") // forces Zoho to re-issue refresh_token
   authUrl.searchParams.set("redirect_uri", redirectUri)
 
   return NextResponse.redirect(authUrl.toString())

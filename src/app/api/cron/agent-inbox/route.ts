@@ -30,7 +30,13 @@ async function refreshZohoToken(admin: ReturnType<typeof createAdminClient>): Pr
     .in("key", ["zoho_refresh_token", "zoho_access_token", "zoho_token_expiry",
                 "zoho_client_id", "zoho_client_secret"])
 
-  const byKey = new Map((settings ?? []).map(s => [s.key, (s.value as string).replace(/^"|"$/g, "")]))
+  const byKey = new Map((settings ?? []).map(s => {
+    // value column is jsonb — may be a plain string or a JSON-encoded string
+    // Strip surrounding quotes that result from double-encoding
+    const raw = s.value as string
+    const cleaned = raw.replace(/^"+|"+$/g, "").replace(/\\"/g, '"')
+    return [s.key, cleaned]
+  }))
   const refreshToken = byKey.get("zoho_refresh_token")
   if (!refreshToken) return null
 

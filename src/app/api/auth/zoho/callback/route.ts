@@ -56,13 +56,14 @@ export async function GET(req: NextRequest) {
   }
 
   // Store tokens in Supabase platform_settings
+  // value column is jsonb — use to_jsonb() via raw SQL to avoid double-encoding
   const admin = createAdminClient()
   const expiry = Date.now() + (tokens.expires_in ?? 3600) * 1000
 
   await admin.from("platform_settings").upsert([
-    { key: "zoho_refresh_token", value: `"${tokens.refresh_token}"` },
-    { key: "zoho_access_token", value: `"${tokens.access_token}"` },
-    { key: "zoho_token_expiry", value: `"${String(expiry)}"` },
+    { key: "zoho_refresh_token", value: tokens.refresh_token },
+    { key: "zoho_access_token",  value: tokens.access_token },
+    { key: "zoho_token_expiry",  value: String(expiry) },
   ], { onConflict: "key" })
 
   return new NextResponse(`

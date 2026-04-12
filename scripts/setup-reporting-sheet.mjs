@@ -5,150 +5,195 @@ const creds = JSON.parse(readFileSync("/tmp/gcp_creds.json", "utf8"))
 const auth = new google.auth.GoogleAuth({ credentials: creds, scopes: ["https://www.googleapis.com/auth/spreadsheets"] })
 const sheets = google.sheets({ version: "v4", auth })
 const MASTER_ID = "1V6qMPwq7F_AHM3VUsa8mXKubknvXrI2-2nND1MWh4pU"
+const NAMER_ID  = "1yx5cxxno8Pig23Zs6GagF0EblImIUQqy1fv6e4Rfh3o"
 
-// ── Column schema ─────────────────────────────────────────────────────────
-// NO calculated metrics (CTR, CPC, CPM, ROAS, CPA removed)
-// Naming columns renamed to match their actual values
-
+// ── Real Platform Data columns (no calculated metrics) ───────────────────
 const PLATFORM_DATA_HEADERS = [
-  // Date & platform
+  // Date + Platform
   "Date", "Platform",
-  // Hierarchy IDs
-  "Campaign ID", "Ad Set ID", "Ad ID",
-  // Hierarchy names (raw from platform)
+  // Naming hierarchy (raw)
   "Campaign Name", "Ad Set Name", "Ad Name",
-  // Parsed naming convention — named to match values
-  "Phase",              // P1 / P2 / P3
-  "Campaign Objective", // Conversion | Awareness | Traffic | Lead
-  "Funnel Stage",       // Prospecting | Retargeting | Lookalike | Broad
-  "Audience",           // Guest | Host
-  "Creative Concept",   // checkout_rt | sauna | earn | booking
-  "Market",             // All | Seattle | LA | etc.
-  // Ad-level creative attributes (from Creative Builder)
-  "Creative Format",    // Video | Image | Carousel | Story | RSA
-  "Aspect Ratio",       // 9:16 | 1:1 | 4:5 | 16:9 | Text
-  "Creative Version",   // v1 | v2 | v3
-  "Hook",               // Opening line / first 3s concept
-  "Headline",           // Ad headline
-  "Primary Text",       // Body copy
-  "CTA",                // Book Now | Learn More | Sign Up | Get Started
-  "Landing Page",       // Destination URL slug
-  // Raw metrics only — no calculated fields
-  "Spend",
-  "Impressions",
-  "Clicks",
-  "Purchases",
-  "Revenue",
-  // Video engagement (Meta only, blank for Google)
-  "3s Views",
-  "50% Views",
-  "100% Views",
+  // Parsed — Campaign level
+  "Phase", "Campaign Objective", "Funnel Stage",
+  "Audience Type", "Audience Group", "Geo",
+  // Parsed — Ad Set level
+  "Space Type", "Audience Source", "Placement",
+  // Parsed — Ad level
+  "Test ID", "Variant", "Angle", "Format", "CTA",
+  // From Creative Builder lookup
+  "Hook Copy", "Status", "Opt. Event",
+  // Raw metrics — no calculated fields
+  "Spend ($)", "Impressions", "Reach", "Link Clicks",
+  // Conversion events (per phase)
+  "become_host_click", "host_onboarding_started", "listing_created", "Purchase",
+  // Video
+  "Video Views 25%",
 ]
 
-// ── Name parser ───────────────────────────────────────────────────────────
-function parseName(name) {
-  const PM = { META:"Meta",FB:"Meta",GOOG:"Google",GA:"Google",GG:"Google",TT:"TikTok",SNAP:"Snapchat" }
-  const OM = { CONV:"Conversion",AWARE:"Awareness",TRAF:"Traffic",LEAD:"Lead",APP:"App",VV:"Video Views",REACH:"Reach",ENG:"Engagement" }
-  const FM = { RT:"Retargeting",RET:"Retargeting",PRO:"Prospecting",LAL:"Lookalike",BROAD:"Broad",INT:"Interest" }
-  const GM = { GUEST:"Guest",BOOKING:"Guest",BOOK:"Guest",HOST:"Host",EARN:"Host",LIST:"Host" }
-  const MM = { ALL:"All",SEA:"Seattle",LA:"Los Angeles",SF:"San Francisco",NYC:"New York",US:"US",CHI:"Chicago",PDX:"Portland" }
-  const KM = new Set(Object.keys(MM))
+// ── Inline name parser (matches naming-parser.ts) ─────────────────────────
+const PLATFORM_MAP  = { META:"Meta", GOOG:"Google", SNAP:"Snapchat", TIKTOK:"TikTok" }
+const OBJECTIVE_MAP = { REACH:"Reach", LEAD:"Lead", CONV:"Conversion", AWARE:"Awareness" }
+const FUNNEL_MAP    = { PROSP:"Prospecting", LAL:"Lookalike", LAL1:"Lookalike (1%)", LAL2:"Lookalike (2%)", RT:"Retargeting", CRM:"CRM" }
+const GEO_MAP       = { ALL:"All", SEA:"Seattle", US:"US", LA:"Los Angeles", SF:"San Francisco" }
+const SPACE_MAP     = { GEN:"General", SAUNA:"Sauna", HOTTUB:"Hot Tub", COLDPLUNGE:"Cold Plunge" }
+const AUD_SRC_MAP   = { INT:"Interest", LAL1:"1% LAL", LAL2:"2% LAL", CRMATCH:"CRM Match", RT:"Retarget" }
+const PLACEMENT_MAP = { "FEED-STORIES":"Feed + Stories", FEED:"Feed", REELS:"Reels", SEARCH:"Search", PMAX:"Performance Max", "DEMAND-GEN":"Demand Gen" }
+const FORMAT_MAP    = { "STATIC_9X16":"Static 9:16","STATIC_1X1":"Static 1:1","VIDEO_15S":"Video 15s","VIDEO_30S":"Video 30s",CAROUSEL:"Carousel",UGC:"UGC",RSA:"RSA" }
+const CTA_MAP       = { LIST_NOW:"List Now",LEARN_MORE:"Learn More",GET_STARTED:"Get Started",SEE_HOW:"See How",BOOK_NOW:"Book Now" }
+const KNOWN_GEOS    = new Set(Object.keys(GEO_MAP))
+const KNOWN_FORMATS = new Set(Object.keys(FORMAT_MAP))
+const KNOWN_CTAS    = new Set(Object.keys(CTA_MAP))
+
+function parseAd(name) {
   const parts = (name||"").trim().split("_").filter(Boolean)
+  const r = { platform:"",phase:"",campaignObjective:"",funnelStage:"",
+    audienceType:"",audienceGroup:"",geo:"",spaceType:"",audienceSource:"",
+    placement:"",testId:"",variant:"",angle:"",format:"",cta:"",optEvent:"" }
   let c = 0
-  const r = {platform:"",phase:"",objective:"",funnelStage:"",audience:"",concept:"",market:""}
-  if (PM[parts[c]?.toUpperCase()]) r.platform = PM[parts[c++].toUpperCase()]
-  if (/^P\d+$/i.test(parts[c])) r.phase = parts[c++].toUpperCase()
-  if (OM[parts[c]?.toUpperCase()]) r.objective = OM[parts[c++].toUpperCase()]
-  if (FM[parts[c]?.toUpperCase()]) r.funnelStage = FM[parts[c++].toUpperCase()]
-  if (GM[parts[c]?.toUpperCase()]) r.audience = GM[parts[c++].toUpperCase()]
-  const last = parts[parts.length-1]?.toUpperCase()
-  let mEnd = parts.length
-  if (KM.has(last)) { r.market = MM[last]; mEnd-- }
-  r.concept = parts.slice(c, mEnd).join("_")
+  if (PLATFORM_MAP[parts[c]?.toUpperCase()]) r.platform = PLATFORM_MAP[parts[c++].toUpperCase()]
+  if (/^P\d+$/i.test(parts[c]??'')) r.phase = parts[c++].toUpperCase()
+  if (OBJECTIVE_MAP[parts[c]?.toUpperCase()]) r.campaignObjective = OBJECTIVE_MAP[parts[c++].toUpperCase()]
+  if (FUNNEL_MAP[parts[c]?.toUpperCase()]) r.funnelStage = FUNNEL_MAP[parts[c++].toUpperCase()]
+  // Audience type: host_* or guest_* (2 tokens)
+  const at1 = parts[c]?.toLowerCase(), at2 = parts[c+1]?.toLowerCase()
+  if (at1 && (at1==="host"||at1==="guest") && at2 && !KNOWN_GEOS.has(at2.toUpperCase())) {
+    r.audienceType=`${at1}_${at2}`; r.audienceGroup=at1==="host"?"Host":"Guest"; c+=2
+  }
+  if (KNOWN_GEOS.has(parts[c]?.toUpperCase())) { r.geo=GEO_MAP[parts[c].toUpperCase()]; c++ }
+  if (SPACE_MAP[parts[c]?.toUpperCase()]) { r.spaceType=SPACE_MAP[parts[c++].toUpperCase()] }
+  if (AUD_SRC_MAP[parts[c]?.toUpperCase()]) { r.audienceSource=AUD_SRC_MAP[parts[c++].toUpperCase()] }
+  // Placement (may contain hyphens, ends at T\d+)
+  const pParts = []
+  while (c < parts.length && !(/^T\d+$/i.test(parts[c]))) pParts.push(parts[c++])
+  const pk = pParts.join("-").toUpperCase()
+  r.placement = PLACEMENT_MAP[pk] || pParts.join("-")
+  // Ad level: find T\d+
+  const ti = parts.findIndex(p => /^T\d+$/i.test(p))
+  if (ti >= 0) {
+    let ac = ti
+    r.testId = parts[ac++]
+    r.variant = parts[ac++]?.toUpperCase() ?? ""
+    // Angle: until FORMAT
+    const aParts = []
+    while (ac < parts.length) {
+      const f1 = parts[ac]?.toUpperCase(), f2 = parts[ac+1]?.toUpperCase()
+      if (KNOWN_FORMATS.has(`${f1}_${f2}`) || KNOWN_FORMATS.has(f1)) break
+      aParts.push(parts[ac++])
+    }
+    r.angle = aParts.join("_")
+    // Format (1 or 2 tokens)
+    const f1 = parts[ac]?.toUpperCase(), f2 = parts[ac+1]?.toUpperCase()
+    if (KNOWN_FORMATS.has(`${f1}_${f2}`)) { r.format=FORMAT_MAP[`${f1}_${f2}`]; ac+=2 }
+    else if (KNOWN_FORMATS.has(f1)) { r.format=FORMAT_MAP[f1]; ac++ }
+    // CTA
+    const ck = parts[ac]?.toUpperCase()
+    r.cta = KNOWN_CTAS.has(ck) ? CTA_MAP[ck] : (parts[ac]??'')
+    // Derive opt event from phase + audience group
+    const ph = parseInt(r.phase.replace("P",""))
+    if (r.audienceGroup==="Host") r.optEvent = ph===1?"become_host_click":ph===2?"host_onboarding_started":"listing_created"
+    else r.optEvent = ph<=2?"ViewContent":"Purchase"
+  }
   return r
 }
 
-function fmt(n,d=2) { return Number(n).toFixed(d) }
-function jitter(base,pct=0.25) { return base*(1+(Math.random()-0.5)*pct) }
+// ── Creative Builder lookup (Test ID → Hook Copy, Status) ─────────────────
+async function loadCreativeBuilder() {
+  const map = new Map() // TestID+Variant → { hook, status, optEvent }
+  try {
+    const r = await sheets.spreadsheets.values.get({
+      spreadsheetId: NAMER_ID, range: "'④ Creative Builder'!A3:K50"
+    })
+    for (const row of r.data.values ?? []) {
+      const [testId, variant, , , , , hook, status, , , optEvent] = row
+      if (testId && variant) map.set(`${testId}_${variant}`, { hook: hook||"", status: status||"", optEvent: optEvent||"" })
+    }
+  } catch(e) { console.warn("Creative Builder read failed:", e.message) }
+  return map
+}
 
-// ── Fake campaigns ────────────────────────────────────────────────────────
-const CAMPAIGNS = [
-  {
-    cname:"META_P3_CONV_RT_guest_checkout_rt_ALL", aname:"META_P3_CONV_RT_guest_checkout_rt_ALL_v2",
-    format:"Video", ratio:"9:16", version:"v2",
-    hook:"Private sauna. No membership.", headline:"Book your session today",
-    body:"Skip the gym. Book a private sauna near you — by the hour, on your schedule.",
-    cta:"Book Now", lp:"/book",
-    spend:45, imps:12000, clicks:320, conv:3, meta:true
+// ── Fake campaigns using real naming convention ───────────────────────────
+const FAKE_ADS = [
+  { // Host acquisition — P1, Prospecting, sauna interest, feed
+    adName: "META_P1_REACH_PROSP_host_gen_ALL_sauna_int_FEED-STORIES_T01_A_income_Static_9x16_list_now",
+    spend: 18.5,  imps: 12400, reach: 11200, clicks: 310,
+    bhc: 22, hos: 0, lc: 0, purch: 0, vv25: 180, status: "Live"
   },
-  {
-    cname:"META_P2_CONV_PRO_guest_sauna_SEA", aname:"META_P2_CONV_PRO_guest_sauna_SEA_v1",
-    format:"Image", ratio:"1:1", version:"v1",
-    hook:"Seattle's first peer-to-peer sauna marketplace", headline:"Private wellness near you",
-    body:"Find and book private saunas, cold plunges, and hot tubs by the hour.",
-    cta:"Learn More", lp:"/seattle",
-    spend:30, imps:8500, clicks:180, conv:1, meta:true
+  { // Host acquisition — P1, Challenger B
+    adName: "META_P1_REACH_PROSP_host_gen_ALL_sauna_int_FEED-STORIES_T01_B_community_Static_9x16_list_now",
+    spend: 14.2,  imps: 9800,  reach: 9100,  clicks: 240,
+    bhc: 16, hos: 0, lc: 0, purch: 0, vv25: 120, status: "Testing"
   },
-  {
-    cname:"META_P1_AWARE_PRO_host_earn_ALL", aname:"META_P1_AWARE_PRO_host_earn_ALL_v1",
-    format:"Video", ratio:"9:16", version:"v1",
-    hook:"Your sauna is sitting empty", headline:"Earn from your wellness space",
-    body:"List your sauna, hot tub, or cold plunge on thrml and earn while you sleep.",
-    cta:"List Your Space", lp:"/become-a-host",
-    spend:20, imps:22000, clicks:95, conv:0, meta:true
+  { // Host P2 — LAL, onboarding push, video
+    adName: "META_P2_LEAD_LAL_host_gen_ALL_sauna_lal1_FEED-STORIES_T02_A_idle_space_Video_15s_get_started",
+    spend: 22.0,  imps: 8200,  reach: 7600,  clicks: 195,
+    bhc: 0, hos: 14, lc: 0, purch: 0, vv25: 2800, status: "Draft"
   },
-  {
-    cname:"GOOG_P2_TRAF_PRO_guest_booking_SEA", aname:"GOOG_P2_TRAF_PRO_guest_booking_SEA_v1",
-    format:"RSA", ratio:"Text", version:"v1",
-    hook:"Private Sauna Rental Seattle", headline:"Book by the Hour | thrml",
-    body:"Find private saunas, hot tubs & cold plunges near you. Book instantly.",
-    cta:"Book Now", lp:"/search?city=seattle",
-    spend:38, imps:5200, clicks:410, conv:2, meta:false
+  { // Guest P3 — Retargeting, checkout
+    adName: "META_P3_CONV_RT_guest_wellness_ALL_sauna_rt_FEED-STORIES_T04_A_fomo_Static_9x16_book_now",
+    spend: 31.0,  imps: 4400,  reach: 4100,  clicks: 380,
+    bhc: 0, hos: 0, lc: 0, purch: 6, vv25: 0, status: "Draft"
   },
-  {
-    cname:"GOOG_P3_CONV_RT_guest_sauna_ALL", aname:"GOOG_P3_CONV_RT_guest_sauna_ALL_v2",
-    format:"RSA", ratio:"Text", version:"v2",
-    hook:"You Viewed Private Saunas", headline:"Complete Your Booking | thrml",
-    body:"Private wellness spaces available now. No membership required.",
-    cta:"Book Now", lp:"/book",
-    spend:22, imps:3800, clicks:290, conv:2, meta:false
+  { // Google Search — Host P1
+    adName: "GOOG_P1_CONV_PROSP_host_gen_SEA_gen_int_SEARCH_T01_A_income_RSA_list_now",
+    spend: 24.5,  imps: 3200,  reach: 3200,  clicks: 290,
+    bhc: 18, hos: 0, lc: 0, purch: 0, vv25: 0, status: "Live"
   },
 ]
 
-function generateRows() {
+function jitter(base, pct=0.2) { return base*(1+(Math.random()-0.5)*pct) }
+function fmt(n,d=2) { return Number(n).toFixed(d) }
+
+function generateFakeRows(creativeMap) {
   const rows = []
   const today = new Date()
   for (let d=6; d>=0; d--) {
     const date = new Date(today); date.setDate(date.getDate()-d)
     const ds = date.toISOString().slice(0,10)
-    for (const c of CAMPAIGNS) {
-      const p = parseName(c.cname)
-      const spend = jitter(c.spend), imps = Math.round(jitter(c.imps))
-      const clicks = Math.round(jitter(c.clicks))
-      const purch = Math.max(0, Math.round(jitter(c.conv,0.8)))
-      const rev = purch * jitter(39.90, 0.1)
-      const v3s = c.meta ? Math.round(imps*jitter(0.12,0.3)) : 0
-      const v50 = c.meta ? Math.round(v3s*jitter(0.55,0.2)) : 0
-      const v100= c.meta ? Math.round(v50*jitter(0.45,0.2)) : 0
+    for (const ad of FAKE_ADS) {
+      const p = parseAd(ad.adName)
+      const creative = creativeMap.get(`${p.testId}_${p.variant}`) ?? {}
+      const spend  = jitter(ad.spend)
+      const imps   = Math.round(jitter(ad.imps))
+      const reach  = Math.round(jitter(ad.reach))
+      const clicks = Math.round(jitter(ad.clicks))
+      const bhc    = Math.max(0, Math.round(jitter(ad.bhc, 0.5)))
+      const hos    = Math.max(0, Math.round(jitter(ad.hos, 0.5)))
+      const lc     = Math.max(0, Math.round(jitter(ad.lc, 0.5)))
+      const purch  = Math.max(0, Math.round(jitter(ad.purch, 0.6)))
+      const vv25   = ad.vv25 > 0 ? Math.round(jitter(ad.vv25)) : 0
       rows.push([
         ds, p.platform,
-        `camp_${c.cname.slice(0,10)}`, `adset_${c.cname.slice(5,14)}`, `ad_${c.aname.slice(0,14)}`,
-        c.cname, c.cname, c.aname,
-        p.phase, p.objective, p.funnelStage, p.audience, p.concept, p.market,
-        c.format, c.ratio, c.version, c.hook, c.headline, c.body, c.cta, c.lp,
-        fmt(spend), String(imps), String(clicks), String(purch), fmt(rev),
-        String(v3s), String(v50), String(v100),
+        // Extract campaign and ad set names from full ad name
+        // Campaign = first 6 underscore tokens (platform_phase_obj_funnel_at1_at2_geo)
+        ad.adName.split("_").slice(0, ad.adName.startsWith("GOOG") ? 7 : 7).join("_"),
+        ad.adName.split("_").slice(0, 11).join("_"), // ad set = first ~11 tokens
+        ad.adName,
+        // Parsed campaign-level
+        p.phase, p.campaignObjective, p.funnelStage,
+        p.audienceType, p.audienceGroup, p.geo,
+        // Parsed ad set-level
+        p.spaceType, p.audienceSource, p.placement,
+        // Parsed ad-level
+        p.testId, p.variant, p.angle, p.format, p.cta,
+        // Creative Builder lookup
+        creative.hook ?? "", creative.status ?? ad.status, creative.optEvent ?? p.optEvent,
+        // Raw metrics
+        fmt(spend), String(imps), String(reach), String(clicks),
+        // Conversion events
+        String(bhc), String(hos), String(lc), String(purch),
+        // Video
+        String(vv25),
       ])
     }
   }
   return rows
 }
 
-// ── Fixed costs ───────────────────────────────────────────────────────────
+// ── Fixed Costs ───────────────────────────────────────────────────────────
 const FC_HEADERS = ["Item", "Category", "Monthly ($)", "Annual ($)", "Notes"]
 const FC_ROWS = [
   ["Redis",            "Infrastructure", "7.00",   "84.00",    "Upstash/RedisLabs"],
-  ["Resend Starter",   "Infrastructure", "20.00",  "240.00",   "Transactional email"],
+  ["Resend Starter",   "Infrastructure", "20.00",  "240.00",   "Transactional email API"],
   ["Zoho Mail Basic",  "Infrastructure", "1.00",   "12.00",    "hello@usethrml.com"],
   ["Domain / DNS",     "Infrastructure", "1.67",   "20.00",    "$20/yr"],
   ["Vercel",           "Infrastructure", "0.00",   "0.00",     "Hobby — free"],
@@ -161,210 +206,215 @@ const FC_ROWS = [
   ["TOTAL FIXED",      "",               "109.67", "1316.00",  ""],
 ]
 
-// ── Ad hoc costs ──────────────────────────────────────────────────────────
+// ── Ad Hoc Costs ──────────────────────────────────────────────────────────
 const AH_HEADERS = ["Date", "Item", "Category", "Amount ($)", "Notes", "Month"]
 const todayStr = new Date().toISOString().slice(0,10)
 const monthStr = new Date().toLocaleDateString("en-US",{month:"short",year:"numeric"})
 const AH_SAMPLE = [
-  [todayStr, "Anthropic API",         "AI",       "4.20",  "Claude API — check dashboard monthly",   monthStr],
-  [todayStr, "Stripe Processing Fees","Payment",  "2.87",  "2.9%+$0.30 on bookings this week",       monthStr],
-  [todayStr, "Stock photo",           "Creative", "15.00", "One-off asset purchase",                  monthStr],
+  [todayStr, "Anthropic API",         "AI",       "4.20",  "Claude API usage",              monthStr],
+  [todayStr, "Stripe Processing Fees","Payment",  "2.87",  "2.9%+$0.30 per booking",        monthStr],
+  [todayStr, "Stock photo license",   "Creative", "15.00", "One-off asset",                 monthStr],
 ]
 
 // ── Overview builder ──────────────────────────────────────────────────────
 function buildOverview(rows) {
   const today = new Date()
-  const agg = (filter) => {
-    let spend=0,imps=0,clicks=0,purch=0,rev=0
+  // Column indices (0-based in data rows)
+  const iSpend=21, iImps=22, iReach=23, iClicks=24
+  const iBHC=25, iHOS=26, iLC=27, iPurch=28, iVV=29
+  const iPlatform=1, iPhase=5, iFunnel=7, iAudGroup=9, iTestId=14
+
+  function agg(filter) {
+    let spend=0,imps=0,clicks=0,bhc=0,hos=0,lc=0,purch=0
     for (const r of rows) {
       if (!filter(r)) continue
-      spend+=parseFloat(r[22]||0); imps+=parseInt(r[23]||0)
-      clicks+=parseInt(r[24]||0); purch+=parseInt(r[25]||0); rev+=parseFloat(r[26]||0)
+      spend+=parseFloat(r[iSpend]||0); imps+=parseInt(r[iImps]||0)
+      clicks+=parseInt(r[iClicks]||0); bhc+=parseInt(r[iBHC]||0)
+      hos+=parseInt(r[iHOS]||0); lc+=parseInt(r[iLC]||0); purch+=parseInt(r[iPurch]||0)
     }
-    return {spend,imps,clicks,purch,rev}
+    return {spend,imps,clicks,bhc,hos,lc,purch}
   }
 
-  const total   = agg(()=>true)
-  const meta    = agg(r=>r[1]==="Meta")
-  const google  = agg(r=>r[1]==="Google")
-  const prosp   = agg(r=>r[10]==="Prospecting")
-  const retarg  = agg(r=>r[10]==="Retargeting")
-  const guest   = agg(r=>r[11]==="Guest")
-  const host    = agg(r=>r[11]==="Host")
+  const total  = agg(()=>true)
+  const meta   = agg(r=>r[iPlatform]==="Meta")
+  const google = agg(r=>r[iPlatform]==="Google")
+  const prosp  = agg(r=>r[iFunnel]==="Prospecting")
+  const retarg = agg(r=>r[iFunnel]==="Retargeting")
+  const host   = agg(r=>r[iAudGroup]==="Host")
+  const guest  = agg(r=>r[iAudGroup]==="Guest")
+  const p1     = agg(r=>r[iPhase]==="P1")
+  const p2     = agg(r=>r[iPhase]==="P2")
+  const p3     = agg(r=>r[iPhase]==="P3")
+
+  // By campaign
+  const byCamp = {}
+  for (const r of rows) {
+    const k = r[2]; if (!k) continue
+    if (!byCamp[k]) byCamp[k] = {spend:0,imps:0,clicks:0,bhc:0,hos:0,lc:0,purch:0}
+    const d=byCamp[k]; d.spend+=parseFloat(r[iSpend]||0); d.imps+=parseInt(r[iImps]||0)
+    d.clicks+=parseInt(r[iClicks]||0); d.bhc+=parseInt(r[iBHC]||0)
+    d.hos+=parseInt(r[iHOS]||0); d.lc+=parseInt(r[iLC]||0); d.purch+=parseInt(r[iPurch]||0)
+  }
+  // By ad set
+  const byAdSet = {}
+  for (const r of rows) {
+    const k = r[3]; if (!k) continue
+    if (!byAdSet[k]) byAdSet[k] = {spend:0,imps:0,clicks:0,bhc:0,hos:0,lc:0,purch:0}
+    const d=byAdSet[k]; d.spend+=parseFloat(r[iSpend]||0); d.imps+=parseInt(r[iImps]||0)
+    d.clicks+=parseInt(r[iClicks]||0); d.bhc+=parseInt(r[iBHC]||0)
+    d.hos+=parseInt(r[iHOS]||0); d.lc+=parseInt(r[iLC]||0); d.purch+=parseInt(r[iPurch]||0)
+  }
+  // By ad
+  const byAd = {}
+  for (const r of rows) {
+    const k = r[4]; if (!k) continue
+    if (!byAd[k]) byAd[k] = {spend:0,imps:0,clicks:0,bhc:0,hos:0,lc:0,purch:0}
+    const d=byAd[k]; d.spend+=parseFloat(r[iSpend]||0); d.imps+=parseInt(r[iImps]||0)
+    d.clicks+=parseInt(r[iClicks]||0); d.bhc+=parseInt(r[iBHC]||0)
+    d.hos+=parseInt(r[iHOS]||0); d.lc+=parseInt(r[iLC]||0); d.purch+=parseInt(r[iPurch]||0)
+  }
 
   const fixedMonthly=109.67, days=7
   const estOpex = fixedMonthly/30*days
-  const profit  = total.rev - total.spend - estOpex
 
-  const row = (label,d) => [label, `$${fmt(d.spend)}`, String(d.imps), String(d.clicks), String(d.purch), `$${fmt(d.rev)}`]
-  const sec = (title) => ["", "", "", "", "", ""]
-
-  // Campaign-level aggregation
-  const byCamp = {}
-  for (const r of rows) {
-    const k = r[5]; if (!k) continue
-    if (!byCamp[k]) byCamp[k] = {spend:0,imps:0,clicks:0,purch:0,rev:0}
-    byCamp[k].spend+=parseFloat(r[22]||0); byCamp[k].imps+=parseInt(r[23]||0)
-    byCamp[k].clicks+=parseInt(r[24]||0); byCamp[k].purch+=parseInt(r[25]||0); byCamp[k].rev+=parseFloat(r[26]||0)
+  function row(label,d) {
+    return [label, `$${fmt(d.spend)}`, String(d.imps), String(d.clicks),
+      String(d.bhc), String(d.hos), String(d.lc), String(d.purch)]
   }
-  // Ad set level (using adset name)
-  const byAdset = {}
-  for (const r of rows) {
-    const k = r[6]; if (!k) continue
-    if (!byAdset[k]) byAdset[k] = {spend:0,imps:0,clicks:0,purch:0,rev:0}
-    byAdset[k].spend+=parseFloat(r[22]||0); byAdset[k].imps+=parseInt(r[23]||0)
-    byAdset[k].clicks+=parseInt(r[24]||0); byAdset[k].purch+=parseInt(r[25]||0); byAdset[k].rev+=parseFloat(r[26]||0)
-  }
-  // Ad level
-  const byAd = {}
-  for (const r of rows) {
-    const k = r[7]; if (!k) continue
-    if (!byAd[k]) byAd[k] = {spend:0,imps:0,clicks:0,purch:0,rev:0}
-    byAd[k].spend+=parseFloat(r[22]||0); byAd[k].imps+=parseInt(r[23]||0)
-    byAd[k].clicks+=parseInt(r[24]||0); byAd[k].purch+=parseInt(r[25]||0); byAd[k].rev+=parseFloat(r[26]||0)
-  }
-
-  const COL_H = ["", "Spend ($)", "Impressions", "Clicks", "Purchases", "Revenue ($)"]
+  const COL_H = ["", "Spend ($)", "Impressions", "Clicks",
+    "become_host_click", "host_onboarding_started", "listing_created", "Purchase"]
 
   return [
-    // Title
-    ["thrml Platform Performance Overview — Last 7 Days","","","","",""],
-    [`As of: ${today.toDateString()}  |  Period: ${new Date(today.getTime()-6*86400000).toISOString().slice(0,10)} → ${today.toISOString().slice(0,10)}`,"","","","",""],
+    ["thrml Platform Performance Overview — Last 7 Days","","","","","","",""],
+    [`As of ${today.toDateString()}  |  ${new Date(today-6*86400000).toISOString().slice(0,10)} → ${today.toISOString().slice(0,10)}`,"","","","","","",""],
     [""],
-
-    // P&L
-    ["💰  P&L SUMMARY","7-Day","Monthly Est.","","",""],
-    ["Total Ad Spend",         `$${fmt(total.spend)}`,     `$${fmt(total.spend/days*30)}`, "","",""],
-    ["Platform Revenue (5%)",  `$${fmt(total.rev)}`,       `$${fmt(total.rev/days*30)}`,   "","",""],
-    ["Gross Booking Value",    `$${fmt(total.rev/0.05)}`,  `$${fmt(total.rev/0.05/days*30)}`,"","",""],
-    ["Fixed OpEx (est.)",     `-$${fmt(estOpex)}`,         `-$${fmt(fixedMonthly)}`,        "","",""],
-    ["Gross Profit",           `$${fmt(profit)}`,          `$${fmt(profit/days*30)}`,       "","",""],
-    ["Profit Margin",          `${fmt(profit/Math.max(total.rev,0.01)*100)}%`, "","","",""],
+    ["💰  P&L SUMMARY","7-Day","Monthly Est.","","","","",""],
+    ["Total Ad Spend",        `$${fmt(total.spend)}`,   `$${fmt(total.spend/days*30)}`,"","","","",""],
+    ["Fixed OpEx (est.)",    `-$${fmt(estOpex)}`,       `-$${fmt(fixedMonthly)}`,"","","","",""],
+    ["Variable OpEx",         "see Ad Hoc tab","","","","","",""],
     [""],
-
-    // By Platform
     ["📊  BY PLATFORM", ...COL_H.slice(1)],
     row("Meta",   meta),
     row("Google", google),
     row("TOTAL",  total),
     [""],
-
-    // By Funnel Stage
+    ["📈  BY PHASE", ...COL_H.slice(1)],
+    row("P1 — Awareness / Reach", p1),
+    row("P2 — Lead / Onboarding",  p2),
+    row("P3 — Conversion",         p3),
+    [""],
     ["🎯  BY FUNNEL STAGE", ...COL_H.slice(1)],
     row("Prospecting", prosp),
     row("Retargeting", retarg),
     [""],
-
-    // By Audience
-    ["👥  BY AUDIENCE", ...COL_H.slice(1)],
-    row("Guest", guest),
+    ["👥  BY AUDIENCE GROUP", ...COL_H.slice(1)],
     row("Host",  host),
+    row("Guest", guest),
     [""],
-
-    // By Campaign
     ["📋  BY CAMPAIGN", ...COL_H.slice(1)],
     ...Object.entries(byCamp).map(([k,d]) => row(k,d)),
     [""],
-
-    // By Ad Set
     ["📋  BY AD SET", ...COL_H.slice(1)],
-    ...Object.entries(byAdset).map(([k,d]) => row(k,d)),
+    ...Object.entries(byAdSet).map(([k,d]) => row(k,d)),
     [""],
-
-    // By Ad
     ["🎨  BY AD", ...COL_H.slice(1)],
     ...Object.entries(byAd).map(([k,d]) => row(k,d)),
     [""],
-    ["* Calculated metrics (CTR, CPC, ROAS, CPA) excluded — available in raw platform exports","","","","",""],
+    ["* No calculated metrics shown. Raw event counts only.","","","","","","",""],
   ]
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────
 async function main() {
-  console.log("\n🛠  thrml Master Report — Full Rebuild\n")
-  const s = sheets
+  console.log("\n🛠  thrml Master Report — Full Rebuild (v3)\n")
 
-  // Get existing tabs
-  const meta = await s.spreadsheets.get({ spreadsheetId: MASTER_ID })
+  // Load Creative Builder lookup
+  console.log("📖 Loading Creative Builder...")
+  const creativeMap = await loadCreativeBuilder()
+  console.log(`   ${creativeMap.size} creative entries loaded`)
+
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: MASTER_ID })
   const tabMap = {}
   meta.data.sheets.forEach(t => { tabMap[t.properties.title] = t.properties.sheetId })
-  console.log("Existing:", Object.keys(tabMap).join(", "))
 
-  // Create required tabs
+  // Ensure required tabs exist
   const required = ["Fixed Costs", "Ad Hoc Costs", "Platform Data", "Overview"]
   const toCreate = required.filter(t => !tabMap[t])
   if (toCreate.length) {
-    const res = await s.spreadsheets.batchUpdate({ spreadsheetId: MASTER_ID,
+    const res = await sheets.spreadsheets.batchUpdate({ spreadsheetId: MASTER_ID,
       requestBody: { requests: toCreate.map(title => ({ addSheet: { properties: { title } } })) }
     })
     res.data.replies.forEach((r,i) => { tabMap[toCreate[i]] = r.addSheet.properties.sheetId })
-    console.log("Created:", toCreate.join(", "))
+    console.log("Created tabs:", toCreate.join(", "))
   }
 
-  // Delete stale tabs
-  const stale = ["Sheet1","Summary"].filter(t => tabMap[t] !== undefined)
-  if (stale.length) {
-    await s.spreadsheets.batchUpdate({ spreadsheetId: MASTER_ID,
-      requestBody: { requests: stale.map(t => ({ deleteSheet: { sheetId: tabMap[t] } })) }
-    }).catch(()=>{})
-    console.log("Removed:", stale.join(", "))
+  const rows = generateFakeRows(creativeMap)
+  console.log(`📊 Generated ${rows.length} fake data rows`)
+
+  // Write all tabs
+  const writes = [
+    { range: "Fixed Costs!A1",    values: [FC_HEADERS, ...FC_ROWS] },
+    { range: "Ad Hoc Costs!A1",   values: [
+      ["⬇ Add variable/one-time costs below. Month column groups for MTD view.","","","","",""],
+      AH_HEADERS, ...AH_SAMPLE
+    ]},
+    { range: "Platform Data!A1",  values: [PLATFORM_DATA_HEADERS, ...rows] },
+    { range: "Overview!A1",       values: buildOverview(rows) },
+  ]
+
+  for (const w of writes) {
+    await sheets.spreadsheets.values.update({ spreadsheetId: MASTER_ID, range: w.range,
+      valueInputOption: "RAW", requestBody: { values: w.values } })
+    console.log(`✅ ${w.range.split("!")[0]}`)
   }
 
-  const rows = generateRows()
-
-  // 1. Fixed Costs
-  await s.spreadsheets.values.update({ spreadsheetId: MASTER_ID, range: "Fixed Costs!A1",
-    valueInputOption: "RAW", requestBody: { values: [FC_HEADERS, ...FC_ROWS] } })
-  console.log("✅ Fixed Costs")
-
-  // 2. Ad Hoc Costs
-  await s.spreadsheets.values.update({ spreadsheetId: MASTER_ID, range: "Ad Hoc Costs!A1",
-    valueInputOption: "RAW", requestBody: { values: [
-      ["⬇ Add variable or one-time costs below. Month column groups MTD totals automatically.","","","","",""],
-      AH_HEADERS, ...AH_SAMPLE,
-    ]}
-  })
-  console.log("✅ Ad Hoc Costs")
-
-  // 3. Platform Data
-  await s.spreadsheets.values.update({ spreadsheetId: MASTER_ID, range: "Platform Data!A1",
-    valueInputOption: "RAW", requestBody: { values: [PLATFORM_DATA_HEADERS, ...rows] } })
-  console.log(`✅ Platform Data — ${rows.length} rows`)
-
-  // 4. Overview
-  await s.spreadsheets.values.update({ spreadsheetId: MASTER_ID, range: "Overview!A1",
-    valueInputOption: "RAW", requestBody: { values: buildOverview(rows) } })
-  console.log("✅ Overview")
-
-  // Formatting
+  // Format
   console.log("\n🎨 Formatting...")
-  const dark  = {red:0.102,green:0.078,blue:0.063}
-  const white = {red:1,green:1,blue:1}
-  const gray  = {red:0.93,green:0.93,blue:0.93}
+  const dark     = {red:0.102,green:0.078,blue:0.063}
+  const white    = {red:1,green:1,blue:1}
+  const gray     = {red:0.93,green:0.93,blue:0.93}
   const pd=tabMap["Platform Data"], fc=tabMap["Fixed Costs"]
   const ah=tabMap["Ad Hoc Costs"],  ov=tabMap["Overview"]
 
-  const hdr = (sid,row,cols,bg,fg) => ({ repeatCell: {
+  const hdr = (sid,row,cols,bg,fg) => ({repeatCell:{
     range:{sheetId:sid,startRowIndex:row,endRowIndex:row+1,startColumnIndex:0,endColumnIndex:cols},
-    cell:{userEnteredFormat:{backgroundColor:bg,textFormat:{foregroundColor:fg,bold:true,fontSize:10},verticalAlignment:"MIDDLE",padding:{top:6,bottom:6}}},
+    cell:{userEnteredFormat:{backgroundColor:bg,textFormat:{foregroundColor:fg,bold:true,fontSize:10},
+      verticalAlignment:"MIDDLE",padding:{top:6,bottom:6}}},
     fields:"userEnteredFormat(backgroundColor,textFormat,verticalAlignment,padding)"
   }})
-  const freeze = (sid,n) => ({updateSheetProperties:{properties:{sheetId:sid,gridProperties:{frozenRowCount:n}},fields:"gridProperties.frozenRowCount"}})
-  const cw = (sid,s,e,px) => ({updateDimensionProperties:{range:{sheetId:sid,dimension:"COLUMNS",startIndex:s,endIndex:e},properties:{pixelSize:px},fields:"pixelSize"}})
+  const freeze=(sid,n)=>({updateSheetProperties:{properties:{sheetId:sid,gridProperties:{frozenRowCount:n}},fields:"gridProperties.frozenRowCount"}})
+  const cw=(sid,s,e,px)=>({updateDimensionProperties:{range:{sheetId:sid,dimension:"COLUMNS",startIndex:s,endIndex:e},properties:{pixelSize:px},fields:"pixelSize"}})
 
-  await s.spreadsheets.batchUpdate({ spreadsheetId: MASTER_ID, requestBody: { requests: [
+  await sheets.spreadsheets.batchUpdate({ spreadsheetId: MASTER_ID, requestBody: { requests: [
     // Platform Data
     freeze(pd,1), hdr(pd,0,PLATFORM_DATA_HEADERS.length,dark,white),
-    cw(pd,0,1,90), cw(pd,1,2,65), cw(pd,2,5,155), cw(pd,5,8,230),
-    cw(pd,8,9,55), cw(pd,9,10,120), cw(pd,10,11,110), cw(pd,11,12,80),
-    cw(pd,12,13,120), cw(pd,13,14,80),
-    cw(pd,14,15,80), cw(pd,15,16,80), cw(pd,16,17,65),
-    cw(pd,17,18,200), cw(pd,18,19,170), cw(pd,19,20,200), cw(pd,20,21,90), cw(pd,21,22,130),
-    cw(pd,22,30,80),
+    cw(pd,0,1,90),  // Date
+    cw(pd,1,2,65),  // Platform
+    cw(pd,2,3,230), // Campaign Name
+    cw(pd,3,4,260), // Ad Set Name
+    cw(pd,4,5,290), // Ad Name
+    cw(pd,5,6,50),  // Phase
+    cw(pd,6,7,110), // Campaign Objective
+    cw(pd,7,8,105), // Funnel Stage
+    cw(pd,8,9,110), // Audience Type
+    cw(pd,9,10,80), // Audience Group
+    cw(pd,10,11,65),// Geo
+    cw(pd,11,12,80),// Space Type
+    cw(pd,12,13,100),// Audience Source
+    cw(pd,13,14,110),// Placement
+    cw(pd,14,15,55),// Test ID
+    cw(pd,15,16,55),// Variant
+    cw(pd,16,17,90),// Angle
+    cw(pd,17,18,90),// Format
+    cw(pd,18,19,85),// CTA
+    cw(pd,19,20,200),// Hook Copy
+    cw(pd,20,21,65),// Status
+    cw(pd,21,22,85),// Opt Event
+    cw(pd,22,30,80),// Metrics
 
     // Fixed Costs
     freeze(fc,1), hdr(fc,0,5,dark,white),
-    cw(fc,0,1,190), cw(fc,1,2,120), cw(fc,2,4,100), cw(fc,4,5,250),
+    cw(fc,0,1,190), cw(fc,1,2,120), cw(fc,2,4,95), cw(fc,4,5,250),
 
     // Ad Hoc
     freeze(ah,2), hdr(ah,0,6,gray,dark), hdr(ah,1,6,dark,white),
@@ -372,12 +422,13 @@ async function main() {
 
     // Overview
     freeze(ov,2),
-    {repeatCell:{range:{sheetId:ov,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:6},
+    {repeatCell:{range:{sheetId:ov,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:8},
       cell:{userEnteredFormat:{backgroundColor:dark,textFormat:{foregroundColor:white,bold:true,fontSize:13},padding:{top:10,bottom:10}}},
       fields:"userEnteredFormat(backgroundColor,textFormat,padding)"}},
-    cw(ov,0,1,300), cw(ov,1,6,120),
+    cw(ov,0,1,310), cw(ov,1,8,120),
   ]}})
-  console.log("✅ Formatting applied")
+
+  console.log(`✅ Formatting applied`)
   console.log(`\n📊 https://docs.google.com/spreadsheets/d/${MASTER_ID}\n`)
 }
 

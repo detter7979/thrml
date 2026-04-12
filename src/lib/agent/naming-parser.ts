@@ -1,202 +1,261 @@
 /**
- * thrml Paid Media Naming Convention Parser
+ * thrml Paid Media Naming Convention Parser — v2
  *
- * Convention: {PLATFORM}_{PHASE}_{OBJECTIVE}_{TYPE}_{GOAL}_{CONCEPT}_{MARKET}
+ * Three-level hierarchy:
  *
- * Example: META_P3_CONV_RT_guest_checkout_rt_ALL
- *   → Platform: Meta, Phase: 3, Objective: Conversion,
- *     Type: Retargeting, Goal: Guest, Concept: checkout_rt, Market: All
+ * CAMPAIGN: [PLATFORM]_[PHASE]_[OBJECTIVE]_[FUNNEL]_[AUDIENCE_TYPE]_[GEO]
+ *   e.g.  META_P1_REACH_PROSP_host_gen_ALL
  *
- * Works at campaign, ad set, and ad level — gracefully handles partial names.
+ * AD SET:   [CAMPAIGN]_[SPACE_TYPE]_[AUDIENCE_SRC]_[PLACEMENT]
+ *   e.g.  META_P1_REACH_PROSP_host_gen_ALL_sauna_int_FEED-STORIES
+ *
+ * AD:       [AD_SET]_[TEST_ID]_[VARIANT]_[ANGLE]_[FORMAT]_[CTA]
+ *   e.g.  META_P1_REACH_PROSP_host_gen_ALL_sauna_int_FEED-STORIES_T01_A_income_Static_9x16_list_now
  */
 
-export type ParsedName = {
-  raw: string
-  platform: string          // Meta | Google | TikTok
-  phase: string             // 1 | 2 | 3
-  campaignObjective: string // Conversion | Awareness | Traffic | Lead
-  funnelStage: string       // Prospecting | Retargeting | Lookalike | Broad
-  audience: string          // Guest | Host
-  creativeConcept: string   // remaining middle segments
-  market: string            // All | Seattle | LA | etc.
-  campaignType: string      // DB-friendly: prospecting | retargeting | lal | broad
-}
-
-// ── Lookup maps ────────────────────────────────────────────────────────────
+// ── Lookup tables ──────────────────────────────────────────────────────────
 
 const PLATFORM_MAP: Record<string, string> = {
-  META: "Meta",
-  FB: "Meta",
-  FACEBOOK: "Meta",
-  GOOG: "Google",
-  GOOGLE: "Google",
-  GA: "Google",
-  GG: "Google",
-  TT: "TikTok",
-  TIKTOK: "TikTok",
-  SNAP: "Snapchat",
-  SC: "Snapchat",
+  META: "Meta", FB: "Meta", FACEBOOK: "Meta",
+  GOOG: "Google", GOOGLE: "Google", GA: "Google",
+  SNAP: "Snapchat", TIKTOK: "TikTok", TT: "TikTok",
 }
 
 const OBJECTIVE_MAP: Record<string, string> = {
-  CONV: "Conversion",
-  CONVERSION: "Conversion",
-  PURCHASE: "Conversion",
-  AWARE: "Awareness",
-  AWARENESS: "Awareness",
-  BRAND: "Awareness",
-  TRAF: "Traffic",
-  TRAFFIC: "Traffic",
-  CLICK: "Traffic",
-  LEAD: "Lead",
-  LEADS: "Lead",
-  APP: "App",
-  APPSINSTALL: "App",
-  REACH: "Reach",
-  VIDEO: "Video Views",
-  VV: "Video Views",
-  ENGAGE: "Engagement",
-  ENG: "Engagement",
-  MSG: "Messages",
-  MESSAGE: "Messages",
+  REACH: "Reach", LEAD: "Lead", LEADS: "Lead",
+  CONV: "Conversion", CONVERSION: "Conversion",
+  AWARE: "Awareness", AWARENESS: "Awareness",
+  TRAF: "Traffic", TRAFFIC: "Traffic",
+  APP: "App", VV: "Video Views",
 }
 
-const TYPE_MAP: Record<string, string> = {
-  RT: "Retargeting",
-  RET: "Retargeting",
-  RETARGET: "Retargeting",
-  RETARGETING: "Retargeting",
-  PRO: "Prospecting",
-  PROSP: "Prospecting",
-  PROSPECTING: "Prospecting",
-  LAL: "Lookalike",
-  LOOKALIKE: "Lookalike",
-  LLA: "Lookalike",
-  BROAD: "Broad",
-  BRD: "Broad",
-  INT: "Interest",
-  INTEREST: "Interest",
+const FUNNEL_MAP: Record<string, string> = {
+  PROSP: "Prospecting", PROSPECTING: "Prospecting",
+  LAL: "Lookalike", LAL1: "Lookalike (1%)", LAL2: "Lookalike (2%)",
+  RT: "Retargeting", RETARGET: "Retargeting",
+  CRM: "CRM",
 }
 
-const TYPE_DB_MAP: Record<string, string> = {
-  RT: "retargeting", RET: "retargeting", RETARGET: "retargeting", RETARGETING: "retargeting",
-  PRO: "prospecting", PROSP: "prospecting", PROSPECTING: "prospecting",
-  LAL: "lal", LOOKALIKE: "lal", LLA: "lal",
-  BROAD: "broad", BRD: "broad",
-  INT: "interest", INTEREST: "interest",
+const GEO_MAP: Record<string, string> = {
+  ALL: "All", SEA: "Seattle", US: "US",
+  LA: "Los Angeles", SF: "San Francisco", NYC: "New York",
+  CHI: "Chicago", PDX: "Portland", MIA: "Miami",
 }
 
-const GOAL_MAP: Record<string, string> = {
-  GUEST: "Guest",
-  BOOKING: "Guest",
-  BOOK: "Guest",
-  HOST: "Host",
-  EARN: "Host",
-  LIST: "Host",
+const SPACE_TYPE_MAP: Record<string, string> = {
+  GEN: "General", SAUNA: "Sauna", HOTTUB: "Hot Tub",
+  COLDPLUNGE: "Cold Plunge", COLD: "Cold Plunge",
 }
 
-const MARKET_MAP: Record<string, string> = {
-  ALL: "All",
-  US: "US",
-  SEA: "Seattle",
-  SEATTLE: "Seattle",
-  LA: "Los Angeles",
-  NYC: "New York",
-  SF: "San Francisco",
-  CHI: "Chicago",
-  ATL: "Atlanta",
-  MIA: "Miami",
-  DEN: "Denver",
-  PDX: "Portland",
+const AUD_SRC_MAP: Record<string, string> = {
+  INT: "Interest", LAL1: "1% LAL", LAL2: "2% LAL",
+  CRMATCH: "CRM Match", RT: "Retarget",
 }
 
-const KNOWN_MARKETS = new Set(Object.keys(MARKET_MAP))
-const KNOWN_TYPES = new Set(Object.keys(TYPE_MAP))
-const KNOWN_OBJECTIVES = new Set(Object.keys(OBJECTIVE_MAP))
-const KNOWN_GOALS = new Set(Object.keys(GOAL_MAP))
+const PLACEMENT_MAP: Record<string, string> = {
+  "FEED-STORIES": "Feed + Stories", FEED: "Feed", REELS: "Reels",
+  STORIES: "Stories", SEARCH: "Search", PMAX: "Performance Max",
+  "DEMAND-GEN": "Demand Gen",
+}
 
-// ── Parser ─────────────────────────────────────────────────────────────────
+const FORMAT_MAP: Record<string, string> = {
+  "STATIC_9X16": "Static 9:16", "STATIC_1X1": "Static 1:1", "STATIC_4X5": "Static 4:5",
+  "VIDEO_15S": "Video 15s", "VIDEO_30S": "Video 30s",
+  CAROUSEL: "Carousel", UGC: "UGC", RSA: "RSA",
+}
 
-export function parseNamingConvention(name: string): ParsedName {
-  const raw = name
-  const base: ParsedName = {
-    raw, platform: "", phase: "", campaignObjective: "",
-    funnelStage: "", audience: "", creativeConcept: "", market: "", campaignType: "",
+const CTA_MAP: Record<string, string> = {
+  LIST_NOW: "List Now", LEARN_MORE: "Learn More", GET_STARTED: "Get Started",
+  SEE_HOW: "See How", BOOK_NOW: "Book Now", SIGN_UP: "Sign Up",
+}
+
+const KNOWN_GEOS      = new Set(Object.keys(GEO_MAP))
+const KNOWN_PLACEMENTS = new Set(Object.keys(PLACEMENT_MAP))
+const KNOWN_FORMATS    = new Set(Object.keys(FORMAT_MAP))
+const KNOWN_CTAS       = new Set(Object.keys(CTA_MAP))
+const KNOWN_AUD_SRCS   = new Set(Object.keys(AUD_SRC_MAP))
+const KNOWN_SPACE_TYPES = new Set(Object.keys(SPACE_TYPE_MAP))
+
+// ── Types ─────────────────────────────────────────────────────────────────
+
+export type ParsedCampaign = {
+  raw: string
+  platform: string       // Meta | Google | TikTok
+  phase: string          // P1 | P2 | P3
+  campaignObjective: string // Reach | Lead | Conversion | Awareness
+  funnelStage: string    // Prospecting | Lookalike | Retargeting | CRM
+  audienceType: string   // host_gen | host_sauna | guest_wellness | guest_biohacking
+  audienceGroup: string  // Host | Guest (derived from audienceType)
+  geo: string            // All | Seattle | US
+}
+
+export type ParsedAdSet = ParsedCampaign & {
+  spaceType: string      // Sauna | Hot Tub | Cold Plunge | General
+  audienceSource: string // Interest | 1% LAL | CRM Match | Retarget
+  placement: string      // Feed + Stories | Reels | Search
+}
+
+export type ParsedAd = ParsedAdSet & {
+  testId: string         // T01 | T02 | T03
+  variant: string        // A | B | C
+  angle: string          // income | community | idle_space | social_proof
+  format: string         // Static 9:16 | Video 15s | Carousel | UGC
+  cta: string            // List Now | Book Now | Get Started
+  optEvent: string       // become_host_click | host_onboarding_started | listing_created | Purchase
+}
+
+// ── Campaign parser ────────────────────────────────────────────────────────
+
+export function parseCampaignName(name: string): ParsedCampaign {
+  const parts = (name || "").trim().split("_").filter(Boolean)
+  const base: ParsedCampaign = {
+    raw: name, platform: "", phase: "", campaignObjective: "",
+    funnelStage: "", audienceType: "", audienceGroup: "", geo: "",
   }
-
-  if (!name) return base
-
-  // Strip any leading/trailing whitespace and split on underscore
-  const parts = name.trim().split("_").filter(Boolean)
-  if (parts.length === 0) return base
-
-  let cursor = 0
+  let c = 0
 
   // [0] Platform
-  const p0 = parts[cursor]?.toUpperCase()
-  if (p0 && PLATFORM_MAP[p0]) {
-    base.platform = PLATFORM_MAP[p0]
-    cursor++
+  if (PLATFORM_MAP[parts[c]?.toUpperCase()]) base.platform = PLATFORM_MAP[parts[c++].toUpperCase()]
+
+  // [1] Phase
+  if (/^P\d+$/i.test(parts[c] ?? "")) base.phase = parts[c++].toUpperCase()
+
+  // [2] Objective
+  if (OBJECTIVE_MAP[parts[c]?.toUpperCase()]) base.campaignObjective = OBJECTIVE_MAP[parts[c++].toUpperCase()]
+
+  // [3] Funnel — handle LAL1/LAL2 before generic LAL
+  const f = parts[c]?.toUpperCase()
+  if (f && FUNNEL_MAP[f]) { base.funnelStage = FUNNEL_MAP[f]; c++ }
+
+  // [4+5] Audience type — always 2 tokens: {host|guest}_{subtype}
+  // The next token starts with "host" or "guest", pair it with the following token
+  const at1 = parts[c]?.toLowerCase()
+  const at2 = parts[c + 1]?.toLowerCase()
+  if (at1 && (at1 === "host" || at1 === "guest") && at2 && !KNOWN_GEOS.has(at2.toUpperCase())) {
+    base.audienceType = `${at1}_${at2}`
+    base.audienceGroup = at1 === "host" ? "Host" : "Guest"
+    c += 2
+  } else if (at1 && (at1.startsWith("host") || at1.startsWith("guest"))) {
+    // Single token audience type like "host" or "guest"
+    base.audienceType = at1
+    base.audienceGroup = at1.startsWith("host") ? "Host" : "Guest"
+    c++
   }
 
-  // [1] Phase — matches P\d+ pattern
-  const p1 = parts[cursor]?.toUpperCase()
-  if (p1 && /^P\d+$/.test(p1)) {
-    base.phase = p1.slice(1) // strip the "P"
-    cursor++
+  // [last campaign token] Geo
+  if (KNOWN_GEOS.has(parts[c]?.toUpperCase())) {
+    base.geo = GEO_MAP[parts[c].toUpperCase()]
+    c++
   }
-
-  // [2] Campaign Objective
-  const p2 = parts[cursor]?.toUpperCase()
-  if (p2 && KNOWN_OBJECTIVES.has(p2)) {
-    base.campaignObjective = OBJECTIVE_MAP[p2]
-    cursor++
-  }
-
-  // [3] Funnel Stage
-  const p3 = parts[cursor]?.toUpperCase()
-  if (p3 && KNOWN_TYPES.has(p3)) {
-    base.funnelStage = TYPE_MAP[p3]
-    base.campaignType = TYPE_DB_MAP[p3] ?? ""
-    cursor++
-  }
-
-  // [4] Audience
-  const p4 = parts[cursor]?.toUpperCase()
-  if (p4 && KNOWN_GOALS.has(p4)) {
-    base.audience = GOAL_MAP[p4]
-    cursor++
-  }
-
-  // Check last segment for market
-  const last = parts[parts.length - 1]?.toUpperCase()
-  let marketEnd = parts.length
-  if (last && KNOWN_MARKETS.has(last) && parts.length > cursor) {
-    base.market = MARKET_MAP[last]
-    marketEnd = parts.length - 1
-  }
-
-  // Everything between cursor and marketEnd = creative concept
-  base.creativeConcept = parts.slice(cursor, marketEnd).join("_")
 
   return base
 }
 
-/**
- * Returns the extra cleaned columns derived from the campaign/adset/ad name.
- * Used in the reporting agent to populate structured columns.
- */
-export function parsedNameToColumns(parsed: ParsedName): {
-  platform: string; phase: string; campaignObjective: string
-  funnelStage: string; audience: string; creativeConcept: string; market: string
-} {
-  return {
-    platform: parsed.platform,
-    phase: parsed.phase ? `P${parsed.phase}` : "",
-    campaignObjective: parsed.campaignObjective,
-    funnelStage: parsed.funnelStage,
-    audience: parsed.audience,
-    creativeConcept: parsed.creativeConcept,
-    market: parsed.market,
+// ── Ad Set parser ─────────────────────────────────────────────────────────
+
+export function parseAdSetName(name: string): ParsedAdSet {
+  const camp = parseCampaignName(name)
+  const parts = (name || "").trim().split("_").filter(Boolean)
+
+  // Find where campaign ends — count campaign tokens consumed
+  let c = 0
+  if (PLATFORM_MAP[parts[c]?.toUpperCase()]) c++
+  if (/^P\d+$/i.test(parts[c] ?? "")) c++
+  if (OBJECTIVE_MAP[parts[c]?.toUpperCase()]) c++
+  if (FUNNEL_MAP[parts[c]?.toUpperCase()]) c++
+  const at1 = parts[c]?.toLowerCase()
+  const at2 = parts[c + 1]?.toLowerCase()
+  if (at1 && (at1 === "host" || at1 === "guest") && at2 && !KNOWN_GEOS.has(at2.toUpperCase())) {
+    c += 2
+  } else if (at1 && (at1.startsWith("host") || at1.startsWith("guest"))) {
+    c++
   }
+  if (KNOWN_GEOS.has(parts[c]?.toUpperCase())) c++
+
+  // Now parse ad set extension: [SPACE_TYPE]_[AUDIENCE_SRC]_[PLACEMENT]
+  const adSetBase: ParsedAdSet = {
+    ...camp, spaceType: "", audienceSource: "", placement: "",
+  }
+
+  if (KNOWN_SPACE_TYPES.has(parts[c]?.toUpperCase())) {
+    adSetBase.spaceType = SPACE_TYPE_MAP[parts[c++].toUpperCase()]
+  }
+  if (KNOWN_AUD_SRCS.has(parts[c]?.toUpperCase())) {
+    adSetBase.audienceSource = AUD_SRC_MAP[parts[c++].toUpperCase()]
+  }
+  // Placement may contain hyphens — reconstruct from remaining tokens before ad-level tokens
+  const placementParts: string[] = []
+  while (c < parts.length && !(/^T\d+$/i.test(parts[c]))) {
+    placementParts.push(parts[c++])
+  }
+  const placementKey = placementParts.join("-").toUpperCase()
+  if (KNOWN_PLACEMENTS.has(placementKey)) {
+    adSetBase.placement = PLACEMENT_MAP[placementKey]
+  } else if (placementParts.length) {
+    adSetBase.placement = placementParts.join("-")
+  }
+
+  return adSetBase
+}
+
+// ── Ad (creative) parser ──────────────────────────────────────────────────
+
+export function parseAdName(name: string): ParsedAd {
+  const adset = parseAdSetName(name)
+  const parts = (name || "").trim().split("_").filter(Boolean)
+
+  // Find T\d+ token — that's where ad-level tokens begin
+  let c = parts.findIndex(p => /^T\d+$/i.test(p))
+  if (c === -1) {
+    return { ...adset, testId: "", variant: "", angle: "", format: "", cta: "", optEvent: "" }
+  }
+
+  const testId  = parts[c++]?.toUpperCase() ?? ""
+  const variant = parts[c++]?.toUpperCase() ?? ""
+
+  // ANGLE: free text until FORMAT (known value) is found
+  const angleParts: string[] = []
+  while (c < parts.length && !KNOWN_FORMATS.has(parts.slice(c, c + 2).join("_").toUpperCase()) && !KNOWN_FORMATS.has(parts[c]?.toUpperCase())) {
+    angleParts.push(parts[c++])
+  }
+
+  // FORMAT: may be 2 tokens like Static_9x16 or Video_15s
+  let format = ""
+  const fmt1 = parts[c]?.toUpperCase()
+  const fmt2 = parts[c + 1]?.toUpperCase()
+  const fmt2token = fmt2 ? `${fmt1}_${fmt2}` : ""
+  if (fmt2token && KNOWN_FORMATS.has(fmt2token)) {
+    format = FORMAT_MAP[fmt2token]; c += 2
+  } else if (fmt1 && KNOWN_FORMATS.has(fmt1)) {
+    format = FORMAT_MAP[fmt1]; c++
+  }
+
+  // CTA: last token
+  const ctaKey = parts[c]?.toUpperCase()
+  const cta = ctaKey && KNOWN_CTAS.has(ctaKey) ? CTA_MAP[ctaKey] : (parts[c] ?? "")
+
+  // Derive optimization event from phase
+  const phaseNum = parseInt(adset.phase.replace("P", "") || "0")
+  const group = adset.audienceGroup
+  let optEvent = ""
+  if (group === "Host") {
+    optEvent = phaseNum === 1 ? "become_host_click" : phaseNum === 2 ? "host_onboarding_started" : "listing_created"
+  } else {
+    optEvent = phaseNum <= 2 ? "ViewContent" : "Purchase"
+  }
+
+  return {
+    ...adset,
+    testId, variant: variant.toUpperCase(),
+    angle: angleParts.join("_"),
+    format,
+    cta,
+    optEvent,
+  }
+}
+
+// ── Convenience: parse any level ──────────────────────────────────────────
+
+export function parseNamingConvention(name: string): ParsedAd {
+  return parseAdName(name)
 }

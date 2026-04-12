@@ -49,18 +49,16 @@ function fmtPct(n: number) { return n.toFixed(2) + "%" }
 // ── Cleaned report columns ─────────────────────────────────────────────────
 // Structure: core metrics + parsed naming columns
 export const CLEANED_HEADERS = [
-  // Identity
   "Date", "Platform",
-  // Hierarchy IDs
-  "Campaign ID", "Ad Set ID", "Ad ID",
-  // Names
   "Campaign Name", "Ad Set Name", "Ad Name",
-  // Parsed naming convention — named to match values
-  "Phase", "Campaign Objective", "Funnel Stage", "Audience", "Creative Concept", "Market",
-  // Raw metrics only — no calculated fields
-  "Spend", "Impressions", "Clicks", "Purchases", "Revenue",
-  // Video metrics (Meta only)
-  "3s Views", "50% Views", "100% Views",
+  "Phase", "Campaign Objective", "Funnel Stage",
+  "Audience Type", "Audience Group", "Geo",
+  "Space Type", "Audience Source", "Placement",
+  "Test ID", "Variant", "Angle", "Format", "CTA",
+  "Hook Copy", "Status", "Opt. Event",
+  "Spend ($)", "Impressions", "Reach", "Link Clicks",
+  "become_host_click", "host_onboarding_started", "listing_created", "Purchase",
+  "Video Views 25%",
 ] as const
 
 type RawRow = {
@@ -76,28 +74,25 @@ type RawRow = {
 }
 
 function cleanRow(raw: RawRow, platformFallback: string): string[] {
-  const parsed = parseNamingConvention(raw.campaign_name)
-  const adsetParsed = parseNamingConvention(raw.adset_name)
+  const parsed = parseNamingConvention(raw.ad_name || raw.campaign_name)
   const platform = parsed.platform || platformFallback
-  const concept = adsetParsed.creativeConcept || parsed.creativeConcept
+  const phaseNum = parseInt(parsed.phase?.replace("P","") || "0")
+  const isHost = parsed.audienceGroup === "Host"
+  const optEvent = isHost
+    ? (phaseNum===1 ? "become_host_click" : phaseNum===2 ? "host_onboarding_started" : "listing_created")
+    : (phaseNum<=2 ? "ViewContent" : "Purchase")
 
   return [
     raw.date, platform,
-    raw.campaign_id, raw.adset_id, raw.ad_id,
     raw.campaign_name, raw.adset_name, raw.ad_name,
-    parsed.phase ? `P${parsed.phase}` : "",
-    parsed.campaignObjective,
-    parsed.funnelStage,
-    parsed.audience,
-    concept,
-    parsed.market,
-    // Raw metrics only
-    fmt(raw.spend), String(raw.impressions), String(raw.clicks),
-    String(raw.purchases), fmt(raw.revenue),
-    // Video
+    parsed.phase, parsed.campaignObjective, parsed.funnelStage,
+    parsed.audienceType, parsed.audienceGroup, parsed.geo,
+    parsed.spaceType, parsed.audienceSource, parsed.placement,
+    parsed.testId, parsed.variant, parsed.angle, parsed.format, parsed.cta,
+    "", "", optEvent, // Hook Copy, Status filled from Creative Builder lookup in future
+    fmt(raw.spend), String(raw.impressions), String(raw.impressions), String(raw.clicks),
+    "0", "0", "0", String(raw.purchases), // conversion events
     String(raw.video_views_3s ?? 0),
-    String(raw.video_views_50pct ?? 0),
-    String(raw.video_views_100pct ?? 0),
   ]
 }
 

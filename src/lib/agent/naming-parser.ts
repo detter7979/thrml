@@ -12,14 +12,14 @@
 
 export type ParsedName = {
   raw: string
-  platform: string        // Meta | Google | TikTok | Unknown
-  phase: string           // "1" | "2" | "3" | ""
-  objective: string       // Conversion | Awareness | Traffic | Lead | App | Reach | ""
-  type: string            // Prospecting | Retargeting | Lookalike | Broad | ""
-  goal: string            // Guest | Host | ""
-  concept: string         // remaining middle segments joined
-  market: string          // All | Seattle | LA | NYC | ""
-  campaignType: string    // prospecting | retargeting | lal | broad (lowercase, for DB)
+  platform: string          // Meta | Google | TikTok
+  phase: string             // 1 | 2 | 3
+  campaignObjective: string // Conversion | Awareness | Traffic | Lead
+  funnelStage: string       // Prospecting | Retargeting | Lookalike | Broad
+  audience: string          // Guest | Host
+  creativeConcept: string   // remaining middle segments
+  market: string            // All | Seattle | LA | etc.
+  campaignType: string      // DB-friendly: prospecting | retargeting | lal | broad
 }
 
 // ── Lookup maps ────────────────────────────────────────────────────────────
@@ -120,8 +120,8 @@ const KNOWN_GOALS = new Set(Object.keys(GOAL_MAP))
 export function parseNamingConvention(name: string): ParsedName {
   const raw = name
   const base: ParsedName = {
-    raw, platform: "", phase: "", objective: "",
-    type: "", goal: "", concept: "", market: "", campaignType: "",
+    raw, platform: "", phase: "", campaignObjective: "",
+    funnelStage: "", audience: "", creativeConcept: "", market: "", campaignType: "",
   }
 
   if (!name) return base
@@ -146,25 +146,25 @@ export function parseNamingConvention(name: string): ParsedName {
     cursor++
   }
 
-  // [2] Objective
+  // [2] Campaign Objective
   const p2 = parts[cursor]?.toUpperCase()
   if (p2 && KNOWN_OBJECTIVES.has(p2)) {
-    base.objective = OBJECTIVE_MAP[p2]
+    base.campaignObjective = OBJECTIVE_MAP[p2]
     cursor++
   }
 
-  // [3] Type (funnel stage)
+  // [3] Funnel Stage
   const p3 = parts[cursor]?.toUpperCase()
   if (p3 && KNOWN_TYPES.has(p3)) {
-    base.type = TYPE_MAP[p3]
+    base.funnelStage = TYPE_MAP[p3]
     base.campaignType = TYPE_DB_MAP[p3] ?? ""
     cursor++
   }
 
-  // [4] Goal
+  // [4] Audience
   const p4 = parts[cursor]?.toUpperCase()
   if (p4 && KNOWN_GOALS.has(p4)) {
-    base.goal = GOAL_MAP[p4]
+    base.audience = GOAL_MAP[p4]
     cursor++
   }
 
@@ -176,8 +176,8 @@ export function parseNamingConvention(name: string): ParsedName {
     marketEnd = parts.length - 1
   }
 
-  // Everything between cursor and marketEnd = concept
-  base.concept = parts.slice(cursor, marketEnd).join("_")
+  // Everything between cursor and marketEnd = creative concept
+  base.creativeConcept = parts.slice(cursor, marketEnd).join("_")
 
   return base
 }
@@ -187,21 +187,16 @@ export function parseNamingConvention(name: string): ParsedName {
  * Used in the reporting agent to populate structured columns.
  */
 export function parsedNameToColumns(parsed: ParsedName): {
-  platform: string
-  phase: string
-  objective: string
-  type: string
-  goal: string
-  concept: string
-  market: string
+  platform: string; phase: string; campaignObjective: string
+  funnelStage: string; audience: string; creativeConcept: string; market: string
 } {
   return {
     platform: parsed.platform,
     phase: parsed.phase ? `P${parsed.phase}` : "",
-    objective: parsed.objective,
-    type: parsed.type,
-    goal: parsed.goal,
-    concept: parsed.concept,
+    campaignObjective: parsed.campaignObjective,
+    funnelStage: parsed.funnelStage,
+    audience: parsed.audience,
+    creativeConcept: parsed.creativeConcept,
     market: parsed.market,
   }
 }

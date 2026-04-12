@@ -51,17 +51,16 @@ function fmtPct(n: number) { return n.toFixed(2) + "%" }
 export const CLEANED_HEADERS = [
   // Identity
   "Date", "Platform",
-  // Campaign hierarchy (raw IDs)
+  // Hierarchy IDs
   "Campaign ID", "Ad Set ID", "Ad ID",
-  // Parsed naming convention columns
+  // Names
   "Campaign Name", "Ad Set Name", "Ad Name",
-  "Phase", "Objective", "Type", "Goal", "Concept", "Market",
-  // Core metrics
-  "Spend", "Impressions", "Clicks", "CTR", "CPM", "CPC",
-  // Conversions
-  "Purchases", "Revenue", "ROAS", "CPA",
-  // Video engagement (Meta)
-  "3s Views", "50% Views", "100% Views", "VTR", "Thumbstop Rate",
+  // Parsed naming convention — named to match values
+  "Phase", "Campaign Objective", "Funnel Stage", "Audience", "Creative Concept", "Market",
+  // Raw metrics only — no calculated fields
+  "Spend", "Impressions", "Clicks", "Purchases", "Revenue",
+  // Video metrics (Meta only)
+  "3s Views", "50% Views", "100% Views",
 ] as const
 
 type RawRow = {
@@ -77,49 +76,28 @@ type RawRow = {
 }
 
 function cleanRow(raw: RawRow, platformFallback: string): string[] {
-  // Parse naming convention from campaign name (most structured)
   const parsed = parseNamingConvention(raw.campaign_name)
   const adsetParsed = parseNamingConvention(raw.adset_name)
-
-  const spend = raw.spend
-  const imps = raw.impressions
-  const clicks = raw.clicks
-  const purchases = raw.purchases
-  const revenue = raw.revenue
-
-  const ctr = imps > 0 ? (clicks / imps * 100) : 0
-  const cpm = imps > 0 ? (spend / imps * 1000) : 0
-  const cpc = clicks > 0 ? (spend / clicks) : 0
-  const roas = spend > 0 ? (revenue / spend) : 0
-  const cpa = purchases > 0 ? (spend / purchases) : 0
-
-  const v3s = raw.video_views_3s ?? 0
-  const v50 = raw.video_views_50pct ?? 0
-  const v100 = raw.video_views_100pct ?? 0
-  const vtr = imps > 0 ? (v3s / imps * 100) : 0
-  const thumbstop = imps > 0 ? (v3s / imps * 100) : 0
-
-  // Use parsed platform or fallback
   const platform = parsed.platform || platformFallback
-
-  // Concept: prefer ad set concept if more specific
-  const concept = adsetParsed.concept || parsed.concept
+  const concept = adsetParsed.creativeConcept || parsed.creativeConcept
 
   return [
     raw.date, platform,
     raw.campaign_id, raw.adset_id, raw.ad_id,
     raw.campaign_name, raw.adset_name, raw.ad_name,
     parsed.phase ? `P${parsed.phase}` : "",
-    parsed.objective,
-    parsed.type,
-    parsed.goal,
+    parsed.campaignObjective,
+    parsed.funnelStage,
+    parsed.audience,
     concept,
     parsed.market,
-    fmt(spend), String(imps), String(clicks),
-    fmtPct(ctr), fmt(cpm), fmt(cpc),
-    String(purchases), fmt(revenue), fmt(roas), fmt(cpa),
-    String(v3s), String(v50), String(v100),
-    fmtPct(vtr), fmtPct(thumbstop),
+    // Raw metrics only
+    fmt(raw.spend), String(raw.impressions), String(raw.clicks),
+    String(raw.purchases), fmt(raw.revenue),
+    // Video
+    String(raw.video_views_3s ?? 0),
+    String(raw.video_views_50pct ?? 0),
+    String(raw.video_views_100pct ?? 0),
   ]
 }
 

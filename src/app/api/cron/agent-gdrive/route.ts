@@ -34,7 +34,7 @@ async function getOrCreateSheetId(
 ): Promise<string | null> {
   const { data: setting } = await admin
     .from("platform_settings").select("value").eq("key", "gdrive_finance_sheet_id").maybeSingle()
-  if (setting?.value) return setting.value as string
+  if (setting?.value) return String(setting.value).replace(/^"|"$/g, "")
 
   const drive = google.drive({ version: "v3", auth })
   const sheets = google.sheets({ version: "v4", auth })
@@ -82,7 +82,9 @@ export async function GET(req: NextRequest) {
 
     const { data: folderSetting } = await admin
       .from("platform_settings").select("value").eq("key", "gdrive_folder_id").maybeSingle()
-    const folderId = (folderSetting?.value as string | null) ?? null
+    const folderId = folderSetting?.value
+      ? String(folderSetting.value).replace(/^"|"$/g, "")
+      : null
 
     const spreadsheetId = await getOrCreateSheetId(admin, auth, folderId)
     if (!spreadsheetId) throw new Error("Could not create/find Google Sheet")

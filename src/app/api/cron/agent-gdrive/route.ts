@@ -32,34 +32,20 @@ async function getOrCreateSheetId(
   auth: GoogleAuth,
   folderId: string | null
 ): Promise<string | null> {
+  // Check if a sheet ID is already stored (either pre-created or from a prior run)
   const { data: setting } = await admin
     .from("platform_settings").select("value").eq("key", "gdrive_finance_sheet_id").maybeSingle()
   if (setting?.value) return String(setting.value).replace(/^"|"$/g, "")
 
-  const drive = google.drive({ version: "v3", auth })
-  const sheets = google.sheets({ version: "v4", auth })
-
-  const createRes = await drive.files.create({
-    requestBody: {
-      name: "thrml Finance Tracker",
-      mimeType: "application/vnd.google-apps.spreadsheet",
-      ...(folderId ? { parents: [folderId] } : {}),
-    },
-  })
-  const id = createRes.data.id
-  if (!id) return null
-
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: id, range: "Sheet1!A1:H1", valueInputOption: "RAW",
-    requestBody: {
-      values: [["Date","Bookings","Gross","Platform Rev","Host Payouts","Refunds","Net Rev","New Users"]],
-    },
-  })
-
-  await admin.from("platform_settings").upsert(
-    { key: "gdrive_finance_sheet_id", value: id }, { onConflict: "key" }
-  )
-  return id
+  // No sheet ID stored — agent cannot create one (service account quota limits).
+  // Solution: create the sheet manually in your Google Drive, share it with
+  // thrml-agent@watchful-muse-350902.iam.gserviceaccount.com (Editor),
+  // then store the sheet ID:
+  //   INSERT INTO platform_settings (key, value)
+  //   VALUES ('gdrive_finance_sheet_id', '"YOUR_SHEET_ID"')
+  //   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+  console.error("[agent-gdrive] No gdrive_finance_sheet_id in platform_settings. Create sheet manually and store ID.")
+  return null
 }
 
 export async function GET(req: NextRequest) {
@@ -100,6 +86,15 @@ export async function GET(req: NextRequest) {
     }
 
     const sheets = google.sheets({ version: "v4", auth })
+
+    // Write headers first (idempotent — just overwrites row 1 each time)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId, range: "Sheet1!A1:H1", valueInputOption: "RAW",
+      requestBody: {
+        values: [["Date","Bookings","Gross","Platform Rev","Host Payouts","Refunds","Net Rev","New Users"]],
+      },
+    })
+
     const rows = snapshots.map(s => [
       s.snapshot_date, s.booking_count,
       Number(s.gross_booking_value).toFixed(2), Number(s.platform_revenue).toFixed(2),

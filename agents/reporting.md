@@ -1,95 +1,68 @@
-# Reporting Agent — thrml
+# Reporting Agent — thrml (v2)
 
-## Purpose
-Build and maintain a fully automated paid media + financial reporting system.
-Pulls raw data from Meta and Google Ads APIs, transforms to cleaned reports,
-combines with OpEx, and outputs to Google Sheets for analysis and pivoting.
+## Naming Convention Parser
+Parses campaign/adset/ad names directly — no separate Namer doc needed.
 
-## Google Drive Structure (Reporting folder — separate from Finance)
-```
-thrml Reporting/                     ← gdrive_reporting_folder_id
-├── Raw/                             ← gdrive_raw_folder_id
-│   ├── Meta_Raw_YYYY-MM-DD.xlsx    ← appended daily, 45-day retention
-│   └── Google_Raw_YYYY-MM-DD.xlsx
-├── Cleaned/                         ← gdrive_cleaned_folder_id
-│   ├── Meta_Cleaned_YYYY-MM-DD.xlsx
-│   └── Google_Cleaned_YYYY-MM-DD.xlsx
-├── Namer.xlsx                       ← ID → Name lookup (manually maintained)
-└── thrml Master Report.xlsx         ← live dashboard, updated daily
-```
+### Convention: `{PLATFORM}_{PHASE}_{OBJECTIVE}_{TYPE}_{GOAL}_{CONCEPT}_{MARKET}`
 
-## Master Report Tabs
-1. `Daily Data`     — rolling 45-day combined cleaned data (Meta + Google)
-2. `OpEx`          — recurring costs table (manually updated monthly)
-3. `P&L Dashboard` — ad spend vs platform revenue vs costs, custom date range
-4. `Pivot`         — filterable by platform, campaign type, goal, date
+| Position | Values | Examples |
+|---|---|---|
+| Platform | META, GOOG, TT, SNAP | `META` → Meta |
+| Phase | P1, P2, P3 | `P3` → Phase 3 |
+| Objective | CONV, AWARE, TRAF, LEAD, APP, REACH, VV | `CONV` → Conversion |
+| Type | RT, PRO, LAL, BROAD, INT | `RT` → Retargeting |
+| Goal | guest, host | `guest` → Guest |
+| Concept | any text | `checkout_rt` → checkout_rt |
+| Market | ALL, SEA, LA, NYC, SF, CHI, PDX | `ALL` → All |
 
-## Cleaned Report Columns (both platforms normalized)
-| Column | Source |
+### Example Parsing
+`META_P3_CONV_RT_guest_checkout_rt_ALL`
+→ Platform: **Meta** | Phase: **P3** | Objective: **Conversion** | Type: **Retargeting** | Goal: **Guest** | Concept: **checkout_rt** | Market: **All**
+
+`GOOG_P1_TRAF_PRO_host_sauna_SEA`
+→ Platform: **Google** | Phase: **P1** | Objective: **Traffic** | Type: **Prospecting** | Goal: **Host** | Concept: **sauna** | Market: **Seattle**
+
+## Cleaned Report Column Structure
+Date | Platform | Campaign ID | Ad Set ID | Ad ID | Campaign Name | Ad Set Name | Ad Name |
+Phase | Objective | Type | Goal | Concept | Market |
+Spend | Impressions | Clicks | CTR | CPM | CPC |
+Purchases | Revenue | ROAS | CPA |
+3s Views | 50% Views | 100% Views | VTR | Thumbstop Rate
+
+## OpEx Defaults (in Master Report → OpEx tab)
+| Item | Monthly |
 |---|---|
-| Date | report date |
-| Platform | Meta / Google |
-| Campaign ID | raw |
-| Campaign Name | Namer lookup |
-| Ad Set ID | raw |
-| Ad Set Name | Namer lookup |
-| Ad ID | raw |
-| Ad Name | Namer lookup |
-| Campaign Type | Namer lookup (prospecting/retargeting/host_acquisition) |
-| Goal | Namer lookup (guest/host) |
-| Market | Namer lookup (Seattle/national) |
-| Spend | raw |
-| Impressions | raw |
-| Clicks | raw |
-| CTR | calculated |
-| CPM | calculated |
-| CPC | calculated |
-| Purchases | conversions (become_host or make_booking) |
-| Revenue | from Supabase bookings (attributed) |
-| ROAS | Revenue / Spend |
-| CPA | Spend / Purchases |
-| Video Views (3s) | raw (Meta only) |
-| Video Views (50%) | raw |
-| Video Views (100%) | raw |
-| VTR (View-Through Rate) | Video Views / Impressions |
-| Thumbstop Rate | 3s Views / Impressions |
+| Redis | $7 |
+| Resend Starter | $20 |
+| Zoho Mail Basic | $1 |
+| Domain/DNS | $1.67 |
+| Vercel Hobby | $0 |
+| Supabase Free | $0 |
+| Business Insurance | $50 |
+| Stripe | variable |
+| Anthropic API | variable |
+| Midjourney | $10 |
+| Cursor | $20 |
+| Google Cloud | $0 |
+| **Total Fixed** | **~$109.67** |
 
-## Namer Doc Format (Namer.xlsx tab: "Namer")
-Columns: ID | Name | Platform | Campaign Type | Goal | Market | Notes
+## Google Drive Structure
+```
+thrml Drive (1TGuRiFkgz6ybJymv8B_ZKG88gu0ZJoVv)/
+├── Raw/              ← auto-created, 45-day retention
+│   ├── Meta_Raw_YYYY-MM-DD
+│   └── Google_Raw_YYYY-MM-DD
+├── Cleaned/          ← auto-created, 45-day retention
+│   ├── Meta_Cleaned_YYYY-MM-DD
+│   └── Google_Cleaned_YYYY-MM-DD
+└── thrml Master Report ← Daily Data | P&L Dashboard | OpEx | Pivot
+```
 
-## OpEx Items (OpEx tab)
-| Item | Amount | Frequency | Category |
-|---|---|---|---|
-| Redis (RedisLabs) | 7 | monthly | infrastructure |
-| Business Insurance | TBD | monthly | operations |
-| Stripe fees | variable | per-transaction | payment |
-| Domain/DNS | 1.67 | monthly | infrastructure |
-| (add more as needed) | | | |
+## Master Report Setup
+1. Create Google Sheet called `thrml Master Report` in the Drive folder
+2. Share with thrml-agent@watchful-muse-350902.iam.gserviceaccount.com (Editor)
+3. Store ID: INSERT INTO platform_settings (key,value) VALUES ('gdrive_master_report_id', '"SHEET_ID"')
+4. Agent auto-creates tabs: Daily Data, P&L Dashboard, OpEx, Pivot
+5. OpEx tab auto-populated with defaults on first run (won't overwrite manual edits)
 
-## P&L Dashboard Metrics
-- Total Ad Spend (period)
-- Platform Revenue (thrml net fees)
-- Gross Booking Value
-- Total OpEx (fixed costs in period)
-- Gross Profit = Revenue - Ad Spend - OpEx
-- Profit Margin %
-- Total Bookings
-- Booking Conversion Rate (bookings / clicks)
-- ROAS (Revenue / Ad Spend)
-- CPB (Cost Per Booking)
-
-## Data Flow
-1. `agent-reporting` cron (02:30 UTC daily, before other syncs):
-   a. Pull Meta insights via Marketing API (45-day lookback)
-   b. Pull Google Ads insights via API (45-day lookback)
-   c. Write raw data to Raw/ folder (one file per platform per day)
-   d. Delete raw files older than 45 days
-   e. Read Namer.xlsx to build ID→Name lookup map
-   f. Transform raw → cleaned (normalize columns, apply lookups)
-   g. Write cleaned data to Cleaned/ folder
-   h. Delete cleaned files older than 45 days
-   i. Update Daily Data tab in Master Report (upsert by date+platform)
-   j. Update P&L Dashboard tab with fresh totals
-
-## Cron Schedule
-- 02:30 UTC daily (before agent-finance at 04:00 and agent-evaluate at 03:00)
+## Cron: 02:30 UTC daily

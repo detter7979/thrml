@@ -4,6 +4,7 @@ import type { GoogleAuth } from "google-auth-library"
 
 import { fetchMetaInsights } from "@/lib/agent/meta-api"
 import { fetchGoogleInsights } from "@/lib/agent/google-ads-api"
+import { parseNamingConvention } from "@/lib/agent/naming-parser"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const maxDuration = 60
@@ -20,12 +21,10 @@ function getAuth(): GoogleAuth | null {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
   if (!raw) return null
   try {
-    const creds = JSON.parse(raw) as Record<string, string>
     return new google.auth.GoogleAuth({
-      credentials: creds,
+      credentials: JSON.parse(raw) as Record<string, string>,
       scopes: [
         "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive.file",
         "https://www.googleapis.com/auth/drive",
       ],
     })
@@ -38,92 +37,49 @@ function getSetting(settings: { key: string; value: unknown }[], key: string): s
   return String(row.value).replace(/^"|"$/g, "")
 }
 
-// 45-day lookback window
-function getLookbackDates(days = 45): string[] {
-  const dates: string[] = []
-  for (let i = days; i >= 0; i--) {
-    const d = new Date()
-    d.setUTCDate(d.getUTCDate() - i)
-    dates.push(d.toISOString().slice(0, 10))
-  }
-  return dates
-}
-
 function yesterday(): string {
   const d = new Date()
   d.setUTCDate(d.getUTCDate() - 1)
   return d.toISOString().slice(0, 10)
 }
 
-// ── Namer lookup ────────────────────────────────────────────────────────────
-type NamerRow = {
-  id: string
-  name: string
-  platform: string
-  campaignType: string
-  goal: string
-  market: string
-}
+function fmt(n: number, dec = 2) { return n.toFixed(dec) }
+function fmtPct(n: number) { return n.toFixed(2) + "%" }
 
-async function loadNamerLookup(
-  sheets: ReturnType<typeof google.sheets>,
-  namerId: string
-): Promise<Map<string, NamerRow>> {
-  const map = new Map<string, NamerRow>()
-  try {
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: namerId,
-      range: "Namer!A2:F1000",
-    })
-    for (const row of res.data.values ?? []) {
-      const id = String(row[0] ?? "").trim()
-      if (!id) continue
-      map.set(id, {
-        id,
-        name: String(row[1] ?? id),
-        platform: String(row[2] ?? ""),
-        campaignType: String(row[3] ?? ""),
-        goal: String(row[4] ?? ""),
-        market: String(row[5] ?? ""),
-      })
-    }
-  } catch (e) {
-    console.error("[agent-reporting] Namer load failed", e)
-  }
-  return map
-}
+// ── Cleaned report columns ─────────────────────────────────────────────────
+// Structure: core metrics + parsed naming columns
+export const CLEANED_HEADERS = [
+  // Identity
+  "Date", "Platform",
+  // Campaign hierarchy (raw IDs)
+  "Campaign ID", "Ad Set ID", "Ad ID",
+  // Parsed naming convention columns
+  "Campaign Name", "Ad Set Name", "Ad Name",
+  "Phase", "Objective", "Type", "Goal", "Concept", "Market",
+  // Core metrics
+  "Spend", "Impressions", "Clicks", "CTR", "CPM", "CPC",
+  // Conversions
+  "Purchases", "Revenue", "ROAS", "CPA",
+  // Video engagement (Meta)
+  "3s Views", "50% Views", "100% Views", "VTR", "Thumbstop Rate",
+] as const
 
-// ── Raw insight → Cleaned row ───────────────────────────────────────────────
 type RawRow = {
   date: string
-  campaign_id: string
-  campaign_name: string
-  adset_id: string
-  adset_name: string
-  ad_id: string
-  ad_name: string
-  spend: number
-  impressions: number
-  clicks: number
-  purchases: number
-  revenue: number
+  campaign_id: string; campaign_name: string
+  adset_id: string;    adset_name: string
+  ad_id: string;       ad_name: string
+  spend: number; impressions: number; clicks: number
+  purchases: number; revenue: number
   video_views_3s?: number
   video_views_50pct?: number
   video_views_100pct?: number
 }
 
-type CleanedRow = [
-  string, string, string, string, string, string, string, string,
-  string, string, string,
-  string, string, string, string, string, string,
-  string, string, string, string,
-  string, string, string, string, string
-]
-
-function cleanRow(raw: RawRow, platform: string, namer: Map<string, NamerRow>): CleanedRow {
-  const camp = namer.get(raw.campaign_id) ?? namer.get(raw.campaign_name)
-  const adset = namer.get(raw.adset_id) ?? namer.get(raw.adset_name)
-  const ad = namer.get(raw.ad_id) ?? namer.get(raw.ad_name)
+function cleanRow(raw: RawRow, platformFallback: string): string[] {
+  // Parse naming convention from campaign name (most structured)
+  const parsed = parseNamingConvention(raw.campaign_name)
+  const adsetParsed = parseNamingConvention(raw.adset_name)
 
   const spend = raw.spend
   const imps = raw.impressions
@@ -143,15 +99,22 @@ function cleanRow(raw: RawRow, platform: string, namer: Map<string, NamerRow>): 
   const vtr = imps > 0 ? (v3s / imps * 100) : 0
   const thumbstop = imps > 0 ? (v3s / imps * 100) : 0
 
-  const fmt = (n: number, dec = 2) => n.toFixed(dec)
-  const fmtPct = (n: number) => n.toFixed(2) + "%"
+  // Use parsed platform or fallback
+  const platform = parsed.platform || platformFallback
+
+  // Concept: prefer ad set concept if more specific
+  const concept = adsetParsed.concept || parsed.concept
 
   return [
     raw.date, platform,
-    raw.campaign_id, camp?.name ?? raw.campaign_name,
-    raw.adset_id, adset?.name ?? raw.adset_name,
-    raw.ad_id, ad?.name ?? raw.ad_name,
-    camp?.campaignType ?? "", camp?.goal ?? "", camp?.market ?? "",
+    raw.campaign_id, raw.adset_id, raw.ad_id,
+    raw.campaign_name, raw.adset_name, raw.ad_name,
+    parsed.phase ? `P${parsed.phase}` : "",
+    parsed.objective,
+    parsed.type,
+    parsed.goal,
+    concept,
+    parsed.market,
     fmt(spend), String(imps), String(clicks),
     fmtPct(ctr), fmt(cpm), fmt(cpc),
     String(purchases), fmt(revenue), fmt(roas), fmt(cpa),
@@ -160,53 +123,69 @@ function cleanRow(raw: RawRow, platform: string, namer: Map<string, NamerRow>): 
   ]
 }
 
-const CLEANED_HEADERS: string[] = [
-  "Date", "Platform",
-  "Campaign ID", "Campaign Name",
-  "Ad Set ID", "Ad Set Name",
-  "Ad ID", "Ad Name",
-  "Campaign Type", "Goal", "Market",
-  "Spend", "Impressions", "Clicks",
-  "CTR", "CPM", "CPC",
-  "Purchases", "Revenue", "ROAS", "CPA",
-  "Video Views (3s)", "Video Views (50%)", "Video Views (100%)",
-  "VTR", "Thumbstop Rate",
-]
+// ── OpEx defaults ──────────────────────────────────────────────────────────
 
-// ── Drive helpers ────────────────────────────────────────────────────────────
+const OPEX_DEFAULTS = [
+  // Item | Monthly $ | Category | Notes
+  ["Redis (RedisLabs)",        "7.00",   "Infrastructure",  "Upstash or RedisLabs free tier"],
+  ["Resend (Starter)",        "20.00",   "Infrastructure",  "Email API — up to 50k emails/mo"],
+  ["Zoho Mail (Basic)",        "1.00",   "Infrastructure",  "hello@usethrml.com"],
+  ["Domain / DNS",             "1.67",   "Infrastructure",  "$20/yr via Vercel"],
+  ["Vercel (Hobby)",           "0.00",   "Infrastructure",  "Free tier"],
+  ["Supabase (Free)",          "0.00",   "Infrastructure",  "Free tier"],
+  ["Business Insurance",      "50.00",   "Operations",      "General liability — update with actual"],
+  ["Stripe Fees",          "variable",   "Payment",         "2.9% + $0.30 per transaction"],
+  ["Anthropic API",        "variable",   "AI",              "Claude API usage — check usage dashboard"],
+  ["Midjourney",              "10.00",   "Creative",        "Basic plan — update if on Standard"],
+  ["Cursor",                  "20.00",   "Development",     "Pro plan — update if on team"],
+  ["Google Cloud",             "0.00",   "Infrastructure",  "Service account only — free"],
+] as const
+
+// ── Drive helpers ──────────────────────────────────────────────────────────
 
 async function getOrCreateFolder(
   drive: ReturnType<typeof google.drive>,
   name: string,
   parentId: string
 ): Promise<string> {
-  // Check if folder exists
   const res = await drive.files.list({
     q: `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`,
-    fields: "files(id, name)",
+    fields: "files(id)",
   })
   if (res.data.files?.[0]?.id) return res.data.files[0].id
-  // Create it
   const created = await drive.files.create({
-    requestBody: {
-      name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [parentId],
-    },
+    requestBody: { name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] },
     fields: "id",
   })
   return created.data.id!
 }
 
-async function writeSheetToFolder(
+async function writeOrUpdateDailySheet(
   drive: ReturnType<typeof google.drive>,
   sheets: ReturnType<typeof google.sheets>,
   folderId: string,
   fileName: string,
-  headers: string[],
+  headers: readonly string[],
   rows: string[][]
-): Promise<string | null> {
-  // Create a new Google Sheet in the folder
+): Promise<void> {
+  // Check if today's file already exists — update it if so
+  const existing = await drive.files.list({
+    q: `name='${fileName}' and '${folderId}' in parents and trashed=false`,
+    fields: "files(id)",
+  })
+  const existingId = existing.data.files?.[0]?.id
+
+  if (existingId) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: existingId,
+      range: "Sheet1!A1",
+      valueInputOption: "RAW",
+      requestBody: { values: [[...headers], ...rows] },
+    })
+    return
+  }
+
+  // Create new sheet
   const created = await drive.files.create({
     requestBody: {
       name: fileName,
@@ -215,18 +194,13 @@ async function writeSheetToFolder(
     },
     fields: "id",
   })
-  const sheetId = created.data.id
-  if (!sheetId) return null
-
-  // Write headers + data
+  if (!created.data.id) return
   await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: `Sheet1!A1`,
+    spreadsheetId: created.data.id,
+    range: "Sheet1!A1",
     valueInputOption: "RAW",
-    requestBody: { values: [headers, ...rows] },
+    requestBody: { values: [[...headers], ...rows] },
   })
-
-  return sheetId
 }
 
 async function deleteOldFiles(
@@ -236,13 +210,10 @@ async function deleteOldFiles(
 ): Promise<number> {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - keepDays)
-  const cutoffStr = cutoff.toISOString()
-
   const res = await drive.files.list({
-    q: `'${folderId}' in parents and trashed=false and createdTime < '${cutoffStr}'`,
-    fields: "files(id, name, createdTime)",
+    q: `'${folderId}' in parents and trashed=false and createdTime < '${cutoff.toISOString()}'`,
+    fields: "files(id, name)",
   })
-
   let deleted = 0
   for (const file of res.data.files ?? []) {
     await drive.files.delete({ fileId: file.id! })
@@ -251,115 +222,174 @@ async function deleteOldFiles(
   return deleted
 }
 
-// ── Master Report upsert ─────────────────────────────────────────────────────
+// ── Master Report helpers ──────────────────────────────────────────────────
 
-async function upsertMasterDailyData(
+async function ensureMasterReportTabs(
   sheets: ReturnType<typeof google.sheets>,
-  masterSheetId: string,
+  masterId: string,
+): Promise<void> {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: masterId })
+  const existingTabs = new Set(meta.data.sheets?.map(s => s.properties?.title ?? "") ?? [])
+  const requiredTabs = ["Daily Data", "P&L Dashboard", "OpEx", "Pivot"]
+
+  const requests = requiredTabs
+    .filter(t => !existingTabs.has(t))
+    .map(title => ({ addSheet: { properties: { title } } }))
+
+  if (requests.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: masterId,
+      requestBody: { requests },
+    })
+  }
+}
+
+async function upsertDailyData(
+  sheets: ReturnType<typeof google.sheets>,
+  masterId: string,
   date: string,
   platform: string,
-  cleanedRows: string[][]
+  newRows: string[][]
 ): Promise<void> {
-  // Get existing data
   const existing = await sheets.spreadsheets.values.get({
-    spreadsheetId: masterSheetId,
-    range: "Daily Data!A1:Z10000",
+    spreadsheetId: masterId, range: "Daily Data!A1:AZ50000",
   })
-  const existingRows = existing.data.values ?? []
-
-  // Remove rows that match this date+platform (will be replaced)
-  const kept = existingRows.filter((row, i) => {
-    if (i === 0) return true // keep header
-    return !(row[0] === date && row[1] === platform)
-  })
-
-  // Append new rows
-  const updated = [...kept, ...cleanedRows]
-
-  // Write back
+  const rows = existing.data.values ?? []
+  // Keep header + rows that don't match this date+platform
+  const kept = rows.filter((r, i) => i === 0 || !(r[0] === date && r[1] === platform))
+  const updated = kept.length > 0 ? [...kept, ...newRows] : [[...CLEANED_HEADERS], ...newRows]
   await sheets.spreadsheets.values.update({
-    spreadsheetId: masterSheetId,
-    range: "Daily Data!A1",
+    spreadsheetId: masterId, range: "Daily Data!A1",
+    valueInputOption: "RAW", requestBody: { values: updated },
+  })
+}
+
+async function updateOpExTab(
+  sheets: ReturnType<typeof google.sheets>,
+  masterId: string
+): Promise<void> {
+  // Only write if tab is empty (don't overwrite user edits)
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId: masterId, range: "OpEx!A1:A2",
+  })
+  if ((existing.data.values ?? []).length > 0) return // already populated
+
+  const headers = ["Item", "Monthly ($)", "Category", "Notes", "Annual ($)"]
+  const rows = OPEX_DEFAULTS.map(([item, amount, cat, notes]) => {
+    const annual = isNaN(Number(amount)) ? "variable" : (Number(amount) * 12).toFixed(2)
+    return [item, amount, cat, notes, annual]
+  })
+  const totalFixed = OPEX_DEFAULTS
+    .filter(([, amt]) => !isNaN(Number(amt)))
+    .reduce((s, [, amt]) => s + Number(amt), 0)
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: masterId, range: "OpEx!A1",
     valueInputOption: "RAW",
-    requestBody: { values: updated },
+    requestBody: { values: [
+      headers,
+      ...rows,
+      [],
+      ["Total Fixed Monthly", totalFixed.toFixed(2), "", "", (totalFixed * 12).toFixed(2)],
+    ]},
   })
 }
 
 async function updatePnLDashboard(
   sheets: ReturnType<typeof google.sheets>,
   admin: ReturnType<typeof createAdminClient>,
-  masterSheetId: string
+  masterId: string
 ): Promise<void> {
-  // Pull last 30 days of data from Daily Data tab
+  // Pull Daily Data
   const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: masterSheetId,
-    range: "Daily Data!A1:Z10000",
+    spreadsheetId: masterId, range: "Daily Data!A1:AZ50000",
   })
   const rows = res.data.values ?? []
   if (rows.length < 2) return
 
-  const headers = rows[0]
-  const spendIdx = headers.indexOf("Spend")
-  const revenueIdx = headers.indexOf("Revenue")
-  const purchasesIdx = headers.indexOf("Purchases")
-  const dateIdx = 0
+  const h = rows[0] as string[]
+  const iDate = 0, iPlatform = 1
+  const iSpend = h.indexOf("Spend")
+  const iPurchases = h.indexOf("Purchases")
+  const iRevenue = h.indexOf("Revenue")
 
-  // Aggregate by date
+  // Aggregate by date across platforms
   const byDate = new Map<string, { spend: number; revenue: number; purchases: number }>()
   for (const row of rows.slice(1)) {
-    const date = row[dateIdx] ?? ""
-    const spend = parseFloat(row[spendIdx] ?? "0") || 0
-    const revenue = parseFloat(row[revenueIdx] ?? "0") || 0
-    const purchases = parseInt(row[purchasesIdx] ?? "0") || 0
+    const date = row[iDate] ?? ""
+    if (!date) continue
+    const spend = parseFloat(row[iSpend] ?? "0") || 0
+    const revenue = parseFloat(row[iRevenue] ?? "0") || 0
+    const purchases = parseInt(row[iPurchases] ?? "0") || 0
     const prev = byDate.get(date) ?? { spend: 0, revenue: 0, purchases: 0 }
-    byDate.set(date, {
-      spend: prev.spend + spend,
-      revenue: prev.revenue + revenue,
-      purchases: prev.purchases + purchases,
-    })
+    byDate.set(date, { spend: prev.spend + spend, revenue: prev.revenue + revenue, purchases: prev.purchases + purchases })
   }
 
-  // Get platform revenue from Supabase finance_snapshots for accurate P&L
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 45)
-  const { data: financeRows } = await admin
+  // Get platform revenue from Supabase
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 45)
+  const { data: finRows } = await admin
     .from("finance_snapshots")
     .select("snapshot_date, net_platform_revenue, gross_booking_value, booking_count")
     .gte("snapshot_date", cutoff.toISOString().slice(0, 10))
     .order("snapshot_date", { ascending: true })
 
-  const financeMap = new Map((financeRows ?? []).map(r => [
-    r.snapshot_date,
-    { netRevenue: Number(r.net_platform_revenue), grossBookings: Number(r.gross_booking_value), bookings: r.booking_count }
-  ]))
+  const finMap = new Map((finRows ?? []).map(r => [r.snapshot_date, r]))
 
-  // Build P&L rows
-  const pnlHeaders = ["Date", "Ad Spend", "Platform Revenue", "Gross Booking Value",
-    "Bookings", "Ad Spend ROAS", "Gross Profit", "Profit Margin %"]
+  // Fixed monthly OpEx
+  const fixedMonthly = OPEX_DEFAULTS
+    .filter(([, amt]) => !isNaN(Number(amt)))
+    .reduce((s, [, amt]) => s + Number(amt), 0)
+  const fixedDaily = fixedMonthly / 30
+
+  const pnlHeaders = [
+    "Date", "Ad Spend", "Platform Revenue (Net)", "Gross Booking Value",
+    "Bookings", "Daily OpEx (est.)", "Gross Profit", "Profit Margin %",
+    "ROAS", "CPB (Cost/Booking)",
+  ]
   const pnlRows = Array.from(byDate.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, ads]) => {
-      const fin = financeMap.get(date) ?? { netRevenue: 0, grossBookings: 0, bookings: 0 }
-      const profit = fin.netRevenue - ads.spend
-      const margin = fin.netRevenue > 0 ? (profit / fin.netRevenue * 100) : 0
-      const roas = ads.spend > 0 ? (fin.netRevenue / ads.spend) : 0
+      const fin = finMap.get(date)
+      const netRev = Number(fin?.net_platform_revenue ?? 0)
+      const grossBook = Number(fin?.gross_booking_value ?? 0)
+      const bookings = Number(fin?.booking_count ?? 0)
+      const profit = netRev - ads.spend - fixedDaily
+      const margin = netRev > 0 ? (profit / netRev * 100) : 0
+      const roas = ads.spend > 0 ? (netRev / ads.spend) : 0
+      const cpb = bookings > 0 ? (ads.spend / bookings) : 0
       return [
-        date,
-        ads.spend.toFixed(2),
-        fin.netRevenue.toFixed(2),
-        fin.grossBookings.toFixed(2),
-        String(fin.bookings),
-        roas.toFixed(2),
-        profit.toFixed(2),
-        margin.toFixed(1) + "%",
+        date, fmt(ads.spend), fmt(netRev), fmt(grossBook),
+        String(bookings), fmt(fixedDaily),
+        fmt(profit), fmtPct(margin),
+        fmt(roas), fmt(cpb),
       ]
     })
 
+  // Totals row
+  const totals = pnlRows.reduce((acc, r) => ({
+    spend: acc.spend + parseFloat(r[1]),
+    rev: acc.rev + parseFloat(r[2]),
+    gross: acc.gross + parseFloat(r[3]),
+    bookings: acc.bookings + parseInt(r[4]),
+    opex: acc.opex + parseFloat(r[5]),
+    profit: acc.profit + parseFloat(r[6]),
+  }), { spend: 0, rev: 0, gross: 0, bookings: 0, opex: 0, profit: 0 })
+
   await sheets.spreadsheets.values.update({
-    spreadsheetId: masterSheetId,
-    range: "P&L Dashboard!A1",
+    spreadsheetId: masterId, range: "P&L Dashboard!A1",
     valueInputOption: "RAW",
-    requestBody: { values: [pnlHeaders, ...pnlRows] },
+    requestBody: { values: [
+      pnlHeaders,
+      ...pnlRows,
+      [],
+      ["TOTAL",
+        fmt(totals.spend), fmt(totals.rev), fmt(totals.gross),
+        String(totals.bookings), fmt(totals.opex), fmt(totals.profit),
+        totals.rev > 0 ? fmtPct(totals.profit / totals.rev * 100) : "0%",
+        totals.spend > 0 ? fmt(totals.rev / totals.spend) : "0",
+        totals.bookings > 0 ? fmt(totals.spend / totals.bookings) : "0",
+      ],
+    ]},
   })
 }
 
@@ -385,25 +415,16 @@ export async function GET(req: NextRequest) {
     const drive = google.drive({ version: "v3", auth })
     const sheets = google.sheets({ version: "v4", auth })
 
-    // Load settings
     const { data: settingsRows } = await admin
-      .from("platform_settings")
-      .select("key, value")
-      .in("key", [
-        "gdrive_reporting_folder_id",
-        "gdrive_namer_sheet_id",
-        "gdrive_master_report_id",
-        "gdrive_raw_folder_id",
-        "gdrive_cleaned_folder_id",
-      ])
+      .from("platform_settings").select("key, value")
+      .in("key", ["gdrive_reporting_folder_id", "gdrive_master_report_id",
+                  "gdrive_raw_folder_id", "gdrive_cleaned_folder_id"])
     const settings = settingsRows ?? []
 
     const reportingFolderId = getSetting(settings, "gdrive_reporting_folder_id")
-    if (!reportingFolderId) {
-      throw new Error("gdrive_reporting_folder_id not set in platform_settings")
-    }
+    if (!reportingFolderId) throw new Error("gdrive_reporting_folder_id not set")
 
-    // Get or create Raw/ and Cleaned/ subfolders
+    // Ensure Raw/ and Cleaned/ subfolders exist
     let rawFolderId = getSetting(settings, "gdrive_raw_folder_id")
     let cleanedFolderId = getSetting(settings, "gdrive_cleaned_folder_id")
     if (!rawFolderId) {
@@ -415,17 +436,15 @@ export async function GET(req: NextRequest) {
       await admin.from("platform_settings").upsert({ key: "gdrive_cleaned_folder_id", value: cleanedFolderId }, { onConflict: "key" })
     }
 
-    // Load Namer lookup
-    const namerId = getSetting(settings, "gdrive_namer_sheet_id")
-    const namer = namerId ? await loadNamerLookup(sheets, namerId) : new Map<string, NamerRow>()
+    // Ensure Master Report has all required tabs + populate OpEx defaults
+    const masterId = getSetting(settings, "gdrive_master_report_id")
+    if (masterId) {
+      await ensureMasterReportTabs(sheets, masterId)
+      await updateOpExTab(sheets, masterId)
+    }
 
     const date = yesterday()
-    const results = {
-      date,
-      metaRows: 0, googleRows: 0,
-      rawFilesCreated: 0, cleanedFilesCreated: 0,
-      oldFilesDeleted: 0,
-    }
+    const results = { date, metaRows: 0, googleRows: 0, rawFiles: 0, cleanedFiles: 0, oldDeleted: 0 }
 
     // ── Meta ──────────────────────────────────────────────────────────────
     if (process.env.META_MARKETING_API_TOKEN && process.env.META_AD_ACCOUNT_ID) {
@@ -434,32 +453,24 @@ export async function GET(req: NextRequest) {
         results.metaRows = metaRaw.length
 
         if (metaRaw.length > 0) {
-          // Raw file
-          const rawHeaders = ["date","campaign_id","campaign_name","adset_id","adset_name",
-            "ad_id","ad_name","spend","impressions","clicks","purchases","revenue",
-            "video_views_3s","video_views_50pct","video_views_100pct"]
-          const rawRowsNorm: RawRow[] = metaRaw.map(r => ({ ...r, date, video_views_3s: 0, video_views_50pct: 0, video_views_100pct: 0 }))
-          const rawRows = rawRowsNorm.map(r => rawHeaders.map(h => String((r as Record<string, unknown>)[h] ?? "")))
-          await writeSheetToFolder(drive, sheets, rawFolderId, `Meta_Raw_${date}`, rawHeaders, rawRows)
-          results.rawFilesCreated++
+          const normalized: RawRow[] = metaRaw.map(r => ({
+            date, ...r, video_views_3s: 0, video_views_50pct: 0, video_views_100pct: 0,
+          }))
 
-          // Cleaned file
-          const cleanedRows = rawRowsNorm.map(r => cleanRow(r, "Meta", namer))
-          await writeSheetToFolder(drive, sheets, cleanedFolderId, `Meta_Cleaned_${date}`, CLEANED_HEADERS, cleanedRows)
-          results.cleanedFilesCreated++
+          // Raw sheet
+          const rawHeaders = Object.keys(normalized[0]) as string[]
+          const rawRows = normalized.map(r => rawHeaders.map(h => String((r as Record<string, unknown>)[h] ?? "")))
+          await writeOrUpdateDailySheet(drive, sheets, rawFolderId, `Meta_Raw_${date}`, rawHeaders, rawRows)
+          results.rawFiles++
 
-          // Update Master Report
-          const masterId = getSetting(settings, "gdrive_master_report_id")
-          if (masterId) {
-            await upsertMasterDailyData(sheets, masterId, date, "Meta", [
-              CLEANED_HEADERS,
-              ...cleanedRows,
-            ])
-          }
+          // Cleaned sheet
+          const cleanedRows = normalized.map(r => cleanRow(r, "Meta"))
+          await writeOrUpdateDailySheet(drive, sheets, cleanedFolderId, `Meta_Cleaned_${date}`, CLEANED_HEADERS, cleanedRows)
+          results.cleanedFiles++
+
+          if (masterId) await upsertDailyData(sheets, masterId, date, "Meta", cleanedRows)
         }
-      } catch (e) {
-        console.error("[agent-reporting] Meta error", e)
-      }
+      } catch (e) { console.error("[agent-reporting] Meta error", e) }
     }
 
     // ── Google Ads ────────────────────────────────────────────────────────
@@ -468,57 +479,38 @@ export async function GET(req: NextRequest) {
       results.googleRows = googleRaw.length
 
       if (googleRaw.length > 0) {
-        const rawHeaders = ["date","campaign_id","campaign_name","adset_id","adset_name",
-          "ad_id","ad_name","spend","impressions","clicks","purchases","revenue"]
-        // Google uses adgroup_id/name — normalize to adset for unified schema
-        const rawRowsNorm: RawRow[] = googleRaw.map(r => ({
+        const normalized: RawRow[] = googleRaw.map(r => ({
           date,
-          campaign_id: r.campaign_id,
-          campaign_name: r.campaign_name,
-          adset_id: r.adgroup_id,
-          adset_name: r.adgroup_name,
-          ad_id: r.ad_id,
-          ad_name: r.ad_name,
-          spend: r.spend,
-          impressions: r.impressions,
-          clicks: r.clicks,
-          purchases: r.purchases,
-          revenue: r.revenue,
+          campaign_id: r.campaign_id, campaign_name: r.campaign_name,
+          adset_id: r.adgroup_id, adset_name: r.adgroup_name,
+          ad_id: r.ad_id, ad_name: r.ad_name,
+          spend: r.spend, impressions: r.impressions, clicks: r.clicks,
+          purchases: r.purchases, revenue: r.revenue,
         }))
-        const rawRows = rawRowsNorm.map(r => rawHeaders.map(h => String((r as Record<string, unknown>)[h] ?? "")))
-        await writeSheetToFolder(drive, sheets, rawFolderId, `Google_Raw_${date}`, rawHeaders, rawRows)
-        results.rawFilesCreated++
 
-        const cleanedRows = rawRowsNorm.map(r => cleanRow(r, "Google", namer))
-        await writeSheetToFolder(drive, sheets, cleanedFolderId, `Google_Cleaned_${date}`, CLEANED_HEADERS, cleanedRows)
-        results.cleanedFilesCreated++
+        const rawHeaders = Object.keys(normalized[0]) as string[]
+        const rawRows = normalized.map(r => rawHeaders.map(h => String((r as Record<string, unknown>)[h] ?? "")))
+        await writeOrUpdateDailySheet(drive, sheets, rawFolderId, `Google_Raw_${date}`, rawHeaders, rawRows)
+        results.rawFiles++
 
-        const masterId = getSetting(settings, "gdrive_master_report_id")
-        if (masterId) {
-          await upsertMasterDailyData(sheets, masterId, date, "Google", [
-            CLEANED_HEADERS,
-            ...cleanedRows,
-          ])
-        }
+        const cleanedRows = normalized.map(r => cleanRow(r, "Google"))
+        await writeOrUpdateDailySheet(drive, sheets, cleanedFolderId, `Google_Cleaned_${date}`, CLEANED_HEADERS, cleanedRows)
+        results.cleanedFiles++
+
+        if (masterId) await upsertDailyData(sheets, masterId, date, "Google", cleanedRows)
       }
-    } catch (e) {
-      console.error("[agent-reporting] Google Ads error — may not be configured", e)
-    }
+    } catch (e) { console.error("[agent-reporting] Google Ads error (may not be configured)", e) }
 
-    // ── Update P&L Dashboard ──────────────────────────────────────────────
-    const masterId = getSetting(settings, "gdrive_master_report_id")
+    // ── P&L Dashboard ─────────────────────────────────────────────────────
     if (masterId) {
-      try {
-        await updatePnLDashboard(sheets, admin, masterId)
-      } catch (e) {
-        console.error("[agent-reporting] P&L dashboard update error", e)
-      }
+      try { await updatePnLDashboard(sheets, admin, masterId) }
+      catch (e) { console.error("[agent-reporting] P&L error", e) }
     }
 
-    // ── Enforce 45-day retention ──────────────────────────────────────────
-    const deleted = await deleteOldFiles(drive, rawFolderId, 45)
-      + await deleteOldFiles(drive, cleanedFolderId, 45)
-    results.oldFilesDeleted = deleted
+    // ── 45-day retention ──────────────────────────────────────────────────
+    results.oldDeleted =
+      await deleteOldFiles(drive, rawFolderId, 45) +
+      await deleteOldFiles(drive, cleanedFolderId, 45)
 
     if (runId) await admin.from("agent_runs").update({
       status: "success", completed_at: new Date().toISOString(),

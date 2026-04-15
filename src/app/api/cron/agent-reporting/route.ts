@@ -48,35 +48,30 @@ function fmtPct(n: number) { return n.toFixed(2) + "%" }
 
 // ── Cleaned report columns ─────────────────────────────────────────────────
 export const CLEANED_HEADERS = [
-  // Identity
+  // Core
   "Date", "Platform",
-  // Names (raw from platform)
+  // IDs (from Namer)
+  "Campaign ID", "Ad Set ID", "Ad ID",
+  // Names
   "Campaign Name", "Ad Set Name", "Ad Name",
   // Campaign-level parsed
   "Phase", "Campaign Objective", "Funnel Stage",
-  // Audience — split columns
-  "Audience Group",     // Host | Guest
-  "Audience Interest",  // gen | sauna | hottub | wellness | biohacking | checkout_rt
+  // Audience
+  "Audience Group",   // Host | Guest
+  "Targeting Name",   // User-controlled via Targeting Lookup tab (e.g. Sauna Interest)
   "Geo",
-  // Ad Set-level parsed
+  // Ad Set-level
   "Space Type",
-  "Audience Source",    // Interest | LAL | Retargeting | CRM
-  "Audience Tier",      // 1% | 2% | checkout | listing | —
+  "Targeting Tactic", // Interest | LAL 1% | LAL 2% | Retargeting - Checkout | etc.
   "Placement",
-  // Ad-level parsed
-  "Test ID", "Variant", "Angle",
-  // Format — split columns
-  "Format Type",        // Static | Video | Carousel | UGC | RSA
-  "Length",             // NA | 6s | 15s | 30s | 60s
-  "Aspect Ratio",       // 9x16 | 1x1 | 4x5 | NA
-  "CTA",
-  // Creative info
-  "Hook Copy", "Status", "Opt. Event",
-  // Raw metrics — no calculated fields
+  // Ad-level
+  "Angle",
+  "Format Type", "Length", "Aspect Ratio", "CTA",
+  // Creative
+  "Hook Copy", "Opt. Event",
+  // Metrics
   "Spend ($)", "Impressions", "Reach", "Link Clicks",
-  // Conversion events (by phase)
   "become_host_click", "host_onboarding_started", "listing_created", "Purchase",
-  // Video — 100% view-through (changed from 25%)
   "Video Views 100%",
 ] as const
 
@@ -89,11 +84,11 @@ type RawRow = {
   spend: number; impressions: number; clicks: number
   purchases: number; revenue: number
   video_views_100pct?: number
-  // Conversion event columns (from platform export)
   become_host_click?: number
   host_onboarding_started?: number
   listing_created?: number
   reach?: number
+  hook_copy?: string
 }
 
 // ── Clean row builder ──────────────────────────────────────────────────────
@@ -101,31 +96,40 @@ function cleanRow(raw: RawRow, platformFallback: string): string[] {
   const parsed = parseNamingConvention(raw.ad_name || raw.adset_name || raw.campaign_name)
   const platform = parsed.platform || platformFallback
 
+  const na  = (v: string | undefined) => (!v || v === "-" || v === "—" ? "NA" : v)
+  const tc  = (s: string | undefined) => {
+    if (!s || s === "NA") return "NA"
+    if (/^[CP]\d{3}$/.test(s) || /^(AS|AD)\d{3}$/.test(s) || /^P\d$/.test(s)) return s
+    return s.replace(/_/g," ").replace(/\w\S*/g, (w: string) => w[0].toUpperCase() + w.slice(1).toLowerCase())
+  }
+
+  // Targeting Tactic: combines audienceSource + audienceTier into LAL 1% / Interest / etc.
+  const tactic = (() => {
+    const src  = parsed.audienceSource
+    const tier = parsed.audienceTier
+    if (src === "LAL" && tier && tier !== "—") return `LAL ${tier}`
+    if (src === "Retargeting" && tier && tier !== "—") return `Retargeting - ${tc(tier)}`
+    return na(src)
+  })()
+
   return [
-    raw.date, platform,
-    raw.campaign_name, raw.adset_name, raw.ad_name,
-    // Campaign-level
-    parsed.phase, parsed.campaignObjective, parsed.funnelStage,
-    // Audience — split
-    parsed.audienceGroup, parsed.audienceInterest, parsed.geo,
-    // Ad Set-level — split
-    parsed.spaceType, parsed.audienceSource, parsed.audienceTier, parsed.placement,
-    // Ad-level
-    parsed.testId, parsed.variant, parsed.angle,
-    // Format — split
-    parsed.formatType, parsed.formatLength, parsed.formatRatio,
-    parsed.cta,
-    // Creative info (Hook + Status from Creative Builder lookup — left for agent to populate)
-    "", "", parsed.optEvent,
-    // Raw metrics
+    raw.date, na(platform),
+    na(raw.campaign_id ?? ""), na(raw.adset_id ?? ""), na(raw.ad_id ?? ""),
+    na(raw.campaign_name), na(raw.adset_name), na(raw.ad_name),
+    na(parsed.phase), na(tc(parsed.campaignObjective)), na(tc(parsed.funnelStage)),
+    na(tc(parsed.audienceGroup)),
+    "NA",  // Targeting Name: filled by reporting agent via Targeting Lookup post-process
+    na(tc(parsed.geo)),
+    na(tc(parsed.spaceType)), na(tactic), na(tc(parsed.placement)),
+    na(tc(parsed.angle)),
+    na(tc(parsed.formatType)), na(parsed.formatLength), na(parsed.formatRatio), na(tc(parsed.cta?.replace(/_/g," "))),
+    na(raw.hook_copy ?? ""), na(parsed.optEvent),
     fmt(raw.spend), String(raw.impressions),
     String(raw.reach ?? raw.impressions), String(raw.clicks),
-    // Conversion event columns
     String(raw.become_host_click ?? 0),
     String(raw.host_onboarding_started ?? 0),
     String(raw.listing_created ?? 0),
     String(raw.purchases ?? 0),
-    // Video 100%
     String(raw.video_views_100pct ?? 0),
   ]
 }

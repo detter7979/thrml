@@ -48,9 +48,8 @@ function fmtPct(n: number) { return n.toFixed(2) + "%" }
 
 // ── Cleaned report columns ─────────────────────────────────────────────────
 export const CLEANED_HEADERS = [
-  // Core
-  "Date", "Platform",
-  // IDs (from Namer)
+  "Date", "Year", "Month", "Week",
+  "Platform",
   "Campaign ID", "Ad Set ID", "Ad ID",
   // Names
   "Campaign Name", "Ad Set Name", "Ad Name",
@@ -112,8 +111,25 @@ function cleanRow(raw: RawRow, platformFallback: string): string[] {
     return na(src)
   })()
 
+  // Date dimensions
+  const d       = new Date(raw.date + "T12:00:00Z")
+  const year    = String(d.getUTCFullYear())
+  const month   = d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })
+  const tmp     = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+  const dow     = tmp.getUTCDay() || 7
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - dow)
+  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1))
+  const weekNum = Math.ceil((((tmp.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  const mon     = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+  mon.setUTCDate(mon.getUTCDate() - ((mon.getUTCDay() || 7) - 1))
+  const sun     = new Date(mon); sun.setUTCDate(mon.getUTCDate() + 6)
+  const pad     = (n: number) => String(n).padStart(2, "0")
+  const yy      = String(d.getUTCFullYear()).slice(2)
+  const week    = `Week ${weekNum} (${pad(mon.getUTCMonth()+1)}/${pad(mon.getUTCDate())} - ${pad(sun.getUTCMonth()+1)}/${pad(sun.getUTCDate())}/${yy})`
+
   return [
-    raw.date, na(platform),
+    raw.date, year, month, week,
+    na(platform),
     na(raw.campaign_id ?? ""), na(raw.adset_id ?? ""), na(raw.ad_id ?? ""),
     na(raw.campaign_name), na(raw.adset_name), na(raw.ad_name),
     na(parsed.phase), na(tc(parsed.campaignObjective)), na(tc(parsed.funnelStage)),

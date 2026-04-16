@@ -64,6 +64,34 @@ const TACTIC_MAP = {
 const fmt = (n, d = 2) => Number(n).toFixed(d)
 const jit = (base, pct = 0.18) => base * (1 + (Math.random() - 0.5) * pct)
 
+// ── Date dimension helper ──────────────────────────────────────────────────
+// Returns { year, month, week } e.g. { year:"2026", month:"Apr", week:"Week 13 (04/09 - 04/15/26)" }
+function dateFields(isoDate) {
+  const d    = new Date(isoDate + "T12:00:00Z")
+  const year = String(d.getUTCFullYear())
+  const month = d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }) // "Apr"
+
+  // ISO week number (Mon–Sun)
+  const tmp = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+  const dayOfWeek = tmp.getUTCDay() || 7          // Mon=1 … Sun=7
+  tmp.setUTCDate(tmp.getUTCDate() + 4 - dayOfWeek) // nearest Thursday
+  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1))
+  const weekNum = Math.ceil((((tmp - yearStart) / 86400000) + 1) / 7)
+
+  // Monday of that week
+  const mon = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+  mon.setUTCDate(mon.getUTCDate() - ((mon.getUTCDay() || 7) - 1))
+  const sun = new Date(mon); sun.setUTCDate(mon.getUTCDate() + 6)
+
+  const pad = n => String(n).padStart(2, "0")
+  const yy  = String(d.getUTCFullYear()).slice(2)
+  const monStr = `${pad(mon.getUTCMonth()+1)}/${pad(mon.getUTCDate())}`
+  const sunStr = `${pad(sun.getUTCMonth()+1)}/${pad(sun.getUTCDate())}`
+  const week = `Week ${weekNum} (${monStr} - ${sunStr}/${yy})`
+
+  return { year, month, week }
+}
+
 // ── Column schemas ─────────────────────────────────────────────────────────
 const RAW_HEADERS = [
   "Date", "Platform",
@@ -76,7 +104,8 @@ const RAW_HEADERS = [
 ]
 
 const CLEANED_HEADERS = [
-  "Date", "Platform",
+  "Date", "Year", "Month", "Week",           // ← new date dimensions
+  "Platform",
   "Campaign ID", "Ad Set ID", "Ad ID",
   "Campaign Name", "Ad Set Name", "Ad Name",
   "Phase", "Campaign Objective", "Funnel Stage",
@@ -191,8 +220,10 @@ function genRows(namer, lookup, dateStr) {
     ])
 
     // CLEANED — fully parsed, title-cased, NA-filled, acronyms preserved
+    const df = dateFields(dateStr)
     cleaned.push([
-      dateStr, platform,
+      dateStr, df.year, df.month, df.week,   // Date + date dimensions
+      platform,
       camp.id, adset.id, cr.id,
       camp.name, adset.name, cr.adName ?? cr.id,
       na(camp.phase), objective, funnel,
@@ -332,25 +363,48 @@ async function formatPlatformData() {
   const cw = (s, e, px) => ({ updateDimensionProperties: {
     range: { sheetId: sid, dimension: "COLUMNS", startIndex: s, endIndex: e },
     properties: { pixelSize: px }, fields: "pixelSize" }})
+  // New col layout (0-based):
+  // 0=Date 1=Year 2=Month 3=Week 4=Platform
+  // 5=CampID 6=AsID 7=AdID  8=CampName 9=AsName 10=AdName
+  // 11=Phase 12=CampObj 13=Funnel
+  // 14=AudGroup 15=TgtName 16=Geo
+  // 17=SpaceType 18=TgtTactic 19=Placement
+  // 20=Angle 21=FmtType 22=Length 23=Ratio 24=CTA
+  // 25=Hook 26=OptEvent
+  // 27=Spend 28=Imps 29=Reach 30=Clicks 31=BHC 32=HOS 33=LC 34=Pur 35=VV100
+  const dateDimTint = { red: 0.90, green: 0.96, blue: 0.90 } // light green tint for Year/Month/Week
   await sheets.spreadsheets.batchUpdate({ spreadsheetId: MASTER_ID, requestBody: { requests: [
     { updateSheetProperties: { properties: { sheetId: sid, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } },
     { repeatCell: { range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: CLEANED_HEADERS.length },
       cell: { userEnteredFormat: { backgroundColor: dark, textFormat: { foregroundColor: white, bold: true, fontSize: 10 }, verticalAlignment: "MIDDLE", padding: { top: 6, bottom: 6 } } },
       fields: "userEnteredFormat(backgroundColor,textFormat,verticalAlignment,padding)" } },
-    { repeatCell: { range: { sheetId: sid, startRowIndex: 1, endRowIndex: 500, startColumnIndex: 2, endColumnIndex: 5 },
+    // Year/Month/Week header tint
+    { repeatCell: { range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 1, endColumnIndex: 4 },
+      cell: { userEnteredFormat: { backgroundColor: dateDimTint, textFormat: { foregroundColor: dark, bold: true, fontSize: 10 } } },
+      fields: "userEnteredFormat(backgroundColor,textFormat)" } },
+    // Year/Month/Week data rows — same light green
+    { repeatCell: { range: { sheetId: sid, startRowIndex: 1, endRowIndex: 500, startColumnIndex: 1, endColumnIndex: 4 },
+      cell: { userEnteredFormat: { backgroundColor: { red: 0.95, green: 0.99, blue: 0.95 } } },
+      fields: "userEnteredFormat(backgroundColor)" } },
+    // ID cols (5,6,7) purple monospace
+    { repeatCell: { range: { sheetId: sid, startRowIndex: 1, endRowIndex: 500, startColumnIndex: 5, endColumnIndex: 8 },
       cell: { userEnteredFormat: { backgroundColor: purple, textFormat: { fontFamily: "Courier New", fontSize: 9, bold: true } } }, fields: "userEnteredFormat(backgroundColor,textFormat)" } },
-    { repeatCell: { range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 12, endColumnIndex: 13 },
+    // Targeting Name header (15) stronger tint
+    { repeatCell: { range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 15, endColumnIndex: 16 },
       cell: { userEnteredFormat: { backgroundColor: tgtTint, textFormat: { bold: true, fontSize: 10 } } }, fields: "userEnteredFormat(backgroundColor,textFormat)" } },
-    { repeatCell: { range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 18, endColumnIndex: 21 },
+    // Format group headers (21,22,23) amber
+    { repeatCell: { range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 21, endColumnIndex: 24 },
       cell: { userEnteredFormat: { backgroundColor: amber, textFormat: { foregroundColor: dark, bold: true, fontSize: 10 } } }, fields: "userEnteredFormat(backgroundColor,textFormat)" } },
-    cw(0,1,90), cw(1,2,70), cw(2,3,75), cw(3,4,75), cw(4,5,65),
-    cw(5,6,230), cw(6,7,250), cw(7,8,155),
-    cw(8,9,50), cw(9,10,115), cw(10,11,115),
-    cw(11,12,95), cw(12,13,175), cw(13,14,75),
-    cw(14,15,90), cw(15,16,160), cw(16,17,130),
-    cw(17,18,115), cw(18,19,80), cw(19,20,65), cw(20,21,85), cw(21,22,90),
-    cw(22,23,195), cw(23,24,175),
-    cw(24,33,80),
+    cw(0,1,90),  cw(1,2,55),  cw(2,3,50),  cw(3,4,175), // Date, Year, Month, Week
+    cw(4,5,70),                                            // Platform
+    cw(5,6,75),  cw(6,7,75),  cw(7,8,65),               // IDs
+    cw(8,9,230), cw(9,10,250),cw(10,11,155),             // Names
+    cw(11,12,50),cw(12,13,115),cw(13,14,115),            // Phase, Obj, Funnel
+    cw(14,15,95),cw(15,16,175),cw(16,17,75),             // AudGroup, TgtName, Geo
+    cw(17,18,90),cw(18,19,160),cw(19,20,130),            // SpaceType, Tactic, Placement
+    cw(20,21,115),cw(21,22,80),cw(22,23,65),cw(23,24,85),cw(24,25,90), // Angle, Format, Length, Ratio, CTA
+    cw(25,26,195),cw(26,27,175),                          // Hook, OptEvent
+    cw(27,36,80),                                          // Metrics
   ]}})
 }
 

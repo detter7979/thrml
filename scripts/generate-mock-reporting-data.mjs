@@ -444,7 +444,8 @@ async function main() {
   console.log("\n📊 Updating Platform Data tab...")
   await sheets.spreadsheets.values.clear({ spreadsheetId: MASTER_ID, range: "Platform Data!A1:AZ10000" })
   await sheets.spreadsheets.values.update({
-    spreadsheetId: MASTER_ID, range: "Platform Data!A1", valueInputOption: "RAW",
+    spreadsheetId: MASTER_ID, range: "Platform Data!A1",
+    valueInputOption: "USER_ENTERED",   // numeric strings parsed as numbers
     requestBody: { values: [CLEANED_HEADERS, ...allCleaned] },
   })
   await formatPlatformData()

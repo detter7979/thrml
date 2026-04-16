@@ -379,12 +379,12 @@ async function main() {
   console.log(`   Generated: ${todayRaw.length} rows/day × 7 days = ${allCleaned.length} total`)
 
   // Raw file → Drive (slate blue header + light blue row tint)
-  console.log(`\n📁 Raw:     Meta_Daily Report_${TODAY_FORMATTED}`)
-  await writeToSheet(RAW_FOLDER_ID, `Meta_Daily Report_${TODAY_FORMATTED}`, RAW_HEADERS, todayRaw, "raw")
+  console.log(`\n📁 Raw:     Meta_Daily Report_Raw_${TODAY_FORMATTED}`)
+  await writeToSheet(RAW_FOLDER_ID, `Meta_Daily Report_Raw_${TODAY_FORMATTED}`, RAW_HEADERS, todayRaw, "raw")
 
   // Cleaned file → Drive (dark charcoal header)
-  console.log(`📁 Cleaned: Meta_Cleaned_${TODAY_FORMATTED}`)
-  await writeToSheet(CLEANED_FOLDER_ID, `Meta_Cleaned_${TODAY_FORMATTED}`, CLEANED_HEADERS, todayCleaned, "cleaned")
+  console.log(`📁 Cleaned: Meta_Daily Report_Cleaned_${TODAY_FORMATTED}`)
+  await writeToSheet(CLEANED_FOLDER_ID, `Meta_Daily Report_Cleaned_${TODAY_FORMATTED}`, CLEANED_HEADERS, todayCleaned, "cleaned")
 
   // Full replace Platform Data (7-day history)
   console.log("\n📊 Updating Platform Data tab...")

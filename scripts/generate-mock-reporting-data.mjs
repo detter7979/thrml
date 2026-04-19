@@ -18,7 +18,8 @@ const sheets = google.sheets({ version: "v4", auth })
 
 const RAW_FOLDER_ID     = "15FIxUe7411b3hzPEB7AzRlQgYRt9EzGo"
 const CLEANED_FOLDER_ID = "1yjIh556CkkQxWZ8oq_mZFtKKISVn1n6b"
-const MASTER_ID         = "1V6qMPwq7F_AHM3VUsa8mXKubknvXrI2-2nND1MWh4pU"
+const MASTER_ID         = "1V6qMPwq7F_AHM3VUsa8mXKubknvXrI2-2nND1MWh4pU"  // Finance Tracker
+const REPORT_ID         = "17wVL2MIf_EuHIA4Wm1ShjgUbyrKthYR2KvvTdeL16qw"  // Master Report (pivots)
 const NAMER_ID          = "1yx5cxxno8Pig23Zs6GagF0EblImIUQqy1fv6e4Rfh3o"
 
 const TODAY_ISO       = new Date().toISOString().slice(0, 10)
@@ -441,15 +442,17 @@ async function main() {
   await writeToSheet(CLEANED_FOLDER_ID, `Meta_Daily Report_Cleaned_${TODAY_FORMATTED}`, CLEANED_HEADERS, todayCleaned, "cleaned")
 
   // Full replace Platform Data (7-day history)
-  console.log("\n📊 Updating Platform Data tab...")
-  await sheets.spreadsheets.values.clear({ spreadsheetId: MASTER_ID, range: "Platform Data!A1:AZ10000" })
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: MASTER_ID, range: "Platform Data!A1",
-    valueInputOption: "USER_ENTERED",   // numeric strings parsed as numbers
-    requestBody: { values: [CLEANED_HEADERS, ...allCleaned] },
-  })
+  console.log("\n📊 Updating Platform Data tabs...")
+  for (const [label, sid] of [["Finance Tracker", MASTER_ID], ["Master Report", REPORT_ID]]) {
+    await sheets.spreadsheets.values.clear({ spreadsheetId: sid, range: "Platform Data!A1:AZ10000" })
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sid, range: "Platform Data!A1",
+      valueInputOption: "USER_ENTERED",   // numeric strings parsed as numbers
+      requestBody: { values: [CLEANED_HEADERS, ...allCleaned] },
+    })
+    console.log(`  ✅ ${label}: ${allCleaned.length} rows`)
+  }
   await formatPlatformData()
-  console.log(`  ✅ Platform Data: ${allCleaned.length} rows`)
 
   // Acronym spot-check
   const sampleTactics  = [...new Set(allCleaned.map(r => r[15]))].join(", ")
@@ -460,7 +463,8 @@ async function main() {
   console.log(`   Targeting Tactics:  ${sampleTactics}`)
   console.log(`   Format Types:       ${sampleFormats}`)
   console.log(`   Targeting Names:    ${sampleTgtNames}`)
-  console.log(`\n📊 https://docs.google.com/spreadsheets/d/${MASTER_ID}`)
+  console.log(`\n📊 Finance Tracker: https://docs.google.com/spreadsheets/d/${MASTER_ID}`)
+  console.log(`📊 Master Report:   https://docs.google.com/spreadsheets/d/${REPORT_ID}`)
   console.log(`💡 Raw = slate blue header + light blue rows | Cleaned = dark charcoal header\n`)
 }
 

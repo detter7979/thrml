@@ -22,6 +22,8 @@ const sheets = google.sheets({ version:"v4", auth })
 const MASTER  = "17wVL2MIf_EuHIA4Wm1ShjgUbyrKthYR2KvvTdeL16qw"
 const FINANCE = "1V6qMPwq7F_AHM3VUsa8mXKubknvXrI2-2nND1MWh4pU"
 const NAMER   = "1yx5cxxno8Pig23Zs6GagF0EblImIUQqy1fv6e4Rfh3o"
+const CLEANED_ID      = "1ut_w46bk2t8YT1h8bQUij8jVPL0PVb6YfIDI6MFlWv8"
+const CLEANED_FOLDER  = "1yjIh556CkkQxWZ8oq_mZFtKKISVn1n6b"
 
 // ── Final correct column order + offsets ─────────────────────────────────
 const HEADERS = [
@@ -577,6 +579,45 @@ async function main() {
     cw(SB,0,1,210),cw(SB,1,2,115),cw(SB,2,3,120),cw(SB,3,4,110),
   ]}})
   console.log("   ✅ Spend Breakdown: 6 pivots")
+
+  // ── 7. Sync today's Meta rows → Cleaned Drive file ───────────────────────
+  console.log("\n📁 Syncing Cleaned Drive file...")
+  const today = new Date().toISOString().slice(0,10)
+  const todayMeta = allRows.filter(r => r[0] === today && r[4] === "Meta")
+  if (todayMeta.length > 0) {
+    await sheets.spreadsheets.values.clear({spreadsheetId:CLEANED_ID, range:"Sheet1!A1:AH500"})
+    await sheets.spreadsheets.values.update({
+      spreadsheetId:CLEANED_ID, range:"Sheet1!A1",
+      valueInputOption:"USER_ENTERED",
+      requestBody:{values:[HEADERS,...todayMeta]}
+    })
+    // Re-apply formatting
+    const cm = await sheets.spreadsheets.get({spreadsheetId:CLEANED_ID})
+    const csid = cm.data.sheets?.[0]?.properties?.sheetId ?? 0
+    const DARK={red:0.047,green:0.086,blue:0.157},WHITE={red:1,green:1,blue:1}
+    const FH={red:0.200,green:0.620,blue:0.100},FB={red:0.851,green:0.953,blue:0.776}
+    const IB={red:0.941,green:0.918,blue:0.988}
+    const cc=(r1,r2,c1,c2,f)=>({repeatCell:{range:{sheetId:csid,startRowIndex:r1,endRowIndex:r2,startColumnIndex:c1,endColumnIndex:c2},cell:{userEnteredFormat:f},fields:Object.keys(f).map(k=>`userEnteredFormat(${k})`).join(",")}})
+    const cw2=(s,e,px)=>({updateDimensionProperties:{range:{sheetId:csid,dimension:"COLUMNS",startIndex:s,endIndex:e},properties:{pixelSize:px},fields:"pixelSize"}})
+    await sheets.spreadsheets.batchUpdate({spreadsheetId:CLEANED_ID,requestBody:{requests:[
+      {updateSheetProperties:{properties:{sheetId:csid,gridProperties:{frozenRowCount:1}},fields:"gridProperties.frozenRowCount"}},
+      cc(0,1,0,HEADERS.length,{backgroundColor:DARK,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10},verticalAlignment:"MIDDLE",padding:{top:6,bottom:6}}),
+      cc(0,1,1,4,{backgroundColor:FH,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10}}),
+      cc(0,1,16,17,{backgroundColor:FH,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10}}),
+      cc(1,500,1,4,{backgroundColor:FB}), cc(1,500,16,17,{backgroundColor:FB}),
+      cc(1,500,6,12,{backgroundColor:IB,textFormat:{fontFamily:"Courier New",fontSize:9}}),
+      cc(1,500,COL.spend,COL.spend+1,{numberFormat:{type:"CURRENCY",pattern:'"$"#,##0.00'}}),
+      cc(1,500,COL.imps,HEADERS.length,{numberFormat:{type:"NUMBER",pattern:"#,##0"}}),
+      cw2(0,1,100),cw2(1,4,50),cw2(3,4,185),cw2(4,5,70),cw2(5,6,50),
+      cw2(6,7,75),cw2(7,8,240),cw2(8,9,75),cw2(9,10,255),cw2(10,11,65),cw2(11,12,160),
+      cw2(12,13,115),cw2(13,14,105),cw2(14,15,115),cw2(15,16,155),cw2(16,17,170),cw2(17,18,75),
+      cw2(18,19,110),cw2(19,20,80),cw2(20,21,65),cw2(21,22,85),cw2(22,23,90),cw2(23,24,195),cw2(24,25,170),
+      cw2(25,34,85),
+    ]}})
+    console.log(`   ✅ Cleaned file: ${todayMeta.length} Meta rows for ${today}`)
+  } else {
+    console.log(`   ⚠️  No Meta rows for today (${today}) — Cleaned file not updated`)
+  }
 
   // Final verification
   const check = await sheets.spreadsheets.values.get({spreadsheetId:MASTER,

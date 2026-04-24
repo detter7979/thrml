@@ -3,6 +3,7 @@ export const NOTIFICATION_PREFERENCE_DEFAULTS = {
   booking_cancelled: true,
   new_review: true,
   payout_sent: true,
+  credit_grants: true,
   marketing_wellness_tips: false,
   marketing_offers: false,
   marketing_product_updates: false,
@@ -30,6 +31,10 @@ export function normalizeNotificationPreferences(value: unknown): NotificationPr
       typeof source.payout_sent === "boolean"
         ? source.payout_sent
         : NOTIFICATION_PREFERENCE_DEFAULTS.payout_sent,
+    credit_grants:
+      typeof source.credit_grants === "boolean"
+        ? source.credit_grants
+        : NOTIFICATION_PREFERENCE_DEFAULTS.credit_grants,
     marketing_wellness_tips:
       typeof source.marketing_wellness_tips === "boolean"
         ? source.marketing_wellness_tips

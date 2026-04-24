@@ -6,10 +6,9 @@ import { calculateFees, fetchPlatformFeePercents } from "@/lib/fees"
 import { calculateBookingSubtotal } from "@/lib/pricing"
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
 import { roundUpTo30 } from "@/lib/slots"
+import { stripe } from "@/lib/stripe"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 const checkoutSchema = z.object({
   listingId: z.string().trim().min(1),
@@ -444,23 +443,33 @@ export async function POST(req: NextRequest) {
     )
     const STRIPE_MIN_CHARGE_CENTS = 50
     let referralCreditAppliedCents = 0
+    let userCreditAppliedCents = 0
     if (applyReferralCredit) {
-      const { data: guestWalletProfile } = await admin
-        .from("profiles")
-        .select("referral_credit_cents")
-        .eq("id", user.id)
-        .maybeSingle()
+      const [{ data: guestWalletProfile }, { data: userCreditRow }] = await Promise.all([
+        admin.from("profiles").select("referral_credit_cents").eq("id", user.id).maybeSingle(),
+        admin.from("user_credits").select("balance").eq("user_id", user.id).maybeSingle(),
+      ])
 
-      const walletCents = Math.max(0, Number(guestWalletProfile?.referral_credit_cents ?? 0))
+      const referralWalletCents = Math.max(0, Number(guestWalletProfile?.referral_credit_cents ?? 0))
+      const userWalletCents = Math.max(0, Number(userCreditRow?.balance ?? 0))
       const dueCents = Math.round(fees.guestTotal * 100)
       const hostPayoutCents = Math.round(fees.hostPayout * 100)
       const maxForHost = Math.max(0, dueCents - hostPayoutCents)
       const maxForStripe =
         dueCents >= STRIPE_MIN_CHARGE_CENTS ? Math.max(0, dueCents - STRIPE_MIN_CHARGE_CENTS) : 0
-      const creditCents = Math.min(walletCents, maxForHost, maxForStripe)
-      if (creditCents > 0) {
-        referralCreditAppliedCents = creditCents
-        fees.guestTotal = (dueCents - creditCents) / 100
+      const maxCreditCents = Math.min(
+        referralWalletCents + userWalletCents,
+        maxForHost,
+        maxForStripe
+      )
+      if (maxCreditCents > 0) {
+        referralCreditAppliedCents = Math.min(referralWalletCents, maxCreditCents)
+        userCreditAppliedCents = Math.min(
+          userWalletCents,
+          Math.max(0, maxCreditCents - referralCreditAppliedCents)
+        )
+        const totalApplied = referralCreditAppliedCents + userCreditAppliedCents
+        fees.guestTotal = (dueCents - totalApplied) / 100
       }
     }
     const isInstantBook = listingInstantBook(listing as Record<string, unknown>)
@@ -575,6 +584,7 @@ export async function POST(req: NextRequest) {
         host_payout: fees.hostPayout,
         total_charged: fees.guestTotal,
         referral_credit_applied_cents: referralCreditAppliedCents,
+        user_credit_applied_cents: userCreditAppliedCents,
         status: isInstantBook ? "pending" : "pending_host",
         confirmation_deadline: isInstantBook ? null : confirmationDeadline,
         waiver_version: waiver_version.trim(),
@@ -743,6 +753,8 @@ export async function POST(req: NextRequest) {
         listing_id: listing.id,
         booked_slot_id: slotReservation.slotId,
         booking_flow: isInstantBook ? "instant_book" : "request_to_book",
+        user_credit_applied_cents: String(userCreditAppliedCents),
+        referral_credit_applied_cents: String(referralCreditAppliedCents),
       },
     }
 
@@ -792,6 +804,7 @@ export async function POST(req: NextRequest) {
       clientSecret: paymentIntent.client_secret,
       bookingId: booking.id,
       appliedReferralCreditCents: referralCreditAppliedCents,
+      appliedUserCreditCents: userCreditAppliedCents,
       guestTotalAfterCredit: fees.guestTotal,
     }
     console.log("[stripe/checkout] Sending successful response", finalResponse)

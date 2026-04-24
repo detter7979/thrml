@@ -12,7 +12,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const admin = createAdminClient()
-  const [code, referralsResult, earningsResult, profileResult] = await Promise.all([
+  const [code, referralsResult, earningsResult, profileResult, userCreditsResult] = await Promise.all([
     getOrCreateReferralCode(user.id),
     admin
       .from("referrals")
@@ -24,6 +24,7 @@ export async function GET() {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     admin.from("profiles").select("referral_credit_cents").eq("id", user.id).maybeSingle(),
+    admin.from("user_credits").select("balance").eq("user_id", user.id).maybeSingle(),
   ])
 
   const referrals = referralsResult.data ?? []
@@ -100,7 +101,9 @@ export async function GET() {
     totalReferrals: referrals.length,
     convertedReferrals: referrals.filter((r) => r.status === "converted").length,
     totalEarnedCents,
-    walletBalanceCents: Number(profileResult.data?.referral_credit_cents ?? 0),
+    walletBalanceCents:
+      Number(profileResult.data?.referral_credit_cents ?? 0) +
+      Number(userCreditsResult.data?.balance ?? 0),
     earnings: earningsDetailed,
   })
 }

@@ -13,6 +13,7 @@ import {
   Settings,
   UserRound,
   Users,
+  Wallet,
 } from "lucide-react"
 
 type NavItem =
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/listings", label: "Listings", icon: Home },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/referrals", label: "Referrals", icon: Gift },
+  { href: "/admin/credits", label: "Credits", icon: Wallet },
   { href: "/admin/earnings", label: "Earnings", icon: BarChart3 },
   { href: "/admin/messages", label: "Messages", icon: Inbox },
   { href: "/admin/disputes", label: "Disputes", emoji: "⚖️" },

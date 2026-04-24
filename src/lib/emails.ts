@@ -1125,3 +1125,5 @@ export async function sendGuestEntryInstructionsEmail(args: {
     preferenceKey: "new_booking",
   })
 }
+
+export { sendCreditGrantedEmail } from "@/lib/emails/credit-granted"

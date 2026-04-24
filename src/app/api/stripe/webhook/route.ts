@@ -17,9 +17,8 @@ import { sendGA4Event } from "@/lib/analytics/measurement-protocol"
 import { mergeBookingLegalException, resolveActiveWaiverVersionForServiceType } from "@/lib/waiver-templates"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
 import { processReferralConversion } from "@/lib/referral"
+import { stripe } from "@/lib/stripe"
 import { createAdminClient } from "@/lib/supabase/admin"
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 function isCodeAccessType(value: unknown) {
   return (
@@ -85,7 +84,7 @@ export async function POST(req: NextRequest) {
       const { data: booking } = await supabase
         .from("bookings")
         .select(
-          "id, status, access_code, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, total_charged, host_payout, automated_messages_sent, waiver_version, waiver_accepted, metadata, referral_credit_applied_cents"
+          "id, status, access_code, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, total_charged, host_payout, automated_messages_sent, waiver_version, waiver_accepted, metadata, referral_credit_applied_cents, user_credit_applied_cents"
         )
         .eq("id", bookingId)
         .maybeSingle()
@@ -212,6 +211,33 @@ export async function POST(req: NextRequest) {
               guestId: booking.guest_id,
               error: walletDebitError.message,
             })
+          }
+        }
+        const appliedUserCredit = Number(booking.user_credit_applied_cents ?? 0)
+        if (appliedUserCredit > 0) {
+          const { data: spendResult, error: userCreditSpendError } = await supabase.rpc(
+            "apply_credits_to_booking",
+            {
+              p_user_id: booking.guest_id,
+              p_amount_cents: appliedUserCredit,
+              p_booking_id: booking.id,
+            }
+          )
+          if (userCreditSpendError) {
+            console.error("[stripe/webhook] user credit ledger spend failed", {
+              bookingId: booking.id,
+              guestId: booking.guest_id,
+              error: userCreditSpendError.message,
+            })
+          } else if (spendResult && typeof spendResult === "object" && "ok" in spendResult) {
+            const payload = spendResult as { ok?: boolean; error?: string }
+            if (payload.ok === false) {
+              console.error("[stripe/webhook] user credit spend rejected", {
+                bookingId: booking.id,
+                guestId: booking.guest_id,
+                error: payload.error ?? null,
+              })
+            }
           }
         }
       }

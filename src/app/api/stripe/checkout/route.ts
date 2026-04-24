@@ -4,6 +4,7 @@ import { z } from "zod"
 
 import { calculateFees, fetchPlatformFeePercents } from "@/lib/fees"
 import { calculateBookingSubtotal } from "@/lib/pricing"
+import { getFallbackServiceType } from "@/lib/service-types"
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
 import { roundUpTo30 } from "@/lib/slots"
 import { stripe } from "@/lib/stripe"
@@ -359,22 +360,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const listingServiceTypeId =
+      typeof listing.service_type === "string" && listing.service_type.trim()
+        ? listing.service_type.trim()
+        : "sauna"
     const { data: serviceType } = await supabase
       .from("service_types")
       .select("min_duration_minutes, max_duration_minutes, duration_increment_minutes, session_type, booking_model")
-      .eq("id", listing.service_type)
+      .eq("id", listingServiceTypeId)
       .maybeSingle()
 
-    const sessionType =
-      listing.session_type === "fixed_session" || listing.session_type === "hourly"
-        ? listing.session_type
-        : serviceType?.session_type === "fixed_session" || serviceType?.session_type === "hourly"
-          ? serviceType.session_type
-          : serviceType?.booking_model === "fixed_session" || serviceType?.booking_model === "hourly"
-            ? serviceType.booking_model
-            : "hourly"
+    // Match listing detail + /book pages: use service_types.booking_model (with canonical fallback),
+    // not listing.session_type, so slot duration and checkout validation stay aligned.
+    const fallbackMeta = getFallbackServiceType(listingServiceTypeId)
+    const bookingModel: "hourly" | "fixed_session" =
+      serviceType?.booking_model === "fixed_session" || serviceType?.booking_model === "hourly"
+        ? serviceType.booking_model
+        : fallbackMeta?.booking_model ?? "hourly"
     const rawBlockMins = Number(
-      sessionType === "fixed_session"
+      bookingModel === "fixed_session"
         ? listing.fixed_session_minutes ??
             listing.min_duration_override_minutes ??
             serviceType?.min_duration_minutes ??
@@ -384,7 +388,7 @@ export async function POST(req: NextRequest) {
     const blockMins = Math.max(30, roundUpTo30(Number.isFinite(rawBlockMins) ? rawBlockMins : 30))
     const minMins = blockMins
     const maxMins =
-      sessionType === "fixed_session"
+      bookingModel === "fixed_session"
         ? blockMins
         : Math.max(blockMins, Number(listing.max_duration_override_minutes ?? serviceType?.max_duration_minutes ?? 240))
     const incrementMins = 30
@@ -433,7 +437,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const chargeDurationHours = sessionType === "fixed_session" ? 1 : durationHours
+    const chargeDurationHours = bookingModel === "fixed_session" ? 1 : durationHours
     const subtotalRow = calculateBookingSubtotal(listing, guestCount, chargeDurationHours)
     const feePercents = await fetchPlatformFeePercents(admin)
     const fees = calculateFees(

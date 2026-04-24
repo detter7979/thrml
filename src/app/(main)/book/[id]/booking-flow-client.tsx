@@ -340,6 +340,7 @@ export function BookingFlowClient({
   const [acceptedWaiverVersion, setAcceptedWaiverVersion] = useState<string | null>(null)
   const [waiverModalOpen, setWaiverModalOpen] = useState(false)
   const [newsletterChecked, setNewsletterChecked] = useState(true)
+  /** Combined referral + Thrml wallet (see /api/referral/stats). */
   const [referralWalletCents, setReferralWalletCents] = useState(0)
   const [applyReferralCredit, setApplyReferralCredit] = useState(false)
   const referralStatsLoadedRef = useRef(false)
@@ -748,8 +749,8 @@ export function BookingFlowClient({
                   onCheckedChange={(checked) => setApplyReferralCredit(Boolean(checked))}
                 />
                 <span className="text-[13px] leading-5 text-[#1A1410]">
-                  Apply {formatMoney(referralWalletCents / 100)} referral credit at checkout (up to what Stripe and
-                  host payouts allow).
+                  Apply {formatMoney(referralWalletCents / 100)} account credit at checkout — referral balance is used
+                  first, then Thrml credits (up to Stripe minimums and host payout limits).
                 </span>
               </label>
             ) : null}

@@ -229,9 +229,18 @@ export async function POST(req: NextRequest) {
               guestId: booking.guest_id,
               error: userCreditSpendError.message,
             })
-          } else if (spendResult && typeof spendResult === "object" && "ok" in spendResult) {
-            const payload = spendResult as { ok?: boolean; error?: string }
-            if (payload.ok === false) {
+          } else {
+            let payload: { ok?: boolean; error?: string } | null = null
+            if (typeof spendResult === "string") {
+              try {
+                payload = JSON.parse(spendResult) as { ok?: boolean; error?: string }
+              } catch {
+                payload = null
+              }
+            } else if (spendResult && typeof spendResult === "object") {
+              payload = spendResult as { ok?: boolean; error?: string }
+            }
+            if (payload?.ok === false) {
               console.error("[stripe/webhook] user credit spend rejected", {
                 bookingId: booking.id,
                 guestId: booking.guest_id,

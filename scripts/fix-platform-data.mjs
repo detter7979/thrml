@@ -16,14 +16,73 @@ import { readFileSync } from "fs"
 
 const creds = JSON.parse(readFileSync("/tmp/gcp_creds.json","utf8"))
 const auth  = new google.auth.GoogleAuth({ credentials:creds,
-  scopes:["https://www.googleapis.com/auth/spreadsheets"] })
+  scopes:["https://www.googleapis.com/auth/spreadsheets","https://www.googleapis.com/auth/drive"] })
 const sheets = google.sheets({ version:"v4", auth })
+const drive  = google.drive({ version:"v3", auth })
+
+// ── Auto-create year/month subfolder under a root Drive folder ────────────
+async function getDatedFolder(rootFolderId, date = new Date()) {
+  const year  = String(date.getFullYear())
+  const month = date.toLocaleDateString("en-US", { month:"long" })
+
+  const getOrCreate = async (parentId, name) => {
+    const res = await drive.files.list({
+      q: `'${parentId}' in parents and name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: "files(id)"
+    })
+    if (res.data.files?.length > 0) return res.data.files[0].id
+    const created = await drive.files.create({
+      requestBody: { name, mimeType:"application/vnd.google-apps.folder", parents:[parentId] },
+      fields: "id"
+    })
+    console.log(`  📁 Created folder: ${name}/`)
+    return created.data.id
+  }
+
+  const yearId  = await getOrCreate(rootFolderId, year)
+  const monthId = await getOrCreate(yearId, month)
+  return { monthId, year, month }
+}
+
+// ── Write sheet inside a dated Drive folder ──────────────────────────────
+async function writeToFolder(folderId, fileName, headers, rows) {
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and name='${fileName}' and trashed=false`,
+    fields: "files(id)"
+  })
+  let fileId = res.data.files?.[0]?.id
+
+  if (!fileId) {
+    try {
+      const created = await drive.files.create({
+        requestBody: { name:fileName, mimeType:"application/vnd.google-apps.spreadsheet", parents:[folderId] },
+        fields: "id"
+      })
+      fileId = created.data.id
+      console.log(`  ✅ Created: ${fileName}`)
+    } catch(e) {
+      console.log(`  ⚠️  Cannot create '${fileName}' — share folder with thrml-agent@watchful-muse-350902.iam.gserviceaccount.com and re-run.`)
+      return null
+    }
+  } else {
+    console.log(`  ✅ Updated: ${fileName}`)
+  }
+
+  await sheets.spreadsheets.values.clear({ spreadsheetId:fileId, range:"Sheet1!A1:AH2000" })
+  await sheets.spreadsheets.values.update({
+    spreadsheetId:fileId, range:"Sheet1!A1",
+    valueInputOption:"USER_ENTERED",
+    requestBody:{ values:[headers,...rows] }
+  })
+  return fileId
+}
 
 const MASTER  = "17wVL2MIf_EuHIA4Wm1ShjgUbyrKthYR2KvvTdeL16qw"
 const FINANCE = "1V6qMPwq7F_AHM3VUsa8mXKubknvXrI2-2nND1MWh4pU"
 const NAMER   = "1yx5cxxno8Pig23Zs6GagF0EblImIUQqy1fv6e4Rfh3o"
-const CLEANED_ID      = "1ut_w46bk2t8YT1h8bQUij8jVPL0PVb6YfIDI6MFlWv8"
-const CLEANED_FOLDER  = "1yjIh556CkkQxWZ8oq_mZFtKKISVn1n6b"
+const CLEANED_ID      = "1ut_w46bk2t8YT1h8bQUij8jVPL0PVb6YfIDI6MFlWv8"  // existing Cleaned sheet (Apr 2026)
+const RAW_ROOT        = "15FIxUe7411b3hzPEB7AzRlQgYRt9EzGo"               // Raw/ root folder
+const CLEANED_ROOT    = "1yjIh556CkkQxWZ8oq_mZFtKKISVn1n6b"               // Cleaned/ root folder
 
 // ── Final correct column order + offsets ─────────────────────────────────
 const HEADERS = [
@@ -580,43 +639,56 @@ async function main() {
   ]}})
   console.log("   ✅ Spend Breakdown: 6 pivots")
 
-  // ── 7. Sync today's Meta rows → Cleaned Drive file ───────────────────────
-  console.log("\n📁 Syncing Cleaned Drive file...")
-  const today = new Date().toISOString().slice(0,10)
-  const todayMeta = allRows.filter(r => r[0] === today && r[4] === "Meta")
+  // ── 7. Sync today's Meta rows → Cleaned Drive file (dated folder) ────────
+  console.log("\n📁 Syncing Drive files...")
+  const today = new Date()
+  const todayISO = today.toISOString().slice(0,10)
+  const todayFormatted = today.toLocaleDateString("en-US",{month:"2-digit",day:"2-digit",year:"2-digit"}).replace(/\//g,".")
+  const todayMeta = allRows.filter(r => r[0] === todayISO && r[4] === "Meta")
+
+  // Auto-create Raw/2026/April/ and Cleaned/2026/April/ if needed
+  const { monthId:rawMonthId, year, month } = await getDatedFolder(RAW_ROOT, today)
+  const { monthId:cleanedMonthId }          = await getDatedFolder(CLEANED_ROOT, today)
+  console.log(`  📂 Writing to: ${year}/${month}/`)
+
+  // Raw file — today's Meta rows in raw format (same HEADERS, hard values)
+  const rawFileName = `Meta_Daily Report_Raw_${todayFormatted}`
+  const rawFileId = await writeToFolder(rawMonthId, rawFileName, HEADERS, todayMeta)
+
+  // Cleaned file — same content (Platform Data format)
   if (todayMeta.length > 0) {
-    await sheets.spreadsheets.values.clear({spreadsheetId:CLEANED_ID, range:"Sheet1!A1:AH500"})
-    await sheets.spreadsheets.values.update({
-      spreadsheetId:CLEANED_ID, range:"Sheet1!A1",
-      valueInputOption:"USER_ENTERED",
-      requestBody:{values:[HEADERS,...todayMeta]}
-    })
-    // Re-apply formatting
-    const cm = await sheets.spreadsheets.get({spreadsheetId:CLEANED_ID})
-    const csid = cm.data.sheets?.[0]?.properties?.sheetId ?? 0
-    const DARK={red:0.047,green:0.086,blue:0.157},WHITE={red:1,green:1,blue:1}
-    const FH={red:0.200,green:0.620,blue:0.100},FB={red:0.851,green:0.953,blue:0.776}
-    const IB={red:0.941,green:0.918,blue:0.988}
-    const cc=(r1,r2,c1,c2,f)=>({repeatCell:{range:{sheetId:csid,startRowIndex:r1,endRowIndex:r2,startColumnIndex:c1,endColumnIndex:c2},cell:{userEnteredFormat:f},fields:Object.keys(f).map(k=>`userEnteredFormat(${k})`).join(",")}})
-    const cw2=(s,e,px)=>({updateDimensionProperties:{range:{sheetId:csid,dimension:"COLUMNS",startIndex:s,endIndex:e},properties:{pixelSize:px},fields:"pixelSize"}})
-    await sheets.spreadsheets.batchUpdate({spreadsheetId:CLEANED_ID,requestBody:{requests:[
-      {updateSheetProperties:{properties:{sheetId:csid,gridProperties:{frozenRowCount:1}},fields:"gridProperties.frozenRowCount"}},
-      cc(0,1,0,HEADERS.length,{backgroundColor:DARK,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10},verticalAlignment:"MIDDLE",padding:{top:6,bottom:6}}),
-      cc(0,1,1,4,{backgroundColor:FH,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10}}),
-      cc(0,1,16,17,{backgroundColor:FH,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10}}),
-      cc(1,500,1,4,{backgroundColor:FB}), cc(1,500,16,17,{backgroundColor:FB}),
-      cc(1,500,6,12,{backgroundColor:IB,textFormat:{fontFamily:"Courier New",fontSize:9}}),
-      cc(1,500,COL.spend,COL.spend+1,{numberFormat:{type:"CURRENCY",pattern:'"$"#,##0.00'}}),
-      cc(1,500,COL.imps,HEADERS.length,{numberFormat:{type:"NUMBER",pattern:"#,##0"}}),
-      cw2(0,1,100),cw2(1,4,50),cw2(3,4,185),cw2(4,5,70),cw2(5,6,50),
-      cw2(6,7,75),cw2(7,8,240),cw2(8,9,75),cw2(9,10,255),cw2(10,11,65),cw2(11,12,160),
-      cw2(12,13,115),cw2(13,14,105),cw2(14,15,115),cw2(15,16,155),cw2(16,17,170),cw2(17,18,75),
-      cw2(18,19,110),cw2(19,20,80),cw2(20,21,65),cw2(21,22,85),cw2(22,23,90),cw2(23,24,195),cw2(24,25,170),
-      cw2(25,34,85),
-    ]}})
-    console.log(`   ✅ Cleaned file: ${todayMeta.length} Meta rows for ${today}`)
+    const cleanedFileName = `Meta_Daily Report_Cleaned_${todayFormatted}`
+    const cleanedFileId = await writeToFolder(cleanedMonthId, cleanedFileName, HEADERS, todayMeta)
+
+    // Apply dark charcoal formatting with formula column highlights
+    if (cleanedFileId) {
+      const cm   = await sheets.spreadsheets.get({spreadsheetId:cleanedFileId})
+      const csid = cm.data.sheets?.[0]?.properties?.sheetId ?? 0
+      const DARK={red:0.047,green:0.086,blue:0.157}, WHITE={red:1,green:1,blue:1}
+      const FH={red:0.200,green:0.620,blue:0.100},   FB={red:0.851,green:0.953,blue:0.776}
+      const IB={red:0.941,green:0.918,blue:0.988}
+      const cc=(r1,r2,c1,c2,f)=>({repeatCell:{range:{sheetId:csid,startRowIndex:r1,endRowIndex:r2,startColumnIndex:c1,endColumnIndex:c2},cell:{userEnteredFormat:f},fields:Object.keys(f).map(k=>`userEnteredFormat(${k})`).join(",")}})
+      const cw2=(s,e,px)=>({updateDimensionProperties:{range:{sheetId:csid,dimension:"COLUMNS",startIndex:s,endIndex:e},properties:{pixelSize:px},fields:"pixelSize"}})
+      await sheets.spreadsheets.batchUpdate({spreadsheetId:cleanedFileId, requestBody:{requests:[
+        {updateSheetProperties:{properties:{sheetId:csid,gridProperties:{frozenRowCount:1}},fields:"gridProperties.frozenRowCount"}},
+        cc(0,1,0,HEADERS.length,{backgroundColor:DARK,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10},verticalAlignment:"MIDDLE",padding:{top:6,bottom:6}}),
+        cc(0,1,1,4,{backgroundColor:FH,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10}}),   // Year, Month, Week headers
+        cc(0,1,16,17,{backgroundColor:FH,textFormat:{foregroundColor:WHITE,bold:true,fontSize:10}}), // Targeting Name header
+        cc(1,500,1,4,{backgroundColor:FB}),   // Year, Month, Week data
+        cc(1,500,16,17,{backgroundColor:FB}), // Targeting Name data
+        cc(1,500,6,12,{backgroundColor:IB,textFormat:{fontFamily:"Courier New",fontSize:9}}),
+        cc(1,500,COL.spend,COL.spend+1,{numberFormat:{type:"CURRENCY",pattern:'"$"#,##0.00'}}),
+        cc(1,500,COL.imps,HEADERS.length,{numberFormat:{type:"NUMBER",pattern:"#,##0"}}),
+        cw2(0,1,100),cw2(1,2,50),cw2(2,3,50),cw2(3,4,185),cw2(4,5,70),cw2(5,6,50),
+        cw2(6,7,75),cw2(7,8,240),cw2(8,9,75),cw2(9,10,255),cw2(10,11,65),cw2(11,12,160),
+        cw2(12,13,115),cw2(13,14,105),cw2(14,15,115),cw2(15,16,155),cw2(16,17,170),cw2(17,18,75),
+        cw2(18,19,110),cw2(19,20,80),cw2(20,21,65),cw2(21,22,85),cw2(22,23,90),cw2(23,24,195),cw2(24,25,170),
+        cw2(25,34,85),
+      ]}})
+      console.log(`  ✅ Cleaned formatted: ${todayMeta.length} rows for ${todayISO}`)
+    }
   } else {
-    console.log(`   ⚠️  No Meta rows for today (${today}) — Cleaned file not updated`)
+    console.log(`  ⚠️  No Meta rows for today (${todayISO})`)
   }
 
   // Final verification

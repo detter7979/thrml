@@ -18,7 +18,12 @@ export async function POST(request: NextRequest) {
     })
     if (limited) return limited
 
-    const body = (await request.json().catch(() => null)) as { email?: unknown; website?: unknown } | null
+    const body = (await request.json().catch(() => null)) as {
+      email?: unknown
+      website?: unknown
+      market_city?: unknown
+      market_state?: unknown
+    } | null
     const honeypot = typeof body?.website === "string" ? body.website.trim() : ""
     if (honeypot.length > 0) {
       // Silently accept but do not process to avoid tipping off bots.
@@ -29,6 +34,18 @@ export async function POST(request: NextRequest) {
     if (!VALID_EMAIL_REGEX.test(email)) {
       return NextResponse.json({ error: "Valid email required" }, { status: 400 })
     }
+
+    const sanitizeMarket = (value: unknown): string | null => {
+      if (typeof value !== "string") return null
+      const t = sanitizeText(value)
+        .trim()
+        .replaceAll("%", "")
+        .replaceAll("_", "")
+        .slice(0, 80)
+      return t.length >= 2 ? t : null
+    }
+    const marketCity = sanitizeMarket(body?.market_city)
+    const marketState = sanitizeMarket(body?.market_state)
 
     const supabase = createAdminClient()
     const { data: existing, error: selectError } = await supabase
@@ -54,6 +71,12 @@ export async function POST(request: NextRequest) {
           source: "homepage",
           is_active: true,
           unsubscribed_at: null,
+          ...(marketCity
+            ? {
+                market_city: marketCity,
+                ...(marketState ? { market_state: marketState } : {}),
+              }
+            : {}),
         },
         { onConflict: "email" }
       )

@@ -47,7 +47,7 @@ function fmt(n: number, dec = 2) { return n.toFixed(dec) }
 function fmtPct(n: number) { return n.toFixed(2) + "%" }
 
 // ── Cleaned report columns ─────────────────────────────────────────────────
-export const CLEANED_HEADERS = [
+const CLEANED_HEADERS = [
   "Date", "Year", "Month", "Week",
   "Platform",
   "Campaign ID", "Ad Set ID", "Ad ID",

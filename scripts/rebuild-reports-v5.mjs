@@ -551,14 +551,38 @@ async function loadLookup(){
   try{const r=await sheets.spreadsheets.values.get({spreadsheetId:MASTER,range:"Targeting Lookup!A2:B100"});return(r.data.values??[]).reduce((a,row)=>{if(row[0]&&row[1])a[row[0].toLowerCase().trim()]=row[1].trim();return a},{...def})}catch{return def}
 }
 
-function genDay(namer,lookup,dateStr,sheetRowStart){
+// ── Date helpers for Drive hardcoded values ────────────────────────────────
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+function dateToYear(iso)  { return String(new Date(iso+"T12:00:00Z").getUTCFullYear()) }
+function dateToMonth(iso) { return MONTHS_SHORT[new Date(iso+"T12:00:00Z").getUTCMonth()] }
+function dateToWeek(iso)  {
+  const d = new Date(iso+"T12:00:00Z")
+  const tmp = new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()))
+  const dow = tmp.getUTCDay()||7; tmp.setUTCDate(tmp.getUTCDate()+4-dow)
+  const yr  = new Date(Date.UTC(tmp.getUTCFullYear(),0,1))
+  const wk  = Math.ceil((((tmp-yr)/86400000)+1)/7)
+  const mon = new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()))
+  mon.setUTCDate(mon.getUTCDate()-((mon.getUTCDay()||7)-1))
+  const sun = new Date(mon); sun.setUTCDate(mon.getUTCDate()+6)
+  const p   = n=>String(n).padStart(2,"0")
+  const yy  = String(d.getUTCFullYear()).slice(2)
+  return `Week ${wk} (${p(mon.getUTCMonth()+1)}/${p(mon.getUTCDate())} - ${p(sun.getUTCMonth()+1)}/${p(sun.getUTCDate())}/${yy})`
+}
+
+// driveMode=true → hardcoded values (no row-ref formulas) for Drive file exports
+// driveMode=false → live Sheets formulas for Master Report Platform Data
+function genDay(namer,lookup,dateStr,sheetRowStart,driveMode=false){
   const campMap=Object.fromEntries(namer.camps.map(c=>[c.id,c]))
   const adsetMap=Object.fromEntries(namer.adsets.map(a=>[a.id,a]))
   const rows=[]
+  // Pre-compute hardcoded date values once per day (used in driveMode)
+  const yearVal  = dateToYear(dateStr)
+  const monthVal = dateToMonth(dateStr)
+  const weekVal  = dateToWeek(dateStr)
   for(const cr of namer.creatives){
     const camp=campMap[cr.campId];if(!camp)continue
     const adset=adsetMap[cr.asId];if(!adset)continue
-    const R=sheetRowStart+rows.length
+    const R=sheetRowStart+rows.length   // only used for formula mode
     const ph=parseInt(camp.phase?.replace("P","")||"1")
     const isVideo=["video","ugc"].includes(cr.format?.toLowerCase())
     const isGoog=camp.platform?.toUpperCase()==="GOOG"
@@ -581,11 +605,17 @@ function genDay(namer,lookup,dateStr,sheetRowStart){
     const tactic=TAC[adset.audSrc?.toLowerCase()]??tc(adset.audSrc)
     const tgtKey=adset.spaceType?.toLowerCase()??""
     const tgtName=lookup[tgtKey]??tc(adset.spaceType)
+    // Year / Month / Week: formulas for Master Report, plain values for Drive
+    const colYear  = driveMode ? yearVal  : `=YEAR(A${R})`
+    const colMonth = driveMode ? monthVal : `=TEXT(A${R},"Mmm")`
+    const colWeek  = driveMode ? weekVal  : weekF(R)
+    // Targeting Name: VLOOKUP formula for Master Report, resolved value for Drive
+    const colTgt   = driveMode ? tgtName
+      : `=IFERROR(VLOOKUP(INDEX(SPLIT(J${R},"_"),1,9),'Targeting Lookup'!$A:$B,2,FALSE),"${tgtName}")`
     rows.push([
-      dateStr,`=YEAR(A${R})`,`=TEXT(A${R},"Mmm")`,weekF(R),
+      dateStr,colYear,colMonth,colWeek,
       platform,na(camp.phase),camp.id,camp.name,adset.id,adset.name,cr.id,cr.adName??cr.id,
-      objective,audGroup,funnel,tactic,
-      `=IFERROR(VLOOKUP(INDEX(SPLIT(J${R},"_"),1,9),'Targeting Lookup'!$A:$B,2,FALSE),"${tgtName}")`,
+      objective,audGroup,funnel,tactic,colTgt,
       geo,tc(cr.concept),tc(cr.format),na(cr.length),na(cr.size),
       tc(cr.cta?.replace(/_/g," ")),na(cr.hook),na(camp.event),
       fmt(spend),String(imps),String(reach),String(clicks),
@@ -692,9 +722,14 @@ async function main() {
   ]}})
   console.log("   ✅ Spend Breakdown: 6 pivots")
 
-  // ── 7. 30-day Drive files ─────────────────────────────────────────────────
+  // ── 7. 30-day consolidated Drive files (driveMode=true → plain values) ───
   console.log("\n📁 Writing 30-day consolidated Drive files...")
-  const metaRows30 = allRows.filter(r=>r[4]==="Meta")
+  const driveRows = []
+  for(const dateStr of dates) {
+    // Drive rows use plain hardcoded values (no row-ref formulas)
+    driveRows.push(...genDay(namer,lookup,dateStr,2+driveRows.length,true))
+  }
+  const metaRows30 = driveRows.filter(r=>r[4]==="Meta")
   const allRows30  = allRows   // all platforms
   const todayDate  = today
   const mm=String(todayDate.getUTCMonth()+1).padStart(2,"0")

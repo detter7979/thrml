@@ -124,30 +124,32 @@ async function upsertCloseIndex(sheets, spreadsheetId, params, summary) {
       requestBody:{ requests:[{ addSheet:{ properties:{ title:IDX, index:0 } } }] },
     })
     await sheets.spreadsheets.values.update({
-      spreadsheetId, range:`'${IDX}'!A1:G1`, valueInputOption:"USER_ENTERED",
-      requestBody:{ values:[["Month","Period","Actual ($)","Forecast ($)","Variance ($)","Status","Tab"]] },
+      spreadsheetId, range:`'${IDX}'!A1:H1`, valueInputOption:"USER_ENTERED",
+      requestBody:{ values:[["Month","Period","Actual ($)","Forecast ($)","Variance ($)","Status","Tab","Net Ad Spend ($)"]] },
     })
   }
-  const rows = await sheets.spreadsheets.values.get({ spreadsheetId, range:`'${IDX}'!A:A` })
-  // Deduplicate — update existing row if month already present
-  const allRows  = rows.data.values ?? []
-  const monthKey = `${params.monthName} ${params.year}`
-  const existIdx = allRows.findIndex(r => r[0] === monthKey)
   const { start, end } = monthRange(params.year, params.month)
-  const rowData = [[
+  const monthKey = `${params.monthName} ${params.year}`
+  const newEntry = [
     monthKey, `${start} → ${end}`,
     Number(summary.totalActual.toFixed(2)),
     Number(summary.forecastTotal.toFixed(2)),
     Number(summary.varianceTotal.toFixed(2)),
     summary.isOverBudget ? "🔴 OVER" : "🟢 OK",
     params.tabName,
-  ]]
-  const targetRow = existIdx > 0 ? existIdx + 1 : allRows.length + 1
+    Number((summary.netAdSpend ?? 0).toFixed(2)),
+  ]
+  // Read existing data rows (skip header)
+  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range:`'${IDX}'!A2:H200` })
+  const allRows  = existing.data.values ?? []
+  // Remove stale entry for this month, prepend new one (row 2 = most recent)
+  const filtered = allRows.filter(r => r[0] !== monthKey)
+  const allData  = [newEntry, ...filtered]
   await sheets.spreadsheets.values.update({
-    spreadsheetId, range:`'${IDX}'!A${targetRow}:G${targetRow}`,
-    valueInputOption:"USER_ENTERED", requestBody:{ values:rowData },
+    spreadsheetId, range:`'${IDX}'!A2:H${allData.length+1}`,
+    valueInputOption:"USER_ENTERED", requestBody:{ values:allData },
   })
-  console.log(`  ✅ Close Index updated (row ${targetRow})`)
+  console.log(`  ✅ Close Index: "${monthKey}" at row 2 (most recent), Net Ad Spend=$${summary.netAdSpend?.toFixed(2)}`)
 }
 
 // ── Data pullers ──────────────────────────────────────────────────────────
@@ -185,6 +187,9 @@ async function pullFixedCosts(sheets) {
   let total=0; const items=[]
   for (const row of rows) {
     if (!row[0]) continue
+    // Skip aggregate/total rows to avoid double-counting
+    const label = String(row[0]).toLowerCase()
+    if (label.includes("total") || label.startsWith("subtotal")) continue
     const amt = parseFloat(row[mCol])||0
     if (amt===0) continue
     items.push({ item:row[0], category:row[1]??"", monthly:amt, notes:row[4]??"" })
@@ -218,18 +223,25 @@ async function pullAdHocCosts(sheets, year, month) {
   return { total, credits, items }
 }
 
+// OpEx tab has been merged into Fixed Costs — pull forecast from Fixed Costs directly.
+// Variable-cost rows (Stripe fees, API usage) are excluded from the forecast total.
 async function pullOpExForecast(sheets) {
   const r = await sheets.spreadsheets.values.get({
-    spreadsheetId:CONFIG.FINANCE_TRACKER, range:"OpEx!A1:E30",
+    spreadsheetId:CONFIG.FINANCE_TRACKER, range:"Fixed Costs!A1:E50",
     valueRenderOption:"UNFORMATTED_VALUE",
   })
-  const [,...rows] = r.data.values??[]
+  const [hdrs,...rows] = r.data.values??[]
+  const mCol = (hdrs??[]).findIndex(h=>String(h).includes("Monthly")) ?? 2
   let total=0; const items=[]
   for (const row of rows) {
     if (!row[0]) continue
-    const amt = parseFloat(row[1])||0   // col B = Monthly ($)
-    if (String(row[1]).toLowerCase()==="variable"||amt===0) continue
-    items.push({ item:row[0], monthly:amt, category:row[2]??"" })
+    const label = String(row[0]).toLowerCase()
+    if (label.includes("total") || label.startsWith("subtotal")) continue
+    const raw = String(row[mCol]??"").toLowerCase()
+    if (raw === "variable") continue
+    const amt = parseFloat(row[mCol]) || 0
+    if (amt === 0) continue
+    items.push({ item:row[0], monthly:amt, category:row[1]??"" })
     total += amt
   }
   return { total, items }
@@ -301,7 +313,7 @@ async function writeReport(sheets, sheetSid, params, data) {
   return {
     rowCount: allRows.length,
     sRows: { sumStart: cover.length, sumEnd: cover.length+summaryHdr.length+summaryRows.length },
-    summary: { totalActual, forecastTotal, varianceTotal, variancePct, isOverBudget, totalCredits },
+    summary: { totalActual, forecastTotal, varianceTotal, variancePct, isOverBudget, totalCredits, netAdSpend: adjustedAdSpend },
   }
 }
 
@@ -417,6 +429,25 @@ async function main() {
   // Update index
   console.log(`📑 Updating Close Index...`)
   await upsertCloseIndex(sheets, CONFIG.FINANCE_TRACKER, params, result.summary)
+
+  // Move Close_ tabs to last positions — keeps Summary and Dashboard at front
+  console.log(`📋 Reordering tabs...`)
+  const freshMeta   = await sheets.spreadsheets.get({ spreadsheetId:CONFIG.FINANCE_TRACKER })
+  const allSheets   = freshMeta.data.sheets
+  const nonClose    = allSheets.filter(s => !s.properties.title.startsWith("Close"))
+  const closeIdx    = allSheets.find(s => s.properties.title === "Close Index")
+  const monthNums   = {January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12}
+  const closeMonths = allSheets
+    .filter(s => s.properties.title.startsWith("Close_"))
+    .sort((a,b) => {
+      const parse = t => { const p=t.replace("Close_","").split("_"); return (parseInt(p[1])||2026)*100+(monthNums[p[0]]||0) }
+      return parse(a.properties.title) - parse(b.properties.title)
+    })
+  const ordered = [...nonClose, ...(closeIdx?[closeIdx]:[]), ...closeMonths]
+  await sheets.spreadsheets.batchUpdate({ spreadsheetId:CONFIG.FINANCE_TRACKER, requestBody:{ requests:
+    ordered.map((s,i) => ({ updateSheetProperties:{ properties:{ sheetId:s.properties.sheetId, index:i }, fields:"index" } }))
+  }})
+  console.log(`   Order: ${ordered.map(s=>s.properties.title).join(" → ")}`)
 
   console.log(`\n✅  Monthly close complete`)
   console.log(`    Sheet  : https://docs.google.com/spreadsheets/d/${CONFIG.FINANCE_TRACKER}`)

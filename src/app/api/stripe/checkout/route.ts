@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { z } from "zod"
 
-import { calculateFees, fetchPlatformFeePercents } from "@/lib/fees"
+import {
+  calculateFees,
+  calculateProtectedBookingCreditCents,
+  fetchPlatformFeePercents,
+  STRIPE_MIN_CHARGE_CENTS,
+} from "@/lib/fees"
 import { calculateBookingSubtotal } from "@/lib/pricing"
 import { getFallbackServiceType } from "@/lib/service-types"
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
@@ -261,7 +266,6 @@ export async function POST(req: NextRequest) {
       endTime,
       durationHours,
       waiver_version,
-      waiverAccepted,
       disclaimersAccepted,
       newsletterOptIn,
       applyReferralCredit,
@@ -445,7 +449,6 @@ export async function POST(req: NextRequest) {
       feePercents.guestFeePercent,
       feePercents.hostFeePercent
     )
-    const STRIPE_MIN_CHARGE_CENTS = 50
     let referralCreditAppliedCents = 0
     let userCreditAppliedCents = 0
     if (applyReferralCredit) {
@@ -458,14 +461,12 @@ export async function POST(req: NextRequest) {
       const userWalletCents = Math.max(0, Number(userCreditRow?.balance ?? 0))
       const dueCents = Math.round(fees.guestTotal * 100)
       const hostPayoutCents = Math.round(fees.hostPayout * 100)
-      const maxForHost = Math.max(0, dueCents - hostPayoutCents)
-      const maxForStripe =
-        dueCents >= STRIPE_MIN_CHARGE_CENTS ? Math.max(0, dueCents - STRIPE_MIN_CHARGE_CENTS) : 0
-      const maxCreditCents = Math.min(
-        referralWalletCents + userWalletCents,
-        maxForHost,
-        maxForStripe
-      )
+      const maxCreditCents = calculateProtectedBookingCreditCents({
+        guestTotalCents: dueCents,
+        hostPayoutCents,
+        availableCreditCents: referralWalletCents + userWalletCents,
+        stripeMinChargeCents: STRIPE_MIN_CHARGE_CENTS,
+      })
       if (maxCreditCents > 0) {
         referralCreditAppliedCents = Math.min(referralWalletCents, maxCreditCents)
         userCreditAppliedCents = Math.min(
@@ -585,8 +586,11 @@ export async function POST(req: NextRequest) {
         price_per_person: subtotalRow.pricePerPerson,
         subtotal: fees.subtotal,
         service_fee: fees.guestFee,
+        guest_fee: fees.guestFee,
+        host_fee: fees.hostFee,
         host_payout: fees.hostPayout,
         total_charged: fees.guestTotal,
+        guest_total: fees.guestTotal,
         referral_credit_applied_cents: referralCreditAppliedCents,
         user_credit_applied_cents: userCreditAppliedCents,
         status: isInstantBook ? "pending" : "pending_host",

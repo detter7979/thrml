@@ -13,6 +13,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test:fees": "tsx scripts/check-fees.ts",
     "test:email": "tsx scripts/test-email.ts"
   },
   "dependencies": {

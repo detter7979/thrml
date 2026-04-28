@@ -1,0 +1,58 @@
+name: Monthly Close Reconciler
+
+on:
+  # Runs at 9:00 AM UTC on the 1st of every month
+  schedule:
+    - cron: "0 9 1 * *"
+
+  # Manual trigger from GitHub UI — can override month
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Target month (YYYY-MM). Defaults to prior month."
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run — validate without writing to Drive"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  reconcile:
+    name: Monthly Spend Reconciliation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run reconciler
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          FINANCE_CLOSES_ROOT:         ${{ secrets.FINANCE_CLOSES_ROOT }}
+          AD_BUDGET_MONTHLY:           ${{ vars.AD_BUDGET_MONTHLY || '5000' }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.month }}" ]; then
+            ARGS="--month ${{ inputs.month }}"
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          node scripts/reconciler.mjs $ARGS
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Monthly close reconciler failed. Check the Finance Tracker — actuals may not be updated yet."

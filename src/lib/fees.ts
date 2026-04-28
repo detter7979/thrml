@@ -17,10 +17,18 @@ export type FeeBreakdown = {
   hostPayout: number
 }
 
+export type ProtectedBookingCreditInput = {
+  guestTotalCents: number
+  hostPayoutCents: number
+  availableCreditCents: number
+  stripeMinChargeCents?: number
+}
+
 type AdminLike = Pick<SupabaseClient, "from">
 
 let feePercentsCache: { value: PlatformFeePercents; expiresAt: number } | null = null
 const FEE_CACHE_MS = 60_000
+export const STRIPE_MIN_CHARGE_CENTS = 50
 
 export function invalidatePlatformFeePercentsCache() {
   feePercentsCache = null
@@ -58,6 +66,23 @@ export function calculateFees(
     guestTotal: guestTotalCents / 100,
     hostPayout: hostPayoutCents / 100,
   }
+}
+
+export function calculateProtectedBookingCreditCents({
+  guestTotalCents,
+  hostPayoutCents,
+  availableCreditCents,
+  stripeMinChargeCents = STRIPE_MIN_CHARGE_CENTS,
+}: ProtectedBookingCreditInput): number {
+  const dueCents = Math.max(0, Math.round(guestTotalCents))
+  const payoutCents = Math.max(0, Math.round(hostPayoutCents))
+  const creditCents = Math.max(0, Math.round(availableCreditCents))
+  const minChargeCents = Math.max(0, Math.round(stripeMinChargeCents))
+  const platformTakeCents = Math.max(0, dueCents - payoutCents)
+  const maxForStripe =
+    dueCents >= minChargeCents ? Math.max(0, dueCents - minChargeCents) : 0
+
+  return Math.min(creditCents, platformTakeCents, maxForStripe)
 }
 
 export async function fetchPlatformFeePercents(admin: AdminLike): Promise<PlatformFeePercents> {

@@ -22,6 +22,13 @@ function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n)
 }
 
+function platformRevenueForBooking(row: {
+  total_charged: number | string | null
+  host_payout: number | string | null
+}) {
+  return Math.max(0, Number(row.total_charged ?? 0) - Number(row.host_payout ?? 0))
+}
+
 async function sendWeeklyReport(admin: ReturnType<typeof createAdminClient>) {
   const today = new Date()
   const sevenDaysAgo = new Date(today)
@@ -104,7 +111,7 @@ export async function GET(req: NextRequest) {
 
     const { data: bookings } = await admin
       .from("bookings")
-      .select("total_charged, service_fee, host_payout, refund_amount, status")
+      .select("total_charged, host_payout, refund_amount, status")
       .in("status", ["confirmed", "completed"])
       .gte("created_at", dayStart)
       .lte("created_at", dayEnd)
@@ -112,10 +119,10 @@ export async function GET(req: NextRequest) {
     const rows = bookings ?? []
     const bookingCount = rows.length
     const grossBookingValue = rows.reduce((s, r) => s + Number(r.total_charged ?? 0), 0)
-    const platformRevenue = rows.reduce((s, r) => s + Number(r.service_fee ?? 0), 0)
+    const platformRevenue = rows.reduce((s, r) => s + platformRevenueForBooking(r), 0)
     const hostPayouts = rows.reduce((s, r) => s + Number(r.host_payout ?? 0), 0)
     const refundsIssued = rows.reduce((s, r) => s + Number(r.refund_amount ?? 0), 0)
-    const netPlatformRevenue = platformRevenue - refundsIssued
+    const netPlatformRevenue = Math.max(0, platformRevenue - refundsIssued)
     const avgOrderValue = bookingCount > 0 ? grossBookingValue / bookingCount : 0
 
     const { count: newUsers } = await admin.from("profiles")

@@ -2,7 +2,7 @@ import { Storage } from "@google-cloud/storage"
 import sharp from "sharp"
 
 import { sendEmail, thrmlEmailWrapper, ctaButton } from "@/lib/emails/send"
-import { generateImagen, type ImagenResult } from "@/lib/agent/imagen"
+import { generateImagen } from "@/lib/agent/imagen"
 import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -197,7 +197,7 @@ export async function generateLifestyleImage(
         count: perGeneratorCount as StaticVariationCount,
       })
       images.push(
-        ...imagenResults.map((image: ImagenResult, index) => ({
+        ...imagenResults.map((image, index) => ({
           buffer: Buffer.from(image.base64, "base64"),
           mimeType: image.mimeType,
           generationTool: "imagen" as const,

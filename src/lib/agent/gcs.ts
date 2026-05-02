@@ -54,7 +54,7 @@ function monthPath(date = new Date()) {
 }
 
 function createStorageClient() {
-  const encoded = requireEnv("GCS_SERVICE_ACCOUNT_KEY")
+  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
   const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
   return new Storage({ credentials })
 }

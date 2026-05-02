@@ -125,7 +125,7 @@ function countBaseImages(generatorCount: number, formatCount: number, requestedV
 }
 
 function createStorageClient() {
-  const encoded = requireEnv("GCS_SERVICE_ACCOUNT_KEY")
+  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
   const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
   return new Storage({ credentials })
 }
@@ -440,7 +440,7 @@ export async function generateStaticCreatives(options: {
   variations?: StaticVariationCount
 } = {}): Promise<StaticGenerationResult> {
   requireEnv("GCS_BUCKET_NAME")
-  requireEnv("GCS_SERVICE_ACCOUNT_KEY")
+  requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
   const admin = createAdminClient()
   const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)

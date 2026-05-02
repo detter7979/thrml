@@ -44,7 +44,7 @@ const BRIEF_FIELDS = [
 ] as const
 
 function storageClient() {
-  const encoded = process.env.GCS_SERVICE_ACCOUNT_KEY
+  const encoded = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
   const bucketName = process.env.GCS_BUCKET_NAME
   if (!encoded || !bucketName) return null
   const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>

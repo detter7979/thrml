@@ -221,7 +221,7 @@ async function downloadVideo(url: string) {
 }
 
 function createStorageClient() {
-  const encoded = requireEnv("GCS_SERVICE_ACCOUNT_KEY")
+  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
   const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
   return new Storage({ credentials })
 }
@@ -331,7 +331,7 @@ async function processQueueItem(admin: ReturnType<typeof createAdminClient>, ite
 export async function generateCreativeVariations(options: GenerateCreativeOptions = {}): Promise<CreativeGenerationResult> {
   requireEnv("HIGGSFIELD_API_KEY")
   requireEnv("GCS_BUCKET_NAME")
-  requireEnv("GCS_SERVICE_ACCOUNT_KEY")
+  requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
   const admin = createAdminClient()
   const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)

@@ -157,7 +157,7 @@ async function downloadImage(url: string) {
 }
 
 function createStorageClient() {
-  const encoded = requireEnv("GCS_SERVICE_ACCOUNT_KEY")
+  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
   const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
   return new Storage({ credentials })
 }
@@ -240,7 +240,7 @@ export async function GET(req: NextRequest) {
   try {
     requireEnv("MIDJOURNEY_API_KEY")
     requireEnv("GCS_BUCKET_NAME")
-    requireEnv("GCS_SERVICE_ACCOUNT_KEY")
+    requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
     const { data: briefs, error: briefsError } = await admin
       .from("creative_briefs")

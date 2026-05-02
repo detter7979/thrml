@@ -5,6 +5,7 @@ import type { GoogleAuth } from "google-auth-library"
 import { fetchMetaInsights } from "@/lib/agent/meta-api"
 import { fetchGoogleInsights } from "@/lib/agent/google-ads-api"
 import { parseNamingConvention } from "@/lib/agent/naming-parser"
+import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const maxDuration = 60
@@ -18,17 +19,14 @@ function cronAuth(req: NextRequest) {
 }
 
 function getAuth(): GoogleAuth | null {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  if (!raw) return null
-  try {
-    return new google.auth.GoogleAuth({
-      credentials: JSON.parse(raw) as Record<string, string>,
-      scopes: [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-      ],
-    })
-  } catch { return null }
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null
+  return new google.auth.GoogleAuth({
+    credentials: loadGoogleServiceAccountCredentials(),
+    scopes: [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/drive",
+    ],
+  })
 }
 
 function getSetting(settings: { key: string; value: unknown }[], key: string): string | null {

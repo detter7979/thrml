@@ -1,5 +1,7 @@
 import { PredictionServiceClient } from "@google-cloud/aiplatform"
 
+import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
+
 const IMAGEN_MODEL = "imagegeneration@006"
 const BASE_PROMPT_SUFFIX = ", photorealistic, editorial photography, warm tones, no text, no logos, cinematic"
 const BRAND_PROMPT_SUFFIX = ", Pacific Northwest aesthetic, terracotta and cream palette, intimate lighting"
@@ -25,8 +27,7 @@ function requireEnv(name: string) {
 }
 
 function createImagenClient() {
-  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
-  const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
+  const credentials = loadGoogleServiceAccountCredentials()
   const location = requireEnv("VERTEX_AI_LOCATION")
 
   return new PredictionServiceClient({

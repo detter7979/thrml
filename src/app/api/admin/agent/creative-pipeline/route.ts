@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Storage } from "@google-cloud/storage"
 
 import { requireAdminApi } from "@/lib/admin-guard"
+import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 
 const PIPELINE_ACTIONS = new Set(["reject_brief", "update_brief", "approve_asset", "reject_asset"])
 
@@ -44,10 +45,9 @@ const BRIEF_FIELDS = [
 ] as const
 
 function storageClient() {
-  const encoded = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
   const bucketName = process.env.GCS_BUCKET_NAME
-  if (!encoded || !bucketName) return null
-  const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || !bucketName) return null
+  const credentials = loadGoogleServiceAccountCredentials()
   return new Storage({ credentials }).bucket(bucketName)
 }
 

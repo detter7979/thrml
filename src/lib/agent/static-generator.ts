@@ -3,6 +3,7 @@ import sharp from "sharp"
 
 import { sendEmail, thrmlEmailWrapper, ctaButton } from "@/lib/emails/send"
 import { generateImagen, type ImagenResult } from "@/lib/agent/imagen"
+import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
@@ -125,8 +126,7 @@ function countBaseImages(generatorCount: number, formatCount: number, requestedV
 }
 
 function createStorageClient() {
-  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
-  const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
+  const credentials = loadGoogleServiceAccountCredentials()
   return new Storage({ credentials })
 }
 
@@ -440,7 +440,7 @@ export async function generateStaticCreatives(options: {
   variations?: StaticVariationCount
 } = {}): Promise<StaticGenerationResult> {
   requireEnv("GCS_BUCKET_NAME")
-  requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
+  loadGoogleServiceAccountCredentials()
 
   const admin = createAdminClient()
   const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)

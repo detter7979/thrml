@@ -2,6 +2,7 @@ import { Storage } from "@google-cloud/storage"
 import { NextRequest, NextResponse } from "next/server"
 
 import { callAgentJson } from "@/lib/agent/claude"
+import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
@@ -157,8 +158,7 @@ async function downloadImage(url: string) {
 }
 
 function createStorageClient() {
-  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
-  const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
+  const credentials = loadGoogleServiceAccountCredentials()
   return new Storage({ credentials })
 }
 
@@ -240,7 +240,7 @@ export async function GET(req: NextRequest) {
   try {
     requireEnv("MIDJOURNEY_API_KEY")
     requireEnv("GCS_BUCKET_NAME")
-    requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    loadGoogleServiceAccountCredentials()
 
     const { data: briefs, error: briefsError } = await admin
       .from("creative_briefs")

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { google } from "googleapis"
 import type { GoogleAuth } from "google-auth-library"
 
+import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 function cronAuth(req: NextRequest) {
@@ -13,18 +14,14 @@ function cronAuth(req: NextRequest) {
 }
 
 function getGoogleAuth(): GoogleAuth | null {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  if (!raw) return null
-  try {
-    const creds = JSON.parse(raw) as Record<string, string>
-    return new google.auth.GoogleAuth({
-      credentials: creds,
-      scopes: [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive.file",
-      ],
-    })
-  } catch { return null }
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null
+  return new google.auth.GoogleAuth({
+    credentials: loadGoogleServiceAccountCredentials(),
+    scopes: [
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/drive.file",
+    ],
+  })
 }
 
 async function getOrCreateSheetId(

@@ -1,6 +1,7 @@
 import { Storage } from "@google-cloud/storage"
 
 import { sendEmail, thrmlEmailWrapper } from "@/lib/emails/send"
+import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const HIGGSFIELD_BASE_URL = "https://platform.higgsfield.ai"
@@ -221,8 +222,7 @@ async function downloadVideo(url: string) {
 }
 
 function createStorageClient() {
-  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
-  const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
+  const credentials = loadGoogleServiceAccountCredentials()
   return new Storage({ credentials })
 }
 
@@ -331,7 +331,7 @@ async function processQueueItem(admin: ReturnType<typeof createAdminClient>, ite
 export async function generateCreativeVariations(options: GenerateCreativeOptions = {}): Promise<CreativeGenerationResult> {
   requireEnv("HIGGSFIELD_API_KEY")
   requireEnv("GCS_BUCKET_NAME")
-  requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
+  loadGoogleServiceAccountCredentials()
 
   const admin = createAdminClient()
   const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)

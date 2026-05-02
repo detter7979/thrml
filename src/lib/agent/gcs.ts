@@ -1,5 +1,7 @@
 import { Storage } from "@google-cloud/storage"
 
+import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
+
 const SIGNED_URL_EXPIRES_MS = 7 * 24 * 60 * 60 * 1000
 const ARCHIVE_PREFIX = "_archive/"
 const GENERATED_BY = "thrml-agent"
@@ -54,8 +56,7 @@ function monthPath(date = new Date()) {
 }
 
 function createStorageClient() {
-  const encoded = requireEnv("GOOGLE_SERVICE_ACCOUNT_JSON")
-  const credentials = JSON.parse(Buffer.from(encoded, "base64").toString("utf-8")) as Record<string, unknown>
+  const credentials = loadGoogleServiceAccountCredentials()
   return new Storage({ credentials })
 }
 

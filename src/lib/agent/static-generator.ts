@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
 const MAX_IMAGE_GENERATIONS_PER_BRIEF = 12
-const BRIEF_TIMEOUT_MS = 300_000
+const BRIEF_TIMEOUT_MS = 240_000
 const VARIATION_LABELS = ["A", "B", "C"] as const
 
 export type StaticGenerator = "imagen" | "replicate" | "both"
@@ -443,7 +443,7 @@ export async function generateStaticCreatives(options: {
   requireEnv("GCS_SERVICE_ACCOUNT_KEY")
 
   const admin = createAdminClient()
-  const limit = Math.min(Math.max(options.limit ?? 3, 1), 3)
+  const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)
   let query = admin
     .from("creative_briefs")
     .select("id")

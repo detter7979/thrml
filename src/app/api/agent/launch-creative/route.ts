@@ -9,7 +9,7 @@ import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-export const maxDuration = 320
+export const maxDuration = 300
 
 const LANDING_URL = "https://usethrml.com"
 const META_GRAPH_BASE = "https://graph.facebook.com/v21.0"

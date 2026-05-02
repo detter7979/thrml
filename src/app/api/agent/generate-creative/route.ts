@@ -5,7 +5,7 @@ import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-export const maxDuration = 900
+export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
   const { error, admin } = await requireAdminApi()
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   try {
     const briefId = typeof body?.brief_id === "string" ? body.brief_id.trim() : ""
     const queueId = typeof body?.queue_id === "string" ? body.queue_id.trim() : ""
-    const limit = typeof body?.limit === "number" ? body.limit : briefId || queueId ? 1 : 5
+    const limit = typeof body?.limit === "number" ? body.limit : briefId || queueId ? 1 : 1
 
     if (briefId) {
       const now = new Date().toISOString()

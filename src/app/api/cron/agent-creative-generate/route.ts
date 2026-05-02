@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-export const maxDuration = 900
+export const maxDuration = 300
 
 const AGENT_NAME = "creative-generate"
 
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const runId = runRow?.id ?? null
 
   try {
-    const results = await generateCreativeVariations({ limit: 5 })
+    const results = await generateCreativeVariations({ limit: 1 })
     const status = results.errors.length > 0 && results.generated === 0 ? "error" : "success"
 
     if (runId) {

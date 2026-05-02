@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 const HIGGSFIELD_BASE_URL = "https://platform.higgsfield.ai"
 const HIGGSFIELD_MODEL_ID = process.env.HIGGSFIELD_MODEL_ID ?? "higgsfield-ai/dop/standard"
 const HIGGSFIELD_POLL_INTERVAL_MS = 30_000
-const HIGGSFIELD_MAX_ATTEMPTS = 20
+const HIGGSFIELD_MAX_ATTEMPTS = 8
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
 
 type CreativeQueueRow = {
@@ -201,7 +201,7 @@ async function pollHiggsfieldRequest(request: HiggsfieldResponse) {
     if (isFailed(status)) throw new Error(`Higgsfield request ${requestId ?? statusUrl} failed with status ${status}`)
   }
 
-  throw new Error(`Higgsfield request ${requestId ?? statusUrl} did not complete within 10 minutes`)
+  throw new Error(`Higgsfield request ${requestId ?? statusUrl} did not complete within 4 minutes`)
 }
 
 async function generateVariation(brief: CreativeBriefRow, variationIndex: number) {
@@ -334,7 +334,7 @@ export async function generateCreativeVariations(options: GenerateCreativeOption
   requireEnv("GCS_SERVICE_ACCOUNT_KEY")
 
   const admin = createAdminClient()
-  const limit = Math.min(Math.max(options.limit ?? 5, 1), 5)
+  const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)
   let query = admin
     .from("creative_queue")
     .select("id, brief_id, status, approved_at")

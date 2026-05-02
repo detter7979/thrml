@@ -33,6 +33,8 @@ export type AgentCallOptions = {
   skill: string
   /** The task prompt to send */
   prompt: string
+  /** Claude model override (default is current Sonnet 4) */
+  model?: string
   /** Max tokens (default 1000) */
   maxTokens?: number
   /** Prior messages for multi-turn (optional) */
@@ -61,7 +63,7 @@ export async function callAgent(opts: AgentCallOptions): Promise<AgentCallResult
 
   try {
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: opts.model ?? "claude-sonnet-4-20250514",
       max_tokens: opts.maxTokens ?? 1000,
       system: systemPrompt,
       messages,

@@ -1,15 +1,23 @@
-const BASE = "https://graph.facebook.com/v22.0"
+export const META_GRAPH_BASE = "https://graph.facebook.com/v22.0"
 
-function token() {
+export function getMetaMarketingApiToken() {
   const t = process.env.META_MARKETING_API_TOKEN
   if (!t) throw new Error("META_MARKETING_API_TOKEN is not set")
   return t
 }
 
-function adAccount() {
+export function getMetaAdAccountId() {
   const id = process.env.META_AD_ACCOUNT_ID
   if (!id) throw new Error("META_AD_ACCOUNT_ID is not set")
   return id
+}
+
+function token() {
+  return getMetaMarketingApiToken()
+}
+
+function adAccount() {
+  return getMetaAdAccountId()
 }
 
 export type MetaInsightRow = {
@@ -36,7 +44,7 @@ function conversionsFromActions(
   if (conversionEvent === "lead") {
     const leadTypes = ["lead", "onsite_conversion.lead_grouped", "offsite_conversion.fb_pixel_lead"]
     let purchases = 0
-    let revenue = 0
+    const revenue = 0
     for (const lt of leadTypes) {
       const a = actions?.find((x) => x.action_type === lt)
       if (a) purchases = Math.max(purchases, Number(a.value ?? 0))
@@ -73,7 +81,7 @@ export async function fetchMetaInsights(
 
   const rows: Record<string, unknown>[] = []
   let url: string | null =
-    `${BASE}/${acct}/insights?fields=${encodeURIComponent(fields)}` +
+    `${META_GRAPH_BASE}/${acct}/insights?fields=${encodeURIComponent(fields)}` +
     `&time_range=${timeRange}&level=ad&access_token=${encodeURIComponent(tok)}&limit=500`
 
   while (url) {
@@ -115,7 +123,7 @@ export async function fetchMetaInsights(
 
 export async function pauseAdSet(adsetId: string): Promise<boolean> {
   const res = await fetch(
-    `${BASE}/${adsetId}?status=PAUSED&access_token=${encodeURIComponent(token())}`,
+    `${META_GRAPH_BASE}/${adsetId}?status=PAUSED&access_token=${encodeURIComponent(token())}`,
     { method: "POST" }
   )
   return res.ok
@@ -123,7 +131,7 @@ export async function pauseAdSet(adsetId: string): Promise<boolean> {
 
 export async function resumeAdSet(adsetId: string): Promise<boolean> {
   const res = await fetch(
-    `${BASE}/${adsetId}?status=ACTIVE&access_token=${encodeURIComponent(token())}`,
+    `${META_GRAPH_BASE}/${adsetId}?status=ACTIVE&access_token=${encodeURIComponent(token())}`,
     { method: "POST" }
   )
   return res.ok
@@ -131,7 +139,7 @@ export async function resumeAdSet(adsetId: string): Promise<boolean> {
 
 export async function pauseAd(adId: string): Promise<boolean> {
   const res = await fetch(
-    `${BASE}/${adId}?status=PAUSED&access_token=${encodeURIComponent(token())}`,
+    `${META_GRAPH_BASE}/${adId}?status=PAUSED&access_token=${encodeURIComponent(token())}`,
     { method: "POST" }
   )
   return res.ok
@@ -139,7 +147,7 @@ export async function pauseAd(adId: string): Promise<boolean> {
 
 export async function resumeAd(adId: string): Promise<boolean> {
   const res = await fetch(
-    `${BASE}/${adId}?status=ACTIVE&access_token=${encodeURIComponent(token())}`,
+    `${META_GRAPH_BASE}/${adId}?status=ACTIVE&access_token=${encodeURIComponent(token())}`,
     { method: "POST" }
   )
   return res.ok
@@ -152,7 +160,7 @@ export async function scaleAdSetBudget(
 ): Promise<boolean> {
   const newBudgetCents = Math.round(currentBudgetDollars * (1 + scalePct) * 100)
   const res = await fetch(
-    `${BASE}/${adsetId}?daily_budget=${newBudgetCents}&access_token=${encodeURIComponent(token())}`,
+    `${META_GRAPH_BASE}/${adsetId}?daily_budget=${newBudgetCents}&access_token=${encodeURIComponent(token())}`,
     { method: "POST" }
   )
   return res.ok
@@ -164,7 +172,7 @@ export async function duplicateAdSet(adsetId: string): Promise<string | null> {
     deep_copy: "true",
     status_option: "PAUSED",
   })
-  const res = await fetch(`${BASE}/${adsetId}/copies?${params.toString()}`, {
+  const res = await fetch(`${META_GRAPH_BASE}/${adsetId}/copies?${params.toString()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({}),
@@ -176,7 +184,7 @@ export async function duplicateAdSet(adsetId: string): Promise<string | null> {
 
 export async function fetchMarketingObjectStatus(objectId: string): Promise<string | null> {
   const res = await fetch(
-    `${BASE}/${objectId}?fields=effective_status,status&access_token=${encodeURIComponent(token())}`
+    `${META_GRAPH_BASE}/${objectId}?fields=effective_status,status&access_token=${encodeURIComponent(token())}`
   )
   if (!res.ok) return null
   const json = (await res.json()) as { effective_status?: string; status?: string }
@@ -188,7 +196,7 @@ export async function fetchActiveAdSets(): Promise<
 > {
   const fields = "id,name,daily_budget,campaign_id,effective_status"
   const url =
-    `${BASE}/${adAccount()}/adsets?fields=${encodeURIComponent(fields)}` +
+    `${META_GRAPH_BASE}/${adAccount()}/adsets?fields=${encodeURIComponent(fields)}` +
     `&access_token=${encodeURIComponent(token())}&limit=200`
   const res = await fetch(url)
   if (!res.ok) return []

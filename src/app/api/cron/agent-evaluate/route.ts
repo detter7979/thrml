@@ -15,7 +15,7 @@ import {
   pauseAdSet,
   scaleAdSetBudget,
 } from "@/lib/agent/meta-api"
-import { evaluateInsights, type AgentConfig, type RegistryAdset } from "@/lib/agent/decision-engine"
+import { evaluateInsights, type AgentConfig, type Decision, type RegistryAdset } from "@/lib/agent/decision-engine"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 function yesterday() {
@@ -48,6 +48,85 @@ function extractConcept(name: string) {
   if (lower.includes("biohack")) return "Biohack"
   if (lower.includes("host")) return "HostEarn"
   return "SocialProof"
+}
+
+function parseCampaignShortName(name: string | null | undefined) {
+  const trimmed = (name ?? "").trim()
+  if (!trimmed) return null
+
+  const [shortName] = trimmed.split(/\s*(?:\||::|--| - |\/)\s*/)
+  return (shortName || trimmed).trim().slice(0, 80)
+}
+
+function daysActiveFrom(createdAt: unknown) {
+  if (!createdAt) return null
+  const created = new Date(String(createdAt))
+  if (Number.isNaN(created.getTime())) return null
+  return Math.max(0, Math.floor((Date.now() - created.getTime()) / 86400000))
+}
+
+function formatMoney(value: number) {
+  return Number.isFinite(value) ? value.toFixed(2) : "∞"
+}
+
+function formatRatio(cpa: number, targetCpa: number) {
+  if (!Number.isFinite(cpa) || !Number.isFinite(targetCpa) || targetCpa <= 0) return "∞"
+  return (cpa / targetCpa).toFixed(2)
+}
+
+function buildDecisionCreativeBrief(
+  decision: Decision,
+  context: { campaignName?: string | null; createdAt?: unknown }
+) {
+  if (decision.entity_type !== "adset") return null
+
+  const reason = decision.rule_triggered ?? ""
+  const cpa = decision.cpa_at_decision
+  const spend = decision.spend_at_decision
+  const targetCpa = decision.target_cpa
+  const ratio = formatRatio(cpa, targetCpa)
+  const campaignShortName = parseCampaignShortName(context.campaignName)
+  const format = decision.platform === "meta" ? "VID" : "RSA"
+
+  if (decision.action_taken === "PAUSED" && reason.includes("CPA")) {
+    return {
+      trigger_type: "fatigue",
+      trigger_data: {
+        adset_id: decision.entity_id,
+        adset_name: decision.entity_name,
+        cpa,
+        spend,
+        target_cpa: targetCpa,
+        days_active: daysActiveFrom(context.createdAt),
+      },
+      campaign_short_name: campaignShortName,
+      rationale: `Ad set ${decision.entity_name} paused at CPA $${formatMoney(cpa)} (${ratio}× target). Need new angle.`,
+      status: "pending",
+    }
+  }
+
+  const lowerReason = reason.toLowerCase()
+  if (
+    decision.action_taken === "SCALED" &&
+    (lowerReason.includes("winner") || lowerReason.includes("scale threshold"))
+  ) {
+    return {
+      trigger_type: "winner_variation",
+      trigger_data: {
+        adset_id: decision.entity_id,
+        adset_name: decision.entity_name,
+        cpa,
+        spend,
+        hook: extractConcept(decision.entity_name),
+        format,
+      },
+      campaign_short_name: campaignShortName,
+      rationale: `Ad set ${decision.entity_name} hit CPA $${formatMoney(cpa)} (${ratio}× target). Generate 3 variations of winning angle.`,
+      status: "pending",
+    }
+  }
+
+  return null
 }
 
 function generateHookSuggestion(rule: string) {
@@ -105,8 +184,8 @@ export async function GET(req: NextRequest) {
   const runId = runRow?.id ?? null
 
   const results = {
-    meta: { decisions: 0, actions: 0, errors: 0 },
-    google: { decisions: 0, actions: 0, errors: 0 },
+    meta: { decisions: 0, actions: 0, briefs: 0, errors: 0 },
+    google: { decisions: 0, actions: 0, briefs: 0, errors: 0 },
   }
 
   const { data: configs } = await supabase
@@ -165,7 +244,7 @@ export async function GET(req: NextRequest) {
       let registryQuery = supabase
         .from("adset_registry")
         .select(
-          `platform_id, target_cpa_override, warm_up_until, ab_test_generation, daily_budget,
+          `platform_id, target_cpa_override, warm_up_until, ab_test_generation, daily_budget, created_at,
            funnel_stage, goal_type, consecutive_warn_days, consecutive_reduce_days,
            last_warn_date, last_reduce_date,
            campaign_registry!inner(campaign_type, goal_type)`
@@ -224,6 +303,47 @@ export async function GET(req: NextRequest) {
 
       const decisions = evaluateInsights(filteredInsights, agentCfg, registryAdsets)
       results[platform].decisions += decisions.length
+
+      const insightContextByAdset = new Map<
+        string,
+        { campaignName: string | null; createdAt: unknown }
+      >()
+      const registryMetaByAdset = new Map(
+        ((registryRows ?? []) as Record<string, unknown>[]).map((row) => [
+          String(row.platform_id ?? ""),
+          { createdAt: row.created_at },
+        ])
+      )
+      for (const insight of filteredInsights) {
+        if (!insightContextByAdset.has(insight.adset_id)) {
+          insightContextByAdset.set(insight.adset_id, {
+            campaignName: insight.campaign_name || null,
+            createdAt: registryMetaByAdset.get(insight.adset_id)?.createdAt,
+          })
+        }
+      }
+
+      const briefRows = decisions
+        .map((decision) =>
+          buildDecisionCreativeBrief(
+            decision,
+            insightContextByAdset.get(decision.entity_id) ?? {
+              campaignName: null,
+              createdAt: registryMetaByAdset.get(decision.entity_id)?.createdAt,
+            }
+          )
+        )
+        .filter((row): row is NonNullable<typeof row> => row != null)
+
+      if (briefRows.length) {
+        const { error: briefError } = await supabase.from("creative_briefs").insert(briefRows)
+        if (briefError) {
+          results[platform].errors++
+          console.error("[agent-evaluate] creative_briefs insert failed", briefError)
+        } else {
+          results[platform].briefs += briefRows.length
+        }
+      }
 
       for (const decision of decisions) {
         let executed = false

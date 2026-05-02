@@ -50,6 +50,7 @@ type MetaAdset = {
 }
 type CreativePipelineData = {
   briefs: CreativeBrief[]
+  generatingBriefs: CreativeBrief[]
   generatedAssets: CreativeAsset[]
   launchedAssets: CreativeAsset[]
   activeMetaAdsets: MetaAdset[]
@@ -347,6 +348,7 @@ export default function AgentsDashboard() {
   const criticalCount = alerts.filter(a => a.severity === "CRITICAL").length
   const latestFinance = finance[0]
   const briefs = useMemo(() => pipeline?.briefs ?? [], [pipeline?.briefs])
+  const generatingBriefs = useMemo(() => pipeline?.generatingBriefs ?? [], [pipeline?.generatingBriefs])
   const generatedAssets = useMemo(() => pipeline?.generatedAssets ?? [], [pipeline?.generatedAssets])
   const launchedAssets = useMemo(() => pipeline?.launchedAssets ?? [], [pipeline?.launchedAssets])
   const metaAdsets = useMemo(() => pipeline?.activeMetaAdsets ?? [], [pipeline?.activeMetaAdsets])
@@ -362,6 +364,7 @@ export default function AgentsDashboard() {
       assets: assets.slice(0, 6),
     }))
   }, [generatedAssets])
+  const variationReadyCount = generatingBriefs.length + assetsByBrief.length
   const activeLaunchAssets = launchAssetIds
     .map((id) => generatedAssets.find((asset) => asset.id === id))
     .filter((asset): asset is CreativeAsset => Boolean(asset))
@@ -371,7 +374,7 @@ export default function AgentsDashboard() {
     { key: "queue", label: `Content Queue${queue.length > 0 ? ` (${queue.length})` : ""}` },
     { key: "inbox", label: `Inbox Drafts${drafts.length > 0 ? ` (${drafts.length})` : ""}` },
     { key: "finance", label: "Finance" },
-    { key: "creative", label: `Creative Pipeline${briefs.length + assetsByBrief.length > 0 ? ` (${briefs.length + assetsByBrief.length})` : ""}` },
+    { key: "creative", label: `Creative Pipeline${briefs.length + variationReadyCount > 0 ? ` (${briefs.length + variationReadyCount})` : ""}` },
   ] as const
 
   if (loading) return <div className="p-8 text-sm text-muted-foreground">Loading agent dashboard...</div>
@@ -641,14 +644,40 @@ export default function AgentsDashboard() {
 
             <section className="rounded-xl border bg-card p-4">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                Variations Ready ({assetsByBrief.length})
+                Variations Ready ({variationReadyCount})
               </h2>
               <div className="space-y-3">
                 {pipelineLoading ? (
                   <p className="text-sm text-muted-foreground">Loading variations...</p>
-                ) : assetsByBrief.length === 0 ? (
+                ) : variationReadyCount === 0 ? (
                   <p className="text-sm text-muted-foreground">No creative variations are ready.</p>
-                ) : assetsByBrief.map((group) => {
+                ) : (
+                  <>
+                    {generatingBriefs.map((brief) => (
+                      <div key={brief.id} className="rounded-lg border p-3 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded">{brief.format ?? "format"}</span>
+                            <span className="text-[11px] text-muted-foreground">Generating variations</span>
+                          </div>
+                          <span className="h-4 w-4 rounded-full border-2 border-muted border-t-foreground animate-spin" aria-label="Generating" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{shortText(brief.copy_headline ?? brief.hook, 140)}</p>
+                          <p className="text-xs text-muted-foreground">{shortText(brief.hypothesis, 140)}</p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-3">
+                          {[0, 1, 2].map((index) => (
+                            <div key={index} className="rounded-md border bg-background p-2 space-y-2 animate-pulse">
+                              <div className="aspect-video rounded bg-muted" />
+                              <div className="h-3 w-3/4 rounded bg-muted" />
+                              <div className="h-7 rounded bg-muted" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {assetsByBrief.map((group) => {
                   const selected = selectedForBrief(group.briefId)
                   const selectedApproved = selected.filter((asset) => asset.status === "approved")
                   return (
@@ -732,7 +761,9 @@ export default function AgentsDashboard() {
                       </div>
                     </div>
                   )
-                })}
+                    })}
+                  </>
+                )}
               </div>
             </section>
 

@@ -164,6 +164,30 @@ export async function GET() {
     briefs.error ?? generatedAssets.error ?? launchedAssets.error ?? adsets.error
   if (firstError) return NextResponse.json({ error: firstError.message }, { status: 500 })
 
+  const approvedBriefs = await admin!
+    .from("creative_briefs")
+    .select("*")
+    .in("status", ["approved", "generating"])
+    .not("approved_at", "is", null)
+    .order("approved_at", { ascending: false })
+    .limit(50)
+
+  if (approvedBriefs.error) return NextResponse.json({ error: approvedBriefs.error.message }, { status: 500 })
+
+  const approvedBriefIds = (approvedBriefs.data ?? []).map((brief) => brief.id).filter(Boolean)
+  const assetBriefIds = new Set<string>()
+  if (approvedBriefIds.length > 0) {
+    const assetLinks = await admin!
+      .from("creative_assets")
+      .select("brief_id")
+      .in("brief_id", approvedBriefIds)
+
+    if (assetLinks.error) return NextResponse.json({ error: assetLinks.error.message }, { status: 500 })
+    for (const asset of assetLinks.data ?? []) {
+      if (asset.brief_id) assetBriefIds.add(asset.brief_id)
+    }
+  }
+
   const activeMetaAdsets = (adsets.data ?? []).filter((adset) =>
     String(adset.status ?? "").toLowerCase() === "active"
   )
@@ -173,6 +197,7 @@ export async function GET() {
 
   return NextResponse.json({
     briefs: briefs.data ?? [],
+    generatingBriefs: (approvedBriefs.data ?? []).filter((brief) => !assetBriefIds.has(brief.id)),
     generatedAssets: signedGeneratedAssets,
     launchedAssets: launchedWithInsights,
     activeMetaAdsets,

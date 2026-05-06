@@ -238,10 +238,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    requireEnv("MIDJOURNEY_API_KEY")
-    requireEnv("GCS_BUCKET_NAME")
-    loadGoogleServiceAccountCredentials()
-
     const { data: briefs, error: briefsError } = await admin
       .from("creative_briefs")
       .select("id, trigger_type, trigger_data, status")
@@ -250,6 +246,25 @@ export async function GET(req: NextRequest) {
       .limit(3)
 
     if (briefsError) throw briefsError
+    if (!briefs?.length) {
+      if (runId) {
+        await admin
+          .from("agent_runs")
+          .update({
+            status: "success",
+            completed_at: new Date().toISOString(),
+            duration_ms: Date.now() - runStart,
+            results,
+            error_message: null,
+          })
+          .eq("id", runId)
+      }
+      return NextResponse.json({ ok: true, ...results })
+    }
+
+    requireEnv("MIDJOURNEY_API_KEY")
+    requireEnv("GCS_BUCKET_NAME")
+    loadGoogleServiceAccountCredentials()
 
     for (const brief of (briefs ?? []) as CreativeBriefRow[]) {
       results.processed++

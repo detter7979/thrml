@@ -439,9 +439,6 @@ export async function generateStaticCreatives(options: {
   formats?: StaticFormat[]
   variations?: StaticVariationCount
 } = {}): Promise<StaticGenerationResult> {
-  requireEnv("GCS_BUCKET_NAME")
-  loadGoogleServiceAccountCredentials()
-
   const admin = createAdminClient()
   const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)
   let query = admin
@@ -463,6 +460,11 @@ export async function generateStaticCreatives(options: {
     queued: briefs?.length ?? 0,
     errors: [],
   }
+
+  if (!briefs?.length) return result
+
+  requireEnv("GCS_BUCKET_NAME")
+  loadGoogleServiceAccountCredentials()
 
   for (const brief of (briefs ?? []) as Array<{ id: string }>) {
     result.processed++

@@ -604,8 +604,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, date, results })
-
   if (runId) await supabase.from("agent_runs").update({
     status: "success", completed_at: new Date().toISOString(),
     duration_ms: Date.now() - runStart, results,

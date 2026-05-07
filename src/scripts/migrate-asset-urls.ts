@@ -1,5 +1,9 @@
+import { loadEnvConfig } from "@next/env"
+
 import { normalizeCreativeAssetGcsPath, refreshCreativeAssetUrl } from "../lib/agent/gcs"
 import { createAdminClient } from "../lib/supabase/admin"
+
+loadEnvConfig(process.cwd())
 
 type CreativeAssetRow = {
   id: string

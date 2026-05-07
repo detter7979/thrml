@@ -62,12 +62,26 @@ function pathPrefix() {
 }
 
 function loadCredentials() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim()
   if (!raw) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not configured")
+
+  const parseJson = (value: string) => {
+    const parsed = JSON.parse(value)
+    return typeof parsed === "string" ? JSON.parse(parsed) : parsed
+  }
+
   try {
-    return JSON.parse(raw)
-  } catch {
-    return JSON.parse(Buffer.from(raw, "base64").toString("utf8"))
+    return parseJson(raw)
+  } catch (jsonErr) {
+    try {
+      return parseJson(Buffer.from(raw, "base64").toString("utf8").trim())
+    } catch (base64Err) {
+      const jsonMessage = jsonErr instanceof Error ? jsonErr.message : String(jsonErr)
+      const base64Message = base64Err instanceof Error ? base64Err.message : String(base64Err)
+      throw new Error(
+        `GOOGLE_SERVICE_ACCOUNT_JSON must be valid service account JSON or base64-encoded JSON. JSON parse failed: ${jsonMessage}; base64 parse failed: ${base64Message}`
+      )
+    }
   }
 }
 

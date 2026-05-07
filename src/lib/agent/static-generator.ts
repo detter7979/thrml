@@ -1,9 +1,8 @@
-import { Storage } from "@google-cloud/storage"
 import sharp from "sharp"
 
+import { uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
 import { sendEmail, thrmlEmailWrapper, ctaButton } from "@/lib/emails/send"
 import { generateImagen } from "@/lib/agent/imagen"
-import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
@@ -30,6 +29,7 @@ type CreativeBriefRow = {
   cta: string | null
   hook: string | null
   format: string | null
+  campaign_short_name: string | null
 }
 
 type BaseImage = {
@@ -68,10 +68,6 @@ function requireEnv(name: string) {
   const value = process.env[name]
   if (!value) throw new Error(`${name} is not configured`)
   return value
-}
-
-function monthPath() {
-  return new Date().toISOString().slice(0, 7)
 }
 
 function escapeHtml(value: string) {
@@ -123,11 +119,6 @@ function dimensionsForFormat(format: StaticFormat) {
 function countBaseImages(generatorCount: number, formatCount: number, requestedVariations: number) {
   const capPerPair = Math.floor(MAX_IMAGE_GENERATIONS_PER_BRIEF / Math.max(generatorCount * formatCount, 1))
   return Math.max(1, Math.min(requestedVariations, capPerPair))
-}
-
-function createStorageClient() {
-  const credentials = loadGoogleServiceAccountCredentials()
-  return new Storage({ credentials })
 }
 
 async function readError(res: Response) {
@@ -288,23 +279,13 @@ export async function compositeStatic(opts: CompositeStaticOptions) {
 }
 
 export async function uploadCreativeAsset(buffer: Buffer, briefId: string, format: StaticFormat, variationLabel: string) {
-  const bucketName = requireEnv("GCS_BUCKET_NAME")
-  const storage = createStorageClient()
-  const objectPath = `${monthPath()}/${briefId}/static_${format}_${sanitizeFilename(variationLabel)}.png`
-  const file = storage.bucket(bucketName).file(objectPath)
-
-  await file.save(buffer, {
+  return uploadGcsCreativeAsset(buffer, {
+    campaignShortName: briefId,
+    briefId,
+    kind: "static",
+    filename: `static_${format}_${sanitizeFilename(variationLabel)}.png`,
     contentType: "image/png",
-    resumable: false,
-    metadata: {
-      cacheControl: "public, max-age=31536000, immutable",
-    },
   })
-
-  return {
-    gcsPath: `${bucketName}/${objectPath}`,
-    gcsUrl: `https://storage.googleapis.com/${bucketName}/${objectPath}`,
-  }
 }
 
 async function sendReadyEmail(count: number, brief: CreativeBriefRow) {
@@ -329,7 +310,7 @@ async function sendReadyEmail(count: number, brief: CreativeBriefRow) {
 async function getBrief(admin: ReturnType<typeof createAdminClient>, briefId: string) {
   const { data, error } = await admin
     .from("creative_briefs")
-    .select("id, trigger_data, status, approved_at, visual_direction, copy_primary, copy_headline, copy_subtext, cta, hook, format")
+    .select("id, trigger_data, status, approved_at, visual_direction, copy_primary, copy_headline, copy_subtext, cta, hook, format, campaign_short_name")
     .eq("id", briefId)
     .maybeSingle()
 
@@ -374,12 +355,13 @@ async function processStaticBriefInner(
           copySubtext: brief.copy_subtext,
           cta: brief.cta,
         })
-        const { gcsPath, gcsUrl } = await uploadCreativeAsset(
-          composite,
-          brief.id,
-          format,
-          `${baseImage.generationTool}_${baseImage.sourceIndex}_${variationLabel}`
-        )
+        const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
+          campaignShortName: brief.campaign_short_name ?? brief.id,
+          briefId: brief.id,
+          kind: "static",
+          filename: `static_${format}_${sanitizeFilename(`${baseImage.generationTool}_${baseImage.sourceIndex}_${variationLabel}`)}.png`,
+          contentType: "image/png",
+        })
 
         const { error: insertError } = await admin.from("creative_assets").insert({
           brief_id: brief.id,
@@ -464,7 +446,6 @@ export async function generateStaticCreatives(options: {
   if (!briefs?.length) return result
 
   requireEnv("GCS_BUCKET_NAME")
-  loadGoogleServiceAccountCredentials()
 
   for (const brief of (briefs ?? []) as Array<{ id: string }>) {
     result.processed++

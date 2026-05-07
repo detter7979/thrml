@@ -38,6 +38,7 @@ type CreativeBrief = {
 }
 type CreativeAsset = {
   id: string; brief_id: string | null; asset_type: string | null; gcs_url: string | null
+  gcs_path?: string | null
   status: string | null; performance_data: Record<string, unknown> | null
   variation_index: number | null; approved_at: string | null; launched_at: string | null
   meta_adset_id: string | null; meta_ad_id?: string | null; generation_tool?: string | null
@@ -342,6 +343,25 @@ export default function AgentsDashboard() {
     } finally {
       setLaunchProgress(null)
       setBusyAction(null)
+    }
+  }
+
+  const refreshAssetUrl = async (asset: CreativeAsset, img: HTMLImageElement) => {
+    if (img.dataset.refreshing === "true" || img.dataset.refreshed === "true") return
+    img.dataset.refreshing = "true"
+    img.dataset.refreshed = "true"
+    try {
+      const res = await fetch("/api/admin/agent/refresh-asset-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetId: asset.id }),
+      })
+      if (res.ok) {
+        const { gcsUrl } = (await res.json()) as { gcsUrl?: string }
+        if (gcsUrl) img.src = gcsUrl
+      }
+    } finally {
+      img.dataset.refreshing = "false"
     }
   }
 
@@ -699,7 +719,14 @@ export default function AgentsDashboard() {
                                 isVideoAsset(asset) ? (
                                   <video src={assetUrl(asset)} className="h-full w-full object-cover" muted />
                                 ) : (
-                                  <img src={assetUrl(asset)} alt="Creative asset" className="h-full w-full object-cover" />
+                                  <img
+                                    src={assetUrl(asset)}
+                                    alt="Creative asset"
+                                    className="h-full w-full object-cover"
+                                    onError={(event) => {
+                                      void refreshAssetUrl(asset, event.currentTarget)
+                                    }}
+                                  />
                                 )
                               ) : (
                                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
@@ -796,7 +823,14 @@ export default function AgentsDashboard() {
                           isVideoAsset(asset) ? (
                             <video src={assetUrl(asset)} className="h-full w-full object-cover" muted />
                           ) : (
-                            <img src={assetUrl(asset)} alt="Launched creative" className="h-full w-full object-cover" />
+                            <img
+                              src={assetUrl(asset)}
+                              alt="Launched creative"
+                              className="h-full w-full object-cover"
+                              onError={(event) => {
+                                void refreshAssetUrl(asset, event.currentTarget)
+                              }}
+                            />
                           )
                         ) : null}
                         </div>
@@ -911,7 +945,14 @@ export default function AgentsDashboard() {
               {isVideoAsset(viewingAsset) ? (
                 <video src={assetUrl(viewingAsset)} className="max-h-[75vh] w-full object-contain" controls />
               ) : (
-                <img src={assetUrl(viewingAsset)} alt="Creative asset full preview" className="max-h-[75vh] w-full object-contain" />
+                <img
+                  src={assetUrl(viewingAsset)}
+                  alt="Creative asset full preview"
+                  className="max-h-[75vh] w-full object-contain"
+                  onError={(event) => {
+                    void refreshAssetUrl(viewingAsset, event.currentTarget)
+                  }}
+                />
               )}
             </div>
           </div>

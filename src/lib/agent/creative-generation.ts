@@ -1,7 +1,5 @@
-import { Storage } from "@google-cloud/storage"
-
+import { uploadCreativeAsset } from "@/lib/agent/gcs"
 import { sendEmail, thrmlEmailWrapper } from "@/lib/emails/send"
-import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const HIGGSFIELD_BASE_URL = "https://platform.higgsfield.ai"
@@ -21,6 +19,7 @@ type CreativeBriefRow = {
   id: string
   visual_direction: string | null
   reference_image_urls: string[] | null
+  campaign_short_name: string | null
 }
 
 type HiggsfieldResponse = Record<string, unknown>
@@ -42,10 +41,6 @@ function requireEnv(name: string) {
   const value = process.env[name]
   if (!value) throw new Error(`${name} is not configured`)
   return value
-}
-
-function monthPath() {
-  return new Date().toISOString().slice(0, 7)
 }
 
 function sleep(ms: number) {
@@ -221,31 +216,6 @@ async function downloadVideo(url: string) {
   return Buffer.from(await res.arrayBuffer())
 }
 
-function createStorageClient() {
-  const credentials = loadGoogleServiceAccountCredentials()
-  return new Storage({ credentials })
-}
-
-async function uploadVideo(buffer: Buffer, briefId: string, variationIndex: number) {
-  const bucketName = requireEnv("GCS_BUCKET_NAME")
-  const storage = createStorageClient()
-  const objectPath = `${monthPath()}/${briefId}/higgsfield_${variationIndex}.mp4`
-  const file = storage.bucket(bucketName).file(objectPath)
-
-  await file.save(buffer, {
-    contentType: "video/mp4",
-    resumable: false,
-    metadata: {
-      cacheControl: "public, max-age=31536000, immutable",
-    },
-  })
-
-  return {
-    gcsPath: `${bucketName}/${objectPath}`,
-    gcsUrl: `https://storage.googleapis.com/${bucketName}/${objectPath}`,
-  }
-}
-
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
@@ -281,7 +251,7 @@ async function processQueueItem(admin: ReturnType<typeof createAdminClient>, ite
 
   const { data: brief, error: briefError } = await admin
     .from("creative_briefs")
-    .select("id, visual_direction, reference_image_urls")
+    .select("id, visual_direction, reference_image_urls, campaign_short_name")
     .eq("id", item.brief_id)
     .maybeSingle()
 
@@ -296,7 +266,13 @@ async function processQueueItem(admin: ReturnType<typeof createAdminClient>, ite
 
   for (const variation of variations) {
     const videoBuffer = await downloadVideo(variation.videoUrl)
-    const { gcsUrl, gcsPath } = await uploadVideo(videoBuffer, creativeBrief.id, variation.variationIndex)
+    const { gcsUrl, gcsPath } = await uploadCreativeAsset(videoBuffer, {
+      campaignShortName: creativeBrief.campaign_short_name ?? creativeBrief.id,
+      briefId: creativeBrief.id,
+      kind: "video",
+      filename: `higgsfield_${variation.variationIndex}.mp4`,
+      contentType: "video/mp4",
+    })
 
     const { error: insertError } = await admin.from("creative_assets").insert({
       brief_id: creativeBrief.id,
@@ -331,7 +307,6 @@ async function processQueueItem(admin: ReturnType<typeof createAdminClient>, ite
 export async function generateCreativeVariations(options: GenerateCreativeOptions = {}): Promise<CreativeGenerationResult> {
   requireEnv("HIGGSFIELD_API_KEY")
   requireEnv("GCS_BUCKET_NAME")
-  loadGoogleServiceAccountCredentials()
 
   const admin = createAdminClient()
   const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)

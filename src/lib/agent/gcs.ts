@@ -53,6 +53,14 @@ function monthPath(date = new Date()) {
   return date.toISOString().slice(0, 7)
 }
 
+function pathPrefix() {
+  return (process.env.GCS_PATH_PREFIX ?? "")
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .join("/")
+}
+
 function loadCredentials() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
   if (!raw) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not configured")
@@ -87,17 +95,33 @@ function publicUrl(bucketName: string, objectPath: string) {
 }
 
 function parseGcsPath(gcsPath: string) {
-  const match = /^gs:\/\/([^/]+)\/(.+)$/.exec(gcsPath)
+  const match = /^gs:\/\/([^/]+)\/(.+)$/.exec(gcsPath) ?? /^([^/]+)\/(.+)$/.exec(gcsPath)
   if (!match) throw new Error(`Invalid GCS path: ${gcsPath}`)
   return { bucketName: match[1], objectPath: match[2] }
 }
 
+export function normalizeCreativeAssetGcsPath(gcsPath: string) {
+  const { bucketName, objectPath } = parseGcsPath(gcsPath)
+  return `gs://${bucketName}/${objectPath}`
+}
+
 async function signedReadUrl(file: ReturnType<ReturnType<typeof getBucket>["file"]>) {
   const [url] = await file.getSignedUrl({
+    version: "v4",
     action: "read",
     expires: Date.now() + SIGNED_URL_EXPIRES_MS,
   })
   return url
+}
+
+export async function refreshCreativeAssetUrl(gcsPath: string) {
+  const { bucketName, objectPath } = parseGcsPath(gcsPath)
+  const configuredBucket = requireEnv("GCS_BUCKET_NAME")
+  if (bucketName !== configuredBucket) {
+    throw new Error(`GCS path bucket ${bucketName} does not match configured bucket ${configuredBucket}`)
+  }
+
+  return signedReadUrl(getBucket().file(objectPath))
 }
 
 export async function downloadCreativeAsset(gcsPath: string): Promise<DownloadedCreativeAsset> {
@@ -136,7 +160,8 @@ function assetCreatedAt(fileMetadata: Record<string, unknown>) {
 
 function isBriefAsset(objectPath: string, briefId: string) {
   const parts = objectPath.split("/")
-  return /^\d{4}-\d{2}$/.test(parts[0] ?? "") && parts[2] === briefId && parts.length >= 5
+  const monthIndex = parts.findIndex((part) => /^\d{4}-\d{2}$/.test(part))
+  return monthIndex >= 0 && parts[monthIndex + 2] === briefId && parts.length >= monthIndex + 5
 }
 
 export async function uploadCreativeAsset(
@@ -145,13 +170,15 @@ export async function uploadCreativeAsset(
 ): Promise<UploadedCreativeAsset> {
   const bucket = getBucket()
   const bucketName = bucket.name
-  const objectPath = [
+  const prefix = pathPrefix()
+  const objectParts = [
     monthPath(),
     pathSegment(opts.campaignShortName, "campaignShortName"),
     pathSegment(opts.briefId, "briefId"),
     kindFolder(opts.kind),
     pathSegment(opts.filename, "filename"),
-  ].join("/")
+  ]
+  const objectPath = prefix ? [prefix, ...objectParts].join("/") : objectParts.join("/")
   const file = bucket.file(objectPath)
   const createdAt = new Date().toISOString()
 

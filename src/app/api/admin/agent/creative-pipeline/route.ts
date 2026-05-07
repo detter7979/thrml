@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Storage } from "@google-cloud/storage"
 
+import { refreshCreativeAssetUrl } from "@/lib/agent/gcs"
 import { requireAdminApi } from "@/lib/admin-guard"
-import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 
 const PIPELINE_ACTIONS = new Set(["reject_brief", "update_brief", "approve_asset", "reject_asset"])
 
@@ -44,34 +43,12 @@ const BRIEF_FIELDS = [
   "success_criteria",
 ] as const
 
-function storageClient() {
-  const bucketName = process.env.GCS_BUCKET_NAME
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || !bucketName) return null
-  const credentials = loadGoogleServiceAccountCredentials()
-  return new Storage({ credentials }).bucket(bucketName)
-}
-
-function objectPathFor(asset: CreativeAssetRow) {
-  if (asset.gcs_path?.startsWith("gs://")) {
-    const [, rest] = asset.gcs_path.replace("gs://", "").split(/\/(.+)/)
-    return rest
-  }
-  return null
-}
-
 async function withSignedUrls<T extends CreativeAssetRow>(assets: T[]) {
-  const bucket = storageClient()
-  if (!bucket) return assets
-
   return Promise.all(
     assets.map(async (asset) => {
-      const objectPath = objectPathFor(asset)
-      if (!objectPath) return asset
+      if (!asset.gcs_path) return asset
       try {
-        const [signedUrl] = await bucket.file(objectPath).getSignedUrl({
-          action: "read",
-          expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-        })
+        const signedUrl = await refreshCreativeAssetUrl(asset.gcs_path)
         return { ...asset, signed_url: signedUrl }
       } catch {
         return asset

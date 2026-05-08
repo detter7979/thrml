@@ -426,7 +426,7 @@ export async function generateStaticCreatives(options: {
   let query = admin
     .from("creative_briefs")
     .select("id")
-    .eq("status", "briefed")
+    .in("status", ["approved", "briefed"])
     .not("approved_at", "is", null)
     .order("created_at", { ascending: true })
     .limit(limit)

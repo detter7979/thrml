@@ -614,51 +614,84 @@ export default function AgentsDashboard() {
                   <p className="text-sm text-muted-foreground">Loading briefs...</p>
                 ) : briefs.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No briefs awaiting approval.</p>
-                ) : briefs.map((brief) => (
-                  <div key={brief.id} className="rounded-lg border p-3 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono uppercase bg-muted px-2 py-0.5 rounded">
-                        {triggerLabel(brief.trigger_type)}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground">{timeAgo(brief.created_at)}</span>
+                ) : briefs.map((brief) => {
+                  const isPendingExpansion = brief.status === "pending"
+                  const canApproveBrief = Boolean(brief.visual_direction?.trim())
+
+                  return (
+                    <div key={brief.id} className="rounded-lg border p-3 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-mono uppercase bg-muted px-2 py-0.5 rounded">
+                            {triggerLabel(brief.trigger_type)}
+                          </span>
+                          <span className="text-[11px] font-mono uppercase bg-muted px-2 py-0.5 rounded">
+                            {brief.status ?? "pending"}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground">{timeAgo(brief.created_at)}</span>
+                      </div>
+
+                      {isPendingExpansion ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-medium">Brief is being expanded by agent...</p>
+                            <span className="h-4 w-4 rounded-full border-2 border-muted border-t-foreground animate-spin" aria-label="Expanding brief" />
+                          </div>
+                          <div className="space-y-2 animate-pulse">
+                            <div className="h-3 w-2/3 rounded bg-muted" />
+                            <div className="h-3 w-full rounded bg-muted" />
+                            <div className="h-3 w-5/6 rounded bg-muted" />
+                            <div className="h-8 rounded bg-muted" />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-1">
+                            <p className="text-[11px] text-muted-foreground">Hook</p>
+                            <p className="text-sm font-medium">{shortText(brief.hook, 140)}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[11px] text-muted-foreground">Hypothesis</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{shortText(brief.hypothesis, 180)}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Audience: {shortText(brief.target_audience, 120)}</p>
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <span className="rounded bg-muted px-2 py-0.5 font-mono">{brief.format ?? "format"}</span>
+                            <span>{Number((brief.success_criteria?.variations as number | undefined) ?? 3)} variations</span>
+                          </div>
+                          {!canApproveBrief ? (
+                            <p className="rounded-md bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                              Add a visual direction before approval so the static generator has an image prompt.
+                            </p>
+                          ) : null}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setEditBrief(briefEditorState(brief))}
+                              className="flex-1 text-xs px-3 py-1.5 border rounded hover:bg-muted"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => approveBrief(brief.id)}
+                              disabled={!canApproveBrief || busyAction === `approve-brief-${brief.id}`}
+                              className="flex-1 text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => rejectBrief(brief.id)}
+                              disabled={busyAction === `reject-brief-${brief.id}`}
+                              className="flex-1 text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-[11px] text-muted-foreground">Hook</p>
-                      <p className="text-sm font-medium">{shortText(brief.hook, 140)}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[11px] text-muted-foreground">Hypothesis</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{shortText(brief.hypothesis, 180)}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Audience: {shortText(brief.target_audience, 120)}</p>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="rounded bg-muted px-2 py-0.5 font-mono">{brief.format ?? "format"}</span>
-                      <span>{Number((brief.success_criteria?.variations as number | undefined) ?? 3)} variations</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setEditBrief(briefEditorState(brief))}
-                        className="flex-1 text-xs px-3 py-1.5 border rounded hover:bg-muted"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => approveBrief(brief.id)}
-                        disabled={busyAction === `approve-brief-${brief.id}`}
-                        className="flex-1 text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => rejectBrief(brief.id)}
-                        disabled={busyAction === `reject-brief-${brief.id}`}
-                        className="flex-1 text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
 

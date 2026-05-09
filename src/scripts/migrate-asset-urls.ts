@@ -16,7 +16,7 @@ async function migrateAssetUrls() {
   const { data, error } = await admin
     .from("creative_assets")
     .select("id, gcs_path, gcs_url")
-    .like("gcs_url", "https://storage.googleapis.com%")
+    .not("gcs_url", "ilike", "%X-Goog-Signature%")
 
   if (error) throw error
 

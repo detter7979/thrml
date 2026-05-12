@@ -24,7 +24,9 @@ export function GoogleTagLoader() {
       }
     }
 
-    if (readAccepted()) setEnabled(true)
+    queueMicrotask(() => {
+      if (readAccepted()) setEnabled(true)
+    })
 
     function onAccepted() {
       if (readAccepted()) setEnabled(true)

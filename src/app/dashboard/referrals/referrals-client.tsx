@@ -55,7 +55,9 @@ export function ReferralsClient() {
   }, [])
 
   useEffect(() => {
-    void load()
+    queueMicrotask(() => {
+      void load()
+    })
   }, [load])
 
   async function copyLink() {

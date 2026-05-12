@@ -16,6 +16,7 @@ import {
   scaleAdSetBudget,
 } from "@/lib/agent/meta-api"
 import { evaluateInsights, type AgentConfig, type Decision, type RegistryAdset } from "@/lib/agent/decision-engine"
+import { HOST_MONETIZATION_PLAYBOOK_ID } from "@/lib/agent/host-monetization-static"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 function yesterday() {
@@ -110,6 +111,7 @@ function buildDecisionCreativeBrief(
     decision.action_taken === "SCALED" &&
     (lowerReason.includes("winner") || lowerReason.includes("scale threshold"))
   ) {
+    const hook = extractConcept(decision.entity_name)
     return {
       trigger_type: "winner_variation",
       trigger_data: {
@@ -117,8 +119,11 @@ function buildDecisionCreativeBrief(
         adset_name: decision.entity_name,
         cpa,
         spend,
-        hook: extractConcept(decision.entity_name),
+        hook,
         format,
+        ...(hook === "HostEarn"
+          ? { static_playbook: HOST_MONETIZATION_PLAYBOOK_ID, goal_type: "host" as const }
+          : {}),
       },
       campaign_short_name: campaignShortName,
       rationale: `Ad set ${decision.entity_name} hit CPA $${formatMoney(cpa)} (${ratio}× target). Generate 3 variations of winning angle.`,

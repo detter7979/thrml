@@ -1,5 +1,9 @@
 # thrml Brand Guidelines
 
+> **For paid Meta ads, [`agents/design.md`](./design.md) is the binding spec
+> and supersedes any rule below where the two conflict.** This file remains
+> the source of truth for non-paid surfaces (site, email, organic social).
+
 ## Voice
 Clean, grounded, premium-accessible. Not spa-luxury, not gym-bro.
 Nordic-meets-California. Warm, private, tactile.

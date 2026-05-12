@@ -1,14 +1,22 @@
-import sharp from "sharp"
-
 import { uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
+import {
+  HOST_PROOF_SUBTEXT,
+  matchesHostMonetizationPlaybook,
+  parseStoredStaticVariations,
+  type StoredStaticVariation,
+  finalizeHostStaticImagePrompt,
+  HOST_MONETIZATION_CANONICAL_VARIATIONS,
+} from "@/lib/agent/host-monetization-static"
 import { sendEmail, thrmlEmailWrapper, ctaButton } from "@/lib/emails/send"
 import { generateImagen } from "@/lib/agent/imagen"
+import { renderMasterAdTemplate } from "@/lib/agent/static-layouts/master-ad-template"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
 const MAX_IMAGE_GENERATIONS_PER_BRIEF = 12
 const BRIEF_TIMEOUT_MS = 240_000
 const VARIATION_LABELS = ["A", "B", "C"] as const
+const DEFAULT_STATIC_VARIATION_COUNT: StaticVariationCount = 1
 
 export type StaticGenerator = "imagen" | "replicate" | "both"
 export type StaticFormat = "1x1" | "9x16"
@@ -19,6 +27,7 @@ type BaseImageGenerator = "imagen" | "replicate"
 
 type CreativeBriefRow = {
   id: string
+  trigger_type: string | null
   trigger_data: Record<string, unknown> | null
   status: string | null
   approved_at: string | null
@@ -43,11 +52,27 @@ type BaseImage = {
 type CompositeStaticOptions = {
   baseImage: Buffer
   format: StaticFormat
-  variationLabel: string
   copyPrimary?: string | null
   copyHeadline?: string | null
   copySubtext?: string | null
-  cta?: string | null
+}
+
+function resolveStaticVariationPlan(brief: CreativeBriefRow): StoredStaticVariation[] | null {
+  const stored = parseStoredStaticVariations(brief.trigger_data)
+  if (stored?.length) return stored.slice(0, 3)
+  if (matchesHostMonetizationPlaybook(brief.trigger_data, brief.trigger_type)) {
+    return HOST_MONETIZATION_CANONICAL_VARIATIONS.map((v) => ({
+      variation_label: v.variation_label,
+      headline: v.headline,
+      background_image_prompt: finalizeHostStaticImagePrompt(v.background_image_prompt),
+    }))
+  }
+  return null
+}
+
+function lockedSubtextForBrief(brief: CreativeBriefRow): string | null {
+  if (matchesHostMonetizationPlaybook(brief.trigger_data, brief.trigger_type)) return HOST_PROOF_SUBTEXT
+  return brief.copy_subtext?.trim() || null
 }
 
 export type ProcessStaticBriefOptions = {
@@ -82,10 +107,6 @@ function sanitizeFilename(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80)
 }
 
-function svgEscape(value: string) {
-  return escapeHtml(value).replaceAll("'", "&apos;")
-}
-
 function normalizeGenerator(value: unknown): StaticGenerator | null {
   return value === "imagen" || value === "replicate" || value === "both" ? value : null
 }
@@ -96,6 +117,15 @@ function normalizeFormat(value: unknown): StaticFormat | null {
 
 function normalizeVariationCount(value: unknown): StaticVariationCount | null {
   return value === 1 || value === 2 || value === 3 ? value : null
+}
+
+function envVariationCount(name: string) {
+  const value = Number(process.env[name])
+  return Number.isInteger(value) ? normalizeVariationCount(value) : null
+}
+
+function defaultVariationCount() {
+  return envVariationCount("CREATIVE_STATIC_VARIATIONS") ?? envVariationCount("CREATIVE_VARIATIONS") ?? DEFAULT_STATIC_VARIATION_COUNT
 }
 
 function briefGenerator(brief: CreativeBriefRow, override?: StaticGenerator) {
@@ -110,10 +140,6 @@ function generatorsFor(generator: StaticGenerator): BaseImageGenerator[] {
 
 function aspectForFormat(format: StaticFormat): AspectRatio {
   return format === "9x16" ? "9:16" : "1:1"
-}
-
-function dimensionsForFormat(format: StaticFormat) {
-  return format === "9x16" ? { width: 1080, height: 1920 } : { width: 1080, height: 1080 }
 }
 
 function countBaseImages(generatorCount: number, formatCount: number, requestedVariations: number) {
@@ -141,8 +167,16 @@ function extractReplicateUrls(payload: unknown): string[] {
 async function generateReplicate(prompt: string, aspectRatio: AspectRatio, count: number) {
   const token = requireEnv("REPLICATE_API_TOKEN")
   const model = process.env.REPLICATE_STATIC_MODEL ?? "black-forest-labs/flux-schnell"
+  const trimmed = prompt.trim()
+  const alreadyRich =
+    /architectural photography/i.test(trimmed) &&
+    /no text/i.test(trimmed) &&
+    /no logos/i.test(trimmed)
+  const tail = alreadyRich
+    ? ", no watermarks"
+    : ", photorealistic lifestyle ad creative, high-end architectural photography, warm editorial lighting, no text, no logos, no signage, no watermarks"
   const input = {
-    prompt: `${prompt}, photorealistic lifestyle ad creative, warm editorial lighting, no text, no logos`,
+    prompt: `${trimmed}${tail}`,
     aspect_ratio: aspectRatio,
     num_outputs: count,
     output_format: "png",
@@ -213,69 +247,16 @@ export async function generateLifestyleImage(
   return images
 }
 
-function textLines(text: string, maxChars: number, maxLines: number) {
-  const words = text.split(/\s+/).filter(Boolean)
-  const lines: string[] = []
-  let current = ""
-
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word
-    if (next.length > maxChars && current) {
-      lines.push(current)
-      current = word
-    } else {
-      current = next
-    }
-    if (lines.length === maxLines) break
-  }
-
-  if (current && lines.length < maxLines) lines.push(current)
-  return lines
-}
-
-function renderLines(lines: string[], x: number, y: number, fontSize: number, lineHeight: number, weight = 700) {
-  return lines
-    .map(
-      (line, index) =>
-        `<text x="${x}" y="${y + index * lineHeight}" font-size="${fontSize}" font-weight="${weight}" fill="#fff">${svgEscape(line)}</text>`
-    )
-    .join("")
-}
-
 export async function compositeStatic(opts: CompositeStaticOptions) {
-  const { width, height } = dimensionsForFormat(opts.format)
-  const headline = opts.copyHeadline?.trim() || opts.copyPrimary?.trim() || "Book your private sauna escape"
-  const body = opts.copyPrimary?.trim() || opts.copySubtext?.trim() || ""
-  const cta = opts.cta?.trim() || "Book Now"
-  const padding = opts.format === "9x16" ? 88 : 64
-  const headlineLines = textLines(headline, opts.format === "9x16" ? 23 : 22, 3)
-  const bodyLines = textLines(body, opts.format === "9x16" ? 38 : 34, 3)
-  const bodyStart = height - padding - 145 - bodyLines.length * 38
-  const headlineStart = bodyStart - 38 - headlineLines.length * (opts.format === "9x16" ? 72 : 64)
-  const overlay = `
-    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#000" stop-opacity="0.08"/>
-          <stop offset="48%" stop-color="#000" stop-opacity="0.12"/>
-          <stop offset="100%" stop-color="#000" stop-opacity="0.78"/>
-        </linearGradient>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#shade)"/>
-      <rect x="${padding}" y="${height - padding - 96}" rx="48" ry="48" width="${Math.min(320, width - padding * 2)}" height="96" fill="#C4623A"/>
-      <text x="${padding + 40}" y="${height - padding - 36}" font-size="34" font-weight="800" fill="#fff">${svgEscape(cta)}</text>
-      <text x="${padding}" y="${padding + 8}" font-size="24" font-weight="700" letter-spacing="4" fill="#fff">THRML</text>
-      <text x="${width - padding}" y="${padding + 8}" font-size="22" font-weight="700" text-anchor="end" fill="#fff">${svgEscape(opts.variationLabel)}</text>
-      ${renderLines(headlineLines, padding, Math.max(padding + 112, headlineStart), opts.format === "9x16" ? 64 : 56, opts.format === "9x16" ? 72 : 64)}
-      ${renderLines(bodyLines, padding, bodyStart, 30, 38, 500)}
-    </svg>
-  `
+  const headline = opts.copyHeadline?.trim() || opts.copyPrimary?.trim() || "Your private spa reset"
+  const subhead = opts.copySubtext?.trim() || opts.copyPrimary?.trim() || ""
 
-  return sharp(opts.baseImage)
-    .resize(width, height, { fit: "cover", position: "center" })
-    .composite([{ input: Buffer.from(overlay), top: 0, left: 0 }])
-    .png()
-    .toBuffer()
+  return renderMasterAdTemplate({
+    baseImage: opts.baseImage,
+    format: opts.format,
+    headline,
+    subhead,
+  })
 }
 
 export async function uploadCreativeAsset(buffer: Buffer, briefId: string, format: StaticFormat, variationLabel: string) {
@@ -310,7 +291,9 @@ async function sendReadyEmail(count: number, brief: CreativeBriefRow) {
 async function getBrief(admin: ReturnType<typeof createAdminClient>, briefId: string) {
   const { data, error } = await admin
     .from("creative_briefs")
-    .select("id, trigger_data, status, approved_at, visual_direction, copy_primary, copy_headline, copy_subtext, cta, hook, format, campaign_short_name")
+    .select(
+      "id, trigger_type, trigger_data, status, approved_at, visual_direction, copy_primary, copy_headline, copy_subtext, cta, hook, format, campaign_short_name",
+    )
     .eq("id", briefId)
     .maybeSingle()
 
@@ -324,36 +307,48 @@ async function processStaticBriefInner(
   options: ProcessStaticBriefOptions
 ) {
   const brief = await getBrief(admin, options.briefId)
-  if (!brief.visual_direction?.trim()) throw new Error("Creative brief is missing visual_direction")
+  const staticPlan = resolveStaticVariationPlan(brief)
+  if (!staticPlan?.length && !brief.visual_direction?.trim()) {
+    throw new Error("Creative brief is missing visual_direction")
+  }
 
   const generator = briefGenerator(brief, options.generator)
   const generators = generatorsFor(generator)
   const requestedFormats = options.formats?.length ? options.formats : [normalizeFormat(brief.format) ?? "1x1"]
   const formats = Array.from(new Set(requestedFormats)).slice(0, 2)
-  const requestedVariations = options.variations ?? 3
+  const requestedVariations = staticPlan?.length
+    ? (Math.min(staticPlan.length, 3) as StaticVariationCount)
+    : (options.variations ?? defaultVariationCount())
   const baseCount = countBaseImages(generators.length, formats.length, requestedVariations)
+  const subtextLocked = lockedSubtextForBrief(brief)
   let generated = 0
 
   await admin.from("creative_briefs").update({ status: "generating" }).eq("id", brief.id)
 
   for (const format of formats) {
-    const baseImages = await generateLifestyleImage(brief.visual_direction, {
-      generator,
-      aspectRatio: aspectForFormat(format),
-      count: baseCount as StaticVariationCount,
-    })
+    if (staticPlan?.length) {
+      const steps = staticPlan.slice(0, requestedVariations)
+      for (const [i, step] of steps.entries()) {
+        const baseImages = await generateLifestyleImage(step.background_image_prompt, {
+          generator,
+          aspectRatio: aspectForFormat(format),
+          count: 1,
+        })
+        const baseImage =
+          generators.length > 1
+            ? baseImages.find((b) => b.generationTool === "replicate_mj") ?? baseImages[0]
+            : baseImages[0]
+        if (!baseImage) throw new Error("Static generation produced no base image")
 
-    for (const baseImage of baseImages.slice(0, baseCount * generators.length)) {
-      for (let variationIndex = 1; variationIndex <= requestedVariations; variationIndex++) {
-        const variationLabel = VARIATION_LABELS[variationIndex - 1]
+        const variationIndex = i + 1
+        const variationLabel = (step.variation_label || VARIATION_LABELS[i] || "A").toUpperCase().slice(0, 1)
+
         const composite = await compositeStatic({
           baseImage: baseImage.buffer,
           format,
-          variationLabel,
           copyPrimary: brief.copy_primary,
-          copyHeadline: brief.copy_headline,
-          copySubtext: brief.copy_subtext,
-          cta: brief.cta,
+          copyHeadline: step.headline,
+          copySubtext: subtextLocked ?? brief.copy_subtext,
         })
         const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
           campaignShortName: brief.campaign_short_name ?? brief.id,
@@ -377,11 +372,60 @@ async function processStaticBriefInner(
             source_image_url: baseImage.sourceUrl ?? null,
             source_index: baseImage.sourceIndex,
             base_mime_type: baseImage.mimeType,
+            static_variation_headline: step.headline,
+            static_variation_label: variationLabel,
           },
         })
         if (insertError) throw insertError
         generated++
       }
+      continue
+    }
+
+    const baseImages = await generateLifestyleImage(brief.visual_direction!, {
+      generator,
+      aspectRatio: aspectForFormat(format),
+      count: baseCount as StaticVariationCount,
+    })
+
+    const eligibleBaseImages = baseImages.slice(0, baseCount * generators.length)
+    for (const [baseIndex, baseImage] of eligibleBaseImages.entries()) {
+      const variationIndex = baseIndex + 1
+      const variationLabel = VARIATION_LABELS[Math.min(baseIndex, VARIATION_LABELS.length - 1)]
+
+      const composite = await compositeStatic({
+        baseImage: baseImage.buffer,
+        format,
+        copyPrimary: brief.copy_primary,
+        copyHeadline: brief.copy_headline,
+        copySubtext: subtextLocked ?? brief.copy_subtext,
+      })
+      const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
+        campaignShortName: brief.campaign_short_name ?? brief.id,
+        briefId: brief.id,
+        kind: "static",
+        filename: `static_${format}_${sanitizeFilename(`${baseImage.generationTool}_${baseImage.sourceIndex}_${variationLabel}`)}.png`,
+        contentType: "image/png",
+      })
+
+      const { error: insertError } = await admin.from("creative_assets").insert({
+        brief_id: brief.id,
+        asset_type: "image",
+        generation_tool: baseImage.generationTool,
+        variation_index: variationIndex,
+        variation_label: variationLabel,
+        format,
+        gcs_path: gcsPath,
+        gcs_url: gcsUrl,
+        status: "generated",
+        performance_data: {
+          source_image_url: baseImage.sourceUrl ?? null,
+          source_index: baseImage.sourceIndex,
+          base_mime_type: baseImage.mimeType,
+        },
+      })
+      if (insertError) throw insertError
+      generated++
     }
   }
 

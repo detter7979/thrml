@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   BarChart3,
   CalendarDays,
+  ClipboardList,
   Gift,
   Home,
   Inbox,
@@ -25,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Overview", icon: BarChart3 },
   { href: "/admin/analytics", label: "Analytics", icon: LineChart },
   { href: "/admin/paid-media", label: "Paid Media", icon: Megaphone },
+  { href: "/admin/paid-media/runs", label: "Paid Media · Reporting", icon: ClipboardList },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin/listings", label: "Listings", icon: Home },
   { href: "/admin/users", label: "Users", icon: Users },

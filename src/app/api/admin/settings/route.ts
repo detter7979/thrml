@@ -72,7 +72,7 @@ export async function GET() {
     )
   )
 
-  let nameById: Record<string, string> = {}
+  const nameById: Record<string, string> = {}
   if (updaterIds.length) {
     const { data: profiles } = await admin.from("profiles").select("id, full_name").in("id", updaterIds)
     for (const p of profiles ?? []) {

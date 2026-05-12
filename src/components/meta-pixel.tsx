@@ -32,7 +32,9 @@ export function MetaPixel() {
 
   useEffect(() => {
     const existing = localStorage.getItem("thrml_cookie_consent")
-    if (existing === "accepted") setConsented(true)
+    queueMicrotask(() => {
+      if (existing === "accepted") setConsented(true)
+    })
 
     const handler = () => {
       const current = localStorage.getItem("thrml_cookie_consent")

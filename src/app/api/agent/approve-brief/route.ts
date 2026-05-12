@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { processStaticBrief } from "@/lib/agent/static-generator"
+import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 type StaticFormat = "1x1" | "9x16"
@@ -35,7 +36,9 @@ export async function POST(req: NextRequest) {
 
   if (briefError) return NextResponse.json({ error: briefError.message }, { status: 500 })
   if (!brief) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
-  if (typeof brief.visual_direction !== "string" || !brief.visual_direction.trim()) {
+  const staticPlan = parseStoredStaticVariations(brief.trigger_data)
+  const hasVisual = typeof brief.visual_direction === "string" && brief.visual_direction.trim()
+  if (!hasVisual && !staticPlan?.length) {
     return NextResponse.json({ error: "Brief needs a visual direction before approval." }, { status: 400 })
   }
 
@@ -53,9 +56,7 @@ export async function POST(req: NextRequest) {
   try {
     const generated = await processStaticBrief({
       briefId: data.id,
-      generator: "both",
       formats: formatsForBrief(data.format),
-      variations: 3,
     })
 
     const queueUpdate = await admin!

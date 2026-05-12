@@ -149,7 +149,7 @@ export function MessageThread({
         })
       presenceChannel.subscribe()
     } catch (error) {
-      setTyping(false)
+      queueMicrotask(() => setTyping(false))
       console.warn("Realtime unavailable for thread, continuing without live updates.", error)
     }
 

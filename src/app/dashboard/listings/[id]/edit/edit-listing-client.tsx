@@ -983,12 +983,12 @@ export function EditListingClient({
                 You haven&apos;t set house rules yet. thrml&apos;s standard community rules will be included in
                 guest emails until you add your own.
               </p>
-              <a
+              <Link
                 href="/dashboard/account#house-rules"
                 className="mt-2 inline-block text-sm font-medium text-[#8B4513] underline-offset-2 hover:underline"
               >
                 Add house rules →
-              </a>
+              </Link>
             </>
           ) : (
             <>
@@ -996,12 +996,12 @@ export function EditListingClient({
                 ✓ You have {configuredHouseRuleCount} house rule{configuredHouseRuleCount === 1 ? "" : "s"} set.
                 These will be included in the access details email your guests receive.
               </p>
-              <a
+              <Link
                 href="/dashboard/account#house-rules"
                 className="mt-2 inline-block text-sm font-medium text-[#8B4513] underline-offset-2 hover:underline"
               >
                 Edit house rules →
-              </a>
+              </Link>
             </>
           )}
         </div>

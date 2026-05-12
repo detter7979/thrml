@@ -1,18 +1,29 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 
 import { COOKIE_CONSENT_ACCEPTED_EVENT } from "@/components/analytics/google-tag-loader"
 
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void
-    dataLayer?: Object[]
+    dataLayer?: object[]
   }
 }
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false)
+
+  function enableAnalytics() {
+    if (typeof window === "undefined") return
+
+    window.dataLayer = window.dataLayer || []
+    const gtag = window.gtag ?? ((...args: unknown[]) => window.dataLayer?.push(args))
+    gtag("consent", "update", {
+      analytics_storage: "granted",
+    })
+  }
 
   useEffect(() => {
     const consent = localStorage.getItem("thrml_cookie_consent")
@@ -25,16 +36,6 @@ export function CookieConsent() {
       enableAnalytics()
     }
   }, [])
-
-  function enableAnalytics() {
-    if (typeof window === "undefined") return
-
-    window.dataLayer = window.dataLayer || []
-    const gtag = window.gtag ?? ((...args: unknown[]) => window.dataLayer?.push(args))
-    gtag("consent", "update", {
-      analytics_storage: "granted",
-    })
-  }
 
   function handleAccept() {
     localStorage.setItem("thrml_cookie_consent", "accepted")
@@ -68,9 +69,9 @@ export function CookieConsent() {
           <p className="text-xs leading-relaxed text-neutral-500">
             We use analytics cookies (retained up to 14 months) to understand how people use thrml and improve the
             experience. We never sell your data.{" "}
-            <a href="/privacy#data-retention" className="text-neutral-600 underline hover:text-neutral-900">
+            <Link href="/privacy#data-retention" className="text-neutral-600 underline hover:text-neutral-900">
               Privacy Policy
-            </a>
+            </Link>
           </p>
         </div>
         <div className="flex shrink-0 gap-2">

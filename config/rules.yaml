@@ -1,0 +1,195 @@
+# =============================================================================
+# thrml — Evaluator Agent Rules Config
+# Version: 1.0 · 2026-05
+# =============================================================================
+# This file is THE knob. Edit values here to change agent behavior without
+# touching code. Evaluator agent loads this at the start of every run.
+#
+# Two write paths:
+#   1. Commit changes to this file in repo (audit trail via git)
+#   2. Edit via admin dashboard → writes to rules_config table → file synced nightly
+#
+# Precedence: dashboard edits > file edits. File is source of truth for fresh
+# environments and disaster recovery.
+# =============================================================================
+
+version: 1
+last_updated: "2026-05-11"
+
+# -----------------------------------------------------------------------------
+# Approval mode — controls how much the agent can do without you
+# -----------------------------------------------------------------------------
+approval:
+  mode: ALL_REQUIRE_APPROVAL          # ALL_REQUIRE_APPROVAL | AUTO_APPROVE_LOW_STAKES | AUTO_APPROVE_MOST
+
+  # Action kinds that ALWAYS require human approval, regardless of mode
+  always_human:
+    - CREATE_CAMPAIGN
+    - KILL_CAMPAIGN
+    - EXPAND_GEO
+    - PROMOTE_WINNER
+    - LAUNCH_LAL
+
+  # When mode = AUTO_APPROVE_LOW_STAKES, these become eligible for auto-approval
+  low_stakes_eligible:
+    - ADJUST_BUDGET                   # subject to budget_change_limits below
+    - PAUSE_AD                        # subject to under_performance triggers
+    - PAUSE_AD_SET                    # only if at least one other ad set in campaign is healthy
+
+  # Recommendations auto-expire if not actioned
+  expiry_hours: 72
+
+# -----------------------------------------------------------------------------
+# Budget guardrails
+# -----------------------------------------------------------------------------
+budget:
+  min_spend_per_variant_usd: 20       # each A/B variant needs >= $20/day to escape learning
+  max_daily_increase_pct: 30          # never propose >30% daily budget increase in one step
+  max_daily_decrease_pct: 50          # >50% drop requires human even at AUTO_APPROVE_MOST
+  budget_change_limits:
+    auto_approve_under_usd: 20        # absolute $/day change eligible for auto-approve
+    auto_approve_under_pct: 20        # OR within 20% of current — whichever is more restrictive
+    test_phase_only: true             # auto-approve budget changes only on TEST status, never SCALE
+  monthly_account_cap_usd: 5000       # hard stop: agent never proposes spend that would breach this
+
+# -----------------------------------------------------------------------------
+# Test windows & significance
+# -----------------------------------------------------------------------------
+testing:
+  min_test_window_days: 7             # never call winners before day 5; default window 7d
+  earliest_significance_read_day: 5
+  kill_clicks_threshold: 200          # underperformer eligible for kill after 200+ clicks each
+  kill_confidence_threshold: 0.95     # 95% confidence required to call a winner
+  ab_split:
+    two_variant: [0.50, 0.50]
+    three_variant: [0.34, 0.33, 0.33]
+  advantage_plus_during_test: false   # never enable Advantage+ during active A/B test
+  winner_carry_forward: true          # winning variant becomes new control in next batch
+
+# -----------------------------------------------------------------------------
+# Phase advancement criteria
+# -----------------------------------------------------------------------------
+phase_advancement:
+  P1_to_P2:
+    event: BH                          # become_host_click
+    min_events_per_week: 50
+    min_consecutive_weeks: 2
+    requires_human_approval: true      # ADVANCE_PHASE is always sensitive
+  P2_to_P3:
+    event: HO
+    min_events_per_week: 50
+    min_consecutive_weeks: 2
+    requires_human_approval: true
+  P3_advantage_plus:
+    event: NL
+    min_total_events: 100              # enable Advantage+ once 100+ listings
+    requires_human_approval: false     # under AUTO_APPROVE_LOW_STAKES this can auto
+
+# -----------------------------------------------------------------------------
+# Audience saturation rules
+# -----------------------------------------------------------------------------
+saturation:
+  frequency_cap_rt: 3.0                # move from RT to PROSP when ad set frequency > 3
+  frequency_cap_prosp: 2.0             # rotate creative when prospecting frequency > 2
+  audience_size_min: 50000             # warn if defined audience drops below this
+
+# -----------------------------------------------------------------------------
+# KPI targets — primary north stars per persona
+# -----------------------------------------------------------------------------
+kpi_targets:
+  host:
+    primary_kpi: cac_activation        # cost per activated host (listing published + verified)
+    target_cac_activation_usd: 150
+    target_cac_signup_usd: 25          # earlier-funnel proxy
+    target_payback_days: 90            # revenue is back-loaded; tune from cohort data
+    target_signup_to_activation_pct: 35
+  guest:
+    primary_kpi: cac_purchase
+    target_cac_purchase_usd: 35
+    target_payback_days: 30
+    target_viewcontent_to_purchase_pct: 2.0
+
+# -----------------------------------------------------------------------------
+# Underperformance — when the agent proposes pause/kill
+# -----------------------------------------------------------------------------
+underperformance:
+  ad_level:
+    cpc_multiplier_vs_adset_median: 3.0  # ad CPC > 3x its ad set's median CPC
+    min_clicks_before_action: 100
+    proposed_action: PAUSE_AD
+  ad_set_level:
+    cac_multiplier_vs_target: 2.5        # ad set CAC > 2.5x target CAC
+    min_spend_before_action_usd: 100
+    proposed_action: PAUSE_AD_SET
+  campaign_level:
+    days_above_target_cac: 14            # campaign CAC > target for 14 consecutive days
+    min_spend_before_action_usd: 500
+    proposed_action: KILL_CAMPAIGN       # always human approval per always_human list
+
+# -----------------------------------------------------------------------------
+# Creative testing cadence
+# -----------------------------------------------------------------------------
+creative:
+  new_test_interval_days: 14           # propose a new T0X batch every 2 weeks per active ad set
+  variants_per_test: 2                 # 2 by default; 3 only when explicitly requested
+  preserve_winner_as_control: true     # winning variant becomes A in next batch
+  generate_via_agent: true             # creative agent auto-generates new variants
+  approval_required: true              # even when generated, new creatives need human approve
+
+# -----------------------------------------------------------------------------
+# Geo expansion gates
+# -----------------------------------------------------------------------------
+geo_expansion:
+  requires_seed_metro_profitable: true
+  seed_metro_definition: payback_days_lt_120
+  min_seed_weeks_at_target: 4
+  default_seed_metro: SEA
+  expansion_order: [PDX, AUS, DEN, LAX, NYC]
+  initial_budget_pct_of_seed: 50       # new metro starts at 50% of seed metro budget
+
+# -----------------------------------------------------------------------------
+# Reporting agent settings
+# -----------------------------------------------------------------------------
+reporting:
+  ingest_hour_utc: 9                   # daily run at 09:00 UTC (= 02:00 PT)
+  master_refresh_after_ingest: true
+  cohort_window_days: 90               # cohort revenue tracked up to 90d post-acquisition
+  retry_on_meta_api_failure: 3
+  alert_on_zero_spend: true            # email if any active campaign reports $0 spend
+
+# -----------------------------------------------------------------------------
+# Evaluator agent settings
+# -----------------------------------------------------------------------------
+evaluator:
+  run_hour_utc: 10                     # daily run at 10:00 UTC, after reporting completes
+  max_recs_per_run: 25                 # safety cap; no more than 25 proposals in one run
+  min_data_freshness_hours: 4          # do not propose if performance_master is stale > 4h
+  confidence_floor_for_proposal: 0.55  # do not surface recs below 55% confidence
+
+# -----------------------------------------------------------------------------
+# Notifications
+# -----------------------------------------------------------------------------
+notifications:
+  pending_rec_summary:
+    enabled: true
+    schedule: "0 14 * * *"             # daily at 14:00 UTC
+    channels: [email, slack]
+  high_priority_immediate:
+    enabled: true
+    triggers:
+      - KILL_CAMPAIGN_proposed
+      - reporting_failure
+      - meta_api_auth_failure
+    channels: [email, slack]
+
+# -----------------------------------------------------------------------------
+# Scope overrides — values here override the global defaults for a slice
+# Format: "<platform>.<persona>.<service>.<geo>" with * as wildcard
+# -----------------------------------------------------------------------------
+scope_overrides:
+  "META.host.sauna.SEA":
+    seed_metro: true
+    kpi_targets:
+      target_cac_activation_usd: 175   # SEA-specific (higher CPMs)
+  "META.guest.all.PDX":
+    creative.new_test_interval_days: 21   # smaller market, less data, slower cadence

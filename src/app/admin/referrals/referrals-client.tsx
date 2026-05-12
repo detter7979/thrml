@@ -49,7 +49,9 @@ export function AdminReferralsClient() {
   }, [])
 
   useEffect(() => {
-    void load()
+    queueMicrotask(() => {
+      void load()
+    })
   }, [load])
 
   async function toggleActive(row: CodeRow, next: boolean) {

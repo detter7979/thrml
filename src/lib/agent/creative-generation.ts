@@ -7,6 +7,7 @@ const HIGGSFIELD_MODEL_ID = process.env.HIGGSFIELD_MODEL_ID ?? "higgsfield-ai/do
 const HIGGSFIELD_POLL_INTERVAL_MS = 30_000
 const HIGGSFIELD_MAX_ATTEMPTS = 8
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
+const DEFAULT_VIDEO_VARIATION_COUNT = 1
 
 type CreativeQueueRow = {
   id: string
@@ -125,6 +126,12 @@ function isFailed(status: string | null | undefined) {
   return status ? ["failed", "error", "cancelled", "canceled", "nsfw"].includes(status) : false
 }
 
+function videoVariationIndexes() {
+  const requested = Number(process.env.CREATIVE_VIDEO_VARIATIONS ?? process.env.CREATIVE_VARIATIONS ?? DEFAULT_VIDEO_VARIATION_COUNT)
+  const count = Number.isInteger(requested) ? Math.min(Math.max(requested, 1), 3) : DEFAULT_VIDEO_VARIATION_COUNT
+  return Array.from({ length: count }, (_, index) => index + 1)
+}
+
 async function readError(res: Response) {
   const text = await res.text()
   try {
@@ -225,6 +232,7 @@ function escapeHtml(value: string) {
 }
 
 async function sendReadyEmail(briefId: string, previewLinks: string[]) {
+  const count = previewLinks.length
   const linksHtml = previewLinks
     .map((link, index) => `<li><a href="${escapeHtml(link)}" style="color:#C4623A;">Variation ${index + 1}</a></li>`)
     .join("")
@@ -232,17 +240,17 @@ async function sendReadyEmail(briefId: string, previewLinks: string[]) {
 
   await sendEmail({
     to: CREATIVE_REVIEW_RECIPIENT,
-    subject: "3 new video variations ready for review",
+    subject: `${count} new video variation${count === 1 ? "" : "s"} ready for review`,
     html: thrmlEmailWrapper(`
-      <h1 style="color:#ffffff;font-size:24px;margin:0 0 16px;">3 new video variations ready for review</h1>
+      <h1 style="color:#ffffff;font-size:24px;margin:0 0 16px;">${count} new video variation${count === 1 ? "" : "s"} ready for review</h1>
       <p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:0 0 16px;">
-        Creative brief ${escapeHtml(briefId)} has 3 Higgsfield variations ready.
+        Creative brief ${escapeHtml(briefId)} has ${count} Higgsfield variation${count === 1 ? "" : "s"} ready.
       </p>
       <ul style="color:#d4d4d4;font-size:15px;line-height:1.8;margin:0 0 24px;padding-left:20px;">
         ${linksHtml}
       </ul>
     `),
-    text: `3 new video variations ready for review\n\nCreative brief ${briefId}\n\n${textLinks}`,
+    text: `${count} new video variation${count === 1 ? "" : "s"} ready for review\n\nCreative brief ${briefId}\n\n${textLinks}`,
   })
 }
 
@@ -261,7 +269,7 @@ async function processQueueItem(admin: ReturnType<typeof createAdminClient>, ite
   await admin.from("creative_queue").update({ status: "generating" }).eq("id", item.id)
 
   const creativeBrief = brief as CreativeBriefRow
-  const variations = await Promise.all([1, 2, 3].map((index) => generateVariation(creativeBrief, index)))
+  const variations = await Promise.all(videoVariationIndexes().map((index) => generateVariation(creativeBrief, index)))
   const uploaded = []
 
   for (const variation of variations) {

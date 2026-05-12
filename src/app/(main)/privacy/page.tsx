@@ -117,16 +117,18 @@ We do not use cookies for cross-site behavioral advertising or sell data to ad n
               <tr className="bg-[#FAF6F2]">
                 <td className="px-4 py-3 text-[#2F241E]">Payment method data</td>
                 <td className="px-4 py-3 text-[#2F241E]">Managed by Stripe — not stored by thrml</td>
-                <td className="px-4 py-3 text-[#5F5148]">See Stripe's privacy policy</td>
+                <td className="px-4 py-3 text-[#5F5148]">See Stripe&apos;s privacy policy</td>
               </tr>
               <tr className="bg-white">
                 <td className="px-4 py-3 text-[#2F241E]">Analytics data (GA4)</td>
-                <td className="px-4 py-3 text-[#2F241E]">14 months (Google's default retention)</td>
-                <td className="px-4 py-3 text-[#5F5148]">Platform improvement; only collected with your consent</td>
+                <td className="px-4 py-3 text-[#2F241E]">14 months (Google&apos;s default retention)</td>
+                <td className="px-4 py-3 text-[#5F5148]">
+                  Platform improvement; only collected with your consent
+                </td>
               </tr>
               <tr className="bg-[#FAF6F2]">
                 <td className="px-4 py-3 text-[#2F241E]">Advertising data (Meta Pixel)</td>
-                <td className="px-4 py-3 text-[#2F241E]">Up to 180 days (Meta's default)</td>
+                <td className="px-4 py-3 text-[#2F241E]">Up to 180 days (Meta&apos;s default)</td>
                 <td className="px-4 py-3 text-[#5F5148]">Ad performance measurement; only collected with your consent</td>
               </tr>
               <tr className="bg-white">
@@ -164,7 +166,7 @@ We do not use cookies for cross-site behavioral advertising or sell data to ad n
         <p className="mt-3">
           <strong>Third-party retention:</strong> Data processed by our service providers (Stripe, Google, Meta,
           Supabase, Resend) is subject to their own data retention policies. We encourage you to review each
-          provider's privacy policy for details.
+          provider&apos;s privacy policy for details.
         </p>
       </section>
 

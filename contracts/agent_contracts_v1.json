@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://thrml.app/schemas/agent_contracts_v1.json",
+  "title": "thrml Agent Contracts v1",
+  "description": "Shared object schemas every agent reads and writes. Mirrors Supabase tables 1:1. Lock changes here first, then DDL, then code.",
+  "$defs": {
+
+    "enums": {
+      "platform":    { "enum": ["META","GOOG","SNAP","TIKTOK","LINKEDIN"] },
+      "persona":     { "enum": ["host","guest"] },
+      "service":     { "enum": ["sauna","hottub","coldplunge","multi","all"] },
+      "phase":       { "enum": ["P1","P2","P3"] },
+      "funnel":      { "enum": ["PROSP","LAL","RT","CRM"] },
+      "event":       { "enum": ["BH","HO","NL","ACT","VC","IC","PUR"] },
+      "status":      { "enum": ["DRAFT","TEST","SCALE","PAUSED","KILLED","ARCHIVED"] },
+      "budget_mode": { "enum": ["ABO","CBO"] },
+      "placement":   { "enum": ["FEED-STORIES","REELS","ADV-PLUS","SEARCH","PMAX","DEMAND-GEN"] },
+      "ad_format":   { "enum": ["Static_9x16","Static_1x1","Static_4x5","Video_15s","Video_30s","Carousel","UGC","RSA"] },
+      "angle":       { "enum": ["income","community","idle_space","thermal","social_proof","urgency","sensory","ease"] },
+      "cta":         { "enum": ["list_now","learn_more","get_started","see_how","book_now","explore","join_waitlist"] },
+      "rec_status":  { "enum": ["PENDING","APPROVED","REJECTED","MODIFIED","EXECUTED","FAILED","EXPIRED"] },
+      "rec_kind":    { "enum": [
+        "CREATE_CAMPAIGN","CREATE_AD_SET","CREATE_AD",
+        "ADJUST_BUDGET","PAUSE_AD","PAUSE_AD_SET","PAUSE_CAMPAIGN",
+        "KILL_AD","KILL_AD_SET","KILL_CAMPAIGN",
+        "ADVANCE_PHASE","LAUNCH_LAL","LAUNCH_TEST","PROMOTE_WINNER",
+        "GENERATE_CREATIVE","EXPAND_GEO"
+      ]},
+      "actor":       { "enum": ["HUMAN","EVALUATOR_AGENT","META_AGENT","CREATIVE_AGENT","REPORTING_AGENT","SYSTEM"] }
+    },
+
+    "campaign": {
+      "type": "object",
+      "required": ["platform","persona","service","geo","phase","funnel","event","launch_week","status"],
+      "properties": {
+        "id":                   { "type": "string", "format": "uuid" },
+        "legacy_id":            { "type": ["string","null"], "pattern": "^C\\d{3,}$" },
+        "name":                 { "type": "string", "pattern": "^[A-Z]+_[a-z]+_[a-z]+_[A-Z]+_P[1-3]_[A-Z]+_[A-Z]+_\\d{4}W\\d{1,2}(_v\\d+)?$" },
+        "platform":             { "$ref": "#/$defs/enums/platform" },
+        "persona":              { "$ref": "#/$defs/enums/persona" },
+        "service":              { "$ref": "#/$defs/enums/service" },
+        "geo":                  { "type": "string", "minLength": 2, "maxLength": 6 },
+        "phase":                { "$ref": "#/$defs/enums/phase" },
+        "funnel":               { "$ref": "#/$defs/enums/funnel" },
+        "event":                { "$ref": "#/$defs/enums/event" },
+        "launch_week":          { "type": "string", "pattern": "^\\d{4}W\\d{1,2}$" },
+        "version":              { "type": "string", "pattern": "^(|v\\d+)$", "default": "" },
+        "status":               { "$ref": "#/$defs/enums/status" },
+        "daily_budget_usd":     { "type": ["number","null"], "minimum": 0 },
+        "budget_mode":          { "$ref": "#/$defs/enums/budget_mode" },
+        "priority":             { "type": ["string","null"] },
+        "platform_campaign_id": { "type": ["string","null"] },
+        "notes":                { "type": ["string","null"] },
+        "created_by":           { "$ref": "#/$defs/enums/actor" },
+        "approved_by":          { "type": ["string","null"] }
+      }
+    },
+
+    "ad_set": {
+      "type": "object",
+      "required": ["campaign_id","audience_src","placement","conv_event","status"],
+      "properties": {
+        "id":                  { "type": "string", "format": "uuid" },
+        "legacy_id":           { "type": ["string","null"], "pattern": "^AS\\d{3,}$" },
+        "campaign_id":         { "type": "string", "format": "uuid" },
+        "name":                { "type": "string" },
+        "audience_src":        { "type": "string", "pattern": "^(int-|lal[12]-|rt-|crm-|broad)" },
+        "placement":           { "$ref": "#/$defs/enums/placement" },
+        "audience_details":    { "type": ["string","null"] },
+        "conv_event":          { "$ref": "#/$defs/enums/event" },
+        "budget_weight_pct":   { "type": ["number","null"], "minimum": 0, "maximum": 100 },
+        "status":              { "$ref": "#/$defs/enums/status" },
+        "platform_adset_id":   { "type": ["string","null"] },
+        "notes":               { "type": ["string","null"] }
+      }
+    },
+
+    "ad": {
+      "type": "object",
+      "required": ["ad_set_id","campaign_id","test_id","variant","angle","format","cta","conv_event","status"],
+      "properties": {
+        "id":                  { "type": "string", "format": "uuid" },
+        "legacy_id":           { "type": ["string","null"], "pattern": "^AD\\d{3,}$" },
+        "ad_set_id":           { "type": "string", "format": "uuid" },
+        "campaign_id":         { "type": "string", "format": "uuid" },
+        "name":                { "type": "string" },
+        "test_id":             { "type": "string", "pattern": "^T\\d{2,}$" },
+        "variant":             { "enum": ["A","B","C"] },
+        "angle":               { "$ref": "#/$defs/enums/angle" },
+        "format":              { "$ref": "#/$defs/enums/ad_format" },
+        "cta":                 { "$ref": "#/$defs/enums/cta" },
+        "hook_copy":           { "type": ["string","null"] },
+        "status":              { "$ref": "#/$defs/enums/status" },
+        "gcs_path":            { "type": ["string","null"], "pattern": "^gs://" },
+        "platform_ad_id":      { "type": ["string","null"] },
+        "conv_event":          { "$ref": "#/$defs/enums/event" },
+        "is_winner":           { "type": "boolean", "default": false },
+        "parent_test_id":      { "type": ["string","null"] }
+      }
+    },
+
+    "recommendation": {
+      "type": "object",
+      "required": ["kind","proposed_by","payload"],
+      "description": "What agents emit. Every change to live campaigns flows through this object.",
+      "properties": {
+        "id":                   { "type": "string", "format": "uuid" },
+        "kind":                 { "$ref": "#/$defs/enums/rec_kind" },
+        "status":               { "$ref": "#/$defs/enums/rec_status", "default": "PENDING" },
+        "proposed_by":          { "$ref": "#/$defs/enums/actor" },
+        "target_campaign_id":   { "type": ["string","null"], "format": "uuid" },
+        "target_ad_set_id":     { "type": ["string","null"], "format": "uuid" },
+        "target_ad_id":         { "type": ["string","null"], "format": "uuid" },
+        "payload":              {
+          "type": "object",
+          "description": "Kind-specific. For CREATE_CAMPAIGN: full campaign object. For ADJUST_BUDGET: { new_daily_budget_usd, reason }. For PAUSE_*: { reason }. For GENERATE_CREATIVE: { test_id, variants:[{angle,format,cta,hook_copy}] }."
+        },
+        "evidence":             {
+          "type": "object",
+          "description": "Snapshot of the data that drove this. Typically: { metrics: {...}, window_days, rule_fired, threshold_breached }."
+        },
+        "rationale":            { "type": "string", "description": "Human-readable explanation of why this is being proposed." },
+        "confidence":           { "type": "number", "minimum": 0, "maximum": 1 },
+        "auto_approve_eligible":{ "type": "boolean", "default": false },
+        "expires_at":           { "type": ["string","null"], "format": "date-time" }
+      }
+    },
+
+    "action_log": {
+      "type": "object",
+      "required": ["kind","executed_by","payload","success"],
+      "description": "What gets written after a recommendation is executed (or after a direct human action). Append-only.",
+      "properties": {
+        "id":                   { "type": "string", "format": "uuid" },
+        "recommendation_id":    { "type": ["string","null"], "format": "uuid" },
+        "kind":                 { "$ref": "#/$defs/enums/rec_kind" },
+        "executed_by":          { "$ref": "#/$defs/enums/actor" },
+        "target_campaign_id":   { "type": ["string","null"], "format": "uuid" },
+        "target_ad_set_id":     { "type": ["string","null"], "format": "uuid" },
+        "target_ad_id":         { "type": ["string","null"], "format": "uuid" },
+        "payload":              { "type": "object" },
+        "platform_request":     { "type": ["object","null"] },
+        "platform_response":    { "type": ["object","null"] },
+        "success":              { "type": "boolean" },
+        "error_message":        { "type": ["string","null"] }
+      }
+    },
+
+    "performance_row": {
+      "type": "object",
+      "required": ["date","level","entity_id"],
+      "description": "Shape the Reporting agent writes to performance_daily. Master rows derived from these.",
+      "properties": {
+        "date":              { "type": "string", "format": "date" },
+        "level":             { "enum": ["campaign","ad_set","ad"] },
+        "entity_id":         { "type": "string", "format": "uuid" },
+        "platform_entity_id":{ "type": "string" },
+        "impressions":       { "type": "integer", "minimum": 0 },
+        "reach":             { "type": "integer", "minimum": 0 },
+        "clicks":            { "type": "integer", "minimum": 0 },
+        "link_clicks":       { "type": "integer", "minimum": 0 },
+        "spend_usd":         { "type": "number",  "minimum": 0 },
+        "cpm":               { "type": "number",  "minimum": 0 },
+        "cpc":               { "type": "number",  "minimum": 0 },
+        "ctr":               { "type": "number",  "minimum": 0, "maximum": 1 },
+        "frequency":         { "type": "number",  "minimum": 0 },
+        "conversions":       { "type": "integer", "minimum": 0 },
+        "conv_event":        { "$ref": "#/$defs/enums/event" },
+        "cost_per_conv":     { "type": "number",  "minimum": 0 },
+        "revenue_usd":       { "type": "number",  "minimum": 0 },
+        "raw_payload":       { "type": "object" }
+      }
+    }
+
+  },
+
+  "type": "object",
+  "properties": {
+    "Campaign":       { "$ref": "#/$defs/campaign" },
+    "AdSet":          { "$ref": "#/$defs/ad_set" },
+    "Ad":             { "$ref": "#/$defs/ad" },
+    "Recommendation": { "$ref": "#/$defs/recommendation" },
+    "ActionLog":      { "$ref": "#/$defs/action_log" },
+    "PerformanceRow": { "$ref": "#/$defs/performance_row" }
+  }
+}

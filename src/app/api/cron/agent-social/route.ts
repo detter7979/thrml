@@ -87,8 +87,8 @@ export async function GET(req: NextRequest) {
 
     const month = new Date().toLocaleString("en-US", { month: "long", timeZone: "UTC" })
     const generated: SocialBrief[] = []
-    let totalInputTokens = 0
-    let totalOutputTokens = 0
+    const totalInputTokens = 0
+    const totalOutputTokens = 0
 
     const platforms = [
       { key: "instagram_reel", label: "Instagram Reel (9:16 vertical video)" },

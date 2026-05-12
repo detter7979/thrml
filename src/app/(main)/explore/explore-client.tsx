@@ -399,31 +399,33 @@ export function ExploreClient() {
   }, [pathname, searchParams])
 
   useEffect(() => {
-    setCenter((current) =>
-      current.lat === initialCenter.lat && current.lng === initialCenter.lng
-        ? current
-        : initialCenter
-    )
-    setSearchCenter((current) =>
-      current.lat === initialCenter.lat && current.lng === initialCenter.lng
-        ? current
-        : initialCenter
-    )
-    setOriginCenter((current) =>
-      current.lat === initialCenter.lat && current.lng === initialCenter.lng
-        ? current
-        : initialCenter
-    )
-    setLocationLabel((current) => (current === initialLocation ? current : initialLocation))
-    setFilters((current) => (areFiltersEqual(current, initialFilters) ? current : initialFilters))
-    setServiceDraft((current) =>
-      areStringArraysEqual(current, initialFilters.serviceTypes)
-        ? current
-        : initialFilters.serviceTypes
-    )
-    if (urlViewMode) {
-      setViewMode((current) => (urlViewMode === current ? current : urlViewMode))
-    }
+    queueMicrotask(() => {
+      setCenter((current) =>
+        current.lat === initialCenter.lat && current.lng === initialCenter.lng
+          ? current
+          : initialCenter
+      )
+      setSearchCenter((current) =>
+        current.lat === initialCenter.lat && current.lng === initialCenter.lng
+          ? current
+          : initialCenter
+      )
+      setOriginCenter((current) =>
+        current.lat === initialCenter.lat && current.lng === initialCenter.lng
+          ? current
+          : initialCenter
+      )
+      setLocationLabel((current) => (current === initialLocation ? current : initialLocation))
+      setFilters((current) => (areFiltersEqual(current, initialFilters) ? current : initialFilters))
+      setServiceDraft((current) =>
+        areStringArraysEqual(current, initialFilters.serviceTypes)
+          ? current
+          : initialFilters.serviceTypes
+      )
+      if (urlViewMode) {
+        setViewMode((current) => (urlViewMode === current ? current : urlViewMode))
+      }
+    })
   }, [initialCenter, initialFilters, initialLocation, urlViewMode])
 
   const serviceMetaMap = useMemo(
@@ -539,7 +541,7 @@ export function ExploreClient() {
 
   useEffect(() => {
     if (!isMobile || viewMode !== "split") return
-    setViewMode("list")
+    queueMicrotask(() => setViewMode("list"))
   }, [isMobile, viewMode])
 
   useEffect(() => {

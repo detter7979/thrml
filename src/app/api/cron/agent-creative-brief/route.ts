@@ -2,6 +2,11 @@ import { Storage } from "@google-cloud/storage"
 import { NextRequest, NextResponse } from "next/server"
 
 import { callAgentJson } from "@/lib/agent/claude"
+import {
+  buildMonetizationTriggerPatch,
+  HOST_PROOF_SUBTEXT,
+  matchesHostMonetizationPlaybook,
+} from "@/lib/agent/host-monetization-static"
 import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -180,11 +185,21 @@ async function uploadReferenceImage(buffer: Buffer, briefId: string, index: numb
 }
 
 function buildPrompt(brief: CreativeBriefRow) {
+  const hostMonetization = matchesHostMonetizationPlaybook(brief.trigger_data, brief.trigger_type)
+    ? `
+
+Host monetization static test (canonical ladder):
+- This brief will receive three locked Replicate image prompts (variants A/B/C) plus a locked proof sub-headline after generation. Your JSON must still include every field below.
+- Emphasize thrml **hosts**, private sauna / cold plunge rental income, and Pacific Northwest residential premium tone.
+- "format" should include both 9:16 and 1x1 if possible (e.g. "9:16, 1x1").`
+    : ""
+
   return `Expand this pending paid ad creative trigger into a complete thrml creative brief.
 
 Trigger type: ${brief.trigger_type ?? "new_concept"}
 Trigger data:
 ${JSON.stringify(brief.trigger_data ?? {}, null, 2)}
+${hostMonetization}
 
 Return a JSON object with these exact fields:
 {
@@ -277,18 +292,33 @@ export async function GET(req: NextRequest) {
           })
         )
 
-        const midjourneyUrl = await generateMidjourneyReference(generated.visual_direction)
+        const patch = buildMonetizationTriggerPatch(brief.trigger_data, brief.trigger_type)
+        const staticVars = patch?.static_variations as
+          | Array<{ headline: string; background_image_prompt: string }>
+          | undefined
+        const visualForMj = staticVars?.[0]?.background_image_prompt ?? generated.visual_direction
+
+        const midjourneyUrl = await generateMidjourneyReference(visualForMj)
         const imageBuffer = await downloadImage(midjourneyUrl)
         const referenceUrl = await uploadReferenceImage(imageBuffer, brief.id, 1)
 
-        const { error: updateError } = await admin
-          .from("creative_briefs")
-          .update({
-            ...generated,
-            reference_image_urls: [referenceUrl],
-            status: "briefed",
-          })
-          .eq("id", brief.id)
+        const baseUpdate = {
+          ...generated,
+          reference_image_urls: [referenceUrl],
+          status: "briefed" as const,
+        }
+        const row =
+          patch && staticVars?.[0]
+            ? {
+                ...baseUpdate,
+                copy_subtext: HOST_PROOF_SUBTEXT,
+                copy_headline: staticVars[0].headline,
+                visual_direction: staticVars[0].background_image_prompt,
+                trigger_data: patch,
+              }
+            : baseUpdate
+
+        const { error: updateError } = await admin.from("creative_briefs").update(row).eq("id", brief.id)
         if (updateError) throw updateError
         results.briefed++
 
@@ -300,10 +330,10 @@ export async function GET(req: NextRequest) {
           copy_suggestion: generated.copy_primary,
           hook_suggestion: generated.hook,
           cta: generated.cta,
-          format: generated.format,
+          format: row.format,
           reason: generated.rationale ?? `Creative brief generated from ${brief.trigger_type ?? "pending"} trigger`,
           platform: "meta",
-          goal_type: "guest",
+          goal_type: patch?.goal_type === "host" ? "host" : "guest",
           priority: "MEDIUM",
           concept: brief.trigger_type,
           audience_suggestion: generated.target_audience,

@@ -55,15 +55,15 @@ function UnsubscribeContent() {
 
         {state === "success" && (
           <p className="mt-4 text-base">
-            You've been unsubscribed.
+            You&apos;ve been unsubscribed.
             <br />
-            You won't hear from us again.
+            You won&apos;t hear from us again.
           </p>
         )}
 
         {state === "error" && (
           <p className="mt-4 text-sm text-[#8B4513]">
-            We couldn't process that unsubscribe link. Please try again from the email you received.
+            We couldn&apos;t process that unsubscribe link. Please try again from the email you received.
           </p>
         )}
       </section>

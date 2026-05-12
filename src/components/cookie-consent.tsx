@@ -8,7 +8,9 @@ import { COOKIE_CONSENT_ACCEPTED_EVENT } from "@/components/analytics/google-tag
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void
-    dataLayer?: object[]
+    /** Merged with gtag.js typings — must be `Object[]`, not `object[]`. */
+    // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types -- matches gtag `Window.dataLayer`
+    dataLayer?: Object[]
   }
 }
 

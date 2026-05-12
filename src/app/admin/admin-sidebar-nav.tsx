@@ -10,6 +10,7 @@ import {
   Home,
   Inbox,
   LineChart,
+  Megaphone,
   Settings,
   UserRound,
   Users,
@@ -23,6 +24,7 @@ type NavItem =
 const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Overview", icon: BarChart3 },
   { href: "/admin/analytics", label: "Analytics", icon: LineChart },
+  { href: "/admin/paid-media", label: "Paid Media", icon: Megaphone },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin/listings", label: "Listings", icon: Home },
   { href: "/admin/users", label: "Users", icon: Users },

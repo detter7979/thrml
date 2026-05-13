@@ -40,6 +40,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getPricePerPerson } from "@/lib/pricing"
 import type { ServiceTypeId } from "@/lib/service-types"
 import { getFacebookPixelCookies, trackMetaEvent } from "@/components/meta-pixel"
+import { IdentityVerificationCTA, type IdentityUiStatus } from "@/components/profile/IdentityVerificationCTA"
 
 const saunaTypes = ["Finnish", "Infrared", "Steam", "Barrel", "Wood-Fired"] as const
 const cancellationPolicies = ["flexible", "moderate", "strict"] as const
@@ -327,11 +328,17 @@ export function HostNewListingClient({
   stripeConnected: initialStripeConnected,
   hasStripeAccount: initialHasStripeAccount,
   defaultHouseRules,
+  idVerificationStatus,
+  idVerified,
+  idVerifiedAt,
 }: {
   userId: string
   stripeConnected: boolean
   hasStripeAccount: boolean
   defaultHouseRules: string[]
+  idVerificationStatus: string | null
+  idVerified: boolean
+  idVerifiedAt: string | null
 }) {
   const router = useRouter()
   const [step, setStep] = useState(1)
@@ -1014,6 +1021,13 @@ export function HostNewListingClient({
               {onboardingError ? <p className="mt-2 text-sm text-destructive">{onboardingError}</p> : null}
             </div>
           ) : null}
+
+          <IdentityVerificationCTA
+            status={(idVerificationStatus ?? null) as IdentityUiStatus}
+            verified={idVerified}
+            verifiedAt={idVerifiedAt}
+            compact
+          />
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="transition-all duration-200">

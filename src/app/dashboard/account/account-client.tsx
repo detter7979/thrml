@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle2, Loader2 } from "lucide-react"
 
+import { IdentityVerificationCTA, type IdentityUiStatus } from "@/components/profile/IdentityVerificationCTA"
 import { AvatarUpload } from "@/components/profile/AvatarUpload"
 import { StripeConnectBanner } from "@/components/host/StripeConnectBanner"
 import { Button } from "@/components/ui/button"
@@ -96,6 +97,9 @@ export function AccountClient({
   stripeChargesEnabled,
   hostingEnabled,
   notificationPreferences,
+  idVerificationStatus,
+  idVerified,
+  idVerifiedAt,
 }: {
   userId: string
   fullName: string
@@ -113,6 +117,9 @@ export function AccountClient({
   stripeChargesEnabled: boolean
   hostingEnabled: boolean
   notificationPreferences: NotificationPreferences
+  idVerificationStatus: string | null
+  idVerified: boolean
+  idVerifiedAt: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -579,6 +586,15 @@ export function AccountClient({
   }, [searchParams, router])
 
   useEffect(() => {
+    if (searchParams.get("identity") !== "complete") return
+    void (async () => {
+      await fetch("/api/account/identity/status", { credentials: "include" })
+      router.replace("/dashboard/account", { scroll: false })
+      router.refresh()
+    })()
+  }, [searchParams, router])
+
+  useEffect(() => {
     if (!toastMessage) return
     const timeout = setTimeout(() => setToastMessage(null), 5500)
     return () => clearTimeout(timeout)
@@ -706,6 +722,12 @@ export function AccountClient({
   return (
     <div className="space-y-6 px-4 py-6 md:px-8 md:py-8">
       <h1 className="font-serif text-3xl text-[#1A1410]">Account</h1>
+
+      <IdentityVerificationCTA
+        status={(idVerificationStatus ?? null) as IdentityUiStatus}
+        verified={idVerified}
+        verifiedAt={idVerifiedAt}
+      />
 
       <section id="notifications" className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">PROFILE</h2>

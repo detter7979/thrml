@@ -8,6 +8,7 @@ import {
   Apple,
   Armchair,
   ArrowDownToLine,
+  BadgeCheck,
   Bed,
   BookOpen,
   CalendarDays,
@@ -91,6 +92,19 @@ function DetailCascade({ step, children }: { step: number; children: React.React
   )
 }
 
+function HostVerifiedBadge() {
+  return (
+    <span
+      title="Identity verified via Stripe"
+      aria-label="Identity verified via Stripe"
+      className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#B54A28]/15 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#8B3A20] ring-1 ring-[#B54A28]/25"
+    >
+      <BadgeCheck className="size-3.5 shrink-0" aria-hidden />
+      Verified
+    </span>
+  )
+}
+
 interface HostProfile {
   id: string
   full_name: string | null
@@ -103,6 +117,7 @@ interface HostProfile {
   bio?: string | null
   average_rating?: number | null
   total_reviews?: number | null
+  id_verified?: boolean
 }
 
 interface Photo {
@@ -1539,7 +1554,10 @@ export function ListingDetailClient({
                           </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[17px] font-semibold text-[#1A1410]">{hostName}</p>
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="text-[17px] font-semibold text-[#1A1410]">{hostName}</p>
+                            {host?.id_verified ? <HostVerifiedBadge /> : null}
+                          </div>
                           <p className="text-sm text-muted-foreground">Hosted since {hostYear}</p>
                           {showHostAsNew ? (
                             <span className="mt-1 inline-flex rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New</span>
@@ -1589,7 +1607,10 @@ export function ListingDetailClient({
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[17px] font-semibold text-[#1A1410]">{hostName}</p>
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="text-[17px] font-semibold text-[#1A1410]">{hostName}</p>
+                          {host?.id_verified ? <HostVerifiedBadge /> : null}
+                        </div>
                         <p className="text-sm text-muted-foreground">Hosted since {hostYear}</p>
                         {showHostAsNew ? (
                           <span className="mt-1 inline-flex rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New</span>

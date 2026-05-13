@@ -16,7 +16,9 @@ export default async function NewHostListingPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("stripe_account_id, stripe_onboarding_complete, house_rules")
+    .select(
+      "stripe_account_id, stripe_onboarding_complete, house_rules, id_verification_status, id_verified, id_verified_at"
+    )
     .eq("id", user.id)
     .single()
   const isMockHost = profile?.stripe_account_id?.startsWith("acct_mock_")
@@ -30,6 +32,11 @@ export default async function NewHostListingPage() {
       stripeConnected={Boolean(isMockHost || profile?.stripe_onboarding_complete)}
       hasStripeAccount={Boolean(profile?.stripe_account_id)}
       defaultHouseRules={defaultHouseRules}
+      idVerificationStatus={
+        typeof profile?.id_verification_status === "string" ? profile.id_verification_status : null
+      }
+      idVerified={Boolean(profile?.id_verified)}
+      idVerifiedAt={typeof profile?.id_verified_at === "string" ? profile.id_verified_at : null}
     />
   )
 }

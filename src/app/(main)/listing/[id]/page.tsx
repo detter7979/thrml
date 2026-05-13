@@ -49,6 +49,7 @@ type HostProfileRow = {
   bio?: string | null
   average_rating?: number | null
   total_reviews?: number | null
+  id_verified?: boolean | null
 }
 
 async function getHostProfile(
@@ -68,6 +69,7 @@ async function getHostProfile(
     "bio",
     "average_rating",
     "total_reviews",
+    "id_verified",
   ]
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -629,6 +631,7 @@ export default async function ListingDetailPage({
                   typeof hostProfile.total_reviews === "number" && Number.isFinite(hostProfile.total_reviews)
                     ? Number(hostProfile.total_reviews)
                     : 0,
+                id_verified: Boolean(hostProfile.id_verified),
               }
             : null
         }

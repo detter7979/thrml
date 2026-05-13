@@ -14,6 +14,7 @@ import {
 } from "@/lib/emails"
 import { sendPostSessionEmails } from "@/lib/emails/post-session"
 import { sendGA4Event } from "@/lib/analytics/measurement-protocol"
+import { fireServerEvent } from "@/lib/agent/meta-capi"
 import { mergeBookingLegalException, resolveActiveWaiverVersionForServiceType } from "@/lib/waiver-templates"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
 import { processReferralConversion } from "@/lib/referral"
@@ -56,6 +57,9 @@ export async function POST(req: NextRequest) {
     "payment_intent.payment_failed",
     "payment_intent.canceled",
     "account.updated",
+    "identity.verification_session.verified",
+    "identity.verification_session.requires_input",
+    "identity.verification_session.canceled",
   ])
   if (!supportedEvents.has(event.type)) {
     console.log("[stripe/webhook] Ignoring unsupported event type", {
@@ -699,6 +703,96 @@ export async function POST(req: NextRequest) {
         stripe_connect_updated_at: new Date().toISOString(),
       })
       .eq("stripe_account_id", account.id)
+  }
+
+  if (event.type === "identity.verification_session.verified") {
+    const session = event.data.object as Stripe.Identity.VerificationSession
+    const profileId = session.metadata?.profile_id
+    if (typeof profileId === "string" && profileId.length > 0) {
+      const { data: existingLog } = await supabase
+        .from("verification_sessions")
+        .select("id")
+        .eq("stripe_verification_id", session.id)
+        .eq("status", "verified")
+        .maybeSingle()
+
+      await supabase
+        .from("profiles")
+        .update({
+          id_verified: true,
+          id_verified_at: new Date().toISOString(),
+          id_verification_status: "verified",
+        })
+        .eq("id", profileId)
+
+      if (!existingLog?.id) {
+        await supabase.from("verification_sessions").insert({
+          profile_id: profileId,
+          stripe_verification_id: session.id,
+          status: "verified",
+          type: session.type ?? "document",
+          failure_reason: null,
+          raw_event: { stripe_event_id: event.id, type: event.type },
+        })
+
+        const { data: authUser } = await supabase.auth.admin.getUserById(profileId)
+        const email = authUser.user?.email ?? undefined
+        void fireServerEvent(
+          "host_verified",
+          { email, externalId: profileId },
+          { profile_id: profileId },
+          { eventId: `host_verified_${event.id}` }
+        )
+      }
+    } else {
+      console.warn("[stripe/webhook] identity.verification_session.verified missing profile_id metadata", {
+        sessionId: session.id,
+      })
+    }
+  }
+
+  if (event.type === "identity.verification_session.requires_input") {
+    const session = event.data.object as Stripe.Identity.VerificationSession
+    const profileId = session.metadata?.profile_id
+    const lastErr = session.last_error
+    const failureReason =
+      typeof lastErr?.code === "string"
+        ? lastErr.code
+        : typeof lastErr === "object" && lastErr && "message" in lastErr
+          ? String((lastErr as { message?: string }).message ?? "")
+          : null
+    if (typeof profileId === "string" && profileId.length > 0) {
+      await supabase
+        .from("profiles")
+        .update({ id_verification_status: "requires_input" })
+        .eq("id", profileId)
+
+      await supabase.from("verification_sessions").insert({
+        profile_id: profileId,
+        stripe_verification_id: session.id,
+        status: "requires_input",
+        type: session.type ?? "document",
+        failure_reason: failureReason,
+        raw_event: { stripe_event_id: event.id, type: event.type, last_error: lastErr ?? null },
+      })
+    }
+  }
+
+  if (event.type === "identity.verification_session.canceled") {
+    const session = event.data.object as Stripe.Identity.VerificationSession
+    const profileId = session.metadata?.profile_id
+    if (typeof profileId === "string" && profileId.length > 0) {
+      await supabase.from("profiles").update({ id_verification_status: "canceled" }).eq("id", profileId)
+
+      await supabase.from("verification_sessions").insert({
+        profile_id: profileId,
+        stripe_verification_id: session.id,
+        status: "canceled",
+        type: session.type ?? "document",
+        failure_reason: null,
+        raw_event: { stripe_event_id: event.id, type: event.type },
+      })
+    }
   }
 
   console.log("[stripe/webhook] Webhook request handled successfully")

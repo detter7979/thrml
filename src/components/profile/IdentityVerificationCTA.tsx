@@ -26,7 +26,7 @@ type Props = {
 
 function normalizeStatus(status: IdentityUiStatus, verified: boolean): IdentityUiStatus {
   if (verified) return "verified"
-  if (!status || status === "") return "not_started"
+  if (!status) return "not_started"
   return status
 }
 

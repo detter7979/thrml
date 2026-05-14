@@ -11,8 +11,9 @@ export type RecStatusT =
   | "FAILED"
   | "EXPIRED"
 
-/** Mirrors public.rec_kind_t */
+/** Mirrors public.rec_kind_t (plus AGENT_RUN used by reporting/evaluator actions_log rows in deployed DB). */
 export type RecKindT =
+  | "AGENT_RUN"
   | "CREATE_CAMPAIGN"
   | "CREATE_AD_SET"
   | "CREATE_AD"

@@ -121,12 +121,52 @@ export async function fetchMetaInsights(
   })
 }
 
+export type MetaMutationResult = {
+  ok: boolean
+  http_status: number
+  body: unknown
+}
+
+async function postGraphObject(objectId: string, query: Record<string, string>): Promise<MetaMutationResult> {
+  const params = new URLSearchParams({ access_token: token(), ...query })
+  const res = await fetch(`${META_GRAPH_BASE}/${objectId}?${params.toString()}`, { method: "POST" })
+  const text = await res.text()
+  let body: unknown = text
+  try {
+    body = JSON.parse(text) as unknown
+  } catch {
+    /* leave as string */
+  }
+  return { ok: res.ok, http_status: res.status, body }
+}
+
+/** Pause a Meta campaign (graph object id = platform_campaign_id). */
+export async function pauseCampaign(campaignId: string): Promise<MetaMutationResult> {
+  return postGraphObject(campaignId, { status: "PAUSED" })
+}
+
+/** Set campaign daily budget (Meta expects cents). */
+export async function setCampaignDailyBudgetUsd(campaignId: string, budgetUsd: number): Promise<MetaMutationResult> {
+  const cents = Math.max(0, Math.round(budgetUsd * 100))
+  return postGraphObject(campaignId, { daily_budget: String(cents) })
+}
+
+/** Set ad set daily budget (Meta expects cents). */
+export async function setAdSetDailyBudgetUsd(adsetId: string, budgetUsd: number): Promise<MetaMutationResult> {
+  const cents = Math.max(0, Math.round(budgetUsd * 100))
+  return postGraphObject(adsetId, { daily_budget: String(cents) })
+}
+
 export async function pauseAdSet(adsetId: string): Promise<boolean> {
   const res = await fetch(
     `${META_GRAPH_BASE}/${adsetId}?status=PAUSED&access_token=${encodeURIComponent(token())}`,
     { method: "POST" }
   )
   return res.ok
+}
+
+export async function pauseAdSetMutation(adsetId: string): Promise<MetaMutationResult> {
+  return postGraphObject(adsetId, { status: "PAUSED" })
 }
 
 export async function resumeAdSet(adsetId: string): Promise<boolean> {
@@ -143,6 +183,10 @@ export async function pauseAd(adId: string): Promise<boolean> {
     { method: "POST" }
   )
   return res.ok
+}
+
+export async function pauseAdMutation(adId: string): Promise<MetaMutationResult> {
+  return postGraphObject(adId, { status: "PAUSED" })
 }
 
 export async function resumeAd(adId: string): Promise<boolean> {

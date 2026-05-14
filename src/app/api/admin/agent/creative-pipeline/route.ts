@@ -144,7 +144,7 @@ export async function GET() {
   const approvedBriefs = await admin!
     .from("creative_briefs")
     .select("*")
-    .in("status", ["approved", "generating"])
+    .in("status", ["approved", "generating", "variations_ready"])
     .not("approved_at", "is", null)
     .order("approved_at", { ascending: false })
     .limit(50)

@@ -180,7 +180,12 @@ export default function AgentsDashboard() {
       sb.from("agent_runs").select("*").order("started_at", { ascending: false }).limit(30),
       sb.from("ops_alerts").select("*").eq("resolved", false).order("created_at", { ascending: false }).limit(20),
       sb.from("finance_snapshots").select("*").order("snapshot_date", { ascending: false }).limit(14),
-      sb.from("creative_queue").select("*").eq("status", "PENDING").order("created_at", { ascending: false }).limit(20),
+      sb
+        .from("creative_queue")
+        .select("*")
+        .in("status", ["PENDING", "brief_ready"])
+        .order("created_at", { ascending: false })
+        .limit(40),
       sb.from("inbox_drafts").select("*").eq("approved", false).is("sent_at", null).order("created_at", { ascending: false }).limit(20),
     ])
     setRuns((r1.data ?? []) as AgentRun[])

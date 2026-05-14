@@ -182,6 +182,44 @@ export type Recommendation = {
   updated_at: string
 }
 
+/** meta_executions.kind — Meta Marketing API executor (Phase A). */
+export type MetaExecutionKindT =
+  | "pause_campaign"
+  | "pause_ad_set"
+  | "pause_ad"
+  | "kill_campaign"
+  | "kill_ad_set"
+  | "kill_ad"
+  | "adjust_campaign_budget"
+  | "adjust_ad_set_budget"
+
+export type MetaExecutionSourceT = "approved_recommendation" | "launch_creative" | "manual"
+
+export type MetaExecutionStatusT = "pending" | "in_progress" | "success" | "failed" | "retrying"
+
+/** Row shape for public.meta_executions (provisioned outside this repo). */
+export type MetaExecutionRow = {
+  id: string
+  source: MetaExecutionSourceT
+  recommendation_id: string | null
+  kind: MetaExecutionKindT
+  target_campaign_id: string | null
+  target_ad_set_id: string | null
+  target_ad_id: string | null
+  meta_campaign_id: string | null
+  meta_adset_id: string | null
+  meta_ad_id: string | null
+  request_payload: Record<string, unknown>
+  response_payload: Record<string, unknown> | null
+  http_status: number | null
+  status: MetaExecutionStatusT
+  attempt: number
+  error_message: string | null
+  started_at: string
+  completed_at: string | null
+  next_retry_at: string | null
+}
+
 export type ActionLog = {
   id: string
   recommendation_id: string | null

@@ -6,8 +6,6 @@ import type { LucideIcon } from "lucide-react"
 import {
   BarChart3,
   CalendarDays,
-  ClipboardList,
-  FlaskConical,
   Gift,
   Home,
   Inbox,
@@ -27,8 +25,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Overview", icon: BarChart3 },
   { href: "/admin/analytics", label: "Analytics", icon: LineChart },
   { href: "/admin/paid-media", label: "Paid Media", icon: Megaphone },
-  { href: "/admin/paid-media/runs", label: "Paid Media · Reporting", icon: ClipboardList },
-  { href: "/admin/paid-media/evaluator", label: "Paid Media · Evaluator", icon: FlaskConical },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin/listings", label: "Listings", icon: Home },
   { href: "/admin/users", label: "Users", icon: Users },
@@ -37,7 +33,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/earnings", label: "Earnings", icon: BarChart3 },
   { href: "/admin/messages", label: "Messages", icon: Inbox },
   { href: "/admin/disputes", label: "Disputes", emoji: "⚖️" },
-  { href: "/admin/agent", label: "Agent", emoji: "🤖" },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 

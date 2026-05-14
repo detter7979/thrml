@@ -1,5 +1,3 @@
-import Link from "next/link"
-
 import { requireAdmin } from "@/lib/admin-guard"
 import { createClient } from "@/lib/supabase/server"
 import type { PendingRecViewRow } from "@/types/paid-media"
@@ -50,17 +48,9 @@ export default async function AdminPaidMediaPage() {
 
   return (
     <div className="space-y-6 px-6 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-3xl text-[#2A2118]">Paid media</h1>
-          <p className="text-sm text-[#6E5B49]">Approval queue and campaign system of record.</p>
-        </div>
-        <Link
-          href="/admin/paid-media/campaigns"
-          className="rounded-full border border-[#CDBCA8] bg-white px-3 py-1.5 text-sm text-[#2A2118] hover:bg-[#F3EADD]"
-        >
-          Campaigns
-        </Link>
+      <div>
+        <h1 className="font-serif text-3xl text-[#2A2118]">Paid media</h1>
+        <p className="text-sm text-[#6E5B49]">Approval queue and campaign system of record.</p>
       </div>
 
       {error ? (

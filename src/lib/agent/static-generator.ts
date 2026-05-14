@@ -271,7 +271,7 @@ export async function uploadCreativeAsset(buffer: Buffer, briefId: string, forma
 
 async function sendReadyEmail(count: number, brief: CreativeBriefRow) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-  const reviewUrl = `${appUrl}/admin/agents?tab=creatives`
+  const reviewUrl = `${appUrl}/admin/paid-media`
   const subject = `${count} new creative variations ready for review — ${brief.hook ?? "Static creative"}`
 
   await sendEmail({
@@ -280,7 +280,7 @@ async function sendReadyEmail(count: number, brief: CreativeBriefRow) {
     html: thrmlEmailWrapper(`
       <h1 style="color:#ffffff;font-size:24px;margin:0 0 16px;">${escapeHtml(subject)}</h1>
       <p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:0 0 16px;">
-        Static creative variations are ready for review in the agent dashboard.
+        Static creative variations are ready for review in Paid Media (approval queue / campaigns).
       </p>
       ${ctaButton("Review creatives", reviewUrl)}
     `),

@@ -240,7 +240,7 @@ export default async function PaidMediaCampaignsPage({
                       href={`/admin/paid-media/campaigns/${c.id}`}
                       className="text-[#9A4A33] underline-offset-2 hover:underline"
                     >
-                      Edit
+                      {c.status === "DRAFT" ? "Launch" : "View"}
                     </Link>
                   </td>
                 </tr>

@@ -89,7 +89,7 @@ export function AdminUsersClient({ initialRows }: { initialRows: AdminUserRow[] 
         setError(payload.error ?? "Unable to send message.")
         return
       }
-      window.location.href = `/admin/messages?conversationId=${payload.conversationId}`
+      window.location.href = `/admin/inbox/messages?conversationId=${payload.conversationId}`
     } finally {
       setMessagingId(null)
     }

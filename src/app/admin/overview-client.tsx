@@ -154,7 +154,7 @@ export function AdminOverviewClient({
               <h2 className="font-medium text-[#2A2118]">Message previews</h2>
             </div>
             <Link
-              href="/admin/messages"
+              href="/admin/inbox/messages"
               className="rounded-full border border-[#CDBCA8] bg-white px-3 py-1 text-xs text-[#2A2118] hover:bg-[#F3EADD]"
             >
               Open inbox

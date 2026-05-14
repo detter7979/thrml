@@ -1,5 +1,6 @@
+import { redirect } from "next/navigation"
+
 import { requireAdmin } from "@/lib/admin-guard"
-import { AdminMessagesHub } from "./admin-messages-hub"
 
 export const dynamic = "force-dynamic"
 
@@ -8,19 +9,18 @@ export default async function AdminMessagesPage({
 }: {
   searchParams: Promise<{ userId?: string; conversationId?: string; view?: string }>
 }) {
-  const { user } = await requireAdmin()
+  await requireAdmin()
   const query = await searchParams
-  const activeConversationId =
-    typeof query.conversationId === "string" && query.conversationId.length > 0
-      ? query.conversationId
-      : null
-  const initialView = query.view === "support" ? "support" : "messages"
-
-  return (
-    <AdminMessagesHub
-      currentUserId={user.id}
-      activeConversationId={activeConversationId}
-      initialView={initialView}
-    />
-  )
+  const q = new URLSearchParams()
+  if (typeof query.userId === "string" && query.userId.length > 0) {
+    q.set("userId", query.userId)
+  }
+  if (typeof query.conversationId === "string" && query.conversationId.length > 0) {
+    q.set("conversationId", query.conversationId)
+  }
+  if (query.view === "support") {
+    q.set("view", "support")
+  }
+  const s = q.toString()
+  redirect(s ? `/admin/inbox/messages?${s}` : "/admin/inbox/messages")
 }

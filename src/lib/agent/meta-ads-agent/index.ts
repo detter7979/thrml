@@ -1,3 +1,18 @@
+/**
+ * Meta Ads Agent — Phase A
+ *
+ * Picks up APPROVED recommendations from the queue and executes them
+ * against the Meta Marketing API. Internal-only actions (status changes,
+ * budget adjustments) on existing entities.
+ *
+ * Cron: every 5 min during 07:00-23:00 UTC.
+ * Audit: writes to meta_executions + actions_log.
+ *
+ * Future phases:
+ *   - Phase B: auto-approval based on rules
+ *   - Phase C: creative brief generation, asset push to Meta
+ */
+
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { dispatchExecution } from "./executors"

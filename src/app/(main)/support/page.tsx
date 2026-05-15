@@ -124,7 +124,7 @@ const GUIDE_CATEGORIES: GuideCategory[] = [
       {
         question: "Can I reschedule instead of cancelling?",
         answer:
-          "Rescheduling works by cancelling your current booking and rebooking your new time. Standard cancellation terms apply so we recommend rescheduling as far in advance as possible.",
+          "Yes. From My Bookings (guest) or your listing dashboard (host), open an upcoming confirmed booking and choose Reschedule. Pick a new available time — same session length and price, no extra charge. Guests must reschedule at least 24 hours before the session.",
       },
     ],
   },

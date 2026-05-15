@@ -8,28 +8,52 @@
 const DEFAULT_CARD_WIDTH = 640
 const DEFAULT_QUALITY = 76
 
+export type ListingPhotoThumbnailOptions = {
+  width?: number
+  height?: number
+  quality?: number
+  /** Crop to exact dimensions (email cards). Defaults to width-only scaling when omitted. */
+  resize?: "cover" | "contain" | "fill"
+}
+
 export function listingPhotoThumbnailUrl(
   rawUrl: string | null | undefined,
-  options?: { width?: number; quality?: number }
+  options?: ListingPhotoThumbnailOptions
 ): string | null {
   if (typeof rawUrl !== "string") return null
   const trimmed = rawUrl.trim()
   if (!trimmed) return null
 
   if (!trimmed.includes(".supabase.co/storage/v1/")) return trimmed
-  if (trimmed.includes("/storage/v1/render/image/")) return trimmed
   if (trimmed.includes("/storage/v1/object/sign/")) return trimmed
 
   const objectPublic = "/storage/v1/object/public/"
-  if (!trimmed.includes(objectPublic)) return trimmed
+  const renderPrefix = "/storage/v1/render/image/public/"
 
   const width = options?.width ?? DEFAULT_CARD_WIDTH
   const quality = options?.quality ?? DEFAULT_QUALITY
 
-  const [base] = trimmed.split("?", 1)
-  const renderBase = base.replace(objectPublic, "/storage/v1/render/image/public/")
-  const params = new URLSearchParams()
+  const [base, query = ""] = trimmed.split("?", 2)
+  const renderBase = base.includes(renderPrefix)
+    ? base
+    : base.includes(objectPublic)
+      ? base.replace(objectPublic, renderPrefix)
+      : null
+
+  if (!renderBase) return trimmed
+
+  const params = new URLSearchParams(query)
   params.set("width", String(width))
   params.set("quality", String(quality))
+  if (typeof options?.height === "number" && options.height > 0) {
+    params.set("height", String(options.height))
+  } else {
+    params.delete("height")
+  }
+  if (options?.resize) {
+    params.set("resize", options.resize)
+  } else {
+    params.delete("resize")
+  }
   return `${renderBase}?${params.toString()}`
 }

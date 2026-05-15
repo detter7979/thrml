@@ -48,7 +48,12 @@ async function logEmail(userId: string, emailType: string): Promise<void> {
 
 // ─── Host retargeting (no listing created after 3 or 7 days) ─────────────
 
-export async function processHostRetargeting(): Promise<{ sent: number }> {
+type RetargetOptions = {
+  /** Skip addresses that receive the weekly newsletter digest (avoids same-day overlap). */
+  skipEmails?: Set<string>
+}
+
+export async function processHostRetargeting(options?: RetargetOptions): Promise<{ sent: number }> {
   const admin = createAdminClient()
   const now = new Date()
   const day3Start = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
@@ -89,6 +94,7 @@ export async function processHostRetargeting(): Promise<{ sent: number }> {
     const { data: authUser } = await admin.auth.admin.getUserById(profile.id)
     const email = authUser.user?.email
     if (!email) continue
+    if (options?.skipEmails?.has(email.trim().toLowerCase())) continue
 
     const firstName = (profile.full_name as string | null)?.split(" ")[0] ?? "there"
     const listingUrl = `${APP_URL}/dashboard/listings/new`
@@ -122,7 +128,7 @@ export async function processHostRetargeting(): Promise<{ sent: number }> {
 
 // ─── Guest retargeting (no booking made after 3 or 7 days) ───────────────
 
-export async function processGuestRetargeting(): Promise<{ sent: number }> {
+export async function processGuestRetargeting(options?: RetargetOptions): Promise<{ sent: number }> {
   const admin = createAdminClient()
   const now = new Date()
   const day3Start = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
@@ -133,6 +139,7 @@ export async function processGuestRetargeting(): Promise<{ sent: number }> {
   const { data: profiles } = await admin
     .from("profiles")
     .select("id, full_name, created_at")
+    .or("is_host.eq.false,is_host.is.null")
     .or(
       `and(created_at.gte.${day3Start.toISOString()},created_at.lte.${day3End.toISOString()}),` +
       `and(created_at.gte.${day7Start.toISOString()},created_at.lte.${day7End.toISOString()})`
@@ -161,6 +168,7 @@ export async function processGuestRetargeting(): Promise<{ sent: number }> {
     const { data: authUser } = await admin.auth.admin.getUserById(profile.id)
     const email = authUser.user?.email
     if (!email) continue
+    if (options?.skipEmails?.has(email.trim().toLowerCase())) continue
 
     const firstName = (profile.full_name as string | null)?.split(" ")[0] ?? "there"
     const exploreUrl = `${APP_URL}/explore`

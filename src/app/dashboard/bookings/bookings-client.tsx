@@ -18,6 +18,7 @@ import {
 
 import { BookingReviewDialog } from "@/components/booking/BookingReviewDialog"
 import { CancelModal } from "@/components/booking/CancelModal"
+import { RescheduleModal } from "@/components/booking/RescheduleModal"
 import { Button } from "@/components/ui/button"
 import { guestCompletedTabBooking } from "@/lib/booking-session"
 import { resolveInstructions } from "@/lib/constants/access-types"
@@ -123,6 +124,13 @@ function isCancellationOpen(booking: BookingRecord) {
   const deadline = new Date(startsAt.getTime() - 24 * 60 * 60 * 1000)
   const diffMs = deadline.getTime() - Date.now()
   return { open: diffMs > 0, hoursRemaining: Math.floor(diffMs / (1000 * 60 * 60)) }
+}
+
+function canRescheduleBooking(booking: BookingRecord) {
+  if (booking.status !== "confirmed" && booking.status !== "pending_host") return false
+  if (!booking.session_date || !booking.start_time) return false
+  const startsAt = new Date(`${booking.session_date}T${booking.start_time}`)
+  return startsAt.getTime() > Date.now()
 }
 
 function canLeaveGuestReview(booking: BookingRecord) {
@@ -795,7 +803,18 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 ? `Free cancellation for ~${formatCancellationWindow(cancellation.hoursRemaining)}`
                                 : "Non-refundable"}
                             </p>
-                            <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {canRescheduleBooking(booking) ? (
+                                <RescheduleModal
+                                  bookingId={booking.id}
+                                  listingTitle={booking.listings?.title ?? "Session"}
+                                  currentSessionDate={booking.session_date}
+                                  currentStartTime={booking.start_time}
+                                  currentEndTime={booking.end_time}
+                                  userRole={userRole}
+                                  onRescheduled={loadBookings}
+                                />
+                              ) : null}
                               <CancelModal
                                 booking={{
                                   id: booking.id,
@@ -805,7 +824,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                   listing_title: booking.listings?.title ?? null,
                                   service_fee: booking.service_fee,
                                 }}
-                                userRole="guest"
+                                userRole={userRole}
                                 onConfirm={({ reason }) => cancelBooking(booking.id, reason)}
                               />
                             </div>
@@ -1147,6 +1166,26 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                               </p>
                             </section>
                             <div className="mt-4 space-y-3 border-t border-[#F0E8E0] pt-3">
+                              {canRescheduleBooking(booking) ? (
+                                <RescheduleModal
+                                  bookingId={booking.id}
+                                  listingTitle={booking.listings?.title ?? "Session"}
+                                  currentSessionDate={booking.session_date}
+                                  currentStartTime={booking.start_time}
+                                  currentEndTime={booking.end_time}
+                                  userRole={userRole}
+                                  onRescheduled={loadBookings}
+                                  trigger={
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="w-full rounded-xl border-[#E2D8CC] bg-white"
+                                    >
+                                      Reschedule
+                                    </Button>
+                                  }
+                                />
+                              ) : null}
                               {cancellation.open ? (
                                 <div className="flex items-center gap-1 text-xs text-[#7A6A5D]">
                                   <span>Need to cancel?</span>

@@ -95,7 +95,14 @@ function bestPhotoUrl(supabase: SupabaseClient, row: DigestListingRow): string |
   )
   for (const p of sorted) {
     const resolved = resolveListingStorageUrl(supabase, p.url)
-    if (resolved) return listingPhotoThumbnailUrl(resolved, { width: 560, quality: 78 })
+    if (resolved) {
+      return listingPhotoThumbnailUrl(resolved, {
+        width: 532,
+        height: 332,
+        quality: 78,
+        resize: "cover",
+      })
+    }
   }
   return null
 }
@@ -230,10 +237,10 @@ function renderListingCardHtml(supabase: SupabaseClient, row: DigestListingRow):
       : ""
   const imgUrl = bestPhotoUrl(supabase, row)
   const imageBlock = imgUrl
-    ? `<a href="${url}" style="text-decoration:none;color:inherit;">
-        <img src="${escapeHtml(imgUrl)}" alt="" width="532" style="display:block;width:100%;max-width:100%;height:auto;border:0;border-radius:12px 12px 0 0;object-fit:cover;aspect-ratio:16/10;background:#E9DED4;" />
+    ? `<a href="${url}" style="text-decoration:none;color:inherit;display:block;line-height:0;font-size:0;">
+        <img src="${escapeHtml(imgUrl)}" alt="" width="532" height="332" style="display:block;width:100%;max-width:532px;height:332px;border:0;border-radius:12px 12px 0 0;background:#E9DED4;" />
       </a>`
-    : `<a href="${url}" style="display:block;text-decoration:none;background:linear-gradient(145deg,#3D2E26,#1A1410);border-radius:12px 12px 0 0;min-height:140px;"></a>`
+    : `<a href="${url}" style="display:block;text-decoration:none;background:linear-gradient(145deg,#3D2E26,#1A1410);border-radius:12px 12px 0 0;height:332px;line-height:332px;font-size:0;">&nbsp;</a>`
 
   return `
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border-collapse:separate;border:1px solid #E3D7CC;border-radius:12px;overflow:hidden;background:#fff;">

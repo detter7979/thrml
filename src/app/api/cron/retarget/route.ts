@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import {
+  isWeeklyDigestDue,
+  loadActiveNewsletterEmails,
+  weeklyDigestCooldownMs,
+} from "@/lib/emails/newsletter-digest"
 import { processGuestRetargeting, processHostRetargeting } from "@/lib/emails/retargeting"
 import { sendEmail } from "@/lib/emails/send"
 import {
@@ -20,17 +25,19 @@ function authGuard(req: NextRequest): boolean {
   return Boolean(secret && supplied === secret)
 }
 
-async function sendNewsletterDigest(): Promise<{ sent: number; skipped: number }> {
+async function sendNewsletterDigest(): Promise<{ sent: number; skipped: number; skipped_recent: number }> {
   const admin = createAdminClient()
+  const cooldownCutoff = new Date(Date.now() - weeklyDigestCooldownMs()).toISOString()
   const { data: subscribers, error: subError } = await admin
     .from("newsletter_subscribers")
-    .select("email, market_city, market_state")
+    .select("email, market_city, market_state, last_weekly_digest_sent_at")
     .eq("is_active", true)
+    .or(`last_weekly_digest_sent_at.is.null,last_weekly_digest_sent_at.lt.${cooldownCutoff}`)
 
   if (subError) {
     console.error("[retarget] newsletter subscribers load failed", subError.message)
   }
-  if (!subscribers?.length) return { sent: 0, skipped: 0 }
+  if (!subscribers?.length) return { sent: 0, skipped: 0, skipped_recent: 0 }
 
   const exploreUrl = `${APP_URL}/explore`
   const unsubBase = `${APP_URL}/unsubscribe`
@@ -45,9 +52,14 @@ async function sendNewsletterDigest(): Promise<{ sent: number; skipped: number }
 
   let sent = 0
   let skipped = 0
+  let skippedRecent = 0
 
   for (const row of subscribers) {
     const email = row.email as string
+    if (!isWeeklyDigestDue(row.last_weekly_digest_sent_at as string | null | undefined)) {
+      skippedRecent++
+      continue
+    }
     const marketCity =
       typeof row.market_city === "string" && row.market_city.trim().length >= 2
         ? row.market_city.trim()
@@ -85,10 +97,22 @@ async function sendNewsletterDigest(): Promise<{ sent: number; skipped: number }
     })
 
     const result = await sendEmail({ to: email, subject, html, text })
-    result.sent ? sent++ : skipped++
+    if (result.sent) {
+      sent++
+      const { error: markError } = await admin
+        .from("newsletter_subscribers")
+        .update({ last_weekly_digest_sent_at: new Date().toISOString() })
+        .eq("email", email)
+        .eq("is_active", true)
+      if (markError) {
+        console.error("[retarget] failed to mark weekly digest sent", { email, error: markError.message })
+      }
+    } else {
+      skipped++
+    }
   }
 
-  return { sent, skipped }
+  return { sent, skipped, skipped_recent: skippedRecent }
 }
 
 export async function GET(req: NextRequest) {
@@ -96,9 +120,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const admin = createAdminClient()
+  const newsletterEmails = await loadActiveNewsletterEmails(admin)
+
   const [hostResult, guestResult, newsletterResult] = await Promise.allSettled([
-    processHostRetargeting(),
-    processGuestRetargeting(),
+    processHostRetargeting({ skipEmails: newsletterEmails }),
+    processGuestRetargeting({ skipEmails: newsletterEmails }),
     sendNewsletterDigest(),
   ])
 

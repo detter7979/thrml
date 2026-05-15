@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Check, ChevronDown, ChevronUp, Copy } from "lucide-react"
 
 import { CancelModal } from "@/components/booking/CancelModal"
+import { RescheduleModal } from "@/components/booking/RescheduleModal"
 import { RatingSummary } from "@/components/reviews/RatingSummary"
 import { ReviewCard } from "@/components/reviews/ReviewCard"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -196,6 +197,12 @@ export function DashboardListingsClient({
     setCodeByBooking(nextCodes)
     setSavedCodeByBooking(nextCodes)
   }, [listings])
+
+  function canRescheduleHostBooking(booking: { status: string; session_date: string | null; start_time: string | null }) {
+    if (booking.status !== "confirmed" && booking.status !== "pending_host") return false
+    if (!booking.session_date || !booking.start_time) return false
+    return new Date(`${booking.session_date}T${booking.start_time}`).getTime() > Date.now()
+  }
 
   async function cancelBooking(bookingId: string, reason?: string) {
     const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
@@ -726,7 +733,18 @@ export function DashboardListingsClient({
                                       )}
                                     </div>
                                   </div>
-                                  <div className={showAccessCode ? "" : "mt-2"}>
+                                  <div className={`flex flex-wrap items-center gap-2 ${showAccessCode ? "" : "mt-2"}`}>
+                                    {canRescheduleHostBooking(booking) ? (
+                                      <RescheduleModal
+                                        bookingId={booking.id}
+                                        listingTitle={listing.title ?? "Session"}
+                                        currentSessionDate={booking.session_date}
+                                        currentStartTime={booking.start_time}
+                                        currentEndTime={booking.end_time}
+                                        userRole="host"
+                                        onRescheduled={() => router.refresh()}
+                                      />
+                                    ) : null}
                                     <CancelModal
                                       booking={{
                                         id: booking.id,

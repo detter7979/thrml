@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     if (!result.ok) {
       console.error("[meta-ads-agent]", result.error)
       return NextResponse.json(
-        { ok: false, error: result.error, runId: result.runId, ...result },
+        { ...result, ok: false, error: result.error },
         { status: 500 },
       )
     }

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     revalidatePath("/admin/paid-media/executions")
     if (!result.ok) {
       return NextResponse.json(
-        { ok: false, error: result.error, runId: result.runId, ...result },
+        { ...result, ok: false, error: result.error },
         { status: 500 },
       )
     }

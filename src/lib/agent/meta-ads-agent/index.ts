@@ -5,7 +5,7 @@
  * against the Meta Marketing API. Internal-only actions (status changes,
  * budget adjustments) on existing entities.
  *
- * Cron: every 5 min during 07:00-23:00 UTC.
+ * Cron: once daily (see vercel.json; default 11:00 UTC, after evaluator-agent).
  * Audit: writes to meta_executions + actions_log.
  *
  * Future phases:

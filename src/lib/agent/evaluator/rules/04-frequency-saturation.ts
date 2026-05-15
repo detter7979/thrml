@@ -1,3 +1,8 @@
+import {
+  aggregateAdMaster,
+  buildCreativePayload,
+  variantsForAd,
+} from "../creative-payload"
 import type { EvaluatorContext, PerformanceDailyRow, RuleResult } from "../types"
 import { isoDateUtcDaysAgo, ruleNumber } from "../types"
 
@@ -32,15 +37,40 @@ export function rule04FrequencySaturation(ctx: EvaluatorContext): RuleResult[] {
     const over = avg - cap
     const confidence = Math.min(0.95, Math.max(0.55, 0.55 + (over / Math.max(cap, 0.1)) * 0.2))
 
+    const dFrom = isoDateUtcDaysAgo(6)
+    const dTo = isoDateUtcDaysAgo(0)
+    const adsInSet = ctx.ads.filter((a) => a.ad_set_id === s.id && (a.status === "TEST" || a.status === "SCALE"))
+    let pick = adsInSet[0]
+    let bestSpend = -1
+    for (const a of adsInSet) {
+      const agg = aggregateAdMaster(ctx.performance, a.id, dFrom, dTo)
+      if (agg.spend > bestSpend) {
+        bestSpend = agg.spend
+        pick = a
+      }
+    }
+    const variations = ((): 1 | 2 | 3 => {
+      const n = Math.round(ruleNumber(ctx.rules, "creative", "frequency_saturation_variations", 3))
+      return n >= 3 ? 3 : n === 2 ? 2 : 1
+    })()
+
+    const vars = pick ? variantsForAd(pick, "frequency_refresh", variations) : []
+
     out.push({
       kind: "GENERATE_CREATIVE",
-      target: { campaignId: s.campaign_id, adSetId: s.id },
-      payload: {
+      target: { campaignId: s.campaign_id, adSetId: s.id, adId: pick?.id },
+      payload: buildCreativePayload({
+        strategy: "frequency_refresh",
         rule: "04-frequency-saturation",
-        avg_frequency_7d: avg,
-        cap,
-        funnel,
-      },
+        variations,
+        variants: vars,
+        messaging_direction: `Audience fatigue (${avg.toFixed(2)} avg frequency / 7d). Introduce net-new creative angles for this ad set.`,
+        extra: {
+          avg_frequency_7d: avg,
+          cap,
+          funnel,
+        },
+      }),
       evidence: { days_sampled: days, frequency: avg },
       rationale: `Ad set ${s.legacy_id ?? s.name}: 7d avg frequency ${avg.toFixed(2)} exceeds cap ${cap} (${funnel}).`,
       confidence,

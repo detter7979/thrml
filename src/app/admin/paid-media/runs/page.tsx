@@ -43,7 +43,7 @@ export default async function PaidMediaReportingRunsPage() {
 
       {rows.length === 0 && !error ? (
         <p className="rounded-2xl border border-[#DCCDBA] bg-[#FCFAF7] px-4 py-6 text-sm text-[#5B4A3A]">
-          No runs yet. The agent runs daily at 09:00 UTC.
+          No runs yet. The agent runs daily at 09:05 UTC.
         </p>
       ) : null}
 
@@ -54,6 +54,7 @@ export default async function PaidMediaReportingRunsPage() {
               <tr className="border-b border-[#EDE8E2] bg-[#F5F0EA] text-left text-xs font-semibold uppercase tracking-wide text-[#6E5B49]">
                 <th className="px-4 py-3">Timestamp</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Error</th>
                 <th className="px-4 py-3">Rows / duration / payload</th>
               </tr>
             </thead>
@@ -69,9 +70,20 @@ export default async function PaidMediaReportingRunsPage() {
                   <tr key={row.id} className="border-b border-[#EDE8E2] last:border-0">
                     <td className="whitespace-nowrap px-4 py-3 text-[#2A2118]">{ts} UTC</td>
                     <td className="px-4 py-3">
-                      <span className={row.success ? "text-[#2D6A4F]" : "text-[#C0392B]"} title={row.error_message ?? ""}>
+                      <span className={row.success ? "text-[#2D6A4F]" : "text-[#C0392B]"}>
                         {status} {row.success ? "success" : "failed"}
                       </span>
+                    </td>
+                    <td className="max-w-md px-4 py-3 align-top text-xs text-[#5B4A3A]">
+                      {row.success ? (
+                        "—"
+                      ) : row.error_message ? (
+                        <span className="line-clamp-4 whitespace-pre-wrap text-[#C0392B]" title={row.error_message}>
+                          {row.error_message}
+                        </span>
+                      ) : (
+                        <span className="text-[#A08E7A]">No message</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <PayloadCell row={row} />

@@ -533,6 +533,7 @@ export async function runReportingIngest(
           ad_sets_processed,
           ads_processed,
           duration_ms: Date.now() - t0,
+          error: msg,
         },
       })
       .eq("id", runId)

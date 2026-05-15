@@ -37,9 +37,15 @@ create table if not exists public.creative_assets (
   launched_at timestamptz
 );
 
-alter table public.creative_queue
-  add column if not exists type text,
-  add column if not exists brief_id uuid references public.creative_briefs(id);
+-- creative_queue may not exist on older / manual databases; do not roll back briefs/assets DDL.
+do $$
+begin
+  if to_regclass('public.creative_queue') is not null then
+    alter table public.creative_queue
+      add column if not exists type text,
+      add column if not exists brief_id uuid references public.creative_briefs(id);
+  end if;
+end $$;
 
 alter table public.creative_briefs enable row level security;
 alter table public.creative_assets enable row level security;

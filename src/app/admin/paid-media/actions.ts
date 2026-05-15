@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireAdmin } from "@/lib/admin-guard"
+import { insertCreativeBriefFromGenerateCreativeRecommendation } from "@/lib/agent/evaluator/creative-brief-from-recommendation"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { ActorT, RecKindT, Recommendation } from "@/types/paid-media"
 
@@ -36,7 +37,9 @@ export async function approveRecommendation(id: string): Promise<ActionResult> {
 
   const { data: rec, error: fetchError } = await admin
     .from("recommendations")
-    .select("id, kind, status, target_campaign_id, target_ad_set_id, target_ad_id, payload, modified_payload")
+    .select(
+      "id, kind, status, target_campaign_id, target_ad_set_id, target_ad_id, payload, modified_payload, rationale, evidence"
+    )
     .eq("id", id)
     .maybeSingle()
 
@@ -45,6 +48,11 @@ export async function approveRecommendation(id: string): Promise<ActionResult> {
 
   const approvedBy = user.email?.trim() || user.id
   const now = new Date().toISOString()
+
+  const effectivePayload =
+    rec.modified_payload && typeof rec.modified_payload === "object"
+      ? (rec.modified_payload as Record<string, unknown>)
+      : (rec.payload as Record<string, unknown>)
 
   const { error: updateError } = await admin
     .from("recommendations")
@@ -58,12 +66,23 @@ export async function approveRecommendation(id: string): Promise<ActionResult> {
 
   if (updateError) return { ok: false, error: updateError.message }
 
-  const effectivePayload =
-    rec.modified_payload && typeof rec.modified_payload === "object"
-      ? (rec.modified_payload as Record<string, unknown>)
-      : (rec.payload as Record<string, unknown>)
-
   try {
+    if (rec.kind === "GENERATE_CREATIVE") {
+      const briefRes = await insertCreativeBriefFromGenerateCreativeRecommendation(admin, rec, effectivePayload)
+      if (!briefRes.ok) {
+        await admin
+          .from("recommendations")
+          .update({
+            status: "PENDING",
+            approved_at: null,
+            approved_by: null,
+          })
+          .eq("id", id)
+          .eq("status", "APPROVED")
+        return { ok: false, error: briefRes.error }
+      }
+    }
+
     await insertHumanActionLog(
       admin,
       {
@@ -76,11 +95,21 @@ export async function approveRecommendation(id: string): Promise<ActionResult> {
       { action: "approve", payload: effectivePayload }
     )
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Failed to write actions log." }
+    await admin
+      .from("recommendations")
+      .update({
+        status: "PENDING",
+        approved_at: null,
+        approved_by: null,
+      })
+      .eq("id", id)
+      .eq("status", "APPROVED")
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to finalize approval." }
   }
 
   revalidatePath("/admin/paid-media")
   revalidatePath("/admin/paid-media/campaigns")
+  revalidatePath("/admin/agents")
   return { ok: true }
 }
 

@@ -128,6 +128,17 @@ function defaultVariationCount() {
   return envVariationCount("CREATIVE_STATIC_VARIATIONS") ?? envVariationCount("CREATIVE_VARIATIONS") ?? DEFAULT_STATIC_VARIATION_COUNT
 }
 
+function briefRequestedVariationCount(brief: CreativeBriefRow): StaticVariationCount | null {
+  const td = brief.trigger_data
+  if (!td) return null
+  const sc = td.success_criteria
+  const fromSc =
+    sc && typeof sc === "object" && !Array.isArray(sc)
+      ? normalizeVariationCount((sc as Record<string, unknown>).variations)
+      : null
+  return normalizeVariationCount(td.variations) ?? fromSc
+}
+
 function briefGenerator(brief: CreativeBriefRow, override?: StaticGenerator) {
   if (override) return override
   const triggerGenerator = brief.trigger_data?.generator ?? brief.trigger_data?.static_generator
@@ -318,7 +329,7 @@ async function processStaticBriefInner(
   const formats = Array.from(new Set(requestedFormats)).slice(0, 2)
   const requestedVariations = staticPlan?.length
     ? (Math.min(staticPlan.length, 3) as StaticVariationCount)
-    : (options.variations ?? defaultVariationCount())
+    : (options.variations ?? briefRequestedVariationCount(brief) ?? defaultVariationCount())
   const baseCount = countBaseImages(generators.length, formats.length, requestedVariations)
   const subtextLocked = lockedSubtextForBrief(brief)
   let generated = 0

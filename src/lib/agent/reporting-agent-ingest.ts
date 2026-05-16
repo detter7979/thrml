@@ -24,6 +24,8 @@ export type ReportingIngestResult = {
   ok: boolean
   runId: string | null
   error?: string
+  /** Set when ingest succeeds with zero rows (no DB campaigns or Meta has no insights). */
+  reason?: string
   partial?: boolean
   last_campaign_processed?: string | null
   resume_token?: string | null
@@ -482,6 +484,13 @@ export async function runReportingIngest(
     }
 
     const duration_ms = Date.now() - t0
+    const reason =
+      rows_ingested === 0
+        ? list.length === 0
+          ? "no_campaigns_in_db"
+          : "no_active_campaigns"
+        : undefined
+
     await admin
       .from("actions_log")
       .update({
@@ -499,6 +508,7 @@ export async function runReportingIngest(
           partial,
           last_campaign_processed: partial ? lastLegacy : null,
           resume_token: partial ? resume_token : null,
+          ...(reason ? { reason } : {}),
         },
         error_message: null,
       })
@@ -515,6 +525,7 @@ export async function runReportingIngest(
       ad_sets_processed,
       ads_processed,
       duration_ms,
+      ...(reason ? { reason } : {}),
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

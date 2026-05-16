@@ -65,6 +65,36 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
 
+export type MetaGraphErrorPayload = {
+  code?: number
+  message?: string
+  error_subcode?: number
+  type?: string
+}
+
+/** Parse Graph API error object from a non-OK response body. */
+export function parseMetaGraphErrorFromText(text: string): MetaGraphErrorPayload | null {
+  try {
+    const j = JSON.parse(text) as { error?: MetaGraphErrorPayload }
+    return j.error ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Meta returns code 100 with this message when an account/object has no insights data.
+ * Empty-state — not auth, rate limit, or a broken query.
+ */
+export function isEmptyAccountError(err: { code?: number; message?: string } | null | undefined): boolean {
+  if (err?.code !== 100) return false
+  const m = (err.message ?? "").toLowerCase()
+  return m.includes("nonexisting field") && m.includes("insights")
+}
+
+const EMPTY_INSIGHTS_LOG =
+  "Meta reporting: no active campaigns / no insights data — skipping ingest"
+
 async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response> {
   const delays = [1000, 2000, 4000]
   let lastErr: unknown
@@ -175,14 +205,25 @@ async function fetchAllPages(initialUrl: string): Promise<Record<string, unknown
     const res = await fetchWithRetry(url)
     if (!res.ok) {
       const t = await res.text()
+      const err = parseMetaGraphErrorFromText(t)
+      if (isEmptyAccountError(err)) {
+        console.log(EMPTY_INSIGHTS_LOG)
+        return []
+      }
       throw new Error(`Meta insights error ${res.status}: ${t.slice(0, 500)}`)
     }
     const json = (await res.json()) as {
       data?: Record<string, unknown>[]
       paging?: { next?: string }
-      error?: { message?: string }
+      error?: MetaGraphErrorPayload
     }
-    if (json.error?.message) throw new Error(json.error.message)
+    if (json.error) {
+      if (isEmptyAccountError(json.error)) {
+        console.log(EMPTY_INSIGHTS_LOG)
+        return rows
+      }
+      if (json.error.message) throw new Error(json.error.message)
+    }
     rows.push(...(json.data ?? []))
     url = json.paging?.next ?? null
   }

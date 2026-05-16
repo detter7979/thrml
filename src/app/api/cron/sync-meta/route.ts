@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { isEmptyAccountError, parseMetaGraphErrorFromText } from "@/lib/agent/meta-ads-api"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 function yesterday() {
@@ -43,6 +44,10 @@ export async function GET(req: NextRequest) {
   const metaRes = await fetch(url)
   if (!metaRes.ok) {
     const err = await metaRes.text()
+    if (isEmptyAccountError(parseMetaGraphErrorFromText(err))) {
+      console.log("Meta reporting: no active campaigns / no insights data — skipping ingest")
+      return NextResponse.json({ ok: true, date, upserted: 0, reason: "no_active_campaigns" })
+    }
     console.error("[sync-meta] API error", err)
     return NextResponse.json({ error: "Meta API failed", detail: err }, { status: 500 })
   }

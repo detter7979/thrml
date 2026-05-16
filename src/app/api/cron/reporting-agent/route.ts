@@ -33,7 +33,10 @@ export async function GET(req: NextRequest) {
       partial: result.partial,
       rows_ingested: result.rows_ingested,
       campaigns_processed: result.campaigns_processed,
+      ad_sets_processed: result.ad_sets_processed,
+      ads_processed: result.ads_processed,
       duration_ms: result.duration_ms,
+      ...(result.reason ? { reason: result.reason } : {}),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error"

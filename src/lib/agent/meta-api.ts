@@ -1,3 +1,5 @@
+import { isEmptyAccountError, parseMetaGraphErrorFromText } from "@/lib/agent/meta-ads-api"
+
 export const META_GRAPH_BASE = "https://graph.facebook.com/v22.0"
 
 export function getMetaMarketingApiToken() {
@@ -86,11 +88,24 @@ export async function fetchMetaInsights(
 
   while (url) {
     const res = await fetch(url)
-    if (!res.ok) throw new Error(`Meta insights error: ${await res.text()}`)
+    if (!res.ok) {
+      const text = await res.text()
+      if (isEmptyAccountError(parseMetaGraphErrorFromText(text))) {
+        console.log("Meta reporting: no active campaigns / no insights data — skipping ingest")
+        return []
+      }
+      throw new Error(`Meta insights error: ${text}`)
+    }
     const json = (await res.json()) as {
       data?: Record<string, unknown>[]
       paging?: { next?: string }
+      error?: { code?: number; message?: string }
     }
+    if (json.error && isEmptyAccountError(json.error)) {
+      console.log("Meta reporting: no active campaigns / no insights data — skipping ingest")
+      return []
+    }
+    if (json.error?.message) throw new Error(json.error.message)
     rows.push(...(json.data ?? []))
     url = json.paging?.next ?? null
   }

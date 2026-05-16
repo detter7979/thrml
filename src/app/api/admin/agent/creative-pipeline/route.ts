@@ -58,13 +58,15 @@ async function withSignedUrls<T extends CreativeAssetRow>(assets: T[]) {
 }
 
 async function fetchMetaAdsets(admin: AdminClient) {
-  const select = "id, platform_id, adset_name, status, market, aud_type, goal_type"
-  const metaRegistry = await admin.from("meta_adset_registry").select(select).order("created_at", { ascending: false })
+  const metaRegistry = await admin
+    .from("meta_adset_registry")
+    .select("*")
+    .order("created_at", { ascending: false })
   if (!metaRegistry.error) return metaRegistry
 
   return admin
     .from("adset_registry")
-    .select(select)
+    .select("*")
     .eq("platform", "meta")
     .order("created_at", { ascending: false })
 }

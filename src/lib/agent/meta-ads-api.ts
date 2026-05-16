@@ -1,6 +1,7 @@
 /**
  * Meta Marketing API — insights + campaign listing (HTTP only, no SDK).
- * Env: META_ACCESS_TOKEN or META_MARKETING_API_TOKEN (legacy), META_AD_ACCOUNT_ID, optional META_API_VERSION (default v21.0).
+ * Env: META_MARKETING_API_TOKEN (required), META_AD_ACCOUNT_ID, optional META_API_VERSION (default v21.0).
+ * Do not set META_ACCESS_TOKEN — it is retired; a non-empty value will fail fast so stale keys are noticed.
  */
 
 export type MetaAction = { action_type: string; value?: string }
@@ -37,8 +38,20 @@ function graphBase(): string {
 }
 
 export function getMetaAccessToken(): string {
-  const t = process.env.META_ACCESS_TOKEN ?? process.env.META_MARKETING_API_TOKEN
-  if (!t) throw new Error("META_ACCESS_TOKEN or META_MARKETING_API_TOKEN is required")
+  const legacy = process.env.META_ACCESS_TOKEN?.trim()
+  if (legacy) {
+    throw new Error(
+      "META_ACCESS_TOKEN is deprecated and must be removed from the environment. " +
+        "Use META_MARKETING_API_TOKEN only for the Meta Marketing API."
+    )
+  }
+  const t = process.env.META_MARKETING_API_TOKEN?.trim()
+  if (!t) {
+    throw new Error(
+      "META_MARKETING_API_TOKEN is required for Meta Marketing API calls (insights, campaigns). " +
+        "Set it in the server environment; do not use META_ACCESS_TOKEN."
+    )
+  }
   return t
 }
 

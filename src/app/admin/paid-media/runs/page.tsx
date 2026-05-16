@@ -15,11 +15,13 @@ type ActionsLogRow = {
 export default async function PaidMediaReportingRunsPage() {
   const { admin } = await requireAdmin()
 
+  // One row per ingest run only — exclude per-campaign zero_spend_warning SYSTEM events.
   const { data: runs, error } = await admin
     .from("actions_log")
     .select("id, executed_at, success, error_message, payload")
     .eq("executed_by", "REPORTING_AGENT")
-    .in("kind", ["AGENT_RUN", "SYSTEM"])
+    .eq("kind", "AGENT_RUN")
+    .contains("payload", { run_type: "daily_ingest" })
     .order("executed_at", { ascending: false })
     .limit(50)
 

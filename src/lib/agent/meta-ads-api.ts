@@ -83,7 +83,7 @@ export function parseMetaGraphErrorFromText(text: string): MetaGraphErrorPayload
 }
 
 /**
- * Meta returns code 100 with this message when an account/object has no insights data.
+ * Meta returns code 100 with this message when an account has no insights edge/data.
  * Empty-state — not auth, rate limit, or a broken query.
  */
 export function isEmptyAccountError(err: { code?: number; message?: string } | null | undefined): boolean {
@@ -92,8 +92,38 @@ export function isEmptyAccountError(err: { code?: number; message?: string } | n
   return m.includes("nonexisting field") && m.includes("insights")
 }
 
+/**
+ * Per-object empty-state: draft/paused/test objects, missing permissions, or no insights support.
+ * Skip the object and continue the run — do not fail the whole ingest.
+ */
+export function isUnavailableObjectError(
+  err: { code?: number; error_subcode?: number; message?: string } | null | undefined
+): boolean {
+  if (err?.code !== 100) return false
+  if (err.error_subcode === 33) return true
+  const msg = (err.message ?? "").toLowerCase()
+  return (
+    msg.includes("does not exist") ||
+    msg.includes("missing permissions") ||
+    msg.includes("does not support this operation")
+  )
+}
+
 const EMPTY_INSIGHTS_LOG =
   "Meta reporting: no active campaigns / no insights data — skipping ingest"
+
+type FetchAllPagesOptions = {
+  /** Graph object id (campaign/ad set/ad) for log context when skipping. */
+  graphObjectId?: string
+  /** When true, unavailable-object errors return empty rows instead of throwing. */
+  skipUnavailableObject?: boolean
+}
+
+type FetchAllPagesResult = {
+  rows: Record<string, unknown>[]
+  /** Object could not be queried for insights (subcode 33 / permissions / unsupported). */
+  skippedUnavailable: boolean
+}
 
 async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response> {
   const delays = [1000, 2000, 4000]
@@ -198,7 +228,30 @@ function mapGraphRow(
   return [out]
 }
 
-async function fetchAllPages(initialUrl: string): Promise<Record<string, unknown>[]> {
+function handleInsightsGraphError(
+  err: MetaGraphErrorPayload | null,
+  opts: FetchAllPagesOptions | undefined
+): FetchAllPagesResult | null {
+  if (!err) return null
+  if (isEmptyAccountError(err)) {
+    console.log(EMPTY_INSIGHTS_LOG)
+    return { rows: [], skippedUnavailable: false }
+  }
+  if (opts?.skipUnavailableObject && isUnavailableObjectError(err)) {
+    const id = opts.graphObjectId ?? "unknown"
+    console.warn(
+      `[meta-ads-api] insights unavailable for object ${id}, skipping:`,
+      err.message ?? "code 100"
+    )
+    return { rows: [], skippedUnavailable: true }
+  }
+  return null
+}
+
+async function fetchAllPages(
+  initialUrl: string,
+  opts?: FetchAllPagesOptions
+): Promise<FetchAllPagesResult> {
   const rows: Record<string, unknown>[] = []
   let url: string | null = initialUrl
   while (url) {
@@ -206,10 +259,8 @@ async function fetchAllPages(initialUrl: string): Promise<Record<string, unknown
     if (!res.ok) {
       const t = await res.text()
       const err = parseMetaGraphErrorFromText(t)
-      if (isEmptyAccountError(err)) {
-        console.log(EMPTY_INSIGHTS_LOG)
-        return []
-      }
+      const handled = handleInsightsGraphError(err, opts)
+      if (handled) return handled
       throw new Error(`Meta insights error ${res.status}: ${t.slice(0, 500)}`)
     }
     const json = (await res.json()) as {
@@ -218,16 +269,20 @@ async function fetchAllPages(initialUrl: string): Promise<Record<string, unknown
       error?: MetaGraphErrorPayload
     }
     if (json.error) {
-      if (isEmptyAccountError(json.error)) {
-        console.log(EMPTY_INSIGHTS_LOG)
-        return rows
-      }
+      const handled = handleInsightsGraphError(json.error, opts)
+      if (handled) return handled
       if (json.error.message) throw new Error(json.error.message)
     }
     rows.push(...(json.data ?? []))
     url = json.paging?.next ?? null
   }
-  return rows
+  return { rows, skippedUnavailable: false }
+}
+
+export type FetchInsightsResult = {
+  insights: MetaInsightRow[]
+  /** Platform entity IDs skipped because insights were unavailable (not a fatal error). */
+  skippedEntityIds: string[]
 }
 
 /**
@@ -239,11 +294,13 @@ export async function fetchInsights(
   entityIds: string[],
   dateStart: string,
   dateEnd: string
-): Promise<MetaInsightRow[]> {
+): Promise<FetchInsightsResult> {
   const token = encodeURIComponent(getMetaAccessToken())
   const timeRange = encodeURIComponent(JSON.stringify({ since: dateStart, until: dateEnd }))
   const fields = encodeURIComponent(INSIGHT_FIELDS)
   const results: MetaInsightRow[] = []
+  const skippedEntityIds: string[] = []
+  const skipUnavailableObject = level !== "account"
 
   for (const rawId of entityIds) {
     const id = rawId.startsWith("act_") || /^\d+$/.test(rawId) ? rawId : rawId
@@ -252,13 +309,20 @@ export async function fetchInsights(
       `fields=${fields}&time_range=${timeRange}&time_increment=1` +
       `&access_token=${token}`
 
-    const data = await fetchAllPages(url)
+    const { rows: data, skippedUnavailable } = await fetchAllPages(url, {
+      graphObjectId: id,
+      skipUnavailableObject,
+    })
+    if (skippedUnavailable) {
+      skippedEntityIds.push(id)
+      continue
+    }
     for (const row of data) {
       results.push(...mapGraphRow(level, row, dateStart, dateEnd, id))
     }
   }
 
-  return results
+  return { insights: results, skippedEntityIds }
 }
 
 export async function fetchActiveCampaigns(adAccountId: string): Promise<MetaCampaign[]> {

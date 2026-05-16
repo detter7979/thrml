@@ -31,6 +31,8 @@ export type ReportingIngestResult = {
   resume_token?: string | null
   rows_ingested: number
   campaigns_processed: number
+  /** Campaigns skipped because Meta returned unavailable-object insights (subcode 33, etc.). */
+  campaigns_skipped: number
   ad_sets_processed: number
   ads_processed: number
   duration_ms: number
@@ -315,6 +317,7 @@ export async function runReportingIngest(
   const t0 = Date.now()
   let rows_ingested = 0
   let campaigns_processed = 0
+  let campaigns_skipped = 0
   let ad_sets_processed = 0
   let ads_processed = 0
   const { dateStart, dateEnd, freshRun } = options
@@ -342,6 +345,7 @@ export async function runReportingIngest(
       error: runErr?.message ?? "Failed to create actions_log run",
       rows_ingested: 0,
       campaigns_processed: 0,
+      campaigns_skipped: 0,
       ad_sets_processed: 0,
       ads_processed: 0,
       duration_ms: Date.now() - t0,
@@ -405,7 +409,11 @@ export async function runReportingIngest(
       const setRows = adSets ?? []
       const adRows = ads ?? []
 
-      const campInsights = await fetchInsights("campaign", [camp.platform_campaign_id], dateStart, dateEnd)
+      const campFetch = await fetchInsights("campaign", [camp.platform_campaign_id], dateStart, dateEnd)
+      if (campFetch.skippedEntityIds.includes(camp.platform_campaign_id)) {
+        campaigns_skipped += 1
+      }
+      const campInsights = campFetch.insights
       for (const ins of campInsights.filter((x) => x.date >= dateStart && x.date <= dateEnd)) {
         const chunk = insightToDailyRows(ins, "campaign", camp.id, camp.event)
         dailyBuffer.push(...chunk)
@@ -414,8 +422,8 @@ export async function runReportingIngest(
 
       const setIds = setRows.map((s) => s.platform_adset_id).filter(Boolean) as string[]
       if (setIds.length) {
-        const setInsights = await fetchInsights("adset", setIds, dateStart, dateEnd)
-        for (const ins of setInsights.filter((x) => x.date >= dateStart && x.date <= dateEnd)) {
+        const setFetch = await fetchInsights("adset", setIds, dateStart, dateEnd)
+        for (const ins of setFetch.insights.filter((x) => x.date >= dateStart && x.date <= dateEnd)) {
           const row = setRows.find((s) => s.platform_adset_id === ins.platform_entity_id)
           if (row) {
             const chunk = insightToDailyRows(ins, "ad_set", row.id, camp.event)
@@ -427,8 +435,8 @@ export async function runReportingIngest(
 
       const adIds = adRows.map((a) => a.platform_ad_id).filter(Boolean) as string[]
       if (adIds.length) {
-        const adInsights = await fetchInsights("ad", adIds, dateStart, dateEnd)
-        for (const ins of adInsights.filter((x) => x.date >= dateStart && x.date <= dateEnd)) {
+        const adFetch = await fetchInsights("ad", adIds, dateStart, dateEnd)
+        for (const ins of adFetch.insights.filter((x) => x.date >= dateStart && x.date <= dateEnd)) {
           const row = adRows.find((a) => a.platform_ad_id === ins.platform_entity_id)
           if (row) {
             const chunk = insightToDailyRows(ins, "ad", row.id, camp.event)
@@ -484,11 +492,14 @@ export async function runReportingIngest(
     }
 
     const duration_ms = Date.now() - t0
+    const eligibleCampaigns = list.filter((c) => c.platform_campaign_id).length
     const reason =
       rows_ingested === 0
         ? list.length === 0
           ? "no_campaigns_in_db"
-          : "no_active_campaigns"
+          : campaigns_skipped > 0 && campaigns_skipped >= eligibleCampaigns
+            ? "no_campaigns_with_insights_data"
+            : "no_active_campaigns"
         : undefined
 
     await admin
@@ -502,6 +513,7 @@ export async function runReportingIngest(
           reporting_agent: true,
           rows_ingested,
           campaigns_processed,
+          campaigns_skipped,
           ad_sets_processed,
           ads_processed,
           duration_ms,
@@ -522,6 +534,7 @@ export async function runReportingIngest(
       resume_token: partial ? resume_token : null,
       rows_ingested,
       campaigns_processed,
+      campaigns_skipped,
       ad_sets_processed,
       ads_processed,
       duration_ms,
@@ -541,6 +554,7 @@ export async function runReportingIngest(
           reporting_agent: true,
           rows_ingested,
           campaigns_processed,
+          campaigns_skipped,
           ad_sets_processed,
           ads_processed,
           duration_ms: Date.now() - t0,
@@ -555,6 +569,7 @@ export async function runReportingIngest(
       error: msg,
       rows_ingested,
       campaigns_processed,
+      campaigns_skipped,
       ad_sets_processed,
       ads_processed,
       duration_ms: Date.now() - t0,

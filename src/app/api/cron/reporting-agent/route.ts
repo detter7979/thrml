@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       partial: result.partial,
       rows_ingested: result.rows_ingested,
       campaigns_processed: result.campaigns_processed,
+      campaigns_skipped: result.campaigns_skipped,
       ad_sets_processed: result.ad_sets_processed,
       ads_processed: result.ads_processed,
       duration_ms: result.duration_ms,

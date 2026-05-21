@@ -147,9 +147,11 @@ export default async function BookingConfirmationPage({
       <Card className="card-base">
         <CardContent className="grid gap-5 md:grid-cols-[220px_minmax(0,1fr)]">
           {photoUrl ? (
-            <img src={photoUrl} alt={title} className="h-44 w-full rounded-lg object-cover" />
+            <div className="aspect-[16/9] w-full overflow-hidden rounded-lg">
+              <img src={photoUrl} alt={title} className="h-full w-full object-cover object-center" />
+            </div>
           ) : (
-            <div className="flex h-44 items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">
+            <div className="flex aspect-[16/9] w-full items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">
               Listing image
             </div>
           )}

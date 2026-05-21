@@ -1,22 +1,34 @@
 import { Suspense } from "react"
 import type { Metadata } from "next"
 
+import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
+import { formatHostKeepPercent, getPlatformFeePercentsCached } from "@/lib/fees"
+import { createAdminClient } from "@/lib/supabase/admin"
+
 import { BecomeAHostClient } from "./become-a-host-client"
 
-export const metadata: Metadata = {
-  title: "Become a Host — List Your Wellness Space",
-  description:
-    "Earn passive income by listing your private sauna, cold plunge, or wellness space on thrml. Free to list. You keep 88%.",
-  alternates: { canonical: "https://usethrml.com/become-a-host" },
-  openGraph: {
-    type: "website",
-    title: "Become a thrml Host",
-    description: "List your private wellness space and start earning. Free to list.",
-    url: "https://usethrml.com/become-a-host",
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const admin = createAdminClient()
+  const { hostFeePercent } = await getPlatformFeePercentsCached(admin)
+  const hostKeep = formatHostKeepPercent(hostFeePercent)
+
+  return {
+    title: "Become a Host — List Your Wellness Space",
+    description: `Earn passive income by listing your private sauna, cold plunge, or wellness space on thrml. Free to list. You keep ${hostKeep}.`,
+    alternates: { canonical: "https://usethrml.com/become-a-host" },
+    openGraph: {
+      type: "website",
+      title: "Become a thrml Host",
+      description: "List your private wellness space and start earning. Free to list.",
+      url: "https://usethrml.com/become-a-host",
+    },
+  }
 }
 
-export default function BecomeAHostPage() {
+export default async function BecomeAHostPage() {
+  const admin = createAdminClient()
+  const feePercents = await getPlatformFeePercentsCached(admin)
+
   return (
     <Suspense
       fallback={
@@ -25,7 +37,9 @@ export default function BecomeAHostPage() {
         </div>
       }
     >
-      <BecomeAHostClient />
+      <PlatformFeesProvider initialPercents={feePercents}>
+        <BecomeAHostClient />
+      </PlatformFeesProvider>
     </Suspense>
   )
 }

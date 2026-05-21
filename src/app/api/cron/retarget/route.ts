@@ -86,7 +86,7 @@ async function sendNewsletterDigest(): Promise<{ sent: number; skipped: number; 
     }
 
     const unsubUrl = `${unsubBase}?email=${encodeURIComponent(email)}`
-    const { subject, html, text } = buildWeeklyDigestEmail({
+    const { subject, html, text } = await buildWeeklyDigestEmail({
       supabase: admin,
       unsubUrl,
       exploreUrl,

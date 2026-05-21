@@ -1,4 +1,6 @@
+import { renderThrmlEmail, buildPlainText } from "@/lib/emails/render-layout"
 import { sendEmail } from "@/lib/emails/send"
+import { persistBookingRefund } from "@/lib/finance/booking-refund"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { stripe } from "@/lib/stripe"
 
@@ -75,16 +77,17 @@ export async function executeResolution(
             stripeRefundId = refund.id
             actionTaken = `refund_issued_${refund.id}`
 
-            const refundedAmount =
-              Number(bookingRow?.refunded_amount ?? 0) + classification.refund_amount
-            await supabase
-              .from("bookings")
-              .update({
-                refunded_amount: refundedAmount,
-                refunded_at: new Date().toISOString(),
-                stripe_refund_id: refund.id,
-              })
-              .eq("id", booking.booking_id)
+            const persisted = await persistBookingRefund(supabase, {
+              bookingId: booking.booking_id,
+              additionalRefundDollars: classification.refund_amount,
+              stripeRefundId: refund.id,
+              source: bypassAutoGate ? "dispute_human_approved" : "dispute_auto",
+              restorePromoCredits: true,
+            })
+            if (!persisted.ok) {
+              executionError = persisted.error
+              actionTaken = "refund_failed"
+            }
           } else if (alreadyRefundedCents + refundAmountCents > maxRefundableCents) {
             executionError = "Refund would exceed total charged — queued for manual processing"
             actionTaken = "refund_needs_manual"
@@ -162,11 +165,15 @@ export async function executeResolution(
     const toAddress =
       process.env.NODE_ENV === "production" ? userEmail : (process.env.RESEND_TEST_TO_EMAIL ?? userEmail)
 
+    const resolutionLayout = buildResolutionLayout(userName, ticketNumber, classification)
+    const html = await renderThrmlEmail(resolutionLayout)
+    const text = buildPlainText(resolutionLayout)
+
     await sendEmail({
       to: toAddress,
       subject: `Your request has been resolved — ${ticketNumber}`,
-      html: buildResolutionEmail(userName, ticketNumber, classification),
-      text: buildResolutionEmailText(userName, ticketNumber, classification),
+      html,
+      text,
     }).catch((err) => {
       console.error("[dispute-executor] resolution email failed", err)
     })
@@ -190,39 +197,29 @@ export async function executeResolution(
   }
 }
 
-function buildResolutionEmail(name: string, ticket: string, c: ClassificationResult): string {
+function buildResolutionLayout(name: string, ticket: string, c: ClassificationResult) {
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://usethrml.com"
-  const safeName = name.replace(/[<>&"']/g, "")
-  const safeTicket = ticket.replace(/[<>&"']/g, "")
   const safeReply = c.suggested_reply
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
     .replace(/\n/g, "<br/>")
-    .replace(/[<>&"']/g, (m) => (({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }) as Record<string, string>)[m] ?? m)
 
-  return `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#2C2420;padding:24px;">
-  <div style="font-size:20px;font-weight:700;margin-bottom:20px;">Thrml</div>
-  <p>Hi ${safeName},</p>
-  <p>Your support ticket <strong>${safeTicket}</strong> has been reviewed and resolved.</p>
-  <div style="background:#F7F3EE;border-radius:10px;padding:16px;margin:16px 0;font-size:14px;line-height:1.7;">
-    ${safeReply}
-  </div>
-  ${c.refund_amount > 0 ? `<p style="background:#E8F5E9;border-radius:8px;padding:12px 16px;color:#2E7D32;font-weight:600;">Refund of $${c.refund_amount.toFixed(2)} has been issued. Please allow 5–10 business days to appear on your statement.</p>` : ""}
-  <p>If you have further questions, reply to this email or visit <a href="${APP_URL}/support">our support centre</a>.</p>
-  <p style="font-size:12px;color:#888;">thrml · usethrml.com</p>
-</div>`
-}
-
-function buildResolutionEmailText(name: string, ticket: string, c: ClassificationResult): string {
-  return [
-    `Hi ${name},`,
-    `Your support ticket ${ticket} has been reviewed and resolved.`,
-    "",
-    c.suggested_reply,
-    c.refund_amount > 0
-      ? `\nRefund of $${c.refund_amount.toFixed(2)} has been issued. Please allow 5–10 business days.`
-      : "",
-    "\nthrml · usethrml.com",
-  ]
-    .filter((s) => s !== null)
-    .join("\n")
+  return {
+    preview: `Your request has been resolved — ${ticket}`,
+    kicker: "Support",
+    title: "Your request has been resolved.",
+    greeting: `Hi ${name},`,
+    paragraphs: [`Your support ticket ${ticket} has been reviewed and resolved.`],
+    contentHtml: `
+      <blockquote style="margin:0 0 16px;padding:14px 16px;border-left:4px solid #C75B3A;background:#FFF5F0;color:#3E3329;font-size:14px;line-height:1.7;">
+        ${safeReply}
+      </blockquote>
+      ${
+        c.refund_amount > 0
+          ? `<p style="margin:0 0 16px;padding:12px 16px;background:#FFF5F0;border:1px solid #FFE8DC;color:#1A1410;font-weight:600;">Refund of $${c.refund_amount.toFixed(2)} has been issued. Please allow 5–10 business days to appear on your statement.</p>`
+          : ""
+      }`,
+    cta: { label: "Visit support centre", href: `${APP_URL}/support` },
+  }
 }

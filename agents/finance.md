@@ -6,8 +6,10 @@ Track Stripe revenue, platform fees earned, refunds issued, and estimated operat
 Surface trends, anomalies, and runway estimates.
 
 ## Data Sources
-- **Stripe**: PaymentIntents (charges), Refunds, Transfers (host payouts), Connect account balances
-- **Supabase bookings table**: Confirmed/completed bookings with subtotal, service_fee, total_charged, host_payout
+- **Stripe webhooks**: `payment_intent.succeeded`, `refund.created` / `refund.updated` (succeeded), `charge.dispute.*`
+- **financial_events** (Supabase): Immutable ledger — refunds, captures, credit subsidy, chargebacks
+- **stripe_disputes** (Supabase): Chargeback lifecycle from Stripe
+- **Supabase bookings**: Confirmed/completed bookings with fees, credits, refunds
 - **Supabase platform_settings**: Fee percents
 - **Known fixed costs** (hardcoded, update monthly):
   - Vercel Hobby: $0/mo
@@ -20,10 +22,13 @@ Surface trends, anomalies, and runway estimates.
 ## Daily Snapshot (runs every day at 04:00 UTC)
 Calculate for yesterday:
 - Gross booking value (sum of total_charged for completed bookings)
-- Platform revenue (sum of service_fee — thrml's take from guests)
+- Gross platform take (guest_fee + host_fee, before credits)
+- Cash platform revenue (total_charged − host_payout on confirmed bookings)
 - Host payouts (sum of host_payout)
-- Refunds issued (from Stripe refunds or bookings with refund_amount > 0)
-- Net platform revenue = platform revenue - refunds
+- Promo credits applied (referral + admin credits on bookings)
+- Refunds issued (sum of `financial_events` type `refund` for the day)
+- Chargebacks (sum of `financial_events` type `chargeback` / `chargeback_fee`)
+- Net platform revenue = cash platform revenue − refunds − chargebacks
 - Booking count and average order value
 - Save to finance_snapshots table
 

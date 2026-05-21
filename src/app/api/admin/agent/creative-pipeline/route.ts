@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { refreshCreativeAssetUrl } from "@/lib/agent/gcs"
+import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
+import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { requireAdminApi } from "@/lib/admin-guard"
 
-const PIPELINE_ACTIONS = new Set(["reject_brief", "update_brief", "approve_asset", "reject_asset"])
+const PIPELINE_ACTIONS = new Set([
+  "reject_brief",
+  "update_brief",
+  "approve_asset",
+  "reject_asset",
+  "create_video_brief",
+])
 
 type AdminClient = NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>
 type CreativeAssetRow = {
@@ -41,7 +48,40 @@ const BRIEF_FIELDS = [
   "rationale",
   "campaign_short_name",
   "success_criteria",
+  "video_config",
 ] as const
+
+type RenderJobRow = RenderJob & {
+  brief_id: string
+  base_video_gcs_path?: string
+  concept_slug?: string
+  template_version?: number
+}
+
+function isVideoConfig(value: unknown): value is VideoConfig {
+  if (!value || typeof value !== "object") return false
+  const config = value as VideoConfig
+  return (
+    (config.source === "runway" || config.source === "uploaded") &&
+    typeof config.conceptSlug === "string" &&
+    typeof config.assetSlug === "string" &&
+    Array.isArray(config.copyVariants)
+  )
+}
+
+async function withSignedRenderJobs(jobs: RenderJobRow[]) {
+  return Promise.all(
+    jobs.map(async (job) => {
+      if (!job.rendered_gcs_path) return job
+      try {
+        const signed_url = await refreshCreativeObjectUrl(job.rendered_gcs_path)
+        return { ...job, signed_url }
+      } catch {
+        return job
+      }
+    })
+  )
+}
 
 async function withSignedUrls<T extends CreativeAssetRow>(assets: T[]) {
   return Promise.all(
@@ -170,13 +210,77 @@ export async function GET() {
   const activeMetaAdsets = (adsets.data ?? []).filter((adset) =>
     String(adset.status ?? "").toLowerCase() === "active"
   )
+
+  const allBriefIds = [
+    ...(briefs.data ?? []).map((b) => b.id),
+    ...(approvedBriefs.data ?? []).map((b) => b.id),
+  ].filter(Boolean)
+
+  let renderJobsByBrief: Record<string, RenderJob[]> = {}
+  if (allBriefIds.length > 0) {
+    const { data: jobs, error: jobsError } = await admin!
+      .from("render_jobs")
+      .select(
+        "id, brief_id, variant_slug, copy_text, status, attempts, max_attempts, error_message, rendered_gcs_path, rendered_asset_id, duration_ms, created_at, completed_at"
+      )
+      .in("brief_id", allBriefIds)
+      .order("created_at", { ascending: true })
+
+    if (jobsError) return NextResponse.json({ error: jobsError.message }, { status: 500 })
+
+    const signedJobs = await withSignedRenderJobs((jobs ?? []) as RenderJobRow[])
+    renderJobsByBrief = signedJobs.reduce<Record<string, RenderJob[]>>((acc, job) => {
+      const list = acc[job.brief_id] ?? []
+      list.push(job)
+      acc[job.brief_id] = list
+      return acc
+    }, {})
+  }
+
+  for (const brief of approvedBriefs.data ?? []) {
+    if (brief.status !== "generating" || !isVideoConfig(brief.video_config)) continue
+    const jobs = renderJobsByBrief[brief.id] ?? []
+    if (jobs.length === 0) continue
+    const allTerminal = jobs.every(
+      (job) =>
+        job.status === "completed" ||
+        job.status === "failed" ||
+        job.status === "cancelled"
+    )
+    if (allTerminal) {
+      await admin!
+        .from("creative_briefs")
+        .update({ status: "variations_ready" })
+        .eq("id", brief.id)
+      brief.status = "variations_ready"
+    }
+  }
+
+  const approvedVideoBriefs = (approvedBriefs.data ?? []).filter(
+    (brief) => isVideoConfig(brief.video_config) && brief.status === "approved"
+  )
+
+  const staticGeneratingBriefs = (approvedBriefs.data ?? []).filter(
+    (brief) => !isVideoConfig(brief.video_config) && !assetBriefIds.has(brief.id)
+  )
+
+  const videoGeneratingBriefs = (approvedBriefs.data ?? []).filter((brief) => {
+    if (!isVideoConfig(brief.video_config)) return false
+    if (brief.status === "generating") return true
+    const jobs = renderJobsByBrief[brief.id] ?? []
+    return jobs.some((job) => job.status === "pending" || job.status === "running")
+  })
+
   const signedGeneratedAssets = await withSignedUrls((generatedAssets.data ?? []) as CreativeAssetRow[])
   const signedLaunchedAssets = await withSignedUrls((launchedAssets.data ?? []) as CreativeAssetRow[])
   const launchedWithInsights = await mergeMetaInsights(admin!, signedLaunchedAssets)
 
   return NextResponse.json({
     briefs: briefs.data ?? [],
-    generatingBriefs: (approvedBriefs.data ?? []).filter((brief) => !assetBriefIds.has(brief.id)),
+    generatingBriefs: staticGeneratingBriefs,
+    approvedVideoBriefs,
+    videoGeneratingBriefs,
+    renderJobsByBrief,
     generatedAssets: signedGeneratedAssets,
     launchedAssets: launchedWithInsights,
     activeMetaAdsets,
@@ -196,6 +300,49 @@ export async function PATCH(req: NextRequest) {
 
   if (!body?.action || !PIPELINE_ACTIONS.has(body.action)) {
     return NextResponse.json({ error: "Invalid pipeline action" }, { status: 400 })
+  }
+
+  if (body.action === "create_video_brief") {
+    const videoConfig = body.brief?.video_config
+    if (!isVideoConfig(videoConfig)) {
+      return NextResponse.json({ error: "brief.video_config is required" }, { status: 400 })
+    }
+    if (!videoConfig.copyVariants.length) {
+      return NextResponse.json({ error: "At least one copy variant is required" }, { status: 400 })
+    }
+    if (videoConfig.source === "runway" && !videoConfig.runwayPrompt?.trim()) {
+      return NextResponse.json({ error: "runwayPrompt is required for Runway source" }, { status: 400 })
+    }
+    if (videoConfig.source === "uploaded" && !videoConfig.uploadedGcsPath?.trim()) {
+      return NextResponse.json({ error: "uploadedGcsPath is required for uploaded source" }, { status: 400 })
+    }
+
+    const saveAndApprove = Boolean(body.brief?.saveAndApprove)
+    const now = new Date().toISOString()
+    const hook =
+      typeof body.brief?.hook === "string" && body.brief.hook.trim()
+        ? body.brief.hook.trim()
+        : videoConfig.copyVariants[0]?.copy ?? videoConfig.conceptSlug
+
+    const { data, error: insertError } = await admin!
+      .from("creative_briefs")
+      .insert({
+        trigger_type: "manual",
+        status: saveAndApprove ? "approved" : "briefed",
+        format: "9x16",
+        hook,
+        hypothesis:
+          typeof body.brief?.hypothesis === "string" ? body.brief.hypothesis : null,
+        campaign_short_name: videoConfig.conceptSlug,
+        video_config: videoConfig,
+        approved_at: saveAndApprove ? now : null,
+        created_by: "admin",
+      })
+      .select("*")
+      .maybeSingle()
+
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return NextResponse.json({ brief: data })
   }
 
   if (body.action === "reject_brief") {

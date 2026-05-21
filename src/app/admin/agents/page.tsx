@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
+import type { RenderJob, VideoConfig, VideoCopyVariant } from "@/lib/agent/types"
 
 type AgentRun = {
   id: string; agent_name: string; status: string; started_at: string
@@ -36,13 +37,15 @@ type CreativeBrief = {
   cta: string | null; reference_image_urls: string[] | null; rationale: string | null
   campaign_short_name: string | null; success_criteria: Record<string, unknown> | null
   created_at: string; approved_at: string | null; rejected_at?: string | null
+  video_config?: VideoConfig | null
 }
 type CreativeAsset = {
   id: string; brief_id: string | null; asset_type: string | null; gcs_url: string | null
   gcs_path?: string | null
   status: string | null; performance_data: Record<string, unknown> | null
   variation_index: number | null; approved_at: string | null; launched_at: string | null
-  meta_adset_id: string | null; meta_ad_id?: string | null; generation_tool?: string | null
+  meta_adset_id: string | null; meta_ad_id?: string | null;   generation_tool?: string | null
+  convention_name?: string | null
   variation_label?: string | null; format?: string | null; signed_url?: string | null
   created_at: string; creative_briefs?: CreativeBrief | CreativeBrief[] | null
 }
@@ -53,9 +56,40 @@ type MetaAdset = {
 type CreativePipelineData = {
   briefs: CreativeBrief[]
   generatingBriefs: CreativeBrief[]
+  approvedVideoBriefs?: CreativeBrief[]
+  videoGeneratingBriefs?: CreativeBrief[]
+  renderJobsByBrief?: Record<string, RenderJob[]>
   generatedAssets: CreativeAsset[]
   launchedAssets: CreativeAsset[]
   activeMetaAdsets: MetaAdset[]
+}
+
+type VideoBriefDraft = {
+  conceptSlug: string
+  assetSlug: string
+  source: VideoConfig["source"]
+  runwayPrompt: string
+  uploadedGcsPath: string
+  templateVersion: number
+  duration: 5 | 10
+  ratio: "768:1280" | "1280:768"
+  copyVariants: VideoCopyVariant[]
+  hypothesis: string
+}
+
+function isVideoBrief(brief: CreativeBrief) {
+  return Boolean(brief.video_config && typeof brief.video_config === "object")
+}
+
+function jobStatusClass(status: RenderJob["status"]) {
+  const map: Record<RenderJob["status"], string> = {
+    pending: "bg-yellow-100 text-yellow-800",
+    running: "bg-blue-100 text-blue-800",
+    completed: "bg-green-100 text-green-800",
+    failed: "bg-red-100 text-red-800",
+    cancelled: "bg-muted text-muted-foreground",
+  }
+  return map[status] ?? "bg-muted text-muted-foreground"
 }
 type BriefEditorState = Omit<CreativeBrief, "trigger_data" | "success_criteria" | "reference_image_urls"> & {
   trigger_data: string
@@ -91,9 +125,20 @@ function readMetric(data: Record<string, unknown> | null, keys: string[]) {
   }
   return null
 }
+function isLaunchableVideo(asset: CreativeAsset) {
+  return asset.generation_tool === "composite-video"
+}
+
 function isVideoAsset(asset: CreativeAsset) {
-  const kind = `${asset.asset_type ?? ""} ${asset.signed_url ?? asset.gcs_url ?? ""}`.toLowerCase()
-  return kind.includes("video") || kind.endsWith(".mp4") || kind.endsWith(".mov") || kind.endsWith(".webm")
+  const kind = `${asset.asset_type ?? ""} ${asset.gcs_path ?? ""} ${asset.signed_url ?? asset.gcs_url ?? ""}`.toLowerCase()
+  return (
+    kind.includes("video") ||
+    kind.includes("/bases/") ||
+    kind.includes("/renders/") ||
+    kind.endsWith(".mp4") ||
+    kind.endsWith(".mov") ||
+    kind.endsWith(".webm")
+  )
 }
 function assetUrl(asset: CreativeAsset) {
   return asset.signed_url ?? asset.gcs_url ?? ""
@@ -161,6 +206,20 @@ export default function AgentsDashboard() {
   const [launchProgress, setLaunchProgress] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showVideoBriefForm, setShowVideoBriefForm] = useState(false)
+  const [videoDraft, setVideoDraft] = useState<VideoBriefDraft>({
+    conceptSlug: "",
+    assetSlug: "",
+    source: "uploaded",
+    runwayPrompt: "",
+    uploadedGcsPath: "",
+    templateVersion: 1,
+    duration: 5,
+    ratio: "768:1280",
+    copyVariants: [{ slug: "", copy: "" }],
+    hypothesis: "",
+  })
+  const [videoUploadName, setVideoUploadName] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const router = useRouter()
   const [tab, setTab] = useState<AgentTabKey>("overview")
@@ -173,6 +232,22 @@ export default function AgentsDashboard() {
     refreshInterval: 30_000,
     revalidateOnFocus: true,
   })
+
+  const videoJobsInFlight = useMemo(() => {
+    const jobs = pipeline?.renderJobsByBrief
+    if (!jobs) return false
+    return Object.values(jobs)
+      .flat()
+      .some((job) => job.status === "pending" || job.status === "running")
+  }, [pipeline?.renderJobsByBrief])
+
+  useEffect(() => {
+    if (tab !== "creative" || !videoJobsInFlight) return
+    const id = setInterval(() => {
+      void mutatePipeline()
+    }, 5_000)
+    return () => clearInterval(id)
+  }, [tab, videoJobsInFlight, mutatePipeline])
 
   const load = useCallback(async () => {
     const sb = createClient()
@@ -238,6 +313,101 @@ export default function AgentsDashboard() {
     const json = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error((json as { error?: string }).error ?? "Pipeline update failed")
     return json
+  }
+
+  const buildVideoConfig = (): VideoConfig => ({
+    source: videoDraft.source,
+    runwayPrompt: videoDraft.source === "runway" ? videoDraft.runwayPrompt.trim() : undefined,
+    uploadedGcsPath:
+      videoDraft.source === "uploaded" ? videoDraft.uploadedGcsPath.trim() : undefined,
+    copyVariants: videoDraft.copyVariants
+      .map((v) => ({ slug: v.slug.trim(), copy: v.copy.trim() }))
+      .filter((v) => v.slug && v.copy),
+    templateVersion: videoDraft.templateVersion,
+    conceptSlug: videoDraft.conceptSlug.trim(),
+    assetSlug: videoDraft.assetSlug.trim(),
+    duration: videoDraft.duration,
+    ratio: videoDraft.ratio,
+  })
+
+  const createVideoBrief = async (saveAndApprove: boolean) => {
+    setBusyAction(saveAndApprove ? "create-video-approve" : "create-video-draft")
+    setPipelineMessage(null)
+    try {
+      const video_config = buildVideoConfig()
+      if (!video_config.conceptSlug || !video_config.assetSlug) {
+        throw new Error("Concept slug and asset slug are required.")
+      }
+      if (!video_config.copyVariants.length) {
+        throw new Error("Add at least one copy variant.")
+      }
+      await patchPipeline({
+        action: "create_video_brief",
+        brief: {
+          video_config,
+          hook: video_config.copyVariants[0]?.copy,
+          hypothesis: videoDraft.hypothesis.trim() || null,
+          saveAndApprove,
+        },
+      })
+      await mutatePipeline()
+      setShowVideoBriefForm(false)
+      setVideoUploadName(null)
+      setPipelineMessage(saveAndApprove ? "Video brief created and approved." : "Video brief saved.")
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not create video brief.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const uploadBaseVideoFile = async (file: File) => {
+    if (!videoDraft.conceptSlug.trim() || !videoDraft.assetSlug.trim()) {
+      throw new Error("Enter concept slug and asset slug before uploading.")
+    }
+    const res = await fetch("/api/admin/agent/upload-base-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conceptSlug: videoDraft.conceptSlug.trim(),
+        assetSlug: videoDraft.assetSlug.trim(),
+      }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error((json as { error?: string }).error ?? "Upload URL request failed")
+    const { uploadUrl, gcsPath } = json as { uploadUrl: string; gcsPath: string }
+    const put = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "video/mp4" },
+      body: file,
+    })
+    if (!put.ok) throw new Error(`GCS upload failed (${put.status})`)
+    setVideoDraft((prev) => ({ ...prev, uploadedGcsPath: gcsPath }))
+    setVideoUploadName(file.name)
+  }
+
+  const generateVideoVariants = async (briefId: string) => {
+    setBusyAction(`generate-video-${briefId}`)
+    setPipelineMessage(null)
+    try {
+      const res = await fetch("/api/agent/generate-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ briefId }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const detail = (json as { detail?: string; error?: string }).detail
+        const error = (json as { error?: string }).error ?? "Video generation failed"
+        throw new Error(detail ? `${error}: ${detail}` : error)
+      }
+      await mutatePipeline()
+      setPipelineMessage("Video generation started. Render jobs are queued.")
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not start video generation.")
+    } finally {
+      setBusyAction(null)
+    }
   }
 
   const approveBrief = async (id: string) => {
@@ -346,19 +516,39 @@ export default function AgentsDashboard() {
   const launchCreative = async () => {
     setBusyAction("launch-creative")
     setPipelineMessage(null)
-    setLaunchProgress("uploading")
+    const progressTimers: Array<ReturnType<typeof window.setTimeout>> = []
+    const clearProgressTimers = () => {
+      for (const timer of progressTimers) clearTimeout(timer)
+      progressTimers.length = 0
+    }
     try {
       for (const assetId of launchAssetIds) {
-        setLaunchProgress("uploading")
+        const asset = generatedAssets.find((a) => a.id === assetId)
+        const isVideo = asset ? isLaunchableVideo(asset) : false
+        if (isVideo) {
+          setLaunchProgress("Uploading video to Meta…")
+          progressTimers.push(
+            window.setTimeout(
+              () => setLaunchProgress("Meta is processing the video (this can take 1–2 minutes)…"),
+              4_000
+            ),
+            window.setTimeout(() => setLaunchProgress("Creating ad in Meta…"), 50_000)
+          )
+        } else {
+          setLaunchProgress("Uploading image to Meta…")
+        }
         const res = await fetch("/api/agent/launch-creative", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assetId, adsetId: selectedAdsetId }),
+          body: JSON.stringify({ assetId, adsetId: selectedAdsetId, status: "PAUSED" }),
         })
-        setLaunchProgress("creating creative")
+        clearProgressTimers()
         const json = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error((json as { error?: string }).error ?? "Launch failed")
-        setLaunchProgress("creating ad")
+        if (!res.ok) {
+          const detail = (json as { error?: string; detail?: string }).error
+          throw new Error(detail ?? "Launch failed")
+        }
+        setLaunchProgress(isVideo ? "Done" : "Launch complete")
       }
       setLaunchAssetIds([])
       setSelectedAdsetId("")
@@ -366,8 +556,10 @@ export default function AgentsDashboard() {
       setPipelineMessage("Creative launched to the selected Meta ad set.")
       await mutatePipeline()
     } catch (err) {
+      clearProgressTimers()
       setPipelineMessage(err instanceof Error ? err.message : "Could not launch creative.")
     } finally {
+      clearProgressTimers()
       setLaunchProgress(null)
       setBusyAction(null)
     }
@@ -396,6 +588,18 @@ export default function AgentsDashboard() {
   const latestFinance = finance[0]
   const briefs = useMemo(() => pipeline?.briefs ?? [], [pipeline?.briefs])
   const generatingBriefs = useMemo(() => pipeline?.generatingBriefs ?? [], [pipeline?.generatingBriefs])
+  const approvedVideoBriefs = useMemo(
+    () => pipeline?.approvedVideoBriefs ?? [],
+    [pipeline?.approvedVideoBriefs]
+  )
+  const videoGeneratingBriefs = useMemo(
+    () => pipeline?.videoGeneratingBriefs ?? [],
+    [pipeline?.videoGeneratingBriefs]
+  )
+  const renderJobsByBrief = useMemo(
+    () => pipeline?.renderJobsByBrief ?? {},
+    [pipeline?.renderJobsByBrief]
+  )
   const generatedAssets = useMemo(() => pipeline?.generatedAssets ?? [], [pipeline?.generatedAssets])
   const launchedAssets = useMemo(() => pipeline?.launchedAssets ?? [], [pipeline?.launchedAssets])
   const metaAdsets = useMemo(() => pipeline?.activeMetaAdsets ?? [], [pipeline?.activeMetaAdsets])
@@ -411,7 +615,11 @@ export default function AgentsDashboard() {
       assets: assets.slice(0, 6),
     }))
   }, [generatedAssets])
-  const variationReadyCount = generatingBriefs.length + assetsByBrief.length
+  const variationReadyCount =
+    generatingBriefs.length +
+    videoGeneratingBriefs.length +
+    approvedVideoBriefs.length +
+    assetsByBrief.length
   const activeLaunchAssets = launchAssetIds
     .map((id) => generatedAssets.find((asset) => asset.id === id))
     .filter((asset): asset is CreativeAsset => Boolean(asset))
@@ -631,11 +839,57 @@ export default function AgentsDashboard() {
             <p className="text-sm text-red-500">{pipelineError instanceof Error ? pipelineError.message : "Could not load creative pipeline."}</p>
           ) : null}
 
+          <section className="rounded-xl border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Video Briefs</h2>
+                <p className="text-xs text-muted-foreground mt-1">Create, approve, then generate variants explicitly.</p>
+              </div>
+              <button type="button" onClick={() => setShowVideoBriefForm((v) => !v)} className="text-xs px-3 py-1.5 border rounded hover:bg-muted">
+                {showVideoBriefForm ? "Hide" : "+ Video Brief"}
+              </button>
+            </div>
+            {showVideoBriefForm ? (
+              <div className="space-y-3 border-t pt-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="space-y-1 text-xs font-medium text-muted-foreground">Concept slug
+                    <input value={videoDraft.conceptSlug} onChange={(e) => setVideoDraft((p) => ({ ...p, conceptSlug: e.target.value }))} className="w-full rounded-md border px-3 py-2 text-sm" />
+                  </label>
+                  <label className="space-y-1 text-xs font-medium text-muted-foreground">Asset slug
+                    <input value={videoDraft.assetSlug} onChange={(e) => setVideoDraft((p) => ({ ...p, assetSlug: e.target.value }))} className="w-full rounded-md border px-3 py-2 text-sm" />
+                  </label>
+                </div>
+                <div className="flex gap-4 text-sm">
+                  <label className="flex items-center gap-2"><input type="radio" checked={videoDraft.source === "runway"} onChange={() => setVideoDraft((p) => ({ ...p, source: "runway" }))} />Runway</label>
+                  <label className="flex items-center gap-2"><input type="radio" checked={videoDraft.source === "uploaded"} onChange={() => setVideoDraft((p) => ({ ...p, source: "uploaded" }))} />Upload</label>
+                </div>
+                {videoDraft.source === "runway" ? (
+                  <textarea value={videoDraft.runwayPrompt} onChange={(e) => setVideoDraft((p) => ({ ...p, runwayPrompt: e.target.value }))} className="min-h-24 w-full rounded-md border px-3 py-2 text-sm" />
+                ) : (
+                  <div>
+                    <input type="file" accept="video/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setBusyAction("upload-base-video"); void uploadBaseVideoFile(f).catch((err) => setPipelineMessage(err instanceof Error ? err.message : "Upload failed")).finally(() => setBusyAction(null)) }} />
+                    {videoDraft.uploadedGcsPath ? <p className="text-xs font-mono text-green-700">{videoDraft.uploadedGcsPath}</p> : null}
+                  </div>
+                )}
+                {videoDraft.copyVariants.map((variant, index) => (
+                  <div key={index} className="grid gap-2 md:grid-cols-[1fr_2fr_auto]">
+                    <input value={variant.slug} onChange={(e) => setVideoDraft((p) => ({ ...p, copyVariants: p.copyVariants.map((v, i) => i === index ? { ...v, slug: e.target.value } : v) }))} className="rounded-md border px-2 py-1 text-sm" />
+                    <input value={variant.copy} onChange={(e) => setVideoDraft((p) => ({ ...p, copyVariants: p.copyVariants.map((v, i) => i === index ? { ...v, copy: e.target.value } : v) }))} className="rounded-md border px-2 py-1 text-sm" />
+                    <button type="button" onClick={() => setVideoDraft((p) => ({ ...p, copyVariants: p.copyVariants.filter((_, i) => i !== index) }))} className="text-xs border rounded px-2">×</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setVideoDraft((p) => ({ ...p, copyVariants: [...p.copyVariants, { slug: "", copy: "" }] }))} className="text-xs border rounded px-2 py-1">+ variant</button>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => void createVideoBrief(false)} className="text-xs border rounded px-3 py-1.5">Save draft</button>
+                  <button type="button" onClick={() => void createVideoBrief(true)} className="text-xs bg-green-600 text-white rounded px-3 py-1.5">Save &amp; approve</button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
           <div className="grid gap-4 xl:grid-cols-2">
             <section className="rounded-xl border bg-card p-4">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                Pending Briefs ({briefs.length})
-              </h2>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Pending Briefs ({briefs.length})</h2>
               <div className="space-y-3">
                 {pipelineLoading ? (
                   <p className="text-sm text-muted-foreground">Loading briefs...</p>
@@ -643,7 +897,8 @@ export default function AgentsDashboard() {
                   <p className="text-sm text-muted-foreground">No briefs awaiting approval.</p>
                 ) : briefs.map((brief) => {
                   const isPendingExpansion = brief.status === "pending"
-                  const canApproveBrief = Boolean(brief.visual_direction?.trim())
+                  const briefIsVideo = isVideoBrief(brief)
+                  const canApproveBrief = briefIsVideo || Boolean(brief.visual_direction?.trim())
 
                   return (
                     <div key={brief.id} className="rounded-lg border p-3 space-y-3">
@@ -687,6 +942,9 @@ export default function AgentsDashboard() {
                             <span className="rounded bg-muted px-2 py-0.5 font-mono">{brief.format ?? "format"}</span>
                             <span>{Number((brief.success_criteria?.variations as number | undefined) ?? 3)} variations</span>
                           </div>
+                          {briefIsVideo ? (
+                            <span className="text-[11px] font-mono bg-purple-100 text-purple-800 px-2 py-0.5 rounded">video</span>
+                          ) : null}
                           {!canApproveBrief ? (
                             <p className="rounded-md bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
                               Add a visual direction before approval so the static generator has an image prompt.
@@ -733,6 +991,52 @@ export default function AgentsDashboard() {
                   <p className="text-sm text-muted-foreground">No creative variations are ready.</p>
                 ) : (
                   <>
+                    {approvedVideoBriefs.map((brief) => {
+                      const config = brief.video_config!
+                      const variantCount = config.copyVariants?.length ?? 0
+                      return (
+                        <div key={brief.id} className="rounded-lg border p-3 space-y-3 border-purple-200 bg-purple-50/30">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div>
+                              <p className="text-sm font-medium">{config.conceptSlug}</p>
+                              <p className="text-xs text-muted-foreground">Approved · {variantCount} variant{variantCount === 1 ? "" : "s"} · source: {config.source}</p>
+                            </div>
+                            <span className="text-[11px] font-mono bg-green-100 text-green-800 px-2 py-0.5 rounded">approved</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void generateVideoVariants(brief.id)}
+                            disabled={busyAction === `generate-video-${brief.id}`}
+                            className="text-xs px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
+                          >
+                            Generate Video Variants ({variantCount} copies, source: {config.source === "runway" ? "Runway" : "Upload"})
+                          </button>
+                        </div>
+                      )
+                    })}
+                    {videoGeneratingBriefs.map((brief) => {
+                      const jobs = renderJobsByBrief[brief.id] ?? []
+                      const config = brief.video_config
+                      return (
+                        <div key={brief.id} className="rounded-lg border p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium">{config?.conceptSlug ?? brief.hook}</p>
+                            <span className="h-4 w-4 rounded-full border-2 border-muted border-t-foreground animate-spin" />
+                          </div>
+                          <p className="text-xs text-muted-foreground">Video rendering in progress</p>
+                          <div className="space-y-1">
+                            {jobs.map((job) => (
+                              <div key={job.id} className="flex items-center justify-between text-xs gap-2">
+                                <span className="font-mono">{job.variant_slug}</span>
+                                <span className={`px-2 py-0.5 rounded ${jobStatusClass(job.status)}`} title={job.error_message ?? undefined}>
+                                  {job.status} · attempt {job.attempts}/{job.max_attempts ?? 3}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
                     {generatingBriefs.map((brief) => (
                       <div key={brief.id} className="rounded-lg border p-3 space-y-3">
                         <div className="flex items-center justify-between gap-2">
@@ -774,10 +1078,23 @@ export default function AgentsDashboard() {
                       <div className="grid gap-3 md:grid-cols-3">
                         {group.assets.map((asset) => (
                           <div key={asset.id} className="rounded-md border bg-background p-2 space-y-2">
-                            <div className="aspect-video rounded bg-muted overflow-hidden border">
+                            <div className={`rounded bg-muted overflow-hidden border ${isVideoAsset(asset) ? "aspect-[9/16] max-w-[180px]" : "aspect-video"}`}>
                               {assetUrl(asset) ? (
                                 isVideoAsset(asset) ? (
-                                  <video src={assetUrl(asset)} className="h-full w-full object-cover" muted />
+                                  <video
+                                    src={assetUrl(asset)}
+                                    className="h-full w-full object-cover rounded-lg"
+                                    style={{ width: 180, aspectRatio: "9/16" }}
+                                    preload="metadata"
+                                    muted
+                                    loop
+                                    playsInline
+                                    onMouseEnter={(e) => void e.currentTarget.play()}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.pause()
+                                      e.currentTarget.currentTime = 0
+                                    }}
+                                  />
                                 ) : (
                                   <img
                                     src={assetUrl(asset)}
@@ -1028,6 +1345,35 @@ export default function AgentsDashboard() {
                 Select an active Meta ad set for {activeLaunchAssets.length} approved variation{activeLaunchAssets.length === 1 ? "" : "s"}.
               </p>
             </div>
+            {activeLaunchAssets[0] ? (
+              <div className="flex gap-3 items-start">
+                {isLaunchableVideo(activeLaunchAssets[0]) ? (
+                  <video
+                    src={assetUrl(activeLaunchAssets[0])}
+                    className="w-[90px] aspect-[9/16] rounded object-cover bg-muted shrink-0"
+                    muted
+                    playsInline
+                    controls
+                    preload="metadata"
+                  />
+                ) : (
+                  <img
+                    src={assetUrl(activeLaunchAssets[0])}
+                    alt="Launch preview"
+                    className="w-24 h-24 rounded object-cover bg-muted shrink-0"
+                  />
+                )}
+                <div className="space-y-1 text-xs flex-1 min-w-0">
+                  <p className="font-medium text-muted-foreground uppercase tracking-wide">Meta ad name</p>
+                  <p className="font-mono text-sm break-all">
+                    {activeLaunchAssets[0].convention_name ?? "(legacy name — reporting may not auto-parse)"}
+                  </p>
+                  {!activeLaunchAssets[0].convention_name ? (
+                    <p className="text-amber-700">No convention_name. Launch will use a legacy name.</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground" htmlFor="meta-adset">
                 Target ad set
@@ -1046,17 +1392,22 @@ export default function AgentsDashboard() {
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-muted-foreground">
+                Creates a PAUSED ad. Activate in Meta Ads Manager when ready.
+              </p>
             </div>
             <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
               {activeLaunchAssets.map((asset) => (
-                <p key={asset.id}>Variation {asset.variation_index ?? "—"} · {asset.asset_type ?? "asset"}</p>
+                <p key={asset.id}>
+                  {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`} ·{" "}
+                  {isLaunchableVideo(asset) ? "video" : asset.asset_type ?? "asset"}
+                </p>
               ))}
             </div>
             {launchProgress && (
               <div className="rounded-md border p-3 text-xs">
                 <p className="font-medium">Progress</p>
-                <p className="text-muted-foreground">Uploading → creating creative → creating ad</p>
-                <p className="mt-1 text-[#9A4A33]">Current: {launchProgress}</p>
+                <p className="mt-1 text-[#9A4A33]">{launchProgress}</p>
               </div>
             )}
             <div className="flex justify-end gap-2">

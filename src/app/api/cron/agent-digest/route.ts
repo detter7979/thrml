@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { createAdminClient } from "@/lib/supabase/admin"
+import { renderThrmlEmail } from "@/lib/emails/render-layout"
 import { sendEmail } from "@/lib/emails/send"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 function cronAuth(req: NextRequest) {
   return (
@@ -27,6 +28,8 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdminClient()
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://usethrml.com"
+  const disputesInboxUrl = `${appUrl}/admin/inbox/disputes`
   const today = new Date().toISOString().slice(0, 10)
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
   const h24Ago = new Date(Date.now() - 86400000).toISOString()
@@ -106,14 +109,7 @@ export async function GET(req: NextRequest) {
           &nbsp;·&nbsp;${fmt(Number(b.total_charged ?? 0))}
         </div>`).join("") + ((newBookings ?? []).length > 5 ? `<p style="font-size:12px;color:#796A5E">+${(newBookings ?? []).length - 5} more</p>` : "")
 
-    const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:640px;color:#1A1410;padding:24px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-  <div>
-    <h2 style="margin:0;font-size:20px">thrml Agent Digest</h2>
-    <p style="margin:0;color:#796A5E;font-size:13px">${today} · Good morning, Dom</p>
-  </div>
-</div>
-
+    const digestContentHtml = `
 <!-- Stats row -->
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
   ${[
@@ -150,15 +146,21 @@ ${bookingsHtml}
 ${(pendingTickets ?? 0) > 0 || criticals.length > 0 ? `
 <div style="margin-top:20px;background:#FEF3F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px">
   <p style="margin:0;font-size:13px;font-weight:600;color:#C0392B">Action Required</p>
-  ${(pendingTickets ?? 0) > 0 ? `<p style="margin:4px 0 0;font-size:13px">· ${pendingTickets} support ticket(s) need your review → <a href="https://usethrml.com/admin/support-tickets" style="color:#C4623A">Review now</a></p>` : ""}
+  ${(pendingTickets ?? 0) > 0 ? `<p style="margin:4px 0 0;font-size:13px">· ${pendingTickets} support ticket(s) need your review → <a href="${disputesInboxUrl}" style="color:#C4623A">Review now</a></p>` : ""}
   ${criticals.map(a => `<p style="margin:4px 0 0;font-size:13px">· ${a.message}</p>`).join("")}
 </div>` : ""}
 
-<p style="font-size:11px;color:#796A5E;margin-top:24px;border-top:1px solid #EDE8E2;padding-top:12px">
-  thrml agent digest · auto-generated at 07:00 UTC · 
-  <a href="https://usethrml.com/admin" style="color:#C4623A">Admin Dashboard</a>
-</p>
-</div>`
+`
+
+    const html = await renderThrmlEmail({
+      preview: `thrml Digest — ${today}`,
+      kicker: "Admin",
+      title: "thrml Agent Digest",
+      greeting: `Good morning, Dom · ${today}`,
+      contentHtml: digestContentHtml,
+      cta: { label: "Admin Dashboard", href: `${appUrl}/admin` },
+      footnote: "thrml agent digest · auto-generated at 07:00 UTC",
+    })
 
     const subjectRevenue = finance ? ` · ${fmt(Number(finance.net_platform_revenue))} revenue` : ""
     const alertSummary = criticals.length > 0 ? ` · ${criticals.length} critical` : warnings.length > 0 ? ` · ${warnings.length} warnings` : " · all clear"

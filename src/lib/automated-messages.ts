@@ -1,6 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
-import { ctaButton, thrmlEmailWrapper } from "@/lib/emails/send"
-import { sendEmail } from "@/lib/emails/send"
+import { sendThrmlLayoutEmail, THRML_APP_URL } from "@/lib/emails/transactional-send"
 
 type TemplateType =
   | "booking_confirmed"
@@ -533,31 +532,21 @@ export async function processScheduledMessages() {
       if (guestEmail) {
         const hostName = firstName(host?.full_name)
         const listingTitle = listing?.title ?? "your session"
-        const html = thrmlEmailWrapper(`
-          <h1 style="color:#ffffff;font-size:30px;line-height:1.2;margin:0 0 14px;">New message from your host.</h1>
-          <p style="color:#d6d6d6;line-height:1.65;margin:0 0 14px;">
-            ${escapeHtml(hostName)} sent you an automated update about ${escapeHtml(listingTitle)}.
-          </p>
-          <div style="background-color:#2a2a2a;border-radius:12px;padding:20px;margin:16px 0;">
-            <p style="color:#ffffff;line-height:1.6;margin:0;">${escapeHtml(body).replaceAll("\n", "<br/>")}</p>
-          </div>
-          ${ctaButton("View message thread →", `${APP_URL}/dashboard/messages`)}
-        `)
-        const text = [
-          "New message from your host.",
-          `${hostName} sent you an automated update about ${listingTitle}.`,
-          "",
-          body,
-          "",
-          `View message thread: ${APP_URL}/dashboard/messages`,
-        ].join("\n")
-        await sendEmail({
+        await sendThrmlLayoutEmail({
           to: guestEmail,
           subject: `New host message — ${listingTitle}`,
-          html,
-          text,
           userId: booking.guest_id,
           preferenceKey: "new_booking",
+          layout: {
+            preview: `New message from your host — ${listingTitle}`,
+            kicker: "Host message",
+            title: "New message from your host.",
+            paragraphs: [
+              `${hostName} sent you an automated update about ${listingTitle}.`,
+              body,
+            ],
+            cta: { label: "View message thread", href: `${THRML_APP_URL}/dashboard/messages` },
+          },
         })
       }
 

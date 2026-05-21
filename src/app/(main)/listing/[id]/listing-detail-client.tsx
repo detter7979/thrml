@@ -1337,7 +1337,7 @@ export function ListingDetailClient({
               {photos.map((photo, index) => (
                 <div key={`${photo.url}-${index}`} className="w-full shrink-0 snap-start">
                   {index === 0 && heroMotionProps ? (
-                    <motion.div {...heroMotionProps} className="aspect-[4/3] w-full overflow-hidden">
+                    <motion.div {...heroMotionProps} className="aspect-[16/9] w-full overflow-hidden">
                       <img
                         src={photo.url}
                         alt={`${title} — photo ${index + 1}`}
@@ -1345,11 +1345,13 @@ export function ListingDetailClient({
                       />
                     </motion.div>
                   ) : (
-                    <img
-                      src={photo.url}
-                      alt={`${title} — photo ${index + 1}`}
-                      className="aspect-[4/3] w-full object-cover object-center"
-                    />
+                    <div className="aspect-[16/9] w-full overflow-hidden">
+                      <img
+                        src={photo.url}
+                        alt={`${title} — photo ${index + 1}`}
+                        className="h-full w-full object-cover object-center"
+                      />
+                    </div>
                   )}
                 </div>
               ))}
@@ -1392,48 +1394,56 @@ export function ListingDetailClient({
             <div className="grid grid-cols-2 gap-2 overflow-hidden rounded-2xl">
               {photos.slice(0, 2).map((photo, index) =>
                 index === 0 && heroMotionProps ? (
-                  <motion.div key={`${photo.url}-${index}`} {...heroMotionProps} className="overflow-hidden rounded-xl">
+                  <motion.div
+                    key={`${photo.url}-${index}`}
+                    {...heroMotionProps}
+                    className="aspect-[16/9] overflow-hidden rounded-xl"
+                  >
                     <img
                       src={photo.url}
                       alt={`${title} — photo ${index + 1}`}
-                      className="aspect-[4/3] w-full object-cover object-center"
+                      className="h-full w-full object-cover object-center"
                     />
                   </motion.div>
                 ) : (
-                  <img
-                    key={`${photo.url}-${index}`}
-                    src={photo.url}
-                    alt={`${title} — photo ${index + 1}`}
-                    className="aspect-[4/3] w-full object-cover object-center"
-                  />
+                  <div key={`${photo.url}-${index}`} className="aspect-[16/9] overflow-hidden rounded-xl">
+                    <img
+                      src={photo.url}
+                      alt={`${title} — photo ${index + 1}`}
+                      className="h-full w-full object-cover object-center"
+                    />
+                  </div>
                 ),
               )}
             </div>
           ) : (
-            <div className="relative grid max-h-[480px] grid-cols-[3fr_2fr] gap-2 overflow-hidden rounded-2xl">
+            <div className="relative grid aspect-[16/9] grid-cols-[3fr_2fr] gap-2 overflow-hidden rounded-2xl">
               {heroMotionProps ? (
-              <motion.div {...heroMotionProps} className="relative min-h-0 overflow-hidden rounded-2xl">
+              <motion.div {...heroMotionProps} className="relative min-h-0 overflow-hidden">
               <img
                 src={galleryPhotos[0]?.url}
                 alt={`${title} — photo 1`}
-                className="aspect-[4/3] h-full w-full object-cover object-center"
+                className="h-full w-full object-cover object-center"
               />
               </motion.div>
               ) : (
+              <div className="relative min-h-0 overflow-hidden">
               <img
                 src={galleryPhotos[0]?.url}
                 alt={`${title} — photo 1`}
-                className="aspect-[4/3] h-full w-full object-cover object-center"
+                className="h-full w-full object-cover object-center"
               />
+              </div>
               )}
-              <div className="grid gap-2">
+              <div className="grid min-h-0 grid-rows-2 gap-2">
                 {galleryPhotos.slice(1, 3).map((photo, index) => (
-                  <img
-                    key={`${photo.url}-${index + 1}`}
-                    src={photo.url}
-                    alt={`${title} — photo ${index + 2}`}
-                    className="aspect-[4/3] h-full w-full object-cover object-center"
-                  />
+                  <div key={`${photo.url}-${index + 1}`} className="relative min-h-0 overflow-hidden">
+                    <img
+                      src={photo.url}
+                      alt={`${title} — photo ${index + 2}`}
+                      className="h-full w-full object-cover object-center"
+                    />
+                  </div>
                 ))}
               </div>
               {photos.length > 3 ? (
@@ -1466,12 +1476,13 @@ export function ListingDetailClient({
               <div className="h-full overflow-y-auto bg-[#FCFAF7] px-4 py-4 sm:px-6">
                 <div className="mx-auto flex max-w-3xl flex-col gap-3">
                   {photos.map((photo, index) => (
-                    <img
-                      key={`${photo.url}-${index}`}
-                      src={photo.url}
-                      alt={`${title} — photo ${index + 1}`}
-                      className="w-full rounded-xl object-cover object-center"
-                    />
+                    <div key={`${photo.url}-${index}`} className="aspect-[16/9] overflow-hidden rounded-xl bg-[#F3E8DE]">
+                      <img
+                        src={photo.url}
+                        alt={`${title} — photo ${index + 1}`}
+                        className="h-full w-full object-cover object-center"
+                      />
+                    </div>
                   ))}
                 </div>
               </div>

@@ -56,7 +56,7 @@ export function ListingCard({
       whileTap={reduce ? undefined : { scale: 0.97 }}
       transition={tapSpring}
     >
-      <div className="relative mb-3 h-44 w-full shrink-0 overflow-hidden rounded-xl bg-warm-100">
+      <div className="relative mb-3 aspect-[16/9] w-full shrink-0 overflow-hidden rounded-xl bg-warm-100">
         {listing.photoUrl ? (
           <Image
             src={listingPhotoThumbnailUrl(listing.photoUrl) || listing.photoUrl}
@@ -64,7 +64,7 @@ export function ListingCard({
               listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
             }`}
             fill
-            className="object-cover transition-transform duration-[380ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] group-hover:scale-105"
+            className="object-cover object-center"
             sizes="(max-width: 640px) min(100vw, 420px), (max-width: 1280px) min(50vw, 520px), min(33vw, 380px)"
             loading={imageHighPriority ? "eager" : "lazy"}
             priority={imageHighPriority}

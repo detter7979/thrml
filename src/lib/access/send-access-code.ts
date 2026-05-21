@@ -1,3 +1,6 @@
+import { render } from "@react-email/render"
+
+import AccessCodeEmail from "../../../emails/AccessCodeEmail"
 import { sendEmail } from "@/lib/emails/send"
 import { ACCESS_TYPES, resolveInstructions } from "@/lib/constants/access-types"
 import { resolveHouseRules } from "@/lib/constants/default-house-rules"
@@ -205,66 +208,23 @@ export async function sendAccessCode(
     const bookingUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/dashboard/bookings/${booking.id}`
     const wasAlreadySent = Boolean(booking.access_code_sent_at)
     const subject = `Your access details — ${listing.title ?? "your booking"} on ${dateLabel}`
-    const rulesHtml = rules
-      .map(
-        (rule) => `
-          <div style="padding:8px 0;border-bottom:1px solid #F0E8E0;font-size:14px;color:#2C2420;display:flex;gap:10px;align-items:flex-start;">
-            <span style="color:#8B4513;line-height:1.4;">●</span>
-            <span>${escapeHtml(rule)}</span>
-          </div>
-        `
-      )
-      .join("")
-    const customHtml = custom
-      ? `
-          <div style="background:#F5EFE9;border-radius:6px;padding:12px;font-size:13px;color:#4A3728;margin-top:12px;">
-            <p style="margin:0 0 6px;font-weight:600;">Additional notes from your host:</p>
-            <p style="margin:0;line-height:1.5;">${escapeHtml(custom).replace(/\n/g, "<br/>")}</p>
-          </div>
-        `
-      : ""
-    const defaultRulesNote = isDefault
-      ? `<p style="font-size:11px;color:#A89880;text-align:center;margin-top:8px;">Standard Thrml community rules</p>`
-      : ""
-    const html = `
-      <div style="margin:0;padding:28px 12px;background:#F7F3EE;">
-        <div style="max-width:620px;margin:0 auto;background:#FFFFFF;border:1px solid #E5DDD6;border-radius:12px;overflow:hidden;font-family:Arial,sans-serif;color:#1F1914;">
-          <div style="padding:18px 24px;border-bottom:1px solid #EFE5DA;background:#FFF9F2;">
-            <div style="font-size:22px;font-weight:700;letter-spacing:0.4px;">Thrml</div>
-          </div>
-          <div style="padding:24px;">
-            <p style="margin:0 0 10px;">Hi ${guestFirstName},</p>
-            <p style="margin:0 0 14px;">Here are your access details for your upcoming session.</p>
-            <p style="margin:0 0 4px;font-weight:700;">${listing.title ?? "Your booking"}</p>
-            <p style="margin:0 0 14px;color:#6A5848;">${dateLabel} · ${timeLabel} · ${durationLabel}</p>
-            <hr style="border:none;border-top:1px solid #EFE5DA;margin:14px 0;" />
-      ${
-        accessConfig.supportsCode && resolvedCode
-          ? `<p style="font-size:12px;letter-spacing:0.12em;color:#6D5E51;text-transform:uppercase;margin:0 0 6px;">Your access code</p>
-             <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:32px;font-weight:700;letter-spacing:0.22em;background:#F5EFE9;border:1px solid #E5DDD6;border-radius:8px;padding:14px 16px;display:inline-block;">
-               ${resolvedCode.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
-             </div>
-             <p style="margin:6px 0 0;color:#7A6A5D;">(tap to copy)</p>
-             <hr style="border:none;border-top:1px solid #EFE5DA;margin:14px 0;" />`
-          : ""
-      }
-            <p style="font-size:12px;letter-spacing:0.12em;color:#6D5E51;text-transform:uppercase;margin:0 0 6px;">How to get in</p>
-            <p style="margin:0 0 14px;line-height:1.6;">${resolvedInstructions.replace(/\n/g, "<br/>")}</p>
-            <hr style="border:none;border-top:1px solid #EFE5DA;margin:14px 0;" />
-            <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#6D5E51;margin:0 0 12px;">House rules</p>
-            ${rulesHtml}
-            ${customHtml}
-            ${defaultRulesNote}
-            <hr style="border:none;border-top:1px solid #EFE5DA;margin:14px 0;" />
-            <p style="margin:0 0 12px;">
-              <a href="${bookingUrl}" style="display:inline-block;background:#C75B3A;color:#FFFFFF;text-decoration:none;padding:11px 16px;border-radius:10px;font-weight:700;">View booking details →</a>
-            </p>
-            <p style="margin:0;color:#6A5848;">Having trouble? Message ${hostFirstName} directly in the app.</p>
-            <p style="margin:16px 0 0;color:#77685B;font-size:12px;">Thrml · usethermal.com</p>
-          </div>
-        </div>
-      </div>
-    `
+    const html = await render(
+      AccessCodeEmail({
+        preview: subject,
+        guestFirstName,
+        listingTitle: listing.title ?? "Your booking",
+        dateTimeLabel: `${dateLabel} · ${timeLabel} · ${durationLabel}`,
+        accessCode: resolvedCode,
+        showAccessCode: Boolean(accessConfig.supportsCode && resolvedCode),
+        entryInstructions: resolvedInstructions,
+        houseRules: rules,
+        customRulesNote: custom,
+        isDefaultRules: isDefault,
+        hostFirstName,
+        bookingUrl,
+        appUrl: process.env.NEXT_PUBLIC_APP_URL,
+      })
+    )
     const text = [
       `Hi ${guestFirstName},`,
       "",
@@ -277,7 +237,6 @@ export async function sendAccessCode(
       "",
       "HOUSE RULES",
       ...rules.map((rule, index) => `${index + 1}. ${rule}`),
-      custom ? "" : null,
       custom ? `Additional notes: ${custom}` : null,
       "",
       `View booking: ${bookingUrl}`,

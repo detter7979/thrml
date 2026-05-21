@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { classifyDispute, type BookingContext } from "@/lib/disputes/classifier"
 import { executeResolution } from "@/lib/disputes/executor"
+import { notifyHumanReviewEscalation } from "@/lib/disputes/notify-human-review"
 import { hoursUntilSession, parseSessionStart } from "@/lib/cancellations"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -253,6 +254,27 @@ export async function GET(req: NextRequest) {
             .eq("id", ticket.id)
             .eq("status", "pending_agent")
         }
+
+        const { data: finalStatusRow } = await supabase
+          .from("support_requests")
+          .select("status")
+          .eq("id", ticket.id)
+          .maybeSingle()
+
+        if (finalStatusRow?.status === "pending_human") {
+          await notifyHumanReviewEscalation({
+            supportRequestId: ticket.id,
+            ticketNumber: ticketNumberStr,
+            subject: (ticket.subject as string | null) ?? "",
+            name: (ticket.name as string | null) ?? "",
+            email: (ticket.email as string | null) ?? "",
+            bookingId: bookingContext.booking_id,
+            classification,
+            executionAction: execution.action_taken,
+            executionError: execution.execution_error,
+          })
+        }
+
         results.flagged_human++
       }
     } catch (err) {

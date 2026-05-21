@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 import { requireAdminApi } from "@/lib/admin-guard"
+import { persistBookingRefund } from "@/lib/finance/booking-refund"
 import { stripe } from "@/lib/stripe"
 
 const payloadSchema = z.object({
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   const { bookingId, amount } = parsed.data
   const { data: booking, error: bookingError } = await admin
     .from("bookings")
-    .select("id, stripe_payment_intent_id, total_charged, refunded_amount")
+    .select("id, guest_id, stripe_payment_intent_id, total_charged, refunded_amount")
     .eq("id", bookingId)
     .maybeSingle()
   if (bookingError) return NextResponse.json({ error: bookingError.message }, { status: 500 })
@@ -51,17 +52,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 
-  const refundedAmount = Number(booking.refunded_amount ?? 0) + amount
-  const { error: updateError } = await admin
-    .from("bookings")
-    .update({
-      refunded_amount: refundedAmount,
-      refunded_at: new Date().toISOString(),
-      stripe_refund_id: refundId,
-    })
-    .eq("id", bookingId)
+  const persisted = await persistBookingRefund(admin, {
+    bookingId,
+    guestId: typeof booking.guest_id === "string" ? booking.guest_id : null,
+    additionalRefundDollars: amount,
+    stripeRefundId: refundId!,
+    source: "admin_refund",
+    restorePromoCredits: true,
+  })
 
-  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+  if (!persisted.ok) {
+    return NextResponse.json({ error: persisted.error }, { status: 500 })
+  }
 
-  return NextResponse.json({ success: true, refundId, refundedAmount: amount })
+  return NextResponse.json({
+    success: true,
+    refundId,
+    refundedAmount: persisted.refundedAmount,
+  })
 }

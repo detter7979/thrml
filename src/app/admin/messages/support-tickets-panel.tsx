@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 
 type SupportTicket = {
@@ -144,6 +145,14 @@ export function SupportTicketsPanel() {
                 <span className="rounded-full border border-[#D9CBB8] bg-white px-2 py-0.5 text-[11px] font-medium text-[#5B4A3A]">
                   {selectedTicket.status}
                 </span>
+              ) : null}
+              {selectedTicket.status === "pending_human" ? (
+                <Link
+                  href="/admin/inbox/disputes"
+                  className="rounded-full border border-[#9A4A33] bg-[#FFF4EE] px-2.5 py-0.5 text-[11px] font-medium text-[#9A4A33] hover:bg-[#F7E6DC]"
+                >
+                  Review in disputes →
+                </Link>
               ) : null}
             </div>
 

@@ -1,26 +1,29 @@
 /**
- * Visual test for React Email templates.
+ * Visual test for Thrml email layout.
  *
  *   npx tsx scripts/test-email.ts           → print HTML to stdout
  *   npx tsx scripts/test-email.ts --send    → send via Resend (needs RESEND_API_KEY)
  */
-import { render } from "@react-email/render"
 import { Resend } from "resend"
 
-import ThrmlTemplate from "../emails/ThrmlTemplate"
+import { renderThrmlEmail } from "../src/lib/emails/render-layout"
 
 const THRML_FROM = "Thrml <notifications@usethrml.com>"
 
 async function testEmail() {
-  const html = await render(
-    ThrmlTemplate({
-      title: "Your session with Cane's Canines is complete",
-      bodyText:
-        "Your payout of $17.00 is being processed by Stripe and should arrive within 2 business days.",
-      ctaText: "View Payout Status",
-      ctaUrl: "https://dashboard.stripe.com",
-    })
-  )
+  const html = await renderThrmlEmail({
+    preview: "Your session is complete — payout processing",
+    kicker: "Session complete",
+    title: "Your session with a guest is complete.",
+    summary: [
+      { label: "Listing", value: "Cedar Sauna" },
+      { label: "Payout", value: "$17.00" },
+    ],
+    paragraphs: [
+      "Your payout is being processed by Stripe and should arrive within 2 business days.",
+    ],
+    cta: { label: "View payout status", href: "https://usethrml.com/dashboard/payouts" },
+  })
 
   const send = process.argv.includes("--send")
   if (!send) {
@@ -44,7 +47,7 @@ async function testEmail() {
   const { data, error } = await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL?.trim() || THRML_FROM,
     to: [to],
-    subject: "Branding Test — ThrmlTemplate",
+    subject: "Branding Test — ThrmlEmailLayout",
     html,
   })
 

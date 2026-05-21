@@ -38,7 +38,11 @@ export async function POST(req: NextRequest) {
   if (!brief) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
   const staticPlan = parseStoredStaticVariations(brief.trigger_data)
   const hasVisual = typeof brief.visual_direction === "string" && brief.visual_direction.trim()
-  if (!hasVisual && !staticPlan?.length) {
+  const videoConfig =
+    brief.video_config && typeof brief.video_config === "object" ? brief.video_config : null
+  const isVideoBrief = Boolean(videoConfig)
+
+  if (!isVideoBrief && !hasVisual && !staticPlan?.length) {
     return NextResponse.json({ error: "Brief needs a visual direction before approval." }, { status: 400 })
   }
 
@@ -52,6 +56,22 @@ export async function POST(req: NextRequest) {
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
+
+  if (isVideoBrief) {
+    console.log("[agent/approve-brief] video brief approved; awaiting explicit generate-video", {
+      briefId: data.id,
+    })
+
+    const queueUpdate = await admin!
+      .from("creative_queue")
+      .update({ approved_at: now, approved_by: "dom", status: "brief_ready" })
+      .eq("brief_id", briefId)
+    if (queueUpdate.error && queueUpdate.error.code !== "42703") {
+      console.warn("[agent/approve-brief] creative_queue update failed", queueUpdate.error)
+    }
+
+    return NextResponse.json({ ok: true, briefId: data.id, video: true, generated: null })
+  }
 
   try {
     const generated = await processStaticBrief({

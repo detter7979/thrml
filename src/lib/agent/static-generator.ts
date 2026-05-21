@@ -7,7 +7,7 @@ import {
   finalizeHostStaticImagePrompt,
   HOST_MONETIZATION_CANONICAL_VARIATIONS,
 } from "@/lib/agent/host-monetization-static"
-import { sendEmail, thrmlEmailWrapper, ctaButton } from "@/lib/emails/send"
+import { sendThrmlLayoutEmail } from "@/lib/emails/transactional-send"
 import { generateImagen } from "@/lib/agent/imagen"
 import { renderMasterAdTemplate } from "@/lib/agent/static-layouts/master-ad-template"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -285,17 +285,18 @@ async function sendReadyEmail(count: number, brief: CreativeBriefRow) {
   const reviewUrl = `${appUrl}/admin/agents?tab=creative`
   const subject = `${count} new creative variations ready for review — ${brief.hook ?? "Static creative"}`
 
-  await sendEmail({
+  await sendThrmlLayoutEmail({
     to: CREATIVE_REVIEW_RECIPIENT,
     subject,
-    html: thrmlEmailWrapper(`
-      <h1 style="color:#ffffff;font-size:24px;margin:0 0 16px;">${escapeHtml(subject)}</h1>
-      <p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:0 0 16px;">
-        Static creative variations are ready for review in the admin creative pipeline (briefs and assets).
-      </p>
-      ${ctaButton("Review creatives", reviewUrl)}
-    `),
-    text: `${subject}\n\nReview: ${reviewUrl}`,
+    layout: {
+      preview: subject,
+      kicker: "Admin",
+      title: subject,
+      paragraphs: [
+        "Static creative variations are ready for review in the admin creative pipeline (briefs and assets).",
+      ],
+      cta: { label: "Review creatives", href: reviewUrl },
+    },
   })
 }
 

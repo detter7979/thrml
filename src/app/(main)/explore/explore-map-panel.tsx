@@ -234,7 +234,7 @@ export function ExploreMapPanel({
               >
                 <X className="size-3" />
               </button>
-              <div className="relative h-[120px] w-full shrink-0 bg-[#F3E7DC]">
+              <div className="relative aspect-[16/9] w-full shrink-0 bg-[#F3E7DC]">
                 {popupListing.photoUrl ? (
                   <Image
                     src={

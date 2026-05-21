@@ -8,7 +8,9 @@ import { useRouter } from "next/navigation"
 import { trackMetaEvent } from "@/components/meta-pixel"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { usePlatformFeePercents } from "@/contexts/platform-fees-context"
 import { trackGaEvent } from "@/lib/analytics/ga"
+import { formatHostKeepPercent } from "@/lib/fees"
 import { trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { createClient } from "@/lib/supabase/client"
@@ -114,6 +116,8 @@ const GROUND_RULES = [
 
 export function BecomeAHostClient() {
   const router = useRouter()
+  const { hostFeePercent } = usePlatformFeePercents()
+  const hostKeepLabel = formatHostKeepPercent(hostFeePercent)
   const [step, setStep] = useState(1)
   const [rulesAccepted, setRulesAccepted] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
@@ -222,7 +226,7 @@ export function BecomeAHostClient() {
 
                   <div className="grid grid-cols-3 gap-3 text-center">
                     <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                      <p className="text-lg font-semibold text-[#1A1410]">88%</p>
+                      <p className="text-lg font-semibold text-[#1A1410]">{hostKeepLabel}</p>
                       <p className="text-xs text-neutral-400">You keep per booking</p>
                     </div>
                     <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">

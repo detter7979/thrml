@@ -17,6 +17,12 @@ export type FeeBreakdown = {
   hostPayout: number
 }
 
+/** Host share of booking subtotal after platform host fee. */
+export function formatHostKeepPercent(hostFeePercent: number): string {
+  const keep = Math.max(0, 100 - hostFeePercent)
+  return Number.isInteger(keep) ? `${keep}%` : `${keep.toFixed(1)}%`
+}
+
 export type ProtectedBookingCreditInput = {
   guestTotalCents: number
   hostPayoutCents: number

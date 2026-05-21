@@ -16,6 +16,7 @@ import {
   sendHostCancellationNotice,
 } from "@/lib/emails"
 import { requireAuth } from "@/lib/auth-check"
+import { recordFinancialEvent } from "@/lib/finance/events"
 import { rateLimit } from "@/lib/rate-limit"
 import { stripe } from "@/lib/stripe"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -386,6 +387,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
       })
     }
     return NextResponse.json({ error: "Unable to cancel booking" }, { status: 500 })
+  }
+
+  if (refundIssued && refund && refundAmount > 0) {
+    const ledger = await recordFinancialEvent(admin, {
+      eventType: "refund",
+      amountCents: -Math.round(refundAmount * 100),
+      bookingId: id,
+      userId: typeof booking.guest_id === "string" ? booking.guest_id : null,
+      stripeObjectId: refund.id,
+      source: "booking_cancel",
+      metadata: { cancelled_by: cancelledBy, policy: refundPreview.policyApplied },
+    })
+    if (!ledger.ok && !ledger.duplicate) {
+      console.error("[bookings/cancel] financial_events insert failed", ledger.error)
+    }
+
+    const { error: restoreError } = await admin.rpc("restore_booking_promo_credits", {
+      p_booking_id: id,
+    })
+    if (restoreError) {
+      console.error("[bookings/cancel] restore_booking_promo_credits failed", restoreError.message)
+    }
   }
 
   const deleteBookedSlot = async (tableName: "booked_slot" | "booked_slots") => {

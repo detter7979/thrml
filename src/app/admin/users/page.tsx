@@ -48,6 +48,7 @@ export default async function AdminUsersPage() {
       total_listings: listingCount,
       is_host: intent === "host" || intent === "both" || listingCount > 0,
       is_admin: Boolean(profile.is_admin),
+      is_banned: Boolean(profile.is_banned),
     }
   })
 

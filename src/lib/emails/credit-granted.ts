@@ -1,9 +1,6 @@
-import { render } from "@react-email/render"
+import { sendThrmlLayoutEmail, THRML_APP_URL } from "@/lib/emails/transactional-send"
 
-import ThrmlTemplate from "../../../emails/ThrmlTemplate"
-import { sendEmail } from "@/lib/emails/send"
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://usethrml.com"
+const APP_URL = THRML_APP_URL
 
 function formatUsd(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
@@ -18,34 +15,23 @@ export async function sendCreditGrantedEmail(args: {
   const amountLabel = formatUsd(args.amountCents)
   const dashboardUrl = `${APP_URL}/dashboard`
 
-  const html = await render(
-    ThrmlTemplate({
-      title: "You’ve received Thrml credit",
-      editorial: true,
-      bodyText: `We’ve added ${amountLabel} to your Thrml wallet. At checkout, enable “Apply account credit” to use it on eligible bookings (combined with any referral balance, up to platform limits).`,
-      ctaText: "Explore sessions",
-      ctaUrl: dashboardUrl,
-      creditBanner: {
+  return sendThrmlLayoutEmail({
+    to: args.to,
+    subject: "You have new Thrml credit",
+    userId: args.userId,
+    preferenceKey: "credit_grants",
+    layout: {
+      preview: `You've received ${amountLabel} in Thrml credit`,
+      kicker: "Account credit",
+      title: "You've received Thrml credit",
+      creditHighlight: {
         headline: amountLabel,
         subline: args.reason.trim(),
       },
-    })
-  )
-
-  const text = [
-    `You've received ${amountLabel} in Thrml credit.`,
-    "",
-    `Note from Thrml: ${args.reason.trim()}`,
-    "",
-    `Book: ${dashboardUrl}`,
-  ].join("\n")
-
-  return sendEmail({
-    to: args.to,
-    subject: "You have new Thrml credit",
-    html,
-    text,
-    userId: args.userId,
-    preferenceKey: "credit_grants",
+      paragraphs: [
+        "We've added this to your Thrml wallet. At checkout, enable “Apply account credit” to use it on eligible bookings (combined with any referral balance, up to platform limits).",
+      ],
+      cta: { label: "Explore sessions", href: dashboardUrl },
+    },
   })
 }

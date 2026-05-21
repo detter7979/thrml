@@ -3,6 +3,7 @@ import { google } from "googleapis"
 import type { GoogleAuth } from "google-auth-library"
 
 import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
+import { syncMarketplaceFinanceSheet } from "@/lib/finance/sync-marketplace-sheet"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 function cronAuth(req: NextRequest) {
@@ -86,25 +87,65 @@ export async function GET(req: NextRequest) {
 
     // Write headers first (idempotent — just overwrites row 1 each time)
     await sheets.spreadsheets.values.update({
-      spreadsheetId, range: "Sheet1!A1:H1", valueInputOption: "RAW",
+      spreadsheetId, range: "Sheet1!A1:K1", valueInputOption: "RAW",
       requestBody: {
-        values: [["Date","Bookings","Gross","Platform Rev","Host Payouts","Refunds","Net Rev","New Users"]],
+        values: [[
+          "Date",
+          "Bookings",
+          "Gross",
+          "Gross Take",
+          "Cash Platform Rev",
+          "Host Payouts",
+          "Refunds",
+          "Credits Applied",
+          "Chargebacks",
+          "Net Rev",
+          "New Users",
+        ]],
       },
     })
 
-    const rows = snapshots.map(s => [
-      s.snapshot_date, s.booking_count,
-      Number(s.gross_booking_value).toFixed(2), Number(s.platform_revenue).toFixed(2),
-      Number(s.host_payouts).toFixed(2), Number(s.refunds_issued).toFixed(2),
-      Number(s.net_platform_revenue).toFixed(2), s.new_users,
+    const rows = snapshots.map((s) => [
+      s.snapshot_date,
+      s.booking_count,
+      Number(s.gross_booking_value).toFixed(2),
+      Number(s.gross_platform_take ?? 0).toFixed(2),
+      Number(s.platform_revenue).toFixed(2),
+      Number(s.host_payouts).toFixed(2),
+      Number(s.refunds_issued).toFixed(2),
+      Number(s.credits_applied ?? 0).toFixed(2),
+      Number(s.chargebacks ?? 0).toFixed(2),
+      Number(s.net_platform_revenue).toFixed(2),
+      s.new_users,
     ])
 
     await sheets.spreadsheets.values.update({
-      spreadsheetId, range: `Sheet1!A2:H${rows.length + 1}`,
+      spreadsheetId, range: `Sheet1!A2:K${rows.length + 1}`,
       valueInputOption: "RAW", requestBody: { values: rows },
     })
 
-    const results = { rows: rows.length, spreadsheetId }
+    let trackerSync: { rows: number; spreadsheetId: string } | null = null
+    const { data: trackerSetting } = await admin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "gdrive_finance_tracker_sheet_id")
+      .maybeSingle()
+    const trackerSheetId = trackerSetting?.value
+      ? String(trackerSetting.value).replace(/^"|"$/g, "")
+      : null
+    if (trackerSheetId) {
+      try {
+        trackerSync = await syncMarketplaceFinanceSheet(admin, trackerSheetId)
+      } catch (syncErr) {
+        console.error("[agent-gdrive] marketplace tracker sync failed", syncErr)
+      }
+    }
+
+    const results = {
+      rows: rows.length,
+      spreadsheetId,
+      trackerSync,
+    }
     if (runId) await admin.from("agent_runs").update({
       status: "success", completed_at: new Date().toISOString(),
       duration_ms: Date.now() - runStart, results,

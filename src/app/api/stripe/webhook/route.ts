@@ -17,6 +17,11 @@ import { sendGA4Event } from "@/lib/analytics/measurement-protocol"
 import { fireServerEvent } from "@/lib/agent/meta-capi"
 import { mergeBookingLegalException, resolveActiveWaiverVersionForServiceType } from "@/lib/waiver-templates"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
+import { recordBookingCapture } from "@/lib/finance/booking-refund"
+import {
+  handleStripeDisputeEvent,
+  handleStripeRefundEvent,
+} from "@/lib/finance/stripe-webhook-handlers"
 import { processReferralConversion } from "@/lib/referral"
 import { stripe } from "@/lib/stripe"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -56,6 +61,12 @@ export async function POST(req: NextRequest) {
     "payment_intent.amount_capturable_updated",
     "payment_intent.payment_failed",
     "payment_intent.canceled",
+    "refund.created",
+    "refund.updated",
+    "charge.dispute.created",
+    "charge.dispute.updated",
+    "charge.dispute.closed",
+    "charge.dispute.funds_withdrawn",
     "account.updated",
     "identity.verification_session.verified",
     "identity.verification_session.requires_input",
@@ -70,6 +81,22 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createAdminClient()
+
+  if (event.type === "refund.created" || event.type === "refund.updated") {
+    const refund = event.data.object as Stripe.Refund
+    if (refund.status === "succeeded") {
+      await handleStripeRefundEvent(supabase, event, refund)
+    }
+  }
+
+  if (
+    event.type === "charge.dispute.created" ||
+    event.type === "charge.dispute.updated" ||
+    event.type === "charge.dispute.closed" ||
+    event.type === "charge.dispute.funds_withdrawn"
+  ) {
+    await handleStripeDisputeEvent(supabase, event, event.data.object as Stripe.Dispute)
+  }
 
   if (event.type === "payment_intent.succeeded") {
     const pi = event.data.object as Stripe.PaymentIntent
@@ -202,6 +229,22 @@ export async function POST(req: NextRequest) {
       }
 
       if (!bookingUpdateError && newlyConfirmed && booking?.guest_id) {
+        const totalChargedCents = Math.round(Number(booking.total_charged ?? 0) * 100)
+        const hostPayoutCents = Math.round(Number(booking.host_payout ?? 0) * 100)
+        const promoCreditsCents =
+          Math.max(0, Number(booking.referral_credit_applied_cents ?? 0)) +
+          Math.max(0, Number(booking.user_credit_applied_cents ?? 0))
+        void recordBookingCapture(supabase, {
+          bookingId: booking.id,
+          guestId: booking.guest_id,
+          totalChargedCents,
+          hostPayoutCents,
+          promoCreditsCents,
+          source: "stripe_webhook:payment_intent.succeeded",
+          stripeEventId: event.id,
+          stripePaymentIntentId: pi.id,
+        })
+
         void processReferralConversion(booking.guest_id, booking.id)
         const appliedCredit = Number(booking.referral_credit_applied_cents ?? 0)
         if (appliedCredit > 0) {

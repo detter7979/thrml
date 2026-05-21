@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
 
     triggerDisputeAgent(subject)
 
-    const confirmationEmail = buildSupportConfirmationEmail({
+    const confirmationEmail = await buildSupportConfirmationEmail({
       name,
       ticketNumber,
       subject,
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
       priority: savedPriority,
     })
 
-    const internalEmail = buildSupportInternalAlertEmail({
+    const internalEmail = await buildSupportInternalAlertEmail({
       ticketNumber,
       priority: savedPriority,
       subject,

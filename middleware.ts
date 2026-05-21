@@ -53,6 +53,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
+  if (session) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_banned")
+      .eq("id", session.user.id)
+      .maybeSingle()
+
+    if (profile?.is_banned) {
+      await supabase.auth.signOut()
+      const loginUrl = new URL("/login", request.url)
+      loginUrl.searchParams.set("message", "account_suspended")
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
   return response
 }
 

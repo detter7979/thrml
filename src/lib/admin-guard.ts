@@ -18,9 +18,13 @@ export async function requireAdmin() {
   const admin = createAdminClient()
   const { data: profile } = await admin
     .from("profiles")
-    .select("is_admin")
+    .select("is_admin, is_banned")
     .eq("id", user.id)
     .maybeSingle()
+
+  if (profile?.is_banned) {
+    redirect("/login?message=account_suspended")
+  }
 
   if (!profile?.is_admin) {
     redirect("/")
@@ -45,9 +49,17 @@ export async function requireAdminApi() {
   const admin = createAdminClient()
   const { data: profile } = await admin
     .from("profiles")
-    .select("is_admin")
+    .select("is_admin, is_banned")
     .eq("id", user.id)
     .maybeSingle()
+
+  if (profile?.is_banned) {
+    return {
+      error: NextResponse.json({ error: "Account suspended" }, { status: 403 }),
+      user: null,
+      admin: null,
+    }
+  }
 
   if (!profile?.is_admin) {
     return {

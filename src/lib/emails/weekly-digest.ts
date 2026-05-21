@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { formatMoney } from "@/lib/cancellations"
+import { renderThrmlEmail, buildPlainText } from "@/lib/emails/render-layout"
 import { getServiceLabel } from "@/lib/feeds/get-listings-for-feed"
 import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
 
@@ -238,12 +239,12 @@ function renderListingCardHtml(supabase: SupabaseClient, row: DigestListingRow):
   const imgUrl = bestPhotoUrl(supabase, row)
   const imageBlock = imgUrl
     ? `<a href="${url}" style="text-decoration:none;color:inherit;display:block;line-height:0;font-size:0;">
-        <img src="${escapeHtml(imgUrl)}" alt="" width="532" height="332" style="display:block;width:100%;max-width:532px;height:332px;border:0;border-radius:12px 12px 0 0;background:#E9DED4;" />
+        <img src="${escapeHtml(imgUrl)}" alt="" width="532" height="332" style="display:block;width:100%;max-width:532px;height:332px;border:0;background:#E9DED4;" />
       </a>`
-    : `<a href="${url}" style="display:block;text-decoration:none;background:linear-gradient(145deg,#3D2E26,#1A1410);border-radius:12px 12px 0 0;height:332px;line-height:332px;font-size:0;">&nbsp;</a>`
+      : `<a href="${url}" style="display:block;text-decoration:none;background:linear-gradient(145deg,#3D2E26,#1A1410);height:332px;line-height:332px;font-size:0;">&nbsp;</a>`
 
   return `
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border-collapse:separate;border:1px solid #E3D7CC;border-radius:12px;overflow:hidden;background:#fff;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border-collapse:collapse;border:1px solid #FFE8DC;background:#fff;">
     <tr>
       <td style="padding:0;line-height:0;font-size:0;">${imageBlock}</td>
     </tr>
@@ -263,7 +264,7 @@ function renderListingCardHtml(supabase: SupabaseClient, row: DigestListingRow):
   </table>`
 }
 
-export function buildWeeklyDigestEmail(args: {
+export async function buildWeeklyDigestEmail(args: {
   supabase: SupabaseClient
   unsubUrl: string
   exploreUrl: string
@@ -271,7 +272,7 @@ export function buildWeeklyDigestEmail(args: {
   newThisWeekCount: number
   usedMarketFilter: boolean
   marketCity: string | null
-}): { subject: string; html: string; text: string } {
+}): Promise<{ subject: string; html: string; text: string }> {
   const { listings, newThisWeekCount, usedMarketFilter, marketCity, exploreUrl, unsubUrl } = args
   const metro = marketCity?.trim() ?? ""
 
@@ -300,53 +301,23 @@ export function buildWeeklyDigestEmail(args: {
       ? cardsHtml
       : `<p style="font-size:15px;line-height:1.8;color:#3E3329;margin:0;">Browse live spaces on Thrml — new hosts join every week.</p>`
 
-  const html = `
-      <div style="background:#FAF7F4;padding:36px 20px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#2C2420;">
-        <div style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #E9DED4;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(26,20,16,0.06);">
-          <div style="background:#1A1410;padding:22px 26px;">
-            <span style="color:#fff;font-size:20px;font-weight:700;letter-spacing:0.14em;">THRML</span>
-            <p style="margin:10px 0 0;font-size:13px;color:rgba(255,255,255,0.72);line-height:1.5;">This week's spaces · real listings · book by the hour</p>
-          </div>
-          <div style="padding:30px 26px 26px;">
-            <h1 style="margin:0 0 14px;font-size:24px;line-height:1.25;font-weight:700;color:#1F1914;">Weekly spaces update</h1>
-            <p style="margin:0 0 26px;font-size:16px;line-height:1.65;color:#3E3329;">${intro}</p>
-            ${cardsOrFallback}
-            <p style="margin:28px 0 0;">
-              <a href="${exploreUrl}" style="display:inline-block;background:#C4623A;color:#fff;
-                text-decoration:none;font-weight:700;font-size:15px;padding:14px 28px;border-radius:999px;">
-                Browse all spaces →
-              </a>
-            </p>
-          </div>
-          <div style="padding:16px 26px 22px;border-top:1px solid #E9DED4;background:#FFFBF8;">
-            <p style="margin:0;font-size:12px;line-height:1.65;color:#796A5E;">
-              Thrml · <a href="${unsubUrl}" style="color:#796A5E;text-decoration:underline;">Unsubscribe</a>
-            </p>
-          </div>
-        </div>
-      </div>`
+  const layout = {
+    preview: subject,
+    kicker: "This week's spaces",
+    title: "Weekly spaces update",
+    contentHtml: `<p style="margin:0 0 26px;font-size:16px;line-height:1.65;color:#3E3329;">${intro}</p>${cardsOrFallback}`,
+    cta: { label: "Browse all spaces", href: exploreUrl },
+    footnote: `Unsubscribe: ${unsubUrl}`,
+  }
 
-  const textLines = [
-    subject,
-    "",
-    "Weekly spaces update",
-    "",
-    newThisWeekCount > 0
-      ? usedMarketFilter && metro
-        ? `New listings in ${metro} and more on Thrml.`
-        : `${newThisWeekCount} new space(s) this week on Thrml.`
-      : "See what's available on Thrml.",
-    "",
-  ]
+  const html = await renderThrmlEmail(layout)
+
+  let text = buildPlainText(layout)
   for (const row of listings) {
     const loc = deriveLocation(row)
-    textLines.push(
-      `• ${row.title ?? "Listing"} — ${loc} — ${listingPriceLabel(row)}`,
-      `  ${APP_URL}/listings/${row.id}`,
-      ""
-    )
+    text += `\n• ${row.title ?? "Listing"} — ${loc} — ${listingPriceLabel(row)}\n  ${APP_URL}/listings/${row.id}`
   }
-  textLines.push(`Explore: ${exploreUrl}`, `Unsubscribe: ${unsubUrl}`)
+  text += `\nExplore: ${exploreUrl}\nUnsubscribe: ${unsubUrl}`
 
-  return { subject, html, text: textLines.join("\n") }
+  return { subject, html, text }
 }

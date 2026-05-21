@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { downloadCreativeAsset } from "@/lib/agent/gcs"
+import { downloadCreativeAsset, getSignedGcsReadUrl } from "@/lib/agent/gcs"
+import { ctaToMetaEnum as ctaToMetaEnumLenient } from "@/lib/agent/meta-cta"
 import {
   getMetaAdAccountId,
   getMetaMarketingApiToken,
 } from "@/lib/agent/meta-api"
+import { uploadVideo } from "@/lib/agent/meta-video-upload"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
@@ -13,9 +15,12 @@ export const maxDuration = 300
 
 const LANDING_URL = "https://usethrml.com"
 const META_GRAPH_BASE = "https://graph.facebook.com/v21.0"
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 type LaunchStatus = "PAUSED" | "ACTIVE"
 const LAUNCH_STATUSES = new Set<LaunchStatus>(["PAUSED", "ACTIVE"])
+
+const VIDEO_LAUNCH_TOOLS = new Set(["composite-video"])
+const BASE_VIDEO_TOOLS = new Set(["runway", "manual"])
 
 const CTA_TO_META_ENUM: Record<string, string> = {
   "Book Now": "BOOK_TRAVEL",
@@ -37,6 +42,7 @@ type CreativeBrief = {
   copy_headline: string | null
   copy_subtext: string | null
   cta: string | null
+  hook: string | null
   campaign_short_name: string | null
 }
 
@@ -44,9 +50,13 @@ type CreativeAssetRow = {
   id: string
   brief_id: string | null
   asset_type: string | null
+  generation_tool: string | null
   variation_index: number | null
   variation_label: string | null
   gcs_path: string | null
+  convention_name: string | null
+  status: string | null
+  meta_ad_id: string | null
   creative_briefs: CreativeBrief | CreativeBrief[] | null
 }
 
@@ -59,8 +69,8 @@ type MetaAdImageUploadResponse = {
   hash?: string
 }
 
-function jsonError(message: string, status: number) {
-  return NextResponse.json({ ok: false, error: message }, { status })
+function jsonError(message: string, status: number, extra?: Record<string, unknown>) {
+  return NextResponse.json({ ok: false, error: message, ...extra }, { status })
 }
 
 function requiredEnv(name: string) {
@@ -117,6 +127,16 @@ function extractImageHash(json: MetaAdImageUploadResponse) {
   return firstImage?.hash ?? null
 }
 
+function legacyAdName(asset: CreativeAssetRow, brief: CreativeBrief) {
+  const campaign = brief.campaign_short_name?.trim() || "creative"
+  const variation = asset.variation_label?.trim() || `variation-${asset.variation_index ?? 1}`
+  return `${campaign}_${variation}_${asset.id.slice(0, 8)}`
+}
+
+function resolveAdName(asset: CreativeAssetRow, brief: CreativeBrief) {
+  return asset.convention_name?.trim() || legacyAdName(asset, brief)
+}
+
 async function uploadImageToMeta(params: {
   token: string
   adAccountId: string
@@ -150,18 +170,19 @@ async function uploadImageToMeta(params: {
   return imageHash
 }
 
-async function createMetaCreative(params: {
+async function createMetaStaticCreative(params: {
   token: string
   adAccountId: string
   pageId: string
   imageHash: string
+  name: string
   primaryCopy: string
   headline: string
   subtext: string | null
   cta: string | null
 }) {
   const body = {
-    name: params.headline,
+    name: params.name,
     object_story_spec: {
       page_id: params.pageId,
       link_data: {
@@ -190,6 +211,50 @@ async function createMetaCreative(params: {
   return json.id
 }
 
+async function createMetaVideoCreative(params: {
+  token: string
+  adAccountId: string
+  pageId: string
+  name: string
+  videoId: string
+  thumbnailImageHash: string
+  primaryCopy: string
+  headline: string | null
+  cta: string | null
+}) {
+  const videoData: Record<string, unknown> = {
+    video_id: params.videoId,
+    image_hash: params.thumbnailImageHash,
+    message: params.primaryCopy,
+    call_to_action: {
+      type: ctaToMetaEnumLenient(params.cta),
+      value: { link: LANDING_URL },
+    },
+  }
+  if (params.headline?.trim()) {
+    videoData.title = params.headline.trim()
+  }
+
+  const body = {
+    name: params.name,
+    object_story_spec: {
+      page_id: params.pageId,
+      video_data: videoData,
+    },
+  }
+
+  const res = await fetch(metaUrl(`${params.adAccountId}/adcreatives`, params.token), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  await assertMetaOk(res, "Meta video ad creative creation")
+
+  const json = (await res.json()) as MetaIdResponse
+  if (!json.id) throw new Error("Meta video ad creative response did not include an id")
+  return json.id
+}
+
 async function createMetaAd(params: {
   token: string
   adAccountId: string
@@ -215,12 +280,6 @@ async function createMetaAd(params: {
   const json = (await res.json()) as MetaIdResponse
   if (!json.id) throw new Error("Meta ad response did not include an id")
   return json.id
-}
-
-function adName(asset: CreativeAssetRow, brief: CreativeBrief) {
-  const campaign = brief.campaign_short_name?.trim() || "creative"
-  const variation = asset.variation_label?.trim() || `variation-${asset.variation_index ?? 1}`
-  return `${campaign}_${variation}_${asset.id.slice(0, 8)}`
 }
 
 async function maybeMarkBriefLaunched(
@@ -260,7 +319,6 @@ export async function POST(req: NextRequest) {
     ) {
       return jsonError("status must be PAUSED or ACTIVE", 400)
     }
-    const status: LaunchStatus = body?.status === "ACTIVE" ? "ACTIVE" : "PAUSED"
 
     const token = getMetaMarketingApiToken()
     const adAccountId = getMetaAdAccountId()
@@ -269,7 +327,7 @@ export async function POST(req: NextRequest) {
     const { data: asset, error: assetError } = await admin!
       .from("creative_assets")
       .select(
-        "id, brief_id, asset_type, variation_index, variation_label, gcs_path, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, campaign_short_name)"
+        "id, brief_id, asset_type, generation_tool, variation_index, variation_label, gcs_path, convention_name, status, meta_ad_id, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name)"
       )
       .eq("id", assetId)
       .maybeSingle()
@@ -280,38 +338,92 @@ export async function POST(req: NextRequest) {
     const creativeAsset = asset as CreativeAssetRow
     const brief = firstBrief(creativeAsset)
     if (!creativeAsset.brief_id) return jsonError("Creative asset is missing brief_id", 400)
-    if (creativeAsset.asset_type !== "image") return jsonError("Creative asset must be an image", 400)
+    if (!brief) return jsonError("Creative brief not found for asset", 404)
     if (!creativeAsset.gcs_path) return jsonError("Creative asset is missing gcs_path", 400)
-    if (!brief?.copy_primary || !brief.copy_headline) {
-      return jsonError("Creative brief is missing copy_primary or copy_headline", 400)
+
+    const tool = creativeAsset.generation_tool ?? ""
+    if (BASE_VIDEO_TOOLS.has(tool)) {
+      return jsonError(
+        "Cannot push base video to Meta — only rendered variants (composite-video) are launchable",
+        400
+      )
     }
 
-    const downloaded = await downloadCreativeAsset(creativeAsset.gcs_path)
-    const imageHash = await uploadImageToMeta({
-      token,
-      adAccountId,
-      assetId,
-      filename: downloaded.filename,
-      contentType: downloaded.contentType,
-      buffer: downloaded.buffer,
-    })
+    if (creativeAsset.status === "launched" && creativeAsset.meta_ad_id) {
+      return jsonError("Asset already launched", 409, { metaAdId: creativeAsset.meta_ad_id })
+    }
 
-    const { error: imageUpdateError } = await admin!
-      .from("creative_assets")
-      .update({ meta_image_hash: imageHash })
-      .eq("id", assetId)
-    if (imageUpdateError) throw imageUpdateError
+    const isVideo = VIDEO_LAUNCH_TOOLS.has(tool)
+    const adName = resolveAdName(creativeAsset, brief)
+    const launchStatus: LaunchStatus = isVideo ? "PAUSED" : body?.status === "ACTIVE" ? "ACTIVE" : "PAUSED"
 
-    const metaCreativeId = await createMetaCreative({
-      token,
-      adAccountId,
-      pageId,
-      imageHash,
-      primaryCopy: brief.copy_primary,
-      headline: brief.copy_headline,
-      subtext: brief.copy_subtext,
-      cta: brief.cta,
-    })
+    let metaCreativeId: string
+    let imageHash: string | undefined
+    let videoMetaFields: { meta_video_id?: string; meta_thumbnail_image_hash?: string } = {}
+
+    if (isVideo) {
+      const primaryCopy = brief.copy_primary?.trim() || brief.hook?.trim() || ""
+      if (!primaryCopy) {
+        return jsonError("Creative brief needs copy_primary or hook for video ad message", 400)
+      }
+
+      const signedUrl = await getSignedGcsReadUrl(creativeAsset.gcs_path, { expiresInSec: 3600 })
+      const { videoId, thumbnailImageHash } = await uploadVideo({
+        fileUrl: signedUrl,
+        name: adName,
+      })
+      videoMetaFields = {
+        meta_video_id: videoId,
+        meta_thumbnail_image_hash: thumbnailImageHash,
+      }
+
+      metaCreativeId = await createMetaVideoCreative({
+        token,
+        adAccountId,
+        pageId,
+        name: adName,
+        videoId,
+        thumbnailImageHash,
+        primaryCopy,
+        headline: brief.copy_headline,
+        cta: brief.cta,
+      })
+    } else {
+      if (creativeAsset.asset_type !== "image") {
+        return jsonError("Creative asset must be an image or rendered video", 400)
+      }
+      if (!brief.copy_primary || !brief.copy_headline) {
+        return jsonError("Creative brief is missing copy_primary or copy_headline", 400)
+      }
+
+      const downloaded = await downloadCreativeAsset(creativeAsset.gcs_path)
+      imageHash = await uploadImageToMeta({
+        token,
+        adAccountId,
+        assetId,
+        filename: downloaded.filename,
+        contentType: downloaded.contentType,
+        buffer: downloaded.buffer,
+      })
+
+      const { error: imageUpdateError } = await admin!
+        .from("creative_assets")
+        .update({ meta_image_hash: imageHash })
+        .eq("id", assetId)
+      if (imageUpdateError) throw imageUpdateError
+
+      metaCreativeId = await createMetaStaticCreative({
+        token,
+        adAccountId,
+        pageId,
+        imageHash,
+        name: adName,
+        primaryCopy: brief.copy_primary,
+        headline: brief.copy_headline,
+        subtext: brief.copy_subtext,
+        cta: brief.cta,
+      })
+    }
 
     const { error: creativeUpdateError } = await admin!
       .from("creative_assets")
@@ -324,8 +436,8 @@ export async function POST(req: NextRequest) {
       adAccountId,
       adsetId,
       creativeId: metaCreativeId,
-      name: adName(creativeAsset, brief),
-      status,
+      name: adName,
+      status: launchStatus,
     })
 
     const launchedAt = new Date().toISOString()
@@ -333,11 +445,12 @@ export async function POST(req: NextRequest) {
       .from("creative_assets")
       .update({
         status: "launched",
-        meta_image_hash: imageHash,
         meta_creative_id: metaCreativeId,
         meta_ad_id: metaAdId,
         meta_adset_id: adsetId,
         launched_at: launchedAt,
+        ...(imageHash ? { meta_image_hash: imageHash } : {}),
+        ...videoMetaFields,
       })
       .eq("id", assetId)
 
@@ -345,8 +458,12 @@ export async function POST(req: NextRequest) {
     await maybeMarkBriefLaunched(admin!, creativeAsset.brief_id)
 
     return NextResponse.json({
+      ok: true,
+      success: true,
       metaAdId,
       metaCreativeId,
+      adName,
+      ...videoMetaFields,
       adsManagerUrl: adsManagerUrl(adAccountId, metaAdId),
     })
   } catch (err) {

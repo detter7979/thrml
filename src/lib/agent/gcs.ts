@@ -90,8 +90,16 @@ function createStorageClient() {
   return new Storage({ credentials })
 }
 
+function creativeBucketName() {
+  return process.env.GCS_CREATIVE_BUCKET?.trim() || requireEnv("GCS_BUCKET_NAME")
+}
+
 function getBucket() {
   return createStorageClient().bucket(requireEnv("GCS_BUCKET_NAME"))
+}
+
+function getCreativeBucket() {
+  return createStorageClient().bucket(creativeBucketName())
 }
 
 function pathSegment(value: string, label: string) {
@@ -124,6 +132,31 @@ async function signedReadUrl(file: ReturnType<ReturnType<typeof getBucket>["file
     version: "v4",
     action: "read",
     expires: Date.now() + SIGNED_URL_EXPIRES_MS,
+  })
+  return url
+}
+
+export async function getSignedGcsReadUrl(gcsPath: string, opts?: { expiresInSec?: number }) {
+  const { bucketName, objectPath } = parseGcsPath(gcsPath)
+  const expiresInSec = opts?.expiresInSec ?? 3600
+  const creativeBucketName = process.env.GCS_CREATIVE_BUCKET?.trim()
+  const mainBucketName = requireEnv("GCS_BUCKET_NAME")
+
+  let file
+  if (creativeBucketName && bucketName === creativeBucketName) {
+    file = getCreativeBucket().file(objectPath)
+  } else if (bucketName === mainBucketName) {
+    file = getBucket().file(objectPath)
+  } else {
+    throw new Error(
+      `GCS path bucket ${bucketName} does not match configured buckets (${mainBucketName}${creativeBucketName ? `, ${creativeBucketName}` : ""})`
+    )
+  }
+
+  const [url] = await file.getSignedUrl({
+    version: "v4",
+    action: "read",
+    expires: Date.now() + expiresInSec * 1000,
   })
   return url
 }
@@ -241,6 +274,58 @@ export async function listAssetsForBrief(briefId: string): Promise<ListedCreativ
       }
     })
   )
+}
+
+export async function uploadBufferToCreativeObject(
+  objectPath: string,
+  buffer: Buffer,
+  contentType: string
+): Promise<UploadedCreativeAsset> {
+  const bucket = getCreativeBucket()
+  const bucketName = bucket.name
+  const file = bucket.file(objectPath)
+
+  await file.save(buffer, {
+    resumable: false,
+    metadata: { contentType },
+  })
+
+  return {
+    gcsPath: `gs://${bucketName}/${objectPath}`,
+    gcsUrl: await signedReadUrl(file),
+    publicUrl: publicUrl(bucketName, objectPath),
+  }
+}
+
+export async function uploadRemoteToCreativeObject(
+  sourceUrl: string,
+  objectPath: string
+): Promise<UploadedCreativeAsset> {
+  const res = await fetch(sourceUrl)
+  if (!res.ok) {
+    throw new Error(`Failed to download source video: ${res.status} ${await res.text()}`)
+  }
+  const buffer = Buffer.from(await res.arrayBuffer())
+  const contentType = res.headers.get("content-type") ?? "video/mp4"
+  return uploadBufferToCreativeObject(objectPath, buffer, contentType)
+}
+
+export async function getCreativeSignedWriteUrl(objectPath: string, contentType: string) {
+  const file = getCreativeBucket().file(objectPath)
+  const [url] = await file.getSignedUrl({
+    version: "v4",
+    action: "write",
+    expires: Date.now() + 15 * 60 * 1000,
+    contentType,
+  })
+  return url
+}
+
+export async function refreshCreativeObjectUrl(gcsPathOrObject: string) {
+  const objectPath = gcsPathOrObject.startsWith("gs://")
+    ? parseGcsPath(gcsPathOrObject).objectPath
+    : gcsPathOrObject
+  return signedReadUrl(getCreativeBucket().file(objectPath))
 }
 
 export async function archiveOldAssets(daysOld = 90): Promise<{ archived: number; assets: ArchivedCreativeAsset[] }> {

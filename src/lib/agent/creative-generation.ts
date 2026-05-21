@@ -1,5 +1,5 @@
 import { uploadCreativeAsset } from "@/lib/agent/gcs"
-import { sendEmail, thrmlEmailWrapper } from "@/lib/emails/send"
+import { sendThrmlLayoutEmail } from "@/lib/emails/transactional-send"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const HIGGSFIELD_BASE_URL = "https://platform.higgsfield.ai"
@@ -238,19 +238,19 @@ async function sendReadyEmail(briefId: string, previewLinks: string[]) {
     .join("")
   const textLinks = previewLinks.map((link, index) => `Variation ${index + 1}: ${link}`).join("\n")
 
-  await sendEmail({
+  const subject = `${count} new video variation${count === 1 ? "" : "s"} ready for review`
+  await sendThrmlLayoutEmail({
     to: CREATIVE_REVIEW_RECIPIENT,
-    subject: `${count} new video variation${count === 1 ? "" : "s"} ready for review`,
-    html: thrmlEmailWrapper(`
-      <h1 style="color:#ffffff;font-size:24px;margin:0 0 16px;">${count} new video variation${count === 1 ? "" : "s"} ready for review</h1>
-      <p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:0 0 16px;">
-        Creative brief ${escapeHtml(briefId)} has ${count} Higgsfield variation${count === 1 ? "" : "s"} ready.
-      </p>
-      <ul style="color:#d4d4d4;font-size:15px;line-height:1.8;margin:0 0 24px;padding-left:20px;">
-        ${linksHtml}
-      </ul>
-    `),
-    text: `${count} new video variation${count === 1 ? "" : "s"} ready for review\n\nCreative brief ${briefId}\n\n${textLinks}`,
+    subject,
+    layout: {
+      preview: subject,
+      kicker: "Admin",
+      title: subject,
+      paragraphs: [
+        `Creative brief ${briefId} has ${count} Higgsfield variation${count === 1 ? "" : "s"} ready.`,
+      ],
+      contentHtml: `<ul style="color:#3E3329;font-size:15px;line-height:1.8;margin:0 0 8px;padding-left:20px;">${linksHtml}</ul>`,
+    },
   })
 }
 

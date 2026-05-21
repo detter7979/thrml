@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="64" viewBox="0 0 240 64" role="img" aria-label="thrml">
+  <defs>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&amp;display=swap");
+      .wordmark {
+        font-family: "DM Serif Display", Georgia, "Times New Roman", serif;
+        font-size: 48px;
+        font-weight: 400;
+        letter-spacing: -0.025em;
+      }
+    </style>
+  </defs>
+  <text x="0" y="50" class="wordmark" fill="#1A1410">thrml</text>
+</svg>

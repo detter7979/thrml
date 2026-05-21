@@ -1016,7 +1016,7 @@ export function ExploreClient() {
         )}
       >
         <div
-          className={`relative shrink-0 overflow-hidden rounded-xl ${large ? "h-[140px] w-[140px]" : "h-24 w-24"}`}
+          className={`relative aspect-[16/9] shrink-0 overflow-hidden rounded-xl ${large ? "w-[140px]" : "w-24"}`}
         >
           {listing.photoUrl ? (
             <Image
@@ -1545,7 +1545,7 @@ export function ExploreClient() {
                         className="w-[280px] shrink-0 snap-start overflow-hidden rounded-2xl bg-white p-3 text-left shadow-[0_4px_20px_rgba(0,0,0,0.12)]"
                       >
                         <div className="flex gap-3">
-                          <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl">
+                          <div className="relative aspect-[16/9] w-24 shrink-0 overflow-hidden rounded-xl">
                             {listing.photoUrl ? (
                               <Image
                                 src={
@@ -1630,7 +1630,7 @@ export function ExploreClient() {
                             }}
                             className="w-40 shrink-0 overflow-hidden rounded-xl border bg-white text-left"
                           >
-                            <div className="relative h-20 w-full shrink-0 overflow-hidden">
+                            <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden">
                               {listing.photoUrl ? (
                                 <Image
                                   src={

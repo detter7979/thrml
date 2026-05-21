@@ -199,6 +199,15 @@ function LoginForm() {
           Please sign in to continue.
         </div>
       ) : null}
+      {loginMessage === "account_suspended" ? (
+        <div className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          This account has been suspended. Contact{" "}
+          <a href="mailto:hello@usethrml.com" className="font-medium underline">
+            hello@usethrml.com
+          </a>{" "}
+          if you believe this is a mistake.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2">
         <Button

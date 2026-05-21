@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
 import { resolveResendFrom, resolveResendReplyTo } from "@/lib/emails/send"
-import { newsletterWelcomeVariantA as welcomeEmail } from "@/lib/emails/templates"
+import { newsletterWelcomeVariantA as welcomeEmail } from "@/lib/emails/newsletter-welcome"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     }
 
     const resend = new Resend(resendApiKey)
-    const emailTemplate = welcomeEmail({ email })
+    const emailTemplate = await welcomeEmail({ email })
     const fromAddress = resolveResendFrom()
     const replyTo = resolveResendReplyTo()
     const recipient =

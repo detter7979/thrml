@@ -18,8 +18,11 @@ For each test below, confirm:
 
 - [ ] **From** is your transactional address (default `Thrml <notifications@usethrml.com>` unless overridden).
 - [ ] **Reply-To** is `hello@usethrml.com` (or your override), except where noted.
+- [ ] **Layout**: orange header band, cream body, square corners, cream wordmark (`/brand/logo-wordmark-cream.svg`).
 - [ ] Links resolve to the expected host (`NEXT_PUBLIC_APP_URL` / production URL).
 - [ ] Message appears in Resend **Logs** if delivery fails.
+
+**Preview locally:** `npm run email:mock` writes `thrml-email-mock.html` (guest confirm, host booking, access code samples).
 
 ## 3. Guest onboarding (welcome)
 
@@ -103,12 +106,15 @@ If you run `cron` routes that call `sendEmail`:
 
 | Area            | Primary entry |
 |----------------|---------------|
+| Layout (React) | `emails/ThrmlEmailLayout.tsx` |
+| Render + text  | `src/lib/emails/render-layout.ts` |
 | Send helper    | `src/lib/emails/send.ts` |
+| Layout send    | `src/lib/emails/transactional-send.ts` (`sendThrmlLayoutEmail`) |
 | Guest welcome  | `src/lib/emails/onboarding.ts` + `src/app/api/events/user-registered/route.ts` |
 | Host welcome   | Same onboarding lib + `src/app/api/events/host-onboarding-started/route.ts` |
 | Booking mail   | `src/lib/emails.ts`, webhooks / API routes that call it |
-| Access code    | `src/lib/access/send-access-code.ts` |
-| Support        | `src/app/api/support/route.ts` |
-| Newsletter     | `src/app/api/newsletter/subscribe/route.ts` |
+| Access code    | `src/lib/access/send-access-code.ts` + `emails/AccessCodeEmail.tsx` |
+| Support        | `src/app/api/support/route.ts` + `src/lib/emails/support.ts` |
+| Newsletter     | `src/lib/emails/newsletter-welcome.ts` + `src/app/api/newsletter/subscribe/route.ts` |
 
 After each deploy, spot-check **Resend → Logs** and one **Zoho** inbox (**hello@**) for replies and support routing.

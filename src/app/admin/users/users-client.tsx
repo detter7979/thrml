@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Search } from "lucide-react"
 import { useMemo, useState } from "react"
 
@@ -16,6 +17,7 @@ type AdminUserRow = {
   total_listings: number
   is_host: boolean
   is_admin: boolean
+  is_banned: boolean
 }
 
 function formatDate(value: string | null) {
@@ -26,6 +28,7 @@ function formatDate(value: string | null) {
 }
 
 export function AdminUsersClient({ initialRows }: { initialRows: AdminUserRow[] }) {
+  const router = useRouter()
   const [rows, setRows] = useState(initialRows)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -46,6 +49,33 @@ export function AdminUsersClient({ initialRows }: { initialRows: AdminUserRow[] 
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
 
+  async function toggleBan(user: AdminUserRow) {
+    if (!user.is_banned) {
+      const confirmed = window.confirm(
+        `Ban ${user.full_name ?? user.email ?? user.id}? They will be signed out and unable to sign in.`
+      )
+      if (!confirmed) return
+    }
+
+    setBusyId(user.id)
+    setError(null)
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/toggle-ban`, { method: "PATCH" })
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; is_banned?: boolean }
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to update ban status.")
+        return
+      }
+      setRows((current) =>
+        current.map((row) =>
+          row.id === user.id ? { ...row, is_banned: Boolean(payload.is_banned) } : row
+        )
+      )
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function toggleAdmin(userId: string) {
     setBusyId(userId)
     setError(null)
@@ -64,32 +94,24 @@ export function AdminUsersClient({ initialRows }: { initialRows: AdminUserRow[] 
     }
   }
 
-  async function messageUser(user: AdminUserRow) {
-    const subject = window.prompt("Message subject/context (optional):", "Admin follow-up") ?? ""
-    const body = window.prompt(`Message ${user.full_name ?? user.email ?? user.id}:`)
-    if (!body || !body.trim()) return
-
+  async function openUserInbox(user: AdminUserRow) {
     setMessagingId(user.id)
     setError(null)
     try {
-      const response = await fetch("/api/admin/messages", {
+      const response = await fetch("/api/admin/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient: user.id,
-          subject: subject.trim() || null,
-          body: body.trim(),
-        }),
+        body: JSON.stringify({ recipient: user.id }),
       })
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string
         conversationId?: string
       }
       if (!response.ok || !payload.conversationId) {
-        setError(payload.error ?? "Unable to send message.")
+        setError(payload.error ?? "Unable to open conversation.")
         return
       }
-      window.location.href = `/admin/inbox/messages?conversationId=${payload.conversationId}`
+      router.push(`/admin/inbox/messages?conversationId=${payload.conversationId}`)
     } finally {
       setMessagingId(null)
     }
@@ -149,7 +171,19 @@ export function AdminUsersClient({ initialRows }: { initialRows: AdminUserRow[] 
         <table className="min-w-[1300px] w-full text-xs">
           <thead>
             <tr className="border-b border-[#D9CBB8] bg-[#F1E7DA]">
-              {["User ID", "Name", "Email", "Joined", "Intent", "Bookings", "Listings", "Is host", "Is admin", "Actions"].map(
+              {[
+                "User ID",
+                "Name",
+                "Email",
+                "Joined",
+                "Intent",
+                "Bookings",
+                "Listings",
+                "Is host",
+                "Is admin",
+                "Banned",
+                "Actions",
+              ].map(
                 (h) => (
                   <th key={h} className="px-3 py-3 text-left font-medium uppercase tracking-wide text-[#6E5B49]">
                     {h}
@@ -176,6 +210,11 @@ export function AdminUsersClient({ initialRows }: { initialRows: AdminUserRow[] 
                 <td className="px-3 py-2 text-[#6E5B49]">{row.is_host ? "Yes" : "No"}</td>
                 <td className="px-3 py-2 text-[#6E5B49]">{row.is_admin ? "Yes" : "No"}</td>
                 <td className="px-3 py-2">
+                  <span className={row.is_banned ? "font-medium text-rose-700" : "text-[#6E5B49]"}>
+                    {row.is_banned ? "Yes" : "No"}
+                  </span>
+                </td>
+                <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-2">
                     <Button
                       asChild
@@ -190,9 +229,13 @@ export function AdminUsersClient({ initialRows }: { initialRows: AdminUserRow[] 
                       variant="outline"
                       className="h-7 border-[#CDBCA8] bg-[#FCF8F3] text-xs text-[#2A2118] hover:bg-[#E6D8C6]"
                       disabled={messagingId === row.id}
-                      onClick={() => void messageUser(row)}
+                      onClick={() => void openUserInbox(row)}
                     >
-                      Message user
+                      {messagingId === row.id
+                        ? "Opening..."
+                        : row.is_host
+                          ? "Message host"
+                          : "Message user"}
                     </Button>
                     <Button
                       size="sm"
@@ -201,6 +244,19 @@ export function AdminUsersClient({ initialRows }: { initialRows: AdminUserRow[] 
                       onClick={() => toggleAdmin(row.id)}
                     >
                       {row.is_admin ? "Remove admin" : "Make admin"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={
+                        row.is_banned
+                          ? "h-7 border-[#CDBCA8] bg-[#FCF8F3] text-xs text-[#2A2118] hover:bg-[#E6D8C6]"
+                          : "h-7 border-rose-400 bg-rose-50 text-xs text-rose-800 hover:bg-rose-100"
+                      }
+                      disabled={busyId === row.id}
+                      onClick={() => void toggleBan(row)}
+                    >
+                      {row.is_banned ? "Unban user" : "Ban user"}
                     </Button>
                   </div>
                 </td>

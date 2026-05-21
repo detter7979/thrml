@@ -605,9 +605,15 @@ export function BookingFlowClient({
 
             <div className="grid gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
               {listingPhotoUrl ? (
-                <img src={listingPhotoUrl} alt={listingTitle} className="h-44 w-full rounded-lg object-cover" />
+                <div className="aspect-[16/9] w-full overflow-hidden rounded-lg">
+                  <img
+                    src={listingPhotoUrl}
+                    alt={listingTitle}
+                    className="h-full w-full object-cover object-center"
+                  />
+                </div>
               ) : (
-                <div className="flex h-44 items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">
+                <div className="flex aspect-[16/9] w-full items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground">
                   Listing photo
                 </div>
               )}

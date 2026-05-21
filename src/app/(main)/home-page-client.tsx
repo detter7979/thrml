@@ -537,7 +537,7 @@ export function HomePageClient({ initialListings, totalActiveListingsCount }: Ho
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {skeletonCards.map((_, index) => (
                 <div key={index} className="card-base animate-pulse p-3">
-                  <div className="h-44 rounded-xl bg-warm-100" />
+                  <div className="aspect-[16/9] rounded-xl bg-warm-100" />
                   <div className="mt-3 h-4 w-24 rounded bg-warm-100" />
                   <div className="mt-2 h-4 w-3/4 rounded bg-warm-100" />
                   <div className="mt-2 h-4 w-1/2 rounded bg-warm-100" />

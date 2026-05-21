@@ -35,6 +35,12 @@ export function MessagesInboxClient({
   }, [])
 
   useEffect(() => {
+    if (activeConversationId) {
+      void loadConversations()
+    }
+  }, [activeConversationId])
+
+  useEffect(() => {
     const supabase = createClient()
     let messagesChannel: ReturnType<typeof supabase.channel> | null = null
     let conversationsChannel: ReturnType<typeof supabase.channel> | null = null

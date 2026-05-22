@@ -7,7 +7,7 @@
  *   npx tsx scripts/sync-namer.ts --since 2026-05-01
  *   npx tsx scripts/sync-namer.ts --dry-run
  */
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 import { google } from "googleapis"
 
 function requireEnv(name: string) {
@@ -25,7 +25,7 @@ function loadCredentials() {
   }
 }
 
-async function resolveNamerSheetId(supabase: ReturnType<typeof createClient>) {
+async function resolveNamerSheetId(supabase: SupabaseClient) {
   if (process.env.GDRIVE_NAMER_SHEET_ID?.trim()) {
     return process.env.GDRIVE_NAMER_SHEET_ID.trim()
   }
@@ -37,7 +37,7 @@ async function resolveNamerSheetId(supabase: ReturnType<typeof createClient>) {
     .maybeSingle()
 
   if (error) throw error
-  const value = data?.value
+  const value = (data as { value?: unknown } | null)?.value
   if (typeof value === "string" && value.trim()) return value.trim()
   if (value && typeof value === "object" && "sheetId" in value) {
     const sheetId = (value as { sheetId?: string }).sheetId

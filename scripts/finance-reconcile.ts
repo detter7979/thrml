@@ -76,10 +76,11 @@ async function main() {
   if (since) console.log(`Scope: bookings since ${since}\n`)
 
   for (const row of rows) {
+    const bookingId = String(row.id)
     const paid = row.status === "confirmed" || row.status === "completed"
-    if (paid && row.stripe_payment_intent_id && !captureByBooking.has(row.id)) {
+    if (paid && row.stripe_payment_intent_id && !captureByBooking.has(bookingId)) {
       missingCapture += 1
-      console.log(`  MISSING capture  ${String(row.id).slice(0, 8)}  status=${row.status}`)
+      console.log(`  MISSING capture  ${bookingId.slice(0, 8)}  status=${row.status}`)
     }
     if (paid) {
       expectedCashTakeCents += cashPlatformTakeCents(row)
@@ -88,11 +89,11 @@ async function main() {
     const bookingRefundCents = Math.round(bookingRefundedDollars(row) * 100)
     if (bookingRefundCents > 0) {
       expectedRefundsCents += bookingRefundCents
-      const ledgerRefund = refundByBooking.get(row.id) ?? 0
+      const ledgerRefund = refundByBooking.get(bookingId) ?? 0
       if (Math.abs(ledgerRefund - bookingRefundCents) > 1) {
         refundMismatch += 1
         console.log(
-          `  REFUND mismatch ${String(row.id).slice(0, 8)}  booking=$${(bookingRefundCents / 100).toFixed(2)}  ledger=$${(ledgerRefund / 100).toFixed(2)}`
+          `  REFUND mismatch ${bookingId.slice(0, 8)}  booking=$${(bookingRefundCents / 100).toFixed(2)}  ledger=$${(ledgerRefund / 100).toFixed(2)}`
         )
       }
     }

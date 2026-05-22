@@ -6,6 +6,7 @@ import {
   grossPlatformTakeCents,
   promoCreditsAppliedCents,
 } from "@/lib/finance/booking-economics"
+import type { BookingEconomicsRow } from "@/lib/finance/types"
 
 type AdminClient = SupabaseClient
 
@@ -40,9 +41,9 @@ async function loadBookingsForDay(admin: AdminClient, dayStart: string, dayEnd: 
       .gte("created_at", dayStart)
       .lte("created_at", dayEnd)
 
-    if (!error) return data ?? []
+    if (!error) return (data ?? []) as BookingEconomicsRow[]
   }
-  return []
+  return [] as BookingEconomicsRow[]
 }
 
 export async function buildDailyFinanceSnapshot(

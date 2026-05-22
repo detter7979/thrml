@@ -516,7 +516,7 @@ export default function AgentsDashboard() {
   const launchCreative = async () => {
     setBusyAction("launch-creative")
     setPipelineMessage(null)
-    const progressTimers: Array<ReturnType<typeof window.setTimeout>> = []
+    const progressTimers: number[] = []
     const clearProgressTimers = () => {
       for (const timer of progressTimers) clearTimeout(timer)
       progressTimers.length = 0

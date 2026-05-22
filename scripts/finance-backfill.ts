@@ -16,6 +16,7 @@ import {
 import { recordFinancialEvent } from "../src/lib/finance/events"
 import {
   bookingPromoCreditsCents,
+  bookingOccurredAt,
   bookingRefundedAt,
   bookingRefundedDollars,
   bookingStripeRefundId,
@@ -88,8 +89,7 @@ async function main() {
             userId: typeof row.guest_id === "string" ? row.guest_id : null,
             stripeObjectId: piId,
             source: "finance_backfill",
-            occurredAt:
-              typeof row.updated_at === "string" ? row.updated_at : row.created_at ?? undefined,
+            occurredAt: bookingOccurredAt(row),
             metadata: { total_charged_cents: totalCents, host_payout_cents: hostCents },
           })
           if (promoCents > 0) {
@@ -133,7 +133,7 @@ async function main() {
             userId: typeof row.guest_id === "string" ? row.guest_id : null,
             stripeObjectId: refundObjectId,
             source: "finance_backfill",
-            occurredAt: bookingRefundedAt(row) ?? (typeof row.updated_at === "string" ? row.updated_at : undefined),
+            occurredAt: bookingRefundedAt(row) ?? bookingOccurredAt(row),
             metadata: { refunded_amount: refunded },
           })
         }

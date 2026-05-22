@@ -8,6 +8,12 @@ export function bookingRefundedAt(row: Record<string, unknown>) {
   return typeof value === "string" ? value : null
 }
 
+export function bookingOccurredAt(row: Record<string, unknown>): string | undefined {
+  if (typeof row.updated_at === "string") return row.updated_at
+  if (typeof row.created_at === "string") return row.created_at
+  return undefined
+}
+
 export function bookingStripeRefundId(row: Record<string, unknown>) {
   const value = row.stripe_refund_id
   return typeof value === "string" && value ? value : null

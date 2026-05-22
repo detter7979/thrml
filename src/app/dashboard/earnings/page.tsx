@@ -6,6 +6,18 @@ import { createClient } from "@/lib/supabase/server"
 
 import { EarningsClient } from "./earnings-client"
 
+function nestedListingTitle(listings: unknown) {
+  if (Array.isArray(listings)) {
+    const title = listings[0]?.title
+    return typeof title === "string" ? title : "Listing"
+  }
+  if (listings && typeof listings === "object" && "title" in listings) {
+    const title = (listings as { title?: unknown }).title
+    return typeof title === "string" ? title : "Listing"
+  }
+  return "Listing"
+}
+
 export default async function DashboardEarningsPage() {
   const supabase = await createClient()
   const {
@@ -76,8 +88,7 @@ export default async function DashboardEarningsPage() {
     totalCharged: Number(row.total_charged ?? 0),
     hostPayout: Number(row.host_payout ?? 0),
     serviceFee: Number(row.service_fee ?? 0),
-    listingTitle:
-      (Array.isArray(row.listings) ? row.listings[0]?.title : row.listings?.title) ?? "Listing",
+    listingTitle: nestedListingTitle(row.listings),
   }))
 
   const hasListings = (listings ?? []).length > 0

@@ -12,7 +12,7 @@ export async function loadAdminEarningsBookings(admin: SupabaseClient) {
   for (const select of BOOKING_EARNINGS_SELECT_TRIES) {
     const { data, error } = await admin.from("bookings").select(select).order("session_date", { ascending: false })
     if (!error) {
-      return { rows: (data ?? []) as Record<string, unknown>[], loadError: null as string | null }
+      return { rows: (data ?? []) as unknown as Record<string, unknown>[], loadError: null as string | null }
     }
     lastError = error.message
   }

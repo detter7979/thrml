@@ -180,8 +180,14 @@ function exportToCsv(rows: EarningsRow[], start: string | null, end: string | nu
   URL.revokeObjectURL(url)
 }
 
-export function AdminEarningsClient({ initialRows }: { initialRows: EarningsRow[] }) {
-  const [preset, setPreset] = useState<DatePreset>("mtd")
+export function AdminEarningsClient({
+  initialRows,
+  loadError = null,
+}: {
+  initialRows: EarningsRow[]
+  loadError?: string | null
+}) {
+  const [preset, setPreset] = useState<DatePreset>("all")
   const [customStart, setCustomStart] = useState("")
   const [customEnd, setCustomEnd] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -250,6 +256,18 @@ export function AdminEarningsClient({ initialRows }: { initialRows: EarningsRow[
           Export CSV ({filteredRows.length})
         </Button>
       </div>
+
+      {loadError ? (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Could not load bookings: {loadError}. Check that recent finance migrations have been applied.
+        </div>
+      ) : null}
+
+      {initialRows.length === 0 && !loadError ? (
+        <div className="rounded-xl border border-[#D9CBB8] bg-[#FCF8F3] px-4 py-3 text-sm text-[#6E5B49]">
+          No bookings found in the database yet.
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <div className="min-w-[220px]">

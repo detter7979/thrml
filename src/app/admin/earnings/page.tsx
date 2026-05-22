@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin-guard"
+import { loadAdminEarningsBookings } from "@/lib/finance/load-earnings-bookings"
 
 import { AdminEarningsClient, type EarningsRow } from "./earnings-client"
 
@@ -7,14 +8,7 @@ export const dynamic = "force-dynamic"
 export default async function AdminEarningsPage() {
   const { admin } = await requireAdmin()
 
-  const { data: bookingRows } = await admin
-    .from("bookings")
-    .select(
-      "id, listing_id, guest_id, host_id, session_date, start_time, end_time, duration_hours, guest_count, price_per_person, subtotal, service_fee, host_payout, total_charged, guest_fee, host_fee, refunded_amount, referral_credit_applied_cents, user_credit_applied_cents, status, created_at"
-    )
-    .order("session_date", { ascending: false })
-
-  const bookings = (bookingRows ?? []) as Array<Record<string, unknown>>
+  const { rows: bookings, loadError } = await loadAdminEarningsBookings(admin)
   const listingIds = Array.from(
     new Set(bookings.map((row) => (typeof row.listing_id === "string" ? row.listing_id : null)).filter(Boolean))
   ) as string[]
@@ -33,7 +27,7 @@ export default async function AdminEarningsPage() {
           .in("id", listingIds)
       : Promise.resolve({ data: [] }),
     guestIds.length
-      ? admin.from("profiles").select("id, full_name, email, auth_email").in("id", guestIds)
+      ? admin.from("profiles").select("id, full_name, email").in("id", guestIds)
       : Promise.resolve({ data: [] }),
     hostIds.length
       ? admin.from("profiles").select("id, full_name").in("id", hostIds)
@@ -75,17 +69,13 @@ export default async function AdminEarningsPage() {
   type GuestMeta = { full_name: string | null; email: string | null }
 
   const guestMap = new Map<string, GuestMeta>(
-    (guestRows ?? []).map((row) => {
-      const authEmail = typeof row.auth_email === "string" ? row.auth_email : null
-      const profileEmail = typeof row.email === "string" ? row.email : null
-      return [
-        String(row.id),
-        {
-          full_name: typeof row.full_name === "string" ? row.full_name : null,
-          email: authEmail ?? profileEmail,
-        },
-      ]
-    })
+    (guestRows ?? []).map((row) => [
+      String(row.id),
+      {
+        full_name: typeof row.full_name === "string" ? row.full_name : null,
+        email: typeof row.email === "string" ? row.email : null,
+      },
+    ])
   )
   const hostMap = new Map((hostRows ?? []).map((row) => [String(row.id), row.full_name ?? null]))
 
@@ -125,5 +115,5 @@ export default async function AdminEarningsPage() {
     }
   })
 
-  return <AdminEarningsClient initialRows={initialRows} />
+  return <AdminEarningsClient initialRows={initialRows} loadError={loadError} />
 }

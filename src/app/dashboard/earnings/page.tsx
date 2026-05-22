@@ -76,7 +76,8 @@ export default async function DashboardEarningsPage() {
     totalCharged: Number(row.total_charged ?? 0),
     hostPayout: Number(row.host_payout ?? 0),
     serviceFee: Number(row.service_fee ?? 0),
-    listingTitle: row.listings?.[0]?.title ?? "Listing",
+    listingTitle:
+      (Array.isArray(row.listings) ? row.listings[0]?.title : row.listings?.title) ?? "Listing",
   }))
 
   const hasListings = (listings ?? []).length > 0

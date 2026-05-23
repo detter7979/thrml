@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/admin-guard"
-import { loadAdminEarningsBookings } from "@/lib/finance/load-earnings-bookings"
+import { bookingRefundedDollars, loadAdminEarningsBookings } from "@/lib/finance/load-earnings-bookings"
 
 import { AdminEarningsClient, type EarningsRow } from "./earnings-client"
 
@@ -108,7 +108,7 @@ export default async function AdminEarningsPage() {
       host_fee: Number(row.host_fee ?? 0),
       host_payout: Number(row.host_payout ?? 0),
       total_charged: Number(row.total_charged ?? 0),
-      refunded_amount: Number(row.refunded_amount ?? 0),
+      refunded_amount: bookingRefundedDollars(row),
       referral_credit_applied_cents: Number(row.referral_credit_applied_cents ?? 0),
       user_credit_applied_cents: Number(row.user_credit_applied_cents ?? 0),
       status: typeof row.status === "string" ? row.status : "pending",

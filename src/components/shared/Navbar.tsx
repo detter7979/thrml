@@ -270,7 +270,7 @@ export function Navbar() {
           "background-color 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), backdrop-filter 0.4s ease",
       }}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 md:px-10">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 md:px-8">
         <Link href="/" className={`font-serif text-3xl lowercase tracking-tight ${desktopLinkColor}`}>
           thrml
         </Link>

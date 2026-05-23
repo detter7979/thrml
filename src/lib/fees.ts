@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { unstable_noStore as noStore } from "next/cache"
 
 export const PLATFORM_FEE_SETTING_KEYS = ["guest_fee_percent", "host_fee_percent"] as const
 
@@ -32,12 +33,11 @@ export type ProtectedBookingCreditInput = {
 
 type AdminLike = Pick<SupabaseClient, "from">
 
-let feePercentsCache: { value: PlatformFeePercents; expiresAt: number } | null = null
-const FEE_CACHE_MS = 60_000
 export const STRIPE_MIN_CHARGE_CENTS = 50
 
+/** Cleared on admin fee saves; kept for callers that already import it. */
 export function invalidatePlatformFeePercentsCache() {
-  feePercentsCache = null
+  // Fees are read fresh from Supabase on each request (see getPlatformFeePercentsCached).
 }
 
 export function parsePercentFromSetting(value: unknown): number | null {
@@ -45,6 +45,9 @@ export function parsePercentFromSetting(value: unknown): number | null {
   if (typeof value === "string") {
     const parsed = Number(value)
     if (Number.isFinite(parsed)) return parsed
+  }
+  if (value && typeof value === "object" && "value" in value) {
+    return parsePercentFromSetting((value as { value?: unknown }).value)
   }
   return null
 }
@@ -117,11 +120,6 @@ export async function fetchPlatformFeePercents(admin: AdminLike): Promise<Platfo
 }
 
 export async function getPlatformFeePercentsCached(admin: AdminLike): Promise<PlatformFeePercents> {
-  const now = Date.now()
-  if (feePercentsCache && now < feePercentsCache.expiresAt) {
-    return feePercentsCache.value
-  }
-  const value = await fetchPlatformFeePercents(admin)
-  feePercentsCache = { value, expiresAt: now + FEE_CACHE_MS }
-  return value
+  noStore()
+  return fetchPlatformFeePercents(admin)
 }

@@ -345,8 +345,8 @@ export function HomePageClient({ initialListings, totalActiveListingsCount }: Ho
             }}
           />
         </div>
-        <div className="relative z-20 hidden pointer-events-auto md:grid md:min-h-[100svh] md:grid-cols-[60%_40%]">
-          <div className="flex items-center px-6 py-14 md:px-16">
+        <div className="relative z-20 hidden pointer-events-auto md:flex md:min-h-[100svh] md:items-center">
+          <div className="mx-auto w-full max-w-6xl px-4 md:px-8">
             <div className="w-full max-w-[640px]">
               <p className="hero-anim-in hero-delay-0 mb-5 text-xs font-semibold tracking-[0.24em] text-[#E8A58F]">
                 PRIVATE WELLNESS · ON DEMAND
@@ -409,10 +409,9 @@ export function HomePageClient({ initialListings, totalActiveListingsCount }: Ho
               </div>
             </div>
           </div>
-          <div />
         </div>
 
-        <div className="relative z-20 px-5 pt-2 pb-10 pointer-events-auto md:hidden">
+        <div className="relative z-20 mx-auto max-w-6xl px-4 pt-2 pb-10 pointer-events-auto md:hidden">
           <p className="hero-anim-in hero-delay-0 mb-5 text-xs font-semibold tracking-[0.24em] text-[#E8A58F]">
             PRIVATE WELLNESS · ON DEMAND
           </p>

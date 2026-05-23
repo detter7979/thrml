@@ -54,7 +54,28 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: fetchErr.message }, { status: 500 })
   }
   if (!row?.id) {
-    return NextResponse.json({ error: "Active dispute policy row not found" }, { status: 404 })
+    if (content === null) {
+      return NextResponse.json({ error: "Dispute policy row not found — run database migrations" }, { status: 404 })
+    }
+
+    const { data: inserted, error: insertErr } = await admin
+      .from("agent_policies")
+      .insert({
+        policy_key: POLICY_KEY,
+        content,
+        version: 1,
+        is_active: isActiveToggle ?? true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select("*")
+      .maybeSingle()
+
+    if (insertErr) {
+      return NextResponse.json({ error: insertErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ policy: inserted })
   }
 
   const nextVersion = typeof row.version === "number" ? row.version + 1 : 1

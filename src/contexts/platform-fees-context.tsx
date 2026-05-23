@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 
 import type { PlatformFeePercents } from "@/lib/fees"
 
@@ -13,9 +13,36 @@ export function PlatformFeesProvider({
   children: ReactNode
   initialPercents: PlatformFeePercents
 }) {
-  return (
-    <PlatformFeesContext.Provider value={initialPercents}>{children}</PlatformFeesContext.Provider>
-  )
+  const [percents, setPercents] = useState(initialPercents)
+
+  useEffect(() => {
+    let cancelled = false
+
+    fetch("/api/platform/fees", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((payload: { guestFeePercent?: number; hostFeePercent?: number; error?: string }) => {
+        if (cancelled || payload.error) return
+        if (
+          typeof payload.guestFeePercent !== "number" ||
+          typeof payload.hostFeePercent !== "number"
+        ) {
+          return
+        }
+        setPercents({
+          guestFeePercent: payload.guestFeePercent,
+          hostFeePercent: payload.hostFeePercent,
+        })
+      })
+      .catch(() => {
+        // Keep SSR values when the refresh fails.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return <PlatformFeesContext.Provider value={percents}>{children}</PlatformFeesContext.Provider>
 }
 
 export function usePlatformFeePercents(): PlatformFeePercents {

@@ -27,6 +27,7 @@ import {
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { SERVICE_TYPES, type ServiceType } from "@/lib/constants/service-types"
 import { useScrollReveal } from "@/hooks/useScrollReveal"
+import { pickPrimaryListingPhotoUrl } from "@/lib/listings/listing-photos"
 import type { HomeListingCardRow } from "@/lib/listings/home-listings"
 
 const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -123,7 +124,7 @@ export function HomePageClient({ initialListings, totalActiveListingsCount }: Ho
           serviceTypeName: serviceTypeMeta?.display_name ?? "Sauna",
           serviceTypeIcon: serviceTypeMeta?.icon ?? "🔥",
           bookingModel: serviceTypeMeta?.booking_model ?? "hourly",
-          photoUrl: item.listing_photos?.[0]?.url ?? null,
+          photoUrl: pickPrimaryListingPhotoUrl(item.listing_photos),
           priceSolo: Number(item.price_solo ?? 0),
           rating: Number(item.listing_ratings?.[0]?.avg_overall ?? 0) || undefined,
           reviewCount: Number(item.listing_ratings?.[0]?.review_count ?? 0) || undefined,
@@ -536,7 +537,7 @@ export function HomePageClient({ initialListings, totalActiveListingsCount }: Ho
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {skeletonCards.map((_, index) => (
                 <div key={index} className="card-base animate-pulse p-3">
-                  <div className="aspect-[16/9] rounded-xl bg-warm-100" />
+                  <div className="aspect-[4/3] rounded-xl bg-warm-100" />
                   <div className="mt-3 h-4 w-24 rounded bg-warm-100" />
                   <div className="mt-2 h-4 w-3/4 rounded bg-warm-100" />
                   <div className="mt-2 h-4 w-1/2 rounded bg-warm-100" />

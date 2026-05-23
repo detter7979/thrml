@@ -8,6 +8,10 @@
 const DEFAULT_CARD_WIDTH = 640
 const DEFAULT_QUALITY = 76
 
+/** Card cover frame is 4:3 — wider than 16:9 so portrait/square uploads crop less aggressively. */
+export const LISTING_CARD_COVER_WIDTH = 720
+export const LISTING_CARD_COVER_ASPECT = 4 / 3
+
 export type ListingPhotoThumbnailOptions = {
   width?: number
   height?: number
@@ -56,4 +60,12 @@ export function listingPhotoThumbnailUrl(
     params.delete("resize")
   }
   return `${renderBase}?${params.toString()}`
+}
+
+/** Width-only Supabase transform for grid cards — preserves source aspect ratio (no server-side crop). */
+export function listingCardCoverUrl(rawUrl: string | null | undefined): string | null {
+  return listingPhotoThumbnailUrl(rawUrl, {
+    width: LISTING_CARD_COVER_WIDTH,
+    quality: DEFAULT_QUALITY,
+  })
 }

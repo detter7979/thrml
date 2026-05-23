@@ -6,7 +6,7 @@ import { motion, useReducedMotion } from "framer-motion"
 
 import { SaveButton } from "@/components/listings/SaveButton"
 import { Badge } from "@/components/ui/badge"
-import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
+import { listingCardCoverUrl } from "@/lib/listings/thumbnail-url"
 
 const MotionLink = motion.create(Link)
 
@@ -56,15 +56,15 @@ export function ListingCard({
       whileTap={reduce ? undefined : { scale: 0.97 }}
       transition={tapSpring}
     >
-      <div className="relative mb-3 aspect-[16/9] w-full shrink-0 overflow-hidden rounded-xl bg-warm-100">
+      <div className="relative mb-3 aspect-[4/3] w-full shrink-0 overflow-hidden rounded-xl bg-warm-100">
         {listing.photoUrl ? (
           <Image
-            src={listingPhotoThumbnailUrl(listing.photoUrl) || listing.photoUrl}
+            src={listingCardCoverUrl(listing.photoUrl) || listing.photoUrl}
             alt={`${listing.title} in ${
               listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
             }`}
             fill
-            className="object-cover object-center"
+            className="object-cover object-[center_38%]"
             sizes="(max-width: 640px) min(100vw, 420px), (max-width: 1280px) min(50vw, 520px), min(33vw, 380px)"
             loading={imageHighPriority ? "eager" : "lazy"}
             priority={imageHighPriority}

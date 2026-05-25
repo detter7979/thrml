@@ -8,6 +8,7 @@ export type DisputeCategory =
   | "early_termination"
   | "billing_error"
   | "general_help"
+  | "safety_injury"
   | "unclear"
 
 export type RecommendedAction =
@@ -35,6 +36,7 @@ export type ClassificationResult = {
 
 export type BookingContext = {
   booking_id: string | null
+  guest_id: string | null
   booking_status: string | null
   total_charged: number
   session_date: string | null
@@ -45,6 +47,30 @@ export type BookingContext = {
   host_dispute_count: number
   host_cancellation_count: number
   has_safety_mention: boolean
+}
+
+function applySafetyOverride(
+  booking: BookingContext,
+  parsed: Omit<ClassificationResult, "refund_amount" | "raw_response">,
+  guestName: string
+): Omit<ClassificationResult, "refund_amount" | "raw_response"> {
+  if (!booking.has_safety_mention) return parsed
+
+  const firstName = guestName.trim().split(/\s+/)[0] || "there"
+
+  return {
+    ...parsed,
+    dispute_category: "safety_injury",
+    confidence: "high",
+    classification_reasoning:
+      "Safety-related language detected. Safety Override applied: automatic full refund with optional guest incident documentation — not gated on form completion.",
+    recommended_action: "full_refund",
+    refund_pct: 100,
+    host_penalty_pct: parsed.host_penalty_pct ?? 0,
+    requires_human_review: false,
+    human_review_reason: null,
+    suggested_reply: `Hi ${firstName}, we're truly sorry to hear about your experience. Your wellbeing matters to us. We've processed a full refund for your booking, which should appear on your statement within 5–10 business days. We've also sent a separate note with an optional link to share more detail if and when you're ready — there's no rush, and it's completely optional.`,
+  }
 }
 
 export async function classifyDispute(
@@ -68,8 +94,8 @@ POLICY DOCUMENT:
 ${policyText}
 
 ESCALATION RULES (override any other recommendation):
-- If has_safety_mention is true → dispute_category must be flagged, requires_human_review must be true
-- If total_charged > 200 → requires_human_review must be true, confidence must be 'medium' or 'low'
+- If has_safety_mention is true → Safety Override: dispute_category MUST be safety_injury, recommended_action MUST be full_refund, refund_pct MUST be 100, requires_human_review MUST be false, confidence MUST be high. Human follow-up happens via the incident workflow; do NOT block the refund on guest form completion.
+- If total_charged > 200 → requires_human_review must be true, confidence must be 'medium' or 'low' (unless Safety Override applies)
 - If guest_dispute_count >= 2 → requires_human_review must be true, note in reasoning
 - If host_dispute_count >= 3 → add host_penalty, requires_human_review must be true
 - If message contains any variation of "lawyer", "legal", "sue", "court" → requires_human_review must be true`
@@ -115,31 +141,44 @@ Return this exact JSON shape (no other text):
   try {
     parsed = JSON.parse(cleaned) as Omit<ClassificationResult, "refund_amount" | "raw_response">
   } catch {
+    const fallback = applySafetyOverride(
+      booking,
+      {
+        dispute_category: "unclear",
+        confidence: "low",
+        classification_reasoning: "Agent failed to parse — flagged for human review.",
+        recommended_action: "flag_for_human",
+        refund_pct: 0,
+        host_penalty_pct: 0,
+        requires_human_review: true,
+        human_review_reason: "Claude response was not valid JSON.",
+        suggested_reply: `Hi ${ticket.name}, thank you for reaching out. We're reviewing your request and will follow up shortly.`,
+      },
+      ticket.name
+    )
+
+    const refund_amount =
+      Math.round((booking.total_charged * (fallback.refund_pct ?? 0)) / 100 * 100) / 100
+
     return {
-      dispute_category: "unclear",
-      confidence: "low",
-      classification_reasoning: "Agent failed to parse — flagged for human review.",
-      recommended_action: "flag_for_human",
-      refund_pct: 0,
-      refund_amount: 0,
-      host_penalty_pct: 0,
-      requires_human_review: true,
-      human_review_reason: "Claude response was not valid JSON.",
-      suggested_reply: `Hi ${ticket.name}, thank you for reaching out. We're reviewing your request and will follow up shortly.`,
+      ...fallback,
+      refund_amount,
       raw_response: rawText,
     }
   }
 
+  const overridden = applySafetyOverride(booking, parsed, ticket.name)
+
   const refund_amount =
-    Math.round((booking.total_charged * (parsed.refund_pct ?? 0)) / 100 * 100) / 100
+    Math.round((booking.total_charged * (overridden.refund_pct ?? 0)) / 100 * 100) / 100
 
   return {
-    ...parsed,
-    refund_pct: parsed.refund_pct ?? 0,
-    host_penalty_pct: parsed.host_penalty_pct ?? 0,
+    ...overridden,
+    refund_pct: overridden.refund_pct ?? 0,
+    host_penalty_pct: overridden.host_penalty_pct ?? 0,
     refund_amount,
-    requires_human_review: parsed.requires_human_review ?? false,
-    human_review_reason: parsed.human_review_reason ?? null,
+    requires_human_review: overridden.requires_human_review ?? false,
+    human_review_reason: overridden.human_review_reason ?? null,
     raw_response: rawText,
   }
 }

@@ -70,6 +70,8 @@ function categoryBadgeClass(cat: string | null | undefined) {
       return "bg-amber-100 text-amber-950 border-amber-200"
     case "general_help":
       return "bg-sky-100 text-sky-950 border-sky-200"
+    case "safety_injury":
+      return "bg-rose-100 text-rose-950 border-rose-200"
     default:
       return "bg-[#E8DCCB] text-[#2A2118] border-[#DCCDBA]"
   }

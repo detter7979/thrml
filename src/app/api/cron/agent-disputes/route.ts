@@ -66,6 +66,7 @@ export async function GET(req: NextRequest) {
 
       let bookingContext: BookingContext = {
         booking_id: ticket.booking_id ?? null,
+        guest_id: typeof ticket.user_id === "string" ? ticket.user_id : null,
         booking_status: null,
         total_charged: 0,
         session_date: null,
@@ -135,6 +136,7 @@ export async function GET(req: NextRequest) {
 
           bookingContext = {
             booking_id: booking.id,
+            guest_id: typeof booking.guest_id === "string" ? booking.guest_id : bookingContext.guest_id,
             booking_status: booking.status,
             total_charged: Number(booking.total_charged ?? 0),
             session_date: booking.session_date ?? null,

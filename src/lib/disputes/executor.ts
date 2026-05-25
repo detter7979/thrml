@@ -5,12 +5,14 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { stripe } from "@/lib/stripe"
 
 import type { BookingContext, ClassificationResult } from "./classifier"
+import { isSafetyInjuryCategory, runSafetyIncidentFollowUp } from "./safety-incident-followup"
 
 export type ExecutionResult = {
   action_taken: string
   action_executed: boolean
   execution_error: string | null
   stripe_refund_id: string | null
+  safety_followup_errors?: string[]
 }
 
 export type ExecuteResolutionOptions = {
@@ -33,6 +35,7 @@ export async function executeResolution(
   let actionTaken: string = classification.recommended_action
   let executed = false
   const bypassAutoGate = options?.bypassAutoGate === true
+  let safetyFollowupErrors: string[] = []
 
   if (!bypassAutoGate && (classification.confidence !== "high" || classification.requires_human_review)) {
     return {
@@ -162,21 +165,51 @@ export async function executeResolution(
 
     executed = true
 
-    const toAddress =
-      process.env.NODE_ENV === "production" ? userEmail : (process.env.RESEND_TEST_TO_EMAIL ?? userEmail)
+    const refundIssued =
+      Boolean(stripeRefundId) ||
+      (classification.recommended_action === "full_refund" &&
+        classification.refund_amount <= 0 &&
+        !executionError)
 
-    const resolutionLayout = buildResolutionLayout(userName, ticketNumber, classification)
-    const html = await renderThrmlEmail(resolutionLayout)
-    const text = buildPlainText(resolutionLayout)
+    if (
+      isSafetyInjuryCategory(classification) &&
+      refundIssued &&
+      booking.booking_id &&
+      booking.guest_id
+    ) {
+      const followUp = await runSafetyIncidentFollowUp({
+        supabase,
+        supportRequestId,
+        ticketNumber,
+        bookingId: booking.booking_id,
+        reporterUserId: booking.guest_id,
+        guestEmail: userEmail,
+        guestName: userName,
+        refundAmount: classification.refund_amount,
+      })
+      safetyFollowupErrors = followUp.errors
+      if (followUp.errors.length) {
+        console.error("[dispute-executor] safety incident follow-up had errors", followUp.errors)
+      }
+    }
 
-    await sendEmail({
-      to: toAddress,
-      subject: `Your request has been resolved — ${ticketNumber}`,
-      html,
-      text,
-    }).catch((err) => {
-      console.error("[dispute-executor] resolution email failed", err)
-    })
+    if (!isSafetyInjuryCategory(classification)) {
+      const toAddress =
+        process.env.NODE_ENV === "production" ? userEmail : (process.env.RESEND_TEST_TO_EMAIL ?? userEmail)
+
+      const resolutionLayout = buildResolutionLayout(userName, ticketNumber, classification)
+      const html = await renderThrmlEmail(resolutionLayout)
+      const text = buildPlainText(resolutionLayout)
+
+      await sendEmail({
+        to: toAddress,
+        subject: `Your request has been resolved — ${ticketNumber}`,
+        html,
+        text,
+      }).catch((err) => {
+        console.error("[dispute-executor] resolution email failed", err)
+      })
+    }
   } catch (err) {
     executionError = err instanceof Error ? err.message : "Unknown execution error"
     executed = false
@@ -194,6 +227,7 @@ export async function executeResolution(
     action_executed: executed,
     execution_error: executionError,
     stripe_refund_id: stripeRefundId,
+    safety_followup_errors: safetyFollowupErrors.length ? safetyFollowupErrors : undefined,
   }
 }
 

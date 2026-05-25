@@ -125,14 +125,18 @@ export async function POST(
   const bookingId = (ticket.booking_id as string | null) ?? (latest.booking_id as string | null)
 
   let totalCharged = Number(latest.total_charged ?? 0)
+  let guestId = typeof ticket.user_id === "string" ? ticket.user_id : null
   if (bookingId) {
     const { data: bookingRow } = await admin
       .from("bookings")
-      .select("total_charged")
+      .select("total_charged, guest_id")
       .eq("id", bookingId)
       .maybeSingle()
     if (bookingRow && bookingRow.total_charged != null) {
       totalCharged = Number(bookingRow.total_charged)
+    }
+    if (typeof bookingRow?.guest_id === "string") {
+      guestId = bookingRow.guest_id
     }
   }
 
@@ -176,6 +180,7 @@ export async function POST(
 
   const bookingContext: BookingContext = {
     booking_id: bookingId,
+    guest_id: guestId,
     booking_status: (latest.booking_status as string | null) ?? null,
     total_charged: totalCharged,
     session_date: (latest.session_date as string | null) ?? null,

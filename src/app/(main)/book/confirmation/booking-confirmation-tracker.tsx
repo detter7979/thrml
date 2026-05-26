@@ -4,6 +4,7 @@ import { useEffect } from "react"
 
 import { trackMetaEvent } from "@/components/meta-pixel"
 import { trackGaEvent } from "@/lib/analytics/ga"
+import { getGtag } from "@/lib/analytics/gtag"
 
 type BookingConfirmationTrackerProps = {
   bookingId: string
@@ -58,12 +59,10 @@ export function BookingConfirmationTracker({
     })
 
     // Google Ads Enhanced Conversions.
-    if (
-      googleAdsId &&
-      typeof window !== "undefined" &&
-      (window as { gtag?: (...args: unknown[]) => void }).gtag
-    ) {
-      ;(window as { gtag: (...args: unknown[]) => void }).gtag("event", "conversion", {
+    const gtag = getGtag()
+
+    if (googleAdsId && gtag) {
+      gtag("event", "conversion", {
         send_to: googleAdsId,
         transaction_id: bookingId,
         value: totalAmount,

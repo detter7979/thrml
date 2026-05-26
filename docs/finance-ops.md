@@ -10,6 +10,29 @@ NOTIFY pgrst, 'reload schema';
 
 Wait ~30 seconds and re-run `npm run finance:smoke`.
 
+## Admin Finance Command Center
+
+Open **`/admin/finance`** for the unified P&amp;L hub:
+
+- Marketplace revenue, take rate, avg order size, avg guests per booking
+- Supply metrics: new hosts, new listings, totals
+- Ad funnel from Finance Tracker Platform Data (Meta spend, host clicks, purchases)
+- Capex from Fixed Costs + Ad Hoc Costs + paid media
+- Net contribution, breakeven bookings/GMV
+- Breakdowns by **service type** and **market (geo)**
+- **Sync sheets** button runs marketplace snapshot sync + Finance Tracker rebuild
+
+Data is scoped **through yesterday** (not today) for closed-day reporting.
+
+API: `GET /api/admin/finance/dashboard?period=mtd|7d|30d|90d|ytd`  
+Sync: `POST /api/admin/finance/sync`
+
+### CSV statement import (scaffold)
+
+Drop bank/card CSV files in `data/finance-statements/`.  
+List pending files: `GET /api/admin/finance/statements`  
+Auto-mapping into Ad Hoc Costs is planned next.
+
 ## After backfill (`financial_events`)
 
 Rebuild daily rollup rows, then push to the Finance Tracker sheet:

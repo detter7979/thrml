@@ -1,4 +1,5 @@
 import { createClient } from "./server"
+import { filterLaunchVisibleServiceTypeMeta } from "@/lib/launch-config"
 import {
   FALLBACK_SERVICE_TYPES,
   getFallbackServiceType,
@@ -77,5 +78,5 @@ export async function getServiceTypes(): Promise<ServiceTypeMeta[]> {
     }
   })
 
-  return mapped.length ? mapped : FALLBACK_SERVICE_TYPES
+  return filterLaunchVisibleServiceTypeMeta(mapped.length ? mapped : FALLBACK_SERVICE_TYPES)
 }

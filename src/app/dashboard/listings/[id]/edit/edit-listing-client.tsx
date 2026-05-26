@@ -39,7 +39,7 @@ import {
   type CodeSendTimingKey,
 } from "@/lib/constants/access-types"
 import { resolveHouseRules } from "@/lib/constants/default-house-rules"
-import { SERVICE_TYPES } from "@/lib/constants/service-types"
+import { getLaunchSelectableServiceTypes } from "@/lib/launch-config"
 
 type ListingEditModel = {
   id: string
@@ -581,7 +581,7 @@ export function EditListingClient({
                   <SelectValue placeholder="Select service type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {SERVICE_TYPES.map((serviceType) => (
+                  {getLaunchSelectableServiceTypes(form.serviceType).map((serviceType) => (
                     <SelectItem key={serviceType.value} value={serviceType.value}>
                       {serviceType.emoji} {serviceType.label}
                     </SelectItem>

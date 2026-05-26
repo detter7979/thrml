@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react"
 import Script from "next/script"
 
+import {
+  COOKIE_CONSENT_ACCEPTED_EVENT,
+  COOKIE_CONSENT_CHANGED_EVENT,
+  COOKIE_CONSENT_KEY,
+  isAnalyticsConsented,
+} from "@/lib/cookie-consent"
+
 type MetaUserData = {
   email?: string
   firstName?: string
@@ -31,21 +38,27 @@ export function MetaPixel() {
   const [consented, setConsented] = useState(false)
 
   useEffect(() => {
-    const existing = localStorage.getItem("thrml_cookie_consent")
-    queueMicrotask(() => {
-      if (existing === "accepted") setConsented(true)
-    })
-
-    const handler = () => {
-      const current = localStorage.getItem("thrml_cookie_consent")
-      if (current === "accepted") setConsented(true)
+    function syncConsent() {
+      setConsented(isAnalyticsConsented())
     }
 
-    window.addEventListener("storage", handler)
-    const timer = setTimeout(handler, 1500)
+    queueMicrotask(syncConsent)
+
+    function onStorage(event: StorageEvent) {
+      if (event.key === COOKIE_CONSENT_KEY) {
+        syncConsent()
+      }
+    }
+
+    window.addEventListener("storage", onStorage)
+    window.addEventListener(COOKIE_CONSENT_CHANGED_EVENT, syncConsent)
+    window.addEventListener(COOKIE_CONSENT_ACCEPTED_EVENT, syncConsent)
+    const timer = setTimeout(syncConsent, 1500)
 
     return () => {
-      window.removeEventListener("storage", handler)
+      window.removeEventListener("storage", onStorage)
+      window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, syncConsent)
+      window.removeEventListener(COOKIE_CONSENT_ACCEPTED_EVENT, syncConsent)
       clearTimeout(timer)
     }
   }, [])
@@ -119,6 +132,7 @@ export function trackMetaEvent(
   }
 ) {
   if (typeof window === "undefined") return
+  if (!isAnalyticsConsented()) return
 
   const eventId =
     options?.eventId ?? (typeof params?.event_id === "string" ? (params.event_id as string) : undefined)

@@ -17,7 +17,7 @@ export default function TermsPage() {
         {`Please read these Terms of Service carefully before using the thrml platform. By accessing or using our services, you agree to be bound by these terms.
 
 1. About thrml
-thrml ("we," "us," or "our") operates an online peer-to-peer marketplace that connects independent wellness space owners ("Hosts") with individuals seeking access to private wellness experiences ("Guests"), including but not limited to saunas, cold plunge tubs, infrared light therapy, float tanks, contrast therapy, PEMF therapy, hyperbaric chambers, and halotherapy spaces. thrml is a technology platform and marketing service - we do not own, operate, manage, or control any of the wellness spaces listed on our platform.
+thrml LLC ("we," "us," or "our") operates an online peer-to-peer marketplace that connects independent wellness space owners ("Hosts") with individuals seeking access to private wellness experiences ("Guests"), including but not limited to saunas, cold plunge tubs, infrared light therapy, float tanks, contrast therapy, PEMF therapy, hyperbaric chambers, and halotherapy spaces. thrml is a technology platform and marketing service - we do not own, operate, manage, or control any of the wellness spaces listed on our platform.
 
 2. Acceptance of Terms
 By creating an account, listing a space, making a booking, or otherwise using the thrml platform, website, or mobile application, you confirm that you have read, understood, and agree to these Terms of Service, our Privacy Policy, and any additional guidelines or policies posted on the platform. If you do not agree, you must not use the platform.
@@ -52,7 +52,7 @@ You will provide the agreed access code or entry method to confirmed Guests
 Hosts are solely responsible for:
 The safety and condition of their wellness space
 Compliance with applicable health, safety, and zoning regulations
-Maintaining appropriate insurance coverage for hosted activities
+Maintaining valid liability insurance appropriate for hosting paid guests, and providing proof of such coverage to thrml as a condition of listing. Hosts must keep coverage active for as long as their listing is available for booking and must provide updated proof upon thrml's request.
 Responding to Guest inquiries and messages in a timely manner
 Honoring confirmed bookings
 Managing their own tax obligations arising from hosting income
@@ -95,11 +95,13 @@ Pricing is set by Hosts and displayed on each listing. thrml adds a platform ser
 All payments are processed through Stripe. By making a payment you agree to Stripe's Terms of Service. thrml does not store credit card information.
 
 7.3 Cancellations and Refunds
-Cancellation and refund terms are determined by the Host's cancellation policy displayed on each listing. thrml's general platform policy is:
-Cancellations made more than 48 hours before the session start time: full refund minus platform service fee
-Cancellations made within 48 hours of the session start time: no refund unless the Host cancels
-Host cancellations: full refund to Guest including platform service fee
-thrml reserves the right to issue refunds at its discretion in cases of documented safety concerns, Host non-compliance, or platform error.
+Cancellation and refund terms are determined by the Host's cancellation policy displayed on each listing. thrml's general platform cancellation policy is:
+
+Cancellations made more than 48 hours before the session start time: full refund minus the platform service fee.
+Cancellations made within 48 hours of the session start time: no refund, unless the Host cancels or the situation falls under thrml's resolution policy below.
+Host cancellations: full refund to the Guest, including the platform service fee.
+
+In addition, thrml operates a resolution process that may issue full or partial refunds, account credits, or other remedies in cases including access failures, spaces materially not as described, billing errors, documented safety concerns, or Host non-compliance. Where a Guest reports a safety incident or injury, thrml's policy is to prioritize the Guest's wellbeing, which may include an immediate refund pending review. thrml reserves the right to resolve disputes in the Guest's or Host's favor at its reasonable discretion consistent with this policy.
 
 8. Access Codes and Keyless Entry
 Where a listing uses access codes for entry, thrml provides an automatically generated access code to the Guest upon booking confirmation. Guests must:
@@ -133,11 +135,12 @@ Attempt to reverse engineer, scrape, or interfere with the platform
 Create multiple accounts for deceptive purposes
 
 13. Limitation of Liability
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THERMAL AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AND AGENTS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING OUT OF OR RELATED TO YOUR USE OF THE PLATFORM, ANY BOOKING, OR ANY WELLNESS ACTIVITY, EVEN IF THERMAL HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-thrml's total aggregate liability to any user for any claim arising out of or related to these Terms or use of the platform shall not exceed the greater of (a) the total fees paid by you to thrml in the twelve months preceding the claim, or (b) one hundred US dollars ($100).
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, thrml LLC AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AND AGENTS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING OUT OF OR RELATED TO YOUR USE OF THE PLATFORM, ANY BOOKING, OR ANY WELLNESS ACTIVITY, EVEN IF thrml LLC HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+thrml LLC's total aggregate liability to any user for any claim arising out of or related to these Terms or use of the platform shall not exceed the greater of (a) the total fees paid by you to thrml in the twelve months preceding the claim, or (b) one hundred US dollars ($100).
+Nothing in this section limits or excludes liability that cannot be limited or excluded under applicable law, including liability for gross negligence, willful misconduct, or personal injury caused by a Party's own gross negligence or willful misconduct.
 
 14. Indemnification
-You agree to indemnify, defend, and hold harmless thrml and its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, and expenses, including reasonable legal fees, arising out of or in any way connected with: (a) your access to or use of the platform; (b) your listing or booking of a wellness space; (c) your violation of these Terms; or (d) your violation of any applicable law or third-party rights.
+You agree to indemnify, defend, and hold harmless thrml LLC and its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, and expenses, including reasonable legal fees, arising out of or in any way connected with: (a) your access to or use of the platform; (b) your listing or booking of a wellness space; (c) your violation of these Terms; or (d) your violation of any applicable law or third-party rights.
 
 15. Dispute Resolution
 Any disputes arising out of or relating to these Terms or the thrml platform shall first be addressed through good faith negotiation. If unresolved, disputes shall be submitted to binding arbitration under the rules of the American Arbitration Association, conducted in Washington. You waive any right to a jury trial or class action proceeding.
@@ -151,7 +154,13 @@ thrml reserves the right to modify these Terms at any time. We will notify users
 18. Termination
 thrml reserves the right to suspend or terminate any user account at its sole discretion, with or without notice, for violations of these Terms or conduct deemed harmful to the platform or its users.
 
-19. Contact
+19. Severability
+If any provision of these Terms is held invalid or unenforceable by a court of competent jurisdiction, that provision shall be modified to the minimum extent necessary to make it enforceable, or if it cannot be so modified, severed, and the remaining provisions shall continue in full force and effect.
+
+20. Force Majeure
+thrml shall not be liable for any failure or delay in performance resulting from causes beyond its reasonable control, including but not limited to acts of God, natural disasters, power or internet failures, third-party service outages, labor disputes, or governmental actions.
+
+21. Contact
 For questions about these Terms of Service, contact us at: hello@usethrml.com`}
       </div>
     </main>

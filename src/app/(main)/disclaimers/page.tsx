@@ -6,7 +6,7 @@ export default function DisclaimersPage() {
       <p className="mt-1 text-sm text-[#5F5148]">Effective Date: March 2026</p>
 
       <div className="mt-8 whitespace-pre-line text-sm leading-relaxed text-[#2F241E]">
-        {`These disclaimers form part of thrml's Terms of Service and apply to all users. Please read carefully before booking or hosting any wellness experience.
+        {`These disclaimers form part of thrml LLC's Terms of Service and apply to all users. Please read carefully before booking or hosting any wellness experience.
 
 1. Marketplace Disclaimer
 thrml is a technology platform that facilitates connections between independent wellness space owners and individuals seeking access to those spaces. thrml is not a wellness provider, healthcare company, medical service, or spa operator.
@@ -36,11 +36,10 @@ Slipping, falling, or other physical accidents in and around wellness equipment
 By using the thrml platform to book a wellness experience, you voluntarily assume all risks associated with participation, whether or not described above.
 
 4. No Endorsement of Hosts or Listings
-The appearance of a listing on the thrml platform does not constitute an endorsement, certification, or recommendation by thrml. thrml does not verify Host credentials, professional qualifications, insurance coverage, or regulatory compliance beyond what is required for platform onboarding.
-Guests are encouraged to review listings carefully, read Host reviews, and communicate with Hosts directly before booking to ensure the space meets their needs.
+The appearance of a listing on the thrml platform does not constitute an endorsement, certification, or recommendation by thrml. thrml does not independently verify Host professional qualifications or regulatory compliance. While thrml requires proof of Host liability insurance as a condition of listing, thrml does not guarantee the adequacy, scope, or continued validity of any Host's coverage. Guests are encouraged to review listings carefully and communicate with Hosts directly before booking.
 
 5. Insurance Disclaimer
-thrml does not provide insurance coverage for Hosts, Guests, wellness spaces, or equipment. Hosts are responsible for maintaining their own property, liability, and business insurance appropriate for hosting guests. thrml strongly recommends all Hosts consult with an insurance professional to ensure adequate coverage.
+thrml does not provide insurance coverage for Hosts, Guests, wellness spaces, or equipment. Hosts are responsible for maintaining their own property, liability, and business insurance appropriate for hosting guests. thrml requires Hosts to maintain liability insurance appropriate for hosting paid guests and to provide proof of coverage as a condition of listing. Hosts remain solely responsible for ensuring their coverage is adequate for their specific space and activities.
 Guests are responsible for their own health, travel, or personal liability insurance. thrml accepts no liability for injuries, illness, property damage, or loss sustained during a booked session.
 
 6. Access Code Disclaimer
@@ -67,9 +66,8 @@ Listing prices, availability, and amenities are set and managed by Hosts. thrml 
 Hosts are solely responsible for ensuring their wellness spaces comply with all applicable local, state, and federal regulations, including health codes, business licensing, zoning, ADA requirements, and any permits required for specific modalities (such as hyperbaric oxygen therapy). thrml does not provide legal, compliance, or regulatory advice.
 
 
-thrml Wellness Marketplace
-usethrml.com  |  hello@usethrml.com
-These documents are drafts intended for legal review and are not legal advice.`}
+thrml LLC
+usethrml.com  |  hello@usethrml.com`}
       </div>
     </main>
   )

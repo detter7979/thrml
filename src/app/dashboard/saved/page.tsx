@@ -5,7 +5,8 @@ import { Heart } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { ListingCard, type ListingCardData } from "@/components/listings/ListingCard"
-import { getServiceType, SERVICE_TYPES } from "@/lib/constants/service-types"
+import { getServiceType } from "@/lib/constants/service-types"
+import { getLaunchVisibleServiceTypes, isSaunasOnlyLaunch } from "@/lib/launch-config"
 
 type SavedRow = {
   listing_id: string
@@ -132,13 +133,15 @@ export default function DashboardSavedPage() {
     }, 200)
   }
 
-  const filterOptions = [
-    { id: "all", label: "All" },
-    ...SERVICE_TYPES.map((item) => ({
-      id: item.value,
-      label: item.label,
-    })),
-  ]
+  const filterOptions = isSaunasOnlyLaunch()
+    ? []
+    : [
+        { id: "all", label: "All" },
+        ...getLaunchVisibleServiceTypes().map((item) => ({
+          id: item.value,
+          label: item.label,
+        })),
+      ]
 
   return (
     <div className="space-y-5 px-4 py-6 md:px-8 md:py-8">
@@ -163,22 +166,24 @@ export default function DashboardSavedPage() {
       {!loading && savedCount > 0 ? (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {filterOptions.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setServiceFilter(option.id)}
-                  className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
-                    serviceFilter === option.id
-                      ? "border-brand-500 bg-brand-100 text-brand-900"
-                      : "bg-white text-warm-600"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            {filterOptions.length > 0 ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {filterOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setServiceFilter(option.id)}
+                    className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
+                      serviceFilter === option.id
+                        ? "border-brand-500 bg-brand-100 text-brand-900"
+                        : "bg-white text-warm-600"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -1,60 +1,34 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
 
-import { COOKIE_CONSENT_ACCEPTED_EVENT } from "@/components/analytics/google-tag-loader"
+import {
+  COOKIE_CONSENT_ACCEPTED,
+  COOKIE_CONSENT_DECLINED,
+  COOKIE_CONSENT_KEY,
+  disableAnalyticsStorage,
+  enableAnalyticsStorage,
+  notifyConsentChanged,
+} from "@/lib/cookie-consent"
 
-declare global {
-  interface Window {
-    gtag?: (...args: unknown[]) => void
-    /** Merged with gtag.js typings — must be `Object[]`, not `object[]`. */
-    // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types -- matches gtag `Window.dataLayer`
-    dataLayer?: Object[]
-  }
+type CookieConsentBannerProps = {
+  visible: boolean
+  onClose: () => void
 }
 
-export function CookieConsent() {
-  const [visible, setVisible] = useState(false)
-
-  function enableAnalytics() {
-    if (typeof window === "undefined") return
-
-    window.dataLayer = window.dataLayer || []
-    const gtag = window.gtag ?? ((...args: unknown[]) => window.dataLayer?.push(args))
-    gtag("consent", "update", {
-      analytics_storage: "granted",
-    })
-  }
-
-  useEffect(() => {
-    const consent = localStorage.getItem("thrml_cookie_consent")
-    if (!consent) {
-      const timer = setTimeout(() => setVisible(true), 1200)
-      return () => clearTimeout(timer)
-    }
-
-    if (consent === "accepted") {
-      enableAnalytics()
-    }
-  }, [])
-
+export function CookieConsentBanner({ visible, onClose }: CookieConsentBannerProps) {
   function handleAccept() {
-    localStorage.setItem("thrml_cookie_consent", "accepted")
-    window.dispatchEvent(
-      new StorageEvent("storage", {
-        key: "thrml_cookie_consent",
-        newValue: "accepted",
-      })
-    )
-    window.dispatchEvent(new Event(COOKIE_CONSENT_ACCEPTED_EVENT))
-    enableAnalytics()
-    setVisible(false)
+    localStorage.setItem(COOKIE_CONSENT_KEY, COOKIE_CONSENT_ACCEPTED)
+    notifyConsentChanged(COOKIE_CONSENT_ACCEPTED)
+    enableAnalyticsStorage()
+    onClose()
   }
 
   function handleDecline() {
-    localStorage.setItem("thrml_cookie_consent", "declined")
-    setVisible(false)
+    localStorage.setItem(COOKIE_CONSENT_KEY, COOKIE_CONSENT_DECLINED)
+    notifyConsentChanged(COOKIE_CONSENT_DECLINED)
+    disableAnalyticsStorage()
+    onClose()
   }
 
   if (!visible) return null

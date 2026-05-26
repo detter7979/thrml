@@ -11,6 +11,7 @@ import {
   Inbox,
   LineChart,
   Megaphone,
+  PieChart,
   Settings,
   Sparkles,
   UserRound,
@@ -34,6 +35,7 @@ const SECTIONS: NavSection[] = [
       { href: "/admin/referrals", label: "Referrals", icon: Gift },
       { href: "/admin/credits", label: "Credits", icon: Wallet },
       { href: "/admin/earnings", label: "Earnings", icon: BarChart3 },
+      { href: "/admin/finance", label: "Finance", icon: PieChart },
     ],
   },
   {

@@ -1,3 +1,10 @@
+import type {
+  AccessMethod,
+  DoorOperation,
+  HostAvailability,
+  SafetyAmenity,
+} from "@/lib/constants/listing-safety"
+
 export type AccessType = "code" | "lockbox" | "host_onsite" | "other"
 
 export type Listing = {
@@ -15,6 +22,13 @@ export type Listing = {
   access_instructions?: string | null
   onsite_contact_name?: string | null
   onsite_contact_phone?: string | null
+  door_operation?: DoorOperation | null
+  access_method?: AccessMethod | null
+  host_availability?: HostAvailability | null
+  emergency_contact?: string | null
+  controls_in_reach?: boolean | null
+  has_ventilation?: boolean | null
+  safety_amenities?: SafetyAmenity[] | null
 }
 
 export type Booking = {

@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import Link from "next/link"
 import { Facebook, Instagram } from "lucide-react"
 
+import { CookieSettingsLink } from "@/components/cookie-settings-link"
 import { DeferredMainWithMotion } from "@/components/layout/deferred-motion-boundaries"
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { getPlatformFeePercentsCached } from "@/lib/fees"
@@ -79,6 +80,9 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
                   <Link href="/disclaimer" className="transition-colors hover:text-white">
                     Disclaimers
                   </Link>
+                </li>
+                <li>
+                  <CookieSettingsLink className="transition-colors hover:text-white" />
                 </li>
               </ul>
             </div>

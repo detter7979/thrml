@@ -1,5 +1,7 @@
 import type { Metadata } from "next"
 
+import { CookieSettingsLink } from "@/components/cookie-settings-link"
+
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description: "Learn how thrml collects, uses, and protects your personal information.",
@@ -14,7 +16,7 @@ export default function PrivacyPage() {
       <p className="mt-1 text-sm text-[#5F5148]">Effective Date: March 2026</p>
 
       <div className="mt-8 whitespace-pre-line text-sm leading-relaxed text-[#2F241E]">
-        {`This Privacy Policy explains how thrml collects, uses, shares, and protects your personal information when you use our platform.
+        {`This Privacy Policy explains how thrml LLC collects, uses, shares, and protects your personal information when you use our platform.
 
 1. Information We Collect
 1.1 Information You Provide
@@ -78,7 +80,7 @@ In the event of a merger, acquisition, or sale of substantially all of thrml's a
 
 4. Cookies and Tracking
 We use cookies and similar technologies to maintain sessions, remember preferences, and analyze platform usage. You can control cookie settings through your browser, but disabling cookies may affect platform functionality.
-We do not use cookies for cross-site behavioral advertising or sell data to ad networks.`}
+We use the Meta Pixel and similar advertising technologies to measure the performance of our advertising. Under some state privacy laws (including California's CPRA), the use of these technologies may be considered a "sale" or "sharing" of personal information. You can opt out of this sharing at any time using the "Do Not Sell or Share My Personal Information" mechanism described in Section 7, or by adjusting your cookie preferences.`}
       </div>
 
       <section id="data-retention" className="mt-8 text-sm leading-relaxed text-[#2F241E]">
@@ -100,6 +102,13 @@ We do not use cookies for cross-site behavioral advertising or sell data to ad n
             </thead>
             <tbody className="divide-y divide-[#F0E8E2]">
               <tr className="bg-white">
+                <td className="px-4 py-3 text-[#2F241E]">Location data</td>
+                <td className="px-4 py-3 text-[#2F241E]">
+                  Retained only during active session use; not stored after search completes unless tied to a booking
+                </td>
+                <td className="px-4 py-3 text-[#5F5148]">Map-based search functionality</td>
+              </tr>
+              <tr className="bg-[#FAF6F2]">
                 <td className="px-4 py-3 text-[#2F241E]">Account &amp; profile data</td>
                 <td className="px-4 py-3 text-[#2F241E]">Deleted within 30 days of account deletion</td>
                 <td className="px-4 py-3 text-[#5F5148]">User-requested deletion</td>
@@ -179,12 +188,31 @@ Deletion: Request deletion of your personal data, subject to legal retention req
 Portability: Request your data in a portable format
 Opt-out: Opt out of marketing communications at any time
 Restrict processing: Request that we limit how we use your data in certain circumstances
-To exercise any of these rights, contact us at hello@usethrml.com. We will respond within 30 days.
+To exercise any of these rights, contact us at hello@usethrml.com. We will respond within 30 days.`}
+      </div>
 
-7. California Privacy Rights (CCPA)
-California residents have additional rights under the California Consumer Privacy Act, including the right to know what personal information is collected, the right to delete, and the right to opt out of the sale of personal information. thrml does not sell personal information. To submit a CCPA request, contact us at the address below.
+      <div className="mt-8 text-sm leading-relaxed text-[#2F241E]">
+        <h2 className="whitespace-pre-line font-normal">{`7. California Privacy Rights (CCPA)`}</h2>
+        <p className="mt-3">
+          California residents have additional rights under the California Consumer Privacy Act, including the right to
+          know what personal information is collected, the right to delete, and the right to opt out of the sale of
+          personal information. California residents have the right to opt out of the &quot;sale&quot; or
+          &quot;sharing&quot; of personal information. While thrml does not sell personal information for money, our
+          use of advertising technologies such as the Meta Pixel may constitute &quot;sharing&quot; under the CPRA. You
+          may opt out at any time by{" "}
+          <CookieSettingsLink className="text-[#C4623A] underline hover:text-[#b05530]" /> or by contacting us at{" "}
+          hello@usethrml.com. To submit a CCPA request, contact us at the address below.
+        </p>
+        <p className="mt-3">
+          Other U.S. State Privacy Rights. Residents of certain other states (including Virginia, Colorado, Connecticut,
+          and others with comprehensive privacy laws) may have similar rights to access, correct, delete, and opt out
+          of certain processing of their personal information. To exercise any such rights, contact us at
+          hello@usethrml.com and we will respond as required by applicable law.
+        </p>
+      </div>
 
-8. Children's Privacy
+      <div className="mt-8 whitespace-pre-line text-sm leading-relaxed text-[#2F241E]">
+        {`8. Children's Privacy
 The thrml platform is not intended for individuals under 18 years of age. We do not knowingly collect personal information from minors. If we become aware that we have collected information from a minor, we will delete it promptly.
 
 9. Security

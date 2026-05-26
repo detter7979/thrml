@@ -16,6 +16,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -32,7 +33,17 @@ import {
   getCancellationPolicy,
 } from "@/lib/constants/cancellation-policies"
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
-import { SERVICE_TYPES } from "@/lib/constants/service-types"
+import {
+  ACCESS_METHOD_OPTIONS,
+  DOOR_OPERATION_OPTIONS,
+  HOST_AVAILABILITY_OPTIONS,
+  SAFETY_AMENITY_OPTIONS,
+  type AccessMethod,
+  type DoorOperation,
+  type HostAvailability,
+  type SafetyAmenity,
+} from "@/lib/constants/listing-safety"
+import { getLaunchVisibleServiceTypes, isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { getGa4ClientIdForMp } from "@/lib/analytics/ga-client-id"
 import { sanitizeText } from "@/lib/sanitize"
@@ -43,10 +54,14 @@ import { getFacebookPixelCookies, trackMetaEvent } from "@/components/meta-pixel
 import { IdentityVerificationCTA, type IdentityUiStatus } from "@/components/profile/IdentityVerificationCTA"
 
 const saunaTypes = ["Finnish", "Infrared", "Steam", "Barrel", "Wood-Fired"] as const
+const doorOperations = DOOR_OPERATION_OPTIONS.map((option) => option.value)
+const accessMethods = ACCESS_METHOD_OPTIONS.map((option) => option.value)
+const hostAvailabilities = HOST_AVAILABILITY_OPTIONS.map((option) => option.value)
+const safetyAmenityValues = SAFETY_AMENITY_OPTIONS.map((option) => option.value)
 const cancellationPolicies = ["flexible", "moderate", "strict"] as const
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const
 
-const serviceTypeOptions = SERVICE_TYPES.map((serviceType) => ({
+const serviceTypeOptions = getLaunchVisibleServiceTypes().map((serviceType) => ({
   id: serviceType.value,
   display_name: serviceType.label,
   icon: serviceType.emoji,
@@ -116,6 +131,19 @@ const listingFormSchema = z
     serviceDurationMaxMinutes: z.coerce.number().int().min(0).max(59).optional(),
     maxTemperature: z.coerce.number().int().min(80).max(250),
     description: z.string().min(100, "Description must be at least 100 characters."),
+    doorOperation: z.enum(doorOperations as [DoorOperation, ...DoorOperation[]], {
+      message: "Select how the sauna door opens from the inside.",
+    }),
+    accessMethod: z.enum(accessMethods as [AccessMethod, ...AccessMethod[]], {
+      message: "Select how guests access the space.",
+    }),
+    hostAvailability: z.enum(hostAvailabilities as [HostAvailability, ...HostAvailability[]], {
+      message: "Select your availability during the session.",
+    }),
+    emergencyContact: z.string().optional(),
+    controlsInReach: z.boolean(),
+    hasVentilation: z.boolean(),
+    safetyAmenities: z.array(z.enum(safetyAmenityValues as [SafetyAmenity, ...SafetyAmenity[]])),
     amenities: z.array(z.string()).min(1, "Select at least one amenity."),
     address: z.string().min(5, "Address is required."),
     lat: z.number(),
@@ -267,6 +295,13 @@ const STEP_FIELDS: Record<number, Path<ListingFormInput>[]> = {
     "serviceDurationMaxMinutes",
     "maxTemperature",
     "description",
+    "doorOperation",
+    "accessMethod",
+    "hostAvailability",
+    "emergencyContact",
+    "controlsInReach",
+    "hasVentilation",
+    "safetyAmenities",
   ],
   3: [
     "priceSolo",
@@ -295,7 +330,14 @@ function formatMoney(value: number) {
   }).format(value)
 }
 
+const SKIP_SERVICE_TYPE_STEP = isSaunasOnlyLaunch()
 const TOTAL_STEPS = 5
+const FIRST_STEP = SKIP_SERVICE_TYPE_STEP ? 2 : 1
+const WIZARD_STEP_COUNT = SKIP_SERVICE_TYPE_STEP ? TOTAL_STEPS - 1 : TOTAL_STEPS
+
+function getWizardDisplayStep(step: number) {
+  return SKIP_SERVICE_TYPE_STEP ? step - 1 : step
+}
 const REQUIRED_LISTING_COLUMNS = new Set([
   "title",
   "service_type",
@@ -341,7 +383,7 @@ export function HostNewListingClient({
   idVerifiedAt: string | null
 }) {
   const router = useRouter()
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(FIRST_STEP)
   const [photos, setPhotos] = useState<PhotoItem[]>([])
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [draggingPhotoId, setDraggingPhotoId] = useState<string | null>(null)
@@ -415,6 +457,10 @@ export function HostNewListingClient({
       serviceDurationMaxMinutes: 0,
       maxTemperature: 180,
       description: "",
+      emergencyContact: "",
+      controlsInReach: false,
+      hasVentilation: false,
+      safetyAmenities: [],
       amenities: [],
       address: "",
       lat: 0,
@@ -684,7 +730,7 @@ export function HostNewListingClient({
   }
 
   function handlePreviousStep() {
-    setStep((current) => Math.max(1, current - 1))
+    setStep((current) => Math.max(FIRST_STEP, current - 1))
   }
 
   function toggleAmenity(amenityId: string) {
@@ -693,6 +739,15 @@ export function HostNewListingClient({
       : [...selectedAmenities, amenityId]
 
     setValue("amenities", next, { shouldValidate: true })
+  }
+
+  function toggleSafetyAmenity(amenityId: SafetyAmenity) {
+    const current = watch("safetyAmenities") ?? []
+    const next = current.includes(amenityId)
+      ? current.filter((value) => value !== amenityId)
+      : [...current, amenityId]
+
+    setValue("safetyAmenities", next, { shouldValidate: true })
   }
 
   function tierSavingsLabel(groupPrice: number | undefined, base: number) {
@@ -811,6 +866,13 @@ export function HostNewListingClient({
       max_temp: values.maxTemperature,
       max_temperature: values.maxTemperature,
       description: sanitizedDescription,
+      door_operation: values.doorOperation,
+      access_method: values.accessMethod,
+      host_availability: values.hostAvailability,
+      emergency_contact: values.emergencyContact?.trim() || null,
+      controls_in_reach: values.controlsInReach,
+      has_ventilation: values.hasVentilation,
+      safety_amenities: values.safetyAmenities,
       amenities: values.amenities,
       location_address: values.address,
       location: values.address,
@@ -984,7 +1046,7 @@ export function HostNewListingClient({
       <Card className="card-base gap-4">
         <CardHeader className="space-y-3">
           <CardTitle className="type-h2">Create your thrml listing</CardTitle>
-          <ProgressBar step={step} totalSteps={TOTAL_STEPS} />
+          <ProgressBar step={getWizardDisplayStep(step)} totalSteps={WIZARD_STEP_COUNT} />
         </CardHeader>
 
         <CardContent>
@@ -1031,7 +1093,7 @@ export function HostNewListingClient({
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="transition-all duration-200">
-              {step === 1 ? (
+              {!SKIP_SERVICE_TYPE_STEP && step === 1 ? (
                 <div className="space-y-5">
                   <h2 className="type-h2">Step 1 — Select service type</h2>
                   <div className="space-y-2">
@@ -1066,7 +1128,7 @@ export function HostNewListingClient({
 
               {step === 2 ? (
                 <div className="space-y-5">
-                  <h2 className="type-h2">Step 2 — Service details</h2>
+                  <h2 className="type-h2">Step {getWizardDisplayStep(2)} — Service details</h2>
                   <div className="space-y-2">
                     <Label htmlFor="title">Listing title</Label>
                     <Input id="title" {...register("title")} />
@@ -1246,12 +1308,166 @@ export function HostNewListingClient({
                       ) : null}
                     </div>
                   </div>
+
+                  <div className="space-y-5 border-t border-[#E5E0D8] pt-5">
+                    <h3 className="font-serif text-xl font-normal">Safety &amp; Access</h3>
+
+                    <div className="space-y-2">
+                      <Label>How does the sauna door open from the inside?</Label>
+                      <Select
+                        value={watch("doorOperation")}
+                        onValueChange={(value) =>
+                          setValue("doorOperation", value as DoorOperation, {
+                            shouldValidate: true,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select door operation" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DOOR_OPERATION_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.doorOperation ? (
+                        <p className="text-sm text-destructive">{errors.doorOperation.message}</p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        Guests must always be able to exit freely from inside.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>How do guests access the space?</Label>
+                      <Select
+                        value={watch("accessMethod")}
+                        onValueChange={(value) =>
+                          setValue("accessMethod", value as AccessMethod, {
+                            shouldValidate: true,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select access method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ACCESS_METHOD_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.accessMethod ? (
+                        <p className="text-sm text-destructive">{errors.accessMethod.message}</p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        We&apos;ll share detailed entry instructions with guests after booking.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Are you available during the session?</Label>
+                      <Select
+                        value={watch("hostAvailability")}
+                        onValueChange={(value) =>
+                          setValue("hostAvailability", value as HostAvailability, {
+                            shouldValidate: true,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select availability" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HOST_AVAILABILITY_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.hostAvailability ? (
+                        <p className="text-sm text-destructive">{errors.hostAvailability.message}</p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="emergency-contact">Emergency contact number (optional)</Label>
+                      <Input
+                        id="emergency-contact"
+                        type="tel"
+                        autoComplete="tel"
+                        {...register("emergencyContact")}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        A number a guest can call if something goes wrong during their session.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="flex items-start gap-3 rounded-lg border border-[#E5E0D8] px-3 py-3">
+                        <Checkbox
+                          checked={watch("controlsInReach")}
+                          className="mt-0.5 border-[#D9CBB8] data-[state=checked]:border-brand-500 data-[state=checked]:bg-brand-500 data-[state=checked]:text-white"
+                          onCheckedChange={(checked) =>
+                            setValue("controlsInReach", Boolean(checked), { shouldValidate: true })
+                          }
+                        />
+                        <span className="text-sm">
+                          Guests can reach the temperature/timer controls from inside
+                        </span>
+                      </label>
+
+                      <label className="flex items-start gap-3 rounded-lg border border-[#E5E0D8] px-3 py-3">
+                        <Checkbox
+                          checked={watch("hasVentilation")}
+                          className="mt-0.5 border-[#D9CBB8] data-[state=checked]:border-brand-500 data-[state=checked]:bg-brand-500 data-[state=checked]:text-white"
+                          onCheckedChange={(checked) =>
+                            setValue("hasVentilation", Boolean(checked), { shouldValidate: true })
+                          }
+                        />
+                        <span className="text-sm">The sauna has working ventilation</span>
+                      </label>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Available on-site (select all that apply)</Label>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {SAFETY_AMENITY_OPTIONS.map((option) => {
+                          const selectedSafetyAmenities = watch("safetyAmenities") ?? []
+                          const isSelected = selectedSafetyAmenities.includes(option.value)
+                          return (
+                            <label
+                              key={option.value}
+                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                                isSelected
+                                  ? "border-brand-500 bg-brand-100"
+                                  : "border-[#E5E0D8] bg-white text-muted-foreground"
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                className="border-[#D9CBB8] data-[state=checked]:border-brand-500 data-[state=checked]:bg-brand-500 data-[state=checked]:text-white"
+                                onCheckedChange={() => toggleSafetyAmenity(option.value)}
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : null}
 
               {step === 4 ? (
                 <div className="space-y-5">
-                  <h2 className="type-h2">Step 4 — Photos & amenities</h2>
+                  <h2 className="type-h2">Step {getWizardDisplayStep(4)} — Photos & amenities</h2>
                   <div className="space-y-3">
                     <Label>Photos (minimum 3)</Label>
                     <div
@@ -1362,7 +1578,7 @@ export function HostNewListingClient({
 
               {step === 5 ? (
                 <div className="space-y-5">
-                  <h2 className="type-h2">Step 5 — Location & availability</h2>
+                  <h2 className="type-h2">Step {getWizardDisplayStep(5)} — Location & availability</h2>
                   <div className="space-y-2">
                     <Label htmlFor="address">Address</Label>
                     <Input
@@ -1454,7 +1670,7 @@ export function HostNewListingClient({
 
               {step === 3 ? (
                 <div className="space-y-5">
-                  <h2 className="type-h2">Step 3 — Pricing</h2>
+                  <h2 className="type-h2">Step {getWizardDisplayStep(3)} — Pricing</h2>
                   {bookingModel === "fixed_session" ? (
                     <div className="space-y-2">
                       <Label htmlFor="price-session">Price per session</Label>
@@ -1680,7 +1896,7 @@ export function HostNewListingClient({
             {photoError ? <p className="text-sm text-destructive">{photoError}</p> : null}
 
             <div className="flex items-center justify-between">
-              <Button type="button" variant="outline" onClick={handlePreviousStep} disabled={step === 1}>
+              <Button type="button" variant="outline" onClick={handlePreviousStep} disabled={step === FIRST_STEP}>
                 Back
               </Button>
 

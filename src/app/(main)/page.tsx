@@ -7,9 +7,9 @@ import { HomePageClient } from "./home-page-client"
 export const revalidate = 60
 
 export const metadata: Metadata = {
-  title: { absolute: "Book Private Saunas & Cold Plunges | thrml" },
+  title: { absolute: "Your Personal Sauna Awaits | Book Private Home Saunas Near You" },
   description:
-    "Book private saunas, cold plunges, float tanks, infrared therapy and more — hosted by real people in Seattle and Los Angeles. No memberships. No front desks.",
+    "Book private home saunas by the hour. Experience deep recovery in intimate backyard and cabin saunas near you. Hosts earn meaningful passive income sharing their personal wellness spaces.",
   alternates: { canonical: "https://usethrml.com" },
 }
 

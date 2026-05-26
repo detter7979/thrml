@@ -4,8 +4,8 @@ import Script from "next/script";
 import { Suspense } from "react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { GoogleTagLoader } from "@/components/analytics/google-tag-loader";
-import { CookieConsent } from "@/components/cookie-consent";
 import { SmoothScrollProviderDeferred } from "@/components/layout/deferred-motion-boundaries";
+import { CookieConsentProvider } from "@/contexts/cookie-consent-context";
 import { MetaPixel } from "@/components/meta-pixel";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import "./globals.css";
@@ -88,27 +88,28 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <SmoothScrollProviderDeferred>{children}</SmoothScrollProviderDeferred>
-        <Suspense fallback={null}>
-          <ReferralCapture />
-        </Suspense>
-        <Script
-          id="ga-consent-default"
-          strategy="lazyOnload"
-          dangerouslySetInnerHTML={{
-            __html: `
+        <CookieConsentProvider>
+          <SmoothScrollProviderDeferred>{children}</SmoothScrollProviderDeferred>
+          <Suspense fallback={null}>
+            <ReferralCapture />
+          </Suspense>
+          <Script
+            id="ga-consent-default"
+            strategy="lazyOnload"
+            dangerouslySetInnerHTML={{
+              __html: `
               window.dataLayer = window.dataLayer || [];
               window.dataLayer.push(['consent', 'default', {
                 analytics_storage: 'denied',
                 wait_for_update: 2000
               }]);
             `,
-          }}
-        />
-        <GoogleTagLoader />
-        <MetaPixel />
-        <CookieConsent />
-        <SpeedInsights />
+            }}
+          />
+          <GoogleTagLoader />
+          <MetaPixel />
+          <SpeedInsights />
+        </CookieConsentProvider>
       </body>
     </html>
   );

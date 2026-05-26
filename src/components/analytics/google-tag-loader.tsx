@@ -3,8 +3,15 @@
 import Script from "next/script"
 import { useEffect, useState } from "react"
 
-const CONSENT_KEY = "thrml_cookie_consent"
-export const COOKIE_CONSENT_ACCEPTED_EVENT = "thrml-cookie-consent-accepted"
+import {
+  COOKIE_CONSENT_ACCEPTED_EVENT,
+  COOKIE_CONSENT_CHANGED_EVENT,
+  COOKIE_CONSENT_KEY,
+  disableAnalyticsStorage,
+  isAnalyticsConsented,
+} from "@/lib/cookie-consent"
+
+export { COOKIE_CONSENT_ACCEPTED_EVENT } from "@/lib/cookie-consent"
 
 /**
  * Loads gtag / Google Ads + GA4 only after analytics cookies are accepted.
@@ -16,31 +23,33 @@ export function GoogleTagLoader() {
   const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-L20J7S2M51"
 
   useEffect(() => {
-    function readAccepted() {
-      try {
-        return localStorage.getItem(CONSENT_KEY) === "accepted"
-      } catch {
-        return false
+    function syncConsent() {
+      const accepted = isAnalyticsConsented()
+      setEnabled(accepted)
+      if (!accepted) {
+        disableAnalyticsStorage()
       }
     }
 
-    queueMicrotask(() => {
-      if (readAccepted()) setEnabled(true)
-    })
+    queueMicrotask(syncConsent)
 
-    function onAccepted() {
-      if (readAccepted()) setEnabled(true)
+    function onConsentChanged() {
+      syncConsent()
     }
 
     function onStorage(event: StorageEvent) {
-      if (event.key === CONSENT_KEY && event.newValue === "accepted") setEnabled(true)
+      if (event.key === COOKIE_CONSENT_KEY) {
+        syncConsent()
+      }
     }
 
-    window.addEventListener(COOKIE_CONSENT_ACCEPTED_EVENT, onAccepted)
+    window.addEventListener(COOKIE_CONSENT_ACCEPTED_EVENT, onConsentChanged)
+    window.addEventListener(COOKIE_CONSENT_CHANGED_EVENT, onConsentChanged)
     window.addEventListener("storage", onStorage)
 
     return () => {
-      window.removeEventListener(COOKIE_CONSENT_ACCEPTED_EVENT, onAccepted)
+      window.removeEventListener(COOKIE_CONSENT_ACCEPTED_EVENT, onConsentChanged)
+      window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, onConsentChanged)
       window.removeEventListener("storage", onStorage)
     }
   }, [])

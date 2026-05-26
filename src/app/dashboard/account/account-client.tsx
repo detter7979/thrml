@@ -9,6 +9,7 @@ import { IdentityVerificationCTA, type IdentityUiStatus } from "@/components/pro
 import { AvatarUpload } from "@/components/profile/AvatarUpload"
 import { StripeConnectBanner } from "@/components/host/StripeConnectBanner"
 import { Button } from "@/components/ui/button"
+import { CookieSettingsLink } from "@/components/cookie-settings-link"
 import { trackMetaEvent } from "@/components/meta-pixel"
 import {
   Dialog,
@@ -1036,8 +1037,9 @@ export function AccountClient({
             You can unsubscribe at any time. View our{" "}
             <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="underline">
               Privacy Policy
-            </Link>
-            .
+            </Link>{" "}
+            or update your{" "}
+            <CookieSettingsLink className="underline" />.
           </p>
         </div>
       </section>

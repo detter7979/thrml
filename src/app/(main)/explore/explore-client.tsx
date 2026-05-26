@@ -15,7 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { formatServiceType, getServiceType, SERVICE_TYPES } from "@/lib/constants/service-types"
+import { formatServiceType, getServiceType } from "@/lib/constants/service-types"
+import {
+  getLaunchVisibleServiceTypes,
+  isSaunasOnlyLaunch,
+  sanitizeLaunchVisibleServiceTypes,
+} from "@/lib/launch-config"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -334,12 +339,14 @@ export function ExploreClient() {
       : null
     const legacyRating45 = searchParams.get("rating45") === "true"
     return {
-      serviceTypes: rawServices
-        ? rawServices
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean)
-        : [],
+      serviceTypes: sanitizeLaunchVisibleServiceTypes(
+        rawServices
+          ? rawServices
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean)
+          : []
+      ),
       priceMin: parseFiniteNumber(searchParams.get("price_min"), DEFAULT_FILTERS.priceMin),
       priceMax: parseFiniteNumber(searchParams.get("price_max"), DEFAULT_FILTERS.priceMax),
       distanceMiles: Number.isFinite(parsedDistance) ? parsedDistance : DEFAULT_FILTERS.distanceMiles,
@@ -385,7 +392,7 @@ export function ExploreClient() {
   const [geoError, setGeoError] = useState<string | null>(null)
   const serviceTypeOptions = useMemo<ServiceOption[]>(
     () =>
-      SERVICE_TYPES.map((serviceType) => ({
+      getLaunchVisibleServiceTypes().map((serviceType) => ({
         id: serviceType.value,
         display_name: serviceType.label,
         icon: serviceType.emoji,
@@ -444,7 +451,7 @@ export function ExploreClient() {
     haversineMiles(center.lat, center.lng, originCenter.lat, originCenter.lng) > 0.7
   const useClusters = modeListings.length > 50
   const activeFilterCount = [
-    filters.serviceTypes.length > 0,
+    !isSaunasOnlyLaunch() && filters.serviceTypes.length > 0,
     filters.priceMin > DEFAULT_FILTERS.priceMin || filters.priceMax < DEFAULT_FILTERS.priceMax,
     filters.distanceMiles !== DEFAULT_FILTERS.distanceMiles,
     filters.availableToday,
@@ -484,7 +491,9 @@ export function ExploreClient() {
         .gte("lng", bounds.west)
         .lte("lng", bounds.east)
     }
-    if (currentFilters.serviceTypes.length > 0) {
+    if (isSaunasOnlyLaunch()) {
+      query = query.eq("service_type", "sauna")
+    } else if (currentFilters.serviceTypes.length > 0) {
       query = query.in("service_type", currentFilters.serviceTypes)
     }
     if (supportsPriceFilter && currentFilters.priceMin > 0)
@@ -549,7 +558,9 @@ export function ExploreClient() {
     params.set("location", locationLabel)
     params.set("lat", searchCenter.lat.toFixed(5))
     params.set("lng", searchCenter.lng.toFixed(5))
-    if (filters.serviceTypes.length) params.set("service", filters.serviceTypes.join(","))
+    if (!isSaunasOnlyLaunch() && filters.serviceTypes.length) {
+      params.set("service", filters.serviceTypes.join(","))
+    }
     if (filters.priceMin > 0) params.set("price_min", String(filters.priceMin))
     if (filters.priceMax < DEFAULT_FILTERS.priceMax) params.set("price_max", String(filters.priceMax))
     if (filters.distanceMiles !== DEFAULT_FILTERS.distanceMiles) params.set("distance", String(filters.distanceMiles))
@@ -1103,6 +1114,7 @@ export function ExploreClient() {
           <div className="flex items-center gap-2 md:justify-between md:gap-3">
             <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto snap-x-pills md:overflow-visible">
               <div className="flex w-max items-center gap-2 whitespace-nowrap pl-1 md:w-full md:flex-wrap md:gap-2.5 md:whitespace-normal md:pl-0">
+            {!isSaunasOnlyLaunch() ? (
             <Popover
               open={openFilter === "service"}
               onOpenChange={(open) => {
@@ -1168,6 +1180,7 @@ export function ExploreClient() {
                 </div>
               </PopoverContent>
             </Popover>
+            ) : null}
 
             <Popover
               open={openFilter === "price"}

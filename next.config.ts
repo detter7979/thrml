@@ -36,6 +36,15 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  outputFileTracingExcludes: {
+    "*": [
+      ".next/cache/**",
+      ".git/**",
+      ".tmp/**",
+      "node_modules/@swc/**",
+      "node_modules/webpack/**",
+    ],
+  },
   experimental: {
     optimizePackageImports: [
       "lucide-react",

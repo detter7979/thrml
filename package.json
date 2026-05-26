@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
+    "postbuild": "node scripts/ensure-next-build-artifacts.js",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "NODE_OPTIONS='--max-old-space-size=8192' tsc --noEmit",

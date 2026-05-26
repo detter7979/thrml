@@ -102,8 +102,11 @@ const BOOKING_SELECT =
   "id, listing_id, guest_count, total_charged, host_payout, guest_fee, host_fee, service_fee, subtotal, referral_credit_applied_cents, user_credit_applied_cents, status, created_at"
 
 type BookingWithListing = BookingEconomicsRow & {
+  id: string
   listing_id: string | null
   guest_count: number | null
+  status: string | null
+  created_at: string | null
   listings?: {
     service_type: string | null
     city: string | null

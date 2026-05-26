@@ -101,19 +101,56 @@ export type FinanceDashboardPayload = {
 const BOOKING_SELECT =
   "id, listing_id, guest_count, total_charged, host_payout, guest_fee, host_fee, service_fee, subtotal, referral_credit_applied_cents, user_credit_applied_cents, status, created_at"
 
+type BookingListingInfo = {
+  service_type: string | null
+  city: string | null
+  state: string | null
+  location_city: string | null
+  location_state: string | null
+}
+
 type BookingWithListing = BookingEconomicsRow & {
   id: string
   listing_id: string | null
   guest_count: number | null
   status: string | null
   created_at: string | null
-  listings?: {
-    service_type: string | null
-    city: string | null
-    state: string | null
-    location_city: string | null
-    location_state: string | null
-  } | null
+  listings?: BookingListingInfo | null
+}
+
+function normalizeListingJoin(
+  listings: BookingListingInfo | BookingListingInfo[] | null | undefined
+): BookingListingInfo | null {
+  if (!listings) return null
+  if (Array.isArray(listings)) return listings[0] ?? null
+  return listings
+}
+
+function normalizeBookingRow(row: Record<string, unknown>): BookingWithListing {
+  return {
+    id: String(row.id ?? ""),
+    listing_id: typeof row.listing_id === "string" ? row.listing_id : null,
+    guest_count: row.guest_count != null ? Number(row.guest_count) : null,
+    status: typeof row.status === "string" ? row.status : null,
+    created_at: typeof row.created_at === "string" ? row.created_at : null,
+    subtotal: row.subtotal as BookingEconomicsRow["subtotal"],
+    total_charged: row.total_charged as BookingEconomicsRow["total_charged"],
+    host_payout: row.host_payout as BookingEconomicsRow["host_payout"],
+    guest_fee: row.guest_fee as BookingEconomicsRow["guest_fee"],
+    host_fee: row.host_fee as BookingEconomicsRow["host_fee"],
+    service_fee: row.service_fee as BookingEconomicsRow["service_fee"],
+    referral_credit_applied_cents:
+      row.referral_credit_applied_cents as BookingEconomicsRow["referral_credit_applied_cents"],
+    user_credit_applied_cents:
+      row.user_credit_applied_cents as BookingEconomicsRow["user_credit_applied_cents"],
+    listings: normalizeListingJoin(
+      row.listings as BookingListingInfo | BookingListingInfo[] | null | undefined
+    ),
+  }
+}
+
+function normalizeBookingRows(rows: unknown[]): BookingWithListing[] {
+  return rows.map((row) => normalizeBookingRow(row as Record<string, unknown>))
 }
 
 function marketLabel(listing: BookingWithListing["listings"]) {
@@ -173,10 +210,10 @@ async function loadBookingsInRange(admin: AdminClient, start: string, end: strin
       .select(BOOKING_SELECT)
       .gte("created_at", `${start}T00:00:00.000Z`)
       .lte("created_at", `${end}T23:59:59.999Z`)
-    return (fallback.data ?? []) as BookingWithListing[]
+    return normalizeBookingRows(fallback.data ?? [])
   }
 
-  return (data ?? []) as BookingWithListing[]
+  return normalizeBookingRows(data ?? [])
 }
 
 async function loadRefundsInRange(admin: AdminClient, start: string, end: string) {

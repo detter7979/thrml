@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { assertPublishableListingCopy } from "@/lib/listings/host-claim-policy"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(
@@ -16,6 +17,10 @@ export async function POST(
   const body = (await req.json().catch(() => ({}))) as { deactivateOriginal?: boolean }
 
   const selectCandidates = [
+    "id, host_id, parent_listing_id, title, description, access_type, access_code, access_code_template",
+    "id, host_id, parent_listing_id, title, description, access_type, access_code_template",
+    "id, host_id, parent_listing_id, title, description, access_type, access_code",
+    "id, host_id, parent_listing_id, title, description, access_type",
     "id, host_id, parent_listing_id, access_type, access_code, access_code_template",
     "id, host_id, parent_listing_id, access_type, access_code_template",
     "id, host_id, parent_listing_id, access_type, access_code",
@@ -41,6 +46,20 @@ export async function POST(
 
   if (error || !listing) {
     return NextResponse.json({ error: "Listing not found" }, { status: 404 })
+  }
+
+  const claimCheck = assertPublishableListingCopy({
+    title:
+      typeof (listing as Record<string, unknown>).title === "string"
+        ? ((listing as Record<string, unknown>).title as string)
+        : "",
+    description:
+      typeof (listing as Record<string, unknown>).description === "string"
+        ? ((listing as Record<string, unknown>).description as string)
+        : "",
+  })
+  if (!claimCheck.ok) {
+    return NextResponse.json({ error: claimCheck.error }, { status: 400 })
   }
 
   const accessTypeRaw =

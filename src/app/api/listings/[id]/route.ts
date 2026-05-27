@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { assertPublishableListingCopy } from "@/lib/listings/host-claim-policy"
 import { sanitizeText } from "@/lib/sanitize"
 import { createClient } from "@/lib/supabase/server"
 
@@ -99,6 +100,40 @@ export async function PATCH(
   delete updatePayload.host_id
   delete updatePayload.created_at
   delete updatePayload.updated_at
+  delete updatePayload.is_active
+  delete updatePayload.is_draft
+  delete updatePayload.is_featured
+
+  if ("title" in updatePayload || "description" in updatePayload) {
+    const { data: existingListing, error: existingListingError } = await supabase
+      .from("listings")
+      .select("title, description")
+      .eq("id", id)
+      .eq("host_id", user.id)
+      .maybeSingle()
+
+    if (existingListingError || !existingListing) {
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 })
+    }
+
+    const claimCheck = assertPublishableListingCopy({
+      title:
+        typeof updatePayload.title === "string"
+          ? updatePayload.title
+          : typeof existingListing.title === "string"
+            ? existingListing.title
+            : "",
+      description:
+        typeof updatePayload.description === "string"
+          ? updatePayload.description
+          : typeof existingListing.description === "string"
+            ? existingListing.description
+            : "",
+    })
+    if (!claimCheck.ok) {
+      return NextResponse.json({ error: claimCheck.error }, { status: 400 })
+    }
+  }
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const { data, error } = await supabase

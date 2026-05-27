@@ -1,7 +1,75 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { assertPublishableListingCopy } from "@/lib/listings/host-claim-policy"
+import { insertListingWithColumnFallback } from "@/lib/listings/insert-listing"
 import { rateLimit } from "@/lib/rate-limit"
+import { sanitizeText } from "@/lib/sanitize"
 import { createClient } from "@/lib/supabase/server"
+
+function sanitizeHouseRules(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((rule): rule is string => typeof rule === "string")
+    .map((rule) => sanitizeText(rule))
+    .filter(Boolean)
+}
+
+export async function POST(request: NextRequest) {
+  const limited = await rateLimit(request, {
+    maxRequests: 20,
+    windowMs: 60 * 60 * 1000,
+    identifier: "listings-create",
+  })
+  if (limited) return limited
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid listing payload." }, { status: 400 })
+  }
+
+  const title = typeof body.title === "string" ? sanitizeText(body.title) : ""
+  const description = typeof body.description === "string" ? sanitizeText(body.description) : ""
+
+  if (title.length < 6) {
+    return NextResponse.json({ error: "Title must be at least 6 characters." }, { status: 400 })
+  }
+  if (description.length < 100) {
+    return NextResponse.json({ error: "Description must be at least 100 characters." }, { status: 400 })
+  }
+
+  const claimCheck = assertPublishableListingCopy({ title, description })
+  if (!claimCheck.ok) {
+    return NextResponse.json({ error: claimCheck.error }, { status: 400 })
+  }
+
+  const listingPayload: Record<string, unknown> = {
+    ...body,
+    host_id: user.id,
+    title,
+    description,
+    house_rules: sanitizeHouseRules(body.house_rules),
+    is_active: true,
+    is_draft: false,
+  }
+
+  delete listingPayload.id
+  delete listingPayload.created_at
+  delete listingPayload.updated_at
+  delete listingPayload.is_featured
+
+  const { data, error } = await insertListingWithColumnFallback(supabase, listingPayload)
+  if (!data) {
+    return NextResponse.json({ error: error ?? "Failed to create listing." }, { status: 500 })
+  }
+
+  return NextResponse.json({ listingId: data.id })
+}
 
 export async function GET(request: NextRequest) {
   const limited = await rateLimit(request, {

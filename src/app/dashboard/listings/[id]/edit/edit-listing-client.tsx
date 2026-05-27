@@ -31,6 +31,10 @@ import {
   getCancellationPolicy,
 } from "@/lib/constants/cancellation-policies"
 import {
+  assertPublishableListingCopy,
+  HOST_CLAIM_GUIDANCE,
+} from "@/lib/listings/host-claim-policy"
+import {
   ACCESS_TYPES,
   CODE_SEND_TIMING,
   INSTRUCTION_VARIABLES,
@@ -354,6 +358,17 @@ export function EditListingClient({
     setSaving(true)
     setError(null)
     setSuccess(null)
+
+    const claimCheck = assertPublishableListingCopy({
+      title: form.title,
+      description: form.description,
+    })
+    if (!claimCheck.ok) {
+      setSaving(false)
+      setError(claimCheck.error)
+      return
+    }
+
     const response = await fetch(`/api/listings/${listing.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -414,6 +429,17 @@ export function EditListingClient({
   async function publishVersion(replaceOriginal: boolean) {
     setPublishing(replaceOriginal ? "replace" : "only")
     setError(null)
+
+    const claimCheck = assertPublishableListingCopy({
+      title: form.title,
+      description: form.description,
+    })
+    if (!claimCheck.ok) {
+      setPublishing(null)
+      setError(claimCheck.error)
+      return
+    }
+
     const response = await fetch(`/api/listings/${listing.id}/publish`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -738,6 +764,7 @@ export function EditListingClient({
                 onChange={(event) => setForm((s) => ({ ...s, description: event.target.value }))}
                 rows={6}
               />
+              <p className="text-xs text-[#6D5E51]">{HOST_CLAIM_GUIDANCE}</p>
             </div>
           </>
         )}

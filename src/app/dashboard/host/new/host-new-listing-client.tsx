@@ -44,6 +44,11 @@ import {
   type SafetyAmenity,
 } from "@/lib/constants/listing-safety"
 import { getLaunchVisibleServiceTypes, isSaunasOnlyLaunch } from "@/lib/launch-config"
+import {
+  findHostClaimViolations,
+  formatHostClaimError,
+  HOST_CLAIM_GUIDANCE,
+} from "@/lib/listings/host-claim-policy"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { getGa4ClientIdForMp } from "@/lib/analytics/ga-client-id"
 import { sanitizeText } from "@/lib/sanitize"
@@ -265,6 +270,17 @@ const listingFormSchema = z
         })
       }
     }
+
+    for (const violation of findHostClaimViolations({
+      title: value.title,
+      description: value.description,
+    })) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: formatHostClaimError([violation]),
+        path: [violation.field],
+      })
+    }
   })
 
 type ListingFormInput = z.input<typeof listingFormSchema>
@@ -338,14 +354,6 @@ const WIZARD_STEP_COUNT = SKIP_SERVICE_TYPE_STEP ? TOTAL_STEPS - 1 : TOTAL_STEPS
 function getWizardDisplayStep(step: number) {
   return SKIP_SERVICE_TYPE_STEP ? step - 1 : step
 }
-const REQUIRED_LISTING_COLUMNS = new Set([
-  "title",
-  "service_type",
-  "lat",
-  "lng",
-  "availability",
-  "price_solo",
-])
 
 function ProgressBar({ step, totalSteps }: { step: number; totalSteps: number }) {
   const progress = (step / totalSteps) * 100
@@ -843,10 +851,18 @@ export function HostNewListingClient({
 
     const sanitizedTitle = sanitizeText(values.title)
     const sanitizedDescription = sanitizeText(values.description)
+    const claimCheck = findHostClaimViolations({
+      title: sanitizedTitle,
+      description: sanitizedDescription,
+    })
+    if (claimCheck.length > 0) {
+      setPhotoError(formatHostClaimError(claimCheck))
+      setStep(2)
+      return
+    }
     const sanitizedHouseRules = defaultHouseRules.map((rule) => sanitizeText(rule)).filter(Boolean)
 
     const listingPayload: Record<string, unknown> = {
-      host_id: userId,
       title: sanitizedTitle,
       service_type: values.serviceType,
       sauna_type: values.saunaType,
@@ -900,56 +916,24 @@ export function HostNewListingClient({
       is_instant_book: values.instantBook,
       cancellation_policy: values.cancellationPolicy,
       house_rules: sanitizedHouseRules,
-      is_active: true,
     }
 
-    let listing: { id: string } | null = null
-    let listingErrorMessage: string | null = null
+    const createResponse = await fetch("/api/listings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(listingPayload),
+    })
+    const createPayload = (await createResponse.json()) as { listingId?: string; error?: string }
 
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      const { data, error } = await supabase
-        .from("listings")
-        .insert(listingPayload)
-        .select("id")
-        .single()
-
-      if (!error && data) {
-        listing = data
-        break
+    if (!createResponse.ok || !createPayload.listingId) {
+      setPhotoError(createPayload.error ?? "Failed to create listing.")
+      if (createResponse.status === 400 && createPayload.error?.includes("can't publish")) {
+        setStep(2)
       }
-
-      const message = error?.message ?? "Failed to create listing."
-      listingErrorMessage = message
-      const missingColumnMatch = message.match(/'([^']+)' column of 'listings'/i)
-      const missingColumn = missingColumnMatch?.[1]
-
-      if (!missingColumn || !(missingColumn in listingPayload)) {
-        break
-      }
-
-      if (REQUIRED_LISTING_COLUMNS.has(missingColumn)) {
-        listingErrorMessage = `Database schema is missing required column "${missingColumn}". Run the latest listings migration before publishing.`
-        break
-      }
-
-      delete listingPayload[missingColumn]
-    }
-
-    if (!listing) {
-      setPhotoError(listingErrorMessage ?? "Failed to create listing.")
       return
     }
 
-    const { error: publishEnforcementError } = await supabase
-      .from("listings")
-      .update({ is_active: true, is_draft: false })
-      .eq("id", listing.id)
-      .eq("host_id", userId)
-
-    if (publishEnforcementError) {
-      setPhotoError("Listing created, but we couldn't publish it. Please try again.")
-      return
-    }
+    const listing = { id: createPayload.listingId }
 
     const photoRows: { listing_id: string; url: string; order_index: number }[] = []
 
@@ -1301,6 +1285,7 @@ export function HostNewListingClient({
                   <div className="space-y-2">
                     <Label htmlFor="description">Description</Label>
                     <Textarea id="description" rows={6} {...register("description")} />
+                    <p className="text-xs text-muted-foreground">{HOST_CLAIM_GUIDANCE}</p>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>{descriptionLength}/100 min characters</span>
                       {errors.description ? (

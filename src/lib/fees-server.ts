@@ -6,7 +6,7 @@ import { fetchPlatformFeePercents, type PlatformFeePercents } from "@/lib/fees"
 
 /** Bust cached platform fee reads after admin fee updates. */
 export function invalidatePlatformFeePercentsCache() {
-  revalidateTag("platform-fees")
+  revalidateTag("platform-fees", "max")
 }
 
 const loadPlatformFeePercents = unstable_cache(

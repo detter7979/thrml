@@ -107,14 +107,14 @@ export default async function DashboardListingsPage() {
         .order("session_date", { ascending: false })
         .limit(100)
       if (!attempt.error) {
-        return (attempt.data ?? []).filter((row) =>
+        return ((attempt.data ?? []) as unknown as Record<string, unknown>[]).filter((row) =>
           guestCompletedTabBooking({
             session_date: typeof row.session_date === "string" ? row.session_date : null,
             start_time: typeof row.start_time === "string" ? row.start_time : null,
             end_time: typeof row.end_time === "string" ? row.end_time : null,
             status: typeof row.status === "string" ? row.status : null,
           })
-        ) as Record<string, unknown>[]
+        )
       }
       if (!isMissingColumnError(attempt.error.message)) {
         console.error("[dashboard/listings] failed to load recent bookings", attempt.error.message)

@@ -11,6 +11,7 @@ import {
 import type { PricingTiers } from "@/lib/pricing"
 import { roundUpTo30 } from "@/lib/slots"
 import { getServiceTypes } from "@/lib/supabase/queries"
+import { createClient } from "@/lib/supabase/server"
 
 import { ListingDetailClient } from "./listing-detail-client"
 
@@ -341,6 +342,12 @@ export default async function ListingDetailPage({
   if (error || !listing || !listing.is_active) {
     notFound()
   }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const isHost = Boolean(user?.id && listing.host_id && user.id === listing.host_id)
 
   const serviceTypes = await getServiceTypes()
   const serviceTypeId =

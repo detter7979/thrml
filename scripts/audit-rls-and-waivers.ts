@@ -4,7 +4,7 @@
  */
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { createClient } from "@supabase/supabase-js"
+import { createClient, type SupabaseClient } from "@supabase/supabase-js"
 
 function loadEnvFile(filename: string) {
   const path = resolve(process.cwd(), filename)
@@ -123,7 +123,7 @@ const HARDENING_POLICIES: Record<string, string[]> = {
 }
 
 async function probeTable(
-  client: ReturnType<typeof createClient>,
+  client: SupabaseClient,
   table: string,
   role: "anon" | "service",
   columns = "*"

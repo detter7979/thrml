@@ -1,7 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { unstable_cache, revalidateTag } from "next/cache"
-
-import { createAdminClient } from "@/lib/supabase/admin"
 
 export const PLATFORM_FEE_SETTING_KEYS = ["guest_fee_percent", "host_fee_percent"] as const
 
@@ -36,17 +33,6 @@ export type ProtectedBookingCreditInput = {
 type AdminLike = Pick<SupabaseClient, "from">
 
 export const STRIPE_MIN_CHARGE_CENTS = 50
-
-/** Bust cached platform fee reads after admin fee updates. */
-export function invalidatePlatformFeePercentsCache() {
-  revalidateTag("platform-fees")
-}
-
-const loadPlatformFeePercents = unstable_cache(
-  async () => fetchPlatformFeePercents(createAdminClient()),
-  ["platform-fee-percents"],
-  { revalidate: 3600, tags: ["platform-fees"] }
-)
 
 export function parsePercentFromSetting(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value
@@ -125,8 +111,4 @@ export async function fetchPlatformFeePercents(admin: AdminLike): Promise<Platfo
   }
 
   return { guestFeePercent: guest, hostFeePercent: host }
-}
-
-export async function getPlatformFeePercentsCached(_admin?: AdminLike): Promise<PlatformFeePercents> {
-  return loadPlatformFeePercents()
 }

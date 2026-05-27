@@ -2,7 +2,8 @@ import { Suspense } from "react"
 import type { Metadata } from "next"
 
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
-import { formatHostKeepPercent, getPlatformFeePercentsCached } from "@/lib/fees"
+import { formatHostKeepPercent } from "@/lib/fees"
+import { getPlatformFeePercentsCached } from "@/lib/fees-server"
 
 import { BecomeAHostClient } from "./become-a-host-client"
 

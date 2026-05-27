@@ -5,7 +5,7 @@ import { Facebook, Instagram } from "lucide-react"
 import { CookieSettingsLink } from "@/components/cookie-settings-link"
 import { DeferredMainWithMotion } from "@/components/layout/deferred-motion-boundaries"
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
-import { getPlatformFeePercentsCached } from "@/lib/fees"
+import { getPlatformFeePercentsCached } from "@/lib/fees-server"
 import { Navbar } from "@/components/shared/Navbar"
 
 /** Shared shell for public marketing pages — fee percents are ISR-cached, not per-request. */

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
-import { invalidatePlatformFeePercentsCache, parsePercentFromSetting } from "@/lib/fees"
+import { parsePercentFromSetting } from "@/lib/fees"
+import { invalidatePlatformFeePercentsCache } from "@/lib/fees-server"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 const DEFAULT_SETTINGS = {

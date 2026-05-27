@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { sendPostSessionReviewRequestEmail } from "@/lib/emails"
+import { sendPostSessionReviewRequestEmail, sendHostGuestReviewRequestEmail } from "@/lib/emails"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type BookingRow = {
   id: string
   guest_id: string
+  host_id: string
   listing_id: string | null
   session_date: string | null
   start_time: string | null
@@ -13,6 +14,8 @@ type BookingRow = {
   duration_hours: number | null
   guest_count: number | null
   post_session_email_sent?: boolean | null
+  host_review_submitted?: boolean | null
+  host_review_requested_at?: string | null
 }
 
 function isMissingColumnError(message: string) {
@@ -55,14 +58,18 @@ export async function GET(req: NextRequest) {
     () =>
       supabase
         .from("bookings")
-        .select("id, guest_id, listing_id, session_date, start_time, end_time, duration_hours, guest_count, post_session_email_sent")
+        .select(
+          "id, guest_id, host_id, listing_id, session_date, start_time, end_time, duration_hours, guest_count, post_session_email_sent, host_review_submitted, host_review_requested_at"
+        )
         .eq("status", "confirmed")
         .lte("session_date", todayIso)
         .eq("post_session_email_sent", false),
     () =>
       supabase
         .from("bookings")
-        .select("id, guest_id, listing_id, session_date, start_time, end_time, duration_hours, guest_count")
+        .select(
+          "id, guest_id, host_id, listing_id, session_date, start_time, end_time, duration_hours, guest_count, host_review_submitted, host_review_requested_at"
+        )
         .eq("status", "confirmed")
         .lte("session_date", todayIso)
         .is("review_requested_at", null)
@@ -98,13 +105,17 @@ export async function GET(req: NextRequest) {
 
   const listingIds = Array.from(new Set(candidates.map((item) => item.listing_id).filter(Boolean))) as string[]
   const guestIds = Array.from(new Set(candidates.map((item) => item.guest_id).filter(Boolean))) as string[]
+  const hostIds = Array.from(new Set(candidates.map((item) => item.host_id).filter(Boolean))) as string[]
 
-  const [{ data: listings }, { data: guests }] = await Promise.all([
+  const [{ data: listings }, { data: guests }, { data: hosts }] = await Promise.all([
     listingIds.length
       ? supabase.from("listings").select("id, title, service_type").in("id", listingIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     guestIds.length
       ? supabase.from("profiles").select("id, full_name, email, auth_email").in("id", guestIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    hostIds.length
+      ? supabase.from("profiles").select("id, full_name, email, auth_email").in("id", hostIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
   ])
 
@@ -130,12 +141,26 @@ export async function GET(req: NextRequest) {
     })
   }
 
+  const hostMap = new Map<string, { full_name: string; email: string | null }>()
+  for (const row of (hosts ?? []) as Record<string, unknown>[]) {
+    const id = typeof row.id === "string" ? row.id : null
+    if (!id) continue
+    const authEmail = typeof row.auth_email === "string" ? row.auth_email : null
+    const profileEmail = typeof row.email === "string" ? row.email : null
+    hostMap.set(id, {
+      full_name: typeof row.full_name === "string" ? row.full_name : "",
+      email: authEmail ?? profileEmail,
+    })
+  }
+
   let emailed = 0
+  let hostEmailed = 0
 
   for (const booking of candidates) {
     const listing = booking.listing_id ? listingMap.get(booking.listing_id) : null
     const guest = guestMap.get(booking.guest_id)
-    if (!listing || !guest?.email || !booking.session_date) continue
+    const host = hostMap.get(booking.host_id)
+    if (!listing || !booking.session_date) continue
 
     await supabase
       .from("bookings")
@@ -143,22 +168,50 @@ export async function GET(req: NextRequest) {
       .eq("id", booking.id)
       .eq("status", "confirmed")
 
-    try {
-      await sendPostSessionReviewRequestEmail({
-        guestId: booking.guest_id,
-        guestEmail: guest.email,
-        guestFirstName: firstName(guest.full_name),
-        listingTitle: listing.title,
-        bookingId: booking.id,
-      })
+    const bookingUpdates: Record<string, unknown> = {}
 
-      await supabase.from("bookings").update({ review_requested_at: new Date().toISOString() }).eq("id", booking.id)
-      await supabase.from("bookings").update({ post_session_email_sent: true }).eq("id", booking.id)
-      emailed += 1
-    } catch {
-      // Keep the booking completed even if email delivery fails this run.
+    if (guest?.email) {
+      try {
+        await sendPostSessionReviewRequestEmail({
+          guestId: booking.guest_id,
+          guestEmail: guest.email,
+          guestFirstName: firstName(guest.full_name),
+          listingTitle: listing.title,
+          bookingId: booking.id,
+        })
+        bookingUpdates.review_requested_at = new Date().toISOString()
+        bookingUpdates.post_session_email_sent = true
+        emailed += 1
+      } catch {
+        // Keep the booking completed even if guest email delivery fails this run.
+      }
+    }
+
+    if (
+      host?.email &&
+      !booking.host_review_submitted &&
+      !booking.host_review_requested_at
+    ) {
+      try {
+        await sendHostGuestReviewRequestEmail({
+          hostId: booking.host_id,
+          hostEmail: host.email,
+          hostFirstName: firstName(host.full_name),
+          guestFullName: guest?.full_name ?? null,
+          listingTitle: listing.title,
+          bookingId: booking.id,
+        })
+        bookingUpdates.host_review_requested_at = new Date().toISOString()
+        hostEmailed += 1
+      } catch {
+        // Host rating prompt can retry on a later cron run.
+      }
+    }
+
+    if (Object.keys(bookingUpdates).length) {
+      await supabase.from("bookings").update(bookingUpdates).eq("id", booking.id)
     }
   }
 
-  return NextResponse.json({ processed: candidates.length, emailed })
+  return NextResponse.json({ processed: candidates.length, emailed, hostEmailed })
 }

@@ -13,8 +13,10 @@ import {
 import { CookieConsentBanner } from "@/components/cookie-consent"
 import {
   COOKIE_CONSENT_ACCEPTED,
-  enableAnalyticsStorage,
+  COOKIE_CONSENT_DECLINED,
+  grantAnalyticsConsent,
   getCookieConsent,
+  revokeAnalyticsConsent,
 } from "@/lib/cookie-consent"
 
 type CookieConsentContextValue = {
@@ -50,7 +52,9 @@ export function CookieConsentProvider({ children }: { children: ReactNode }) {
     }
 
     if (consent === COOKIE_CONSENT_ACCEPTED) {
-      enableAnalyticsStorage()
+      grantAnalyticsConsent()
+    } else if (consent === COOKIE_CONSENT_DECLINED) {
+      revokeAnalyticsConsent()
     }
   }, [])
 

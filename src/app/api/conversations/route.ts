@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
+import {
+  PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 import { createClient } from "@/lib/supabase/server"
 
 type ConversationPayload = {
@@ -76,7 +80,7 @@ export async function GET() {
   const [{ data: listings }, { data: bookings }, { data: profiles }, { data: messages }] = await Promise.all([
     supabase.from("listings").select("id, title").in("id", listingIds),
     supabase.from("bookings").select("id, session_date").in("id", bookingIds),
-    supabase.from("profiles").select("id, full_name, avatar_url").in("id", otherPartyIds),
+    supabase.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS).in("id", otherPartyIds),
     supabase
       .from("messages")
       .select("id, conversation_id, sender_id, body, message_type, created_at, read_at")

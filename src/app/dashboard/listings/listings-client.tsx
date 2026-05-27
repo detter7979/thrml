@@ -2,13 +2,16 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Check, ChevronDown, ChevronUp, Copy } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Check, ChevronDown, ChevronUp, Copy, Star } from "lucide-react"
 
 import { CancelModal } from "@/components/booking/CancelModal"
+import { GuestReputationBadge } from "@/components/booking/GuestReputationBadge"
+import { GuestReviewDialog, type GuestReviewSuccess } from "@/components/booking/GuestReviewDialog"
 import { RescheduleModal } from "@/components/booking/RescheduleModal"
 import { RatingSummary } from "@/components/reviews/RatingSummary"
 import { ReviewCard } from "@/components/reviews/ReviewCard"
+import { StarRating } from "@/components/reviews/StarRating"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { formatMoney, type ListingCancellationPolicy } from "@/lib/cancellations"
@@ -43,6 +46,21 @@ type ListingRow = {
     host_payout: number | null
     waiver_accepted: boolean
     waiver_accepted_at: string | null
+  }>
+  recent_bookings: Array<{
+    id: string
+    session_date: string | null
+    start_time: string | null
+    end_time: string | null
+    guest_name: string | null
+    guest_avatar_url?: string | null
+    host_review_submitted: boolean
+    guest_review: {
+      id: string
+      rating_overall: number
+      comment: string | null
+      created_at: string | null
+    } | null
   }>
   reviews: Array<{
     id: string
@@ -146,13 +164,17 @@ export function DashboardListingsClient({
     host_payout: number | null
     confirmation_deadline: string | null
     guest_name: string | null
+    guest_id: string | null
     guest_avatar_url: string | null
+    guest_avg_rating: number
+    guest_review_count: number
   }>
   listings: ListingRow[]
   hostCancellations: HostCancellationRecord[]
   cancellationCountLast90Days: number
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [expandedListingId, setExpandedListingId] = useState<string | null>(null)
   const [activeTabs, setActiveTabs] = useState<Record<string, "upcoming" | "recent" | "reviews">>({})
   const [copiedBookingId, setCopiedBookingId] = useState<string | null>(null)
@@ -178,6 +200,48 @@ export function DashboardListingsClient({
   const [expandedAccessByBooking, setExpandedAccessByBooking] = useState<Record<string, boolean>>({})
   const [listingActionLoadingId, setListingActionLoadingId] = useState<string | null>(null)
   const [listingActionErrorById, setListingActionErrorById] = useState<Record<string, string | null>>({})
+  const [guestReviewTarget, setGuestReviewTarget] = useState<{
+    bookingId: string
+    guestName: string
+    initialStars: number
+  } | null>(null)
+  const [submittedGuestReviews, setSubmittedGuestReviews] = useState<
+    Record<string, GuestReviewSuccess>
+  >({})
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    const toast = searchParams.get("toast")
+    if (toast) {
+      setToastMessage(toast)
+      const nextUrl = new URL(window.location.href)
+      nextUrl.searchParams.delete("toast")
+      window.history.replaceState({}, "", nextUrl.toString())
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    const rateBookingId = searchParams.get("rateBooking")
+    if (!rateBookingId) return
+
+    for (const listing of listings) {
+      const booking = listing.recent_bookings.find((item) => item.id === rateBookingId)
+      if (!booking || booking.host_review_submitted || booking.guest_review) continue
+
+      setExpandedListingId(listing.id)
+      setActiveTabs((current) => ({ ...current, [listing.id]: "recent" }))
+      setGuestReviewTarget({
+        bookingId: booking.id,
+        guestName: booking.guest_name ?? "Guest",
+        initialStars: 0,
+      })
+
+      const nextUrl = new URL(window.location.href)
+      nextUrl.searchParams.delete("rateBooking")
+      window.history.replaceState({}, "", nextUrl.toString())
+      break
+    }
+  }, [listings, searchParams])
 
   const visiblePendingRequests = useMemo(
     () => pendingRequests.filter((request) => !dismissedRequestIds.includes(request.id)),
@@ -434,6 +498,12 @@ export function DashboardListingsClient({
 
   return (
     <div className="space-y-4">
+      {toastMessage ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {toastMessage}
+        </div>
+      ) : null}
+
       {visiblePendingRequests.length ? (
         <section className="rounded-2xl border border-[#E9DFD3] bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
@@ -463,7 +533,14 @@ export function DashboardListingsClient({
                           <AvatarImage src={request.guest_avatar_url ?? undefined} alt={request.guest_name ?? "Guest"} />
                           <AvatarFallback>{guestInitials || "G"}</AvatarFallback>
                         </Avatar>
-                        <p className="text-sm font-medium text-[#1A1410]">{request.guest_name ?? "Guest"}</p>
+                        <div>
+                          <p className="text-sm font-medium text-[#1A1410]">{request.guest_name ?? "Guest"}</p>
+                          <GuestReputationBadge
+                            avgRating={request.guest_avg_rating}
+                            reviewCount={request.guest_review_count}
+                            compact
+                          />
+                        </div>
                       </div>
                       <p className="text-sm font-medium text-[#1A1410]">{request.listing_title}</p>
                       <p className="text-xs text-[#6D5E51]">
@@ -681,7 +758,7 @@ export function DashboardListingsClient({
                     <div className="flex gap-2 text-xs">
                       {[
                         { key: "upcoming", label: `Upcoming (${listing.upcoming_bookings.length})` },
-                        { key: "recent", label: "Recent Bookings" },
+                        { key: "recent", label: `Recent (${listing.recent_bookings.length})` },
                         { key: "reviews", label: `Reviews (${listing.reviews.length})` },
                       ].map((tab) => (
                         <button
@@ -894,7 +971,74 @@ export function DashboardListingsClient({
                     ) : null}
 
                     {activeTab === "recent" ? (
-                      <p className="text-sm text-[#7A6A5D]">Recent booking history is coming soon.</p>
+                      listing.recent_bookings.length === 0 ? (
+                        <p className="text-sm text-[#7A6A5D]">No past bookings yet.</p>
+                      ) : (
+                        listing.recent_bookings.map((booking) => {
+                          const submittedReview = submittedGuestReviews[booking.id]
+                          const existingReview = booking.guest_review
+                          const hasReview = Boolean(submittedReview || existingReview || booking.host_review_submitted)
+                          const reviewRating =
+                            submittedReview?.rating ?? existingReview?.rating_overall ?? 0
+
+                          return (
+                            <div
+                              key={booking.id}
+                              className="max-w-full overflow-hidden rounded-lg border border-[#E9DFD3] bg-white p-3 box-border"
+                            >
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <Avatar className="size-8">
+                                      <AvatarImage src={booking.guest_avatar_url ?? undefined} />
+                                      <AvatarFallback className="text-xs">
+                                        {(booking.guest_name ?? "G").slice(0, 1).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="text-sm font-medium text-[#1A1410]">
+                                        {booking.guest_name ?? "Guest"}
+                                      </p>
+                                      <p className="text-xs leading-relaxed text-[#6D5E51]">
+                                        {sessionLabel(booking.session_date, booking.start_time, booking.end_time)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="shrink-0">
+                                  {hasReview ? (
+                                    <div className="flex items-center gap-1.5 rounded-full bg-[#FBF8F4] px-2.5 py-1">
+                                      <StarRating value={reviewRating} size={14} />
+                                      <span className="text-xs text-[#6D5E51]">Rated</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1">
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                          key={star}
+                                          type="button"
+                                          aria-label={`Rate ${star} stars`}
+                                          className="rounded p-0.5 text-[#C75B3A] transition hover:scale-110"
+                                          onClick={() =>
+                                            setGuestReviewTarget({
+                                              bookingId: booking.id,
+                                              guestName: booking.guest_name ?? "Guest",
+                                              initialStars: star,
+                                            })
+                                          }
+                                        >
+                                          <Star className="size-5 fill-current" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })
+                      )
                     ) : null}
 
                     {activeTab === "reviews" ? (
@@ -1063,6 +1207,26 @@ export function DashboardListingsClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <GuestReviewDialog
+        open={Boolean(guestReviewTarget)}
+        onOpenChange={(open) => {
+          if (!open) setGuestReviewTarget(null)
+        }}
+        bookingId={guestReviewTarget?.bookingId ?? ""}
+        guestName={guestReviewTarget?.guestName ?? "Guest"}
+        initialStars={guestReviewTarget?.initialStars ?? 0}
+        onSuccess={(result) => {
+          if (guestReviewTarget?.bookingId) {
+            setSubmittedGuestReviews((current) => ({
+              ...current,
+              [guestReviewTarget.bookingId]: result,
+            }))
+          }
+          setGuestReviewTarget(null)
+          router.refresh()
+        }}
+      />
     </div>
   )
 }

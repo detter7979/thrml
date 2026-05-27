@@ -4,6 +4,10 @@ import { cache, Suspense } from "react"
 import { LayoutGrid, Plus, Settings } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 import { createClient } from "@/lib/supabase/server"
 
 type HostProfile = {
@@ -162,10 +166,6 @@ async function getUpcomingBookings(userId: string, limit = 3): Promise<UpcomingB
       session_date,
       start_time,
       status,
-      guest:profiles!bookings_guest_id_fkey(
-        full_name,
-        avatar_url
-      ),
       listing:listings(
         title,
         listing_photos(url, order_index)
@@ -180,6 +180,26 @@ async function getUpcomingBookings(userId: string, limit = 3): Promise<UpcomingB
 
   const rows = data ?? []
   if (!rows.length) return []
+
+  const guestIds = Array.from(
+    new Set(
+      rows
+        .map((row) => (typeof row.guest_id === "string" ? row.guest_id : null))
+        .filter((id): id is string => Boolean(id))
+    )
+  )
+  const { data: guestProfiles } = guestIds.length
+    ? await supabase.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS).in("id", guestIds)
+    : { data: [] as Array<{ id: string; full_name: string | null; avatar_url: string | null }> }
+  const guestMap = new Map(
+    (guestProfiles ?? []).map((row) => [
+      row.id,
+      {
+        full_name: asNonEmptyString(row.full_name),
+        avatar_url: asNonEmptyString(row.avatar_url),
+      },
+    ])
+  )
 
   const normalized = rows
     .map((row) => {
@@ -200,14 +220,14 @@ async function getUpcomingBookings(userId: string, limit = 3): Promise<UpcomingB
           })
           .map((photo) => asNonEmptyString(photo.url))
           .find(Boolean) ?? null
-      const guest = Array.isArray(row.guest) ? row.guest[0] : row.guest
+      const guestProfile = typeof row.guest_id === "string" ? guestMap.get(row.guest_id) : undefined
 
       return {
         id: typeof row.id === "string" ? row.id : "",
         listingId,
         listingTitle,
         listingThumbnail,
-        guestName: asNonEmptyString(guest?.full_name) ?? "Guest",
+        guestName: guestProfile?.full_name ?? "Guest",
         sessionDate,
         startTime,
         status: asNonEmptyString(row.status) ?? "confirmed",
@@ -249,7 +269,7 @@ async function getRecentConversations(
       ? supabase.from("listings").select("id, title").in("id", listingIds)
       : Promise.resolve({ data: [] as Array<{ id: string; title: string | null }> }),
     otherPartyIds.length
-      ? supabase.from("profiles").select("id, full_name, avatar_url").in("id", otherPartyIds)
+      ? supabase.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS).in("id", otherPartyIds)
       : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null; avatar_url: string | null }> }),
     conversationIds.length
       ? supabase

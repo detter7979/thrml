@@ -2,7 +2,12 @@ import Link from "next/link"
 
 import { StripeConnectBanner } from "@/components/host/StripeConnectBanner"
 import { Button } from "@/components/ui/button"
+import { guestCompletedTabBooking } from "@/lib/booking-session"
 import { normalizeCancellationPolicy } from "@/lib/cancellations"
+import {
+  PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardListingsClient } from "./listings-client"
 
@@ -86,6 +91,63 @@ export default async function DashboardListingsPage() {
   }
   const bookingRows = await loadBookingRows()
 
+  const RECENT_BOOKING_SELECT_CANDIDATES = [
+    "id, listing_id, session_date, start_time, end_time, duration_hours, guest_count, status, guest_id, host_review_submitted",
+    "id, listing_id, session_date, start_time, end_time, duration_hours, guest_count, status, guest_id",
+  ] as const
+  const loadRecentBookingRows = async () => {
+    if (!listingIds.length) return [] as Record<string, unknown>[]
+    for (const select of RECENT_BOOKING_SELECT_CANDIDATES) {
+      const attempt = await supabase
+        .from("bookings")
+        .select(select as string)
+        .in("listing_id", listingIds)
+        .in("status", ["completed", "confirmed"])
+        .lte("session_date", today)
+        .order("session_date", { ascending: false })
+        .limit(100)
+      if (!attempt.error) {
+        return (attempt.data ?? []).filter((row) =>
+          guestCompletedTabBooking({
+            session_date: typeof row.session_date === "string" ? row.session_date : null,
+            start_time: typeof row.start_time === "string" ? row.start_time : null,
+            end_time: typeof row.end_time === "string" ? row.end_time : null,
+            status: typeof row.status === "string" ? row.status : null,
+          })
+        ) as Record<string, unknown>[]
+      }
+      if (!isMissingColumnError(attempt.error.message)) {
+        console.error("[dashboard/listings] failed to load recent bookings", attempt.error.message)
+        return [] as Record<string, unknown>[]
+      }
+    }
+    return [] as Record<string, unknown>[]
+  }
+  const recentBookingRows = await loadRecentBookingRows()
+
+  const recentBookingIds = recentBookingRows
+    .map((row) => (typeof row.id === "string" ? row.id : null))
+    .filter((value): value is string => Boolean(value))
+
+  const { data: guestReviewsForBookings } = recentBookingIds.length
+    ? await supabase
+        .from("guest_reviews")
+        .select("id, booking_id, rating_overall, comment, created_at")
+        .in("booking_id", recentBookingIds)
+    : { data: [] as Record<string, unknown>[] }
+
+  const guestReviewByBookingId = new Map(
+    (guestReviewsForBookings ?? []).map((row) => [
+      typeof row.booking_id === "string" ? row.booking_id : "",
+      {
+        id: typeof row.id === "string" ? row.id : "",
+        rating_overall: Number(row.rating_overall ?? 0),
+        comment: typeof row.comment === "string" ? row.comment : null,
+        created_at: typeof row.created_at === "string" ? row.created_at : null,
+      },
+    ])
+  )
+
   const [{ data: listingReviews }, { data: listingRatings }] = await Promise.all([
     listingIds.length
       ? supabase
@@ -102,18 +164,22 @@ export default async function DashboardListingsPage() {
   ])
 
   const guestIds = Array.from(
-    new Set((bookingRows ?? []).map((row) => (typeof row.guest_id === "string" ? row.guest_id : null)).filter(Boolean))
+    new Set(
+      [...(bookingRows ?? []), ...recentBookingRows]
+        .map((row) => (typeof row.guest_id === "string" ? row.guest_id : null))
+        .filter(Boolean)
+    )
   ) as string[]
 
   const { data: guestProfiles } = guestIds.length
-    ? await supabase.from("profiles").select("id, full_name, avatar_url").in("id", guestIds)
+    ? await supabase.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS).in("id", guestIds)
     : { data: [] as Record<string, unknown>[] }
 
   const reviewGuestIds = Array.from(
     new Set((listingReviews ?? []).map((row) => (typeof row.guest_id === "string" ? row.guest_id : null)).filter(Boolean))
   ) as string[]
   const { data: reviewGuests } = reviewGuestIds.length
-    ? await supabase.from("profiles").select("id, full_name, avatar_url").in("id", reviewGuestIds)
+    ? await supabase.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS).in("id", reviewGuestIds)
     : { data: [] as Record<string, unknown>[] }
 
   const guestMap = new Map(
@@ -136,35 +202,42 @@ export default async function DashboardListingsPage() {
     ])
   )
 
-  const bookingsByListing = new Map<
-    string,
-    Array<{
+  type HostBookingRow = {
+    id: string
+    guest_id: string | null
+    session_date: string | null
+    start_time: string | null
+    end_time: string | null
+    status: string
+    access_code: string | null
+    guest_name: string | null
+    guest_avatar_url: string | null
+    service_fee: number | null
+    total_charged: number | null
+    host_payout: number | null
+    duration_hours: number | null
+    guest_count: number | null
+    confirmation_deadline: string | null
+    waiver_accepted: boolean
+    waiver_accepted_at: string | null
+    access_code_sent_at: string | null
+    host_review_submitted: boolean
+    guest_review: {
       id: string
-      session_date: string | null
-      start_time: string | null
-      end_time: string | null
-      status: string
-      access_code: string | null
-      guest_name: string | null
-      guest_avatar_url: string | null
-      service_fee: number | null
-      total_charged: number | null
-      host_payout: number | null
-      duration_hours: number | null
-      guest_count: number | null
-      confirmation_deadline: string | null
-      waiver_accepted: boolean
-      waiver_accepted_at: string | null
-      access_code_sent_at: string | null
-    }>
-  >()
+      rating_overall: number
+      comment: string | null
+      created_at: string | null
+    } | null
+  }
 
-  for (const row of bookingRows ?? []) {
+  const mapBookingRow = (row: Record<string, unknown>): HostBookingRow | null => {
+    const id = typeof row.id === "string" ? row.id : null
     const listingId = typeof row.listing_id === "string" ? row.listing_id : null
-    if (!listingId) continue
-    const value = bookingsByListing.get(listingId) ?? []
-    value.push({
-      id: typeof row.id === "string" ? row.id : "",
+    if (!id || !listingId) return null
+    const guestReview = guestReviewByBookingId.get(id) ?? null
+    return {
+      id,
+      guest_id: typeof row.guest_id === "string" ? row.guest_id : null,
       session_date: typeof row.session_date === "string" ? row.session_date : null,
       start_time: typeof row.start_time === "string" ? row.start_time : null,
       end_time: typeof row.end_time === "string" ? row.end_time : null,
@@ -184,8 +257,32 @@ export default async function DashboardListingsPage() {
       waiver_accepted: Boolean(row.waiver_accepted),
       waiver_accepted_at: typeof row.waiver_accepted_at === "string" ? row.waiver_accepted_at : null,
       access_code_sent_at: typeof row.access_code_sent_at === "string" ? row.access_code_sent_at : null,
-    })
+      host_review_submitted: Boolean(row.host_review_submitted) || Boolean(guestReview),
+      guest_review: guestReview,
+    }
+  }
+
+  const bookingsByListing = new Map<string, HostBookingRow[]>()
+  const recentBookingsByListing = new Map<string, HostBookingRow[]>()
+
+  for (const row of bookingRows ?? []) {
+    const listingId = typeof row.listing_id === "string" ? row.listing_id : null
+    if (!listingId) continue
+    const mapped = mapBookingRow(row)
+    if (!mapped) continue
+    const value = bookingsByListing.get(listingId) ?? []
+    value.push(mapped)
     bookingsByListing.set(listingId, value)
+  }
+
+  for (const row of recentBookingRows) {
+    const listingId = typeof row.listing_id === "string" ? row.listing_id : null
+    if (!listingId) continue
+    const mapped = mapBookingRow(row)
+    if (!mapped) continue
+    const value = recentBookingsByListing.get(listingId) ?? []
+    value.push(mapped)
+    recentBookingsByListing.set(listingId, value)
   }
 
   const { data: hostCancellationsData, error: hostCancellationsError } = await supabase
@@ -218,6 +315,7 @@ export default async function DashboardListingsPage() {
         cancellation_policy: normalizeCancellationPolicy(listing.cancellation_policy),
         active_booking_count: (bookingsByListing.get(listingId) ?? []).length,
         upcoming_bookings: bookingsByListing.get(listingId) ?? [],
+        recent_bookings: recentBookingsByListing.get(listingId) ?? [],
         reviews: ((listingReviews ?? []) as Record<string, unknown>[])
           .filter((row) => row.listing_id === listingId)
           .map((row) => {
@@ -263,6 +361,34 @@ export default async function DashboardListingsPage() {
       }
     })
     .filter(Boolean)
+
+  const pendingGuestIds = Array.from(
+    new Set(
+      listingsWithCancellationData
+        .flatMap((listing) =>
+          listing
+            ? listing.upcoming_bookings
+                .filter((booking) => booking.status === "pending_host")
+                .map((booking) => booking.guest_id)
+            : []
+        )
+        .filter((value): value is string => Boolean(value))
+    )
+  )
+
+  const { data: pendingGuestRatings } = pendingGuestIds.length
+    ? await supabase.from("guest_ratings").select("guest_id, avg_overall, review_count").in("guest_id", pendingGuestIds)
+    : { data: [] as Record<string, unknown>[] }
+
+  const guestRatingByGuestId = new Map(
+    (pendingGuestRatings ?? []).map((row) => [
+      typeof row.guest_id === "string" ? row.guest_id : "",
+      {
+        avg_overall: Number(row.avg_overall ?? 0),
+        review_count: Number(row.review_count ?? 0),
+      },
+    ])
+  )
 
   return (
     <div className="space-y-5 px-4 py-6 md:px-8 md:py-8">
@@ -321,7 +447,14 @@ export default async function DashboardListingsPage() {
                       host_payout: booking.host_payout,
                       confirmation_deadline: booking.confirmation_deadline,
                       guest_name: booking.guest_name,
+                      guest_id: booking.guest_id,
                       guest_avatar_url: booking.guest_avatar_url ?? null,
+                      guest_avg_rating: booking.guest_id
+                        ? (guestRatingByGuestId.get(booking.guest_id)?.avg_overall ?? 0)
+                        : 0,
+                      guest_review_count: booking.guest_id
+                        ? (guestRatingByGuestId.get(booking.guest_id)?.review_count ?? 0)
+                        : 0,
                     }))
                 : []
             )

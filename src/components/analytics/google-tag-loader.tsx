@@ -7,8 +7,9 @@ import {
   COOKIE_CONSENT_ACCEPTED_EVENT,
   COOKIE_CONSENT_CHANGED_EVENT,
   COOKIE_CONSENT_KEY,
-  disableAnalyticsStorage,
+  grantAnalyticsConsent,
   isAnalyticsConsented,
+  revokeAnalyticsConsent,
 } from "@/lib/cookie-consent"
 
 export { COOKIE_CONSENT_ACCEPTED_EVENT } from "@/lib/cookie-consent"
@@ -27,7 +28,9 @@ export function GoogleTagLoader() {
       const accepted = isAnalyticsConsented()
       setEnabled(accepted)
       if (!accepted) {
-        disableAnalyticsStorage()
+        revokeAnalyticsConsent()
+      } else {
+        grantAnalyticsConsent()
       }
     }
 
@@ -67,7 +70,12 @@ export function GoogleTagLoader() {
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('consent', 'update', { analytics_storage: 'granted' });
+          gtag('consent', 'update', {
+            analytics_storage: 'granted',
+            ad_storage: 'granted',
+            ad_user_data: 'granted',
+            ad_personalization: 'granted',
+          });
           gtag('config', '${googleAdsId}');
           gtag('config', '${gaMeasurementId}');
         `}

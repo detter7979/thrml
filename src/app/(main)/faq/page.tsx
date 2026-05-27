@@ -1,5 +1,7 @@
 import type { Metadata } from "next"
 
+export const revalidate = 3600
+
 export const metadata: Metadata = {
   title: "FAQs — Frequently Asked Questions",
   description: "Answers to common questions about booking private wellness spaces, hosting, payments, cancellations, and access on thrml.",

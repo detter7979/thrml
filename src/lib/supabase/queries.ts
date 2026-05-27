@@ -1,5 +1,8 @@
-import { createClient } from "./server"
+import { unstable_cache } from "next/cache"
+
 import { filterLaunchVisibleServiceTypeMeta } from "@/lib/launch-config"
+import { createAdminClient } from "./admin"
+import { createClient } from "./server"
 import {
   FALLBACK_SERVICE_TYPES,
   getFallbackServiceType,
@@ -41,42 +44,50 @@ export async function getNearbyListings(
   return data ?? []
 }
 
-export async function getServiceTypes(): Promise<ServiceTypeMeta[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("service_types")
-    .select("id, display_name, icon, tagline, booking_model, health_disclaimer")
-    .order("display_name", { ascending: true })
+const loadServiceTypes = unstable_cache(
+  async (): Promise<ServiceTypeMeta[]> => {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from("service_types")
+      .select("id, display_name, icon, tagline, booking_model, health_disclaimer")
+      .order("display_name", { ascending: true })
 
-  if (error || !data) {
-    return FALLBACK_SERVICE_TYPES
-  }
-
-  const rowsById = new Map<string, Record<string, unknown>>()
-  for (const row of data as Record<string, unknown>[]) {
-    const rawId = typeof row.id === "string" ? row.id : ""
-    if (!isServiceTypeId(rawId)) continue
-    rowsById.set(rawId, row)
-  }
-
-  const mapped = FALLBACK_SERVICE_TYPES.map((fallback) => {
-    const row = rowsById.get(fallback.id)
-    if (!row) return fallback
-    return {
-      id: fallback.id,
-      display_name:
-        typeof row.display_name === "string" ? row.display_name : fallback.display_name,
-      icon: typeof row.icon === "string" ? row.icon : fallback.icon,
-      tagline:
-        typeof row.tagline === "string" ? row.tagline : fallback.tagline,
-      booking_model:
-        row.booking_model === "fixed_session" || row.booking_model === "hourly"
-          ? row.booking_model
-          : fallback.booking_model,
-      health_disclaimer:
-        typeof row.health_disclaimer === "string" ? row.health_disclaimer : fallback.health_disclaimer,
+    if (error || !data) {
+      return FALLBACK_SERVICE_TYPES
     }
-  })
 
-  return filterLaunchVisibleServiceTypeMeta(mapped.length ? mapped : FALLBACK_SERVICE_TYPES)
+    const rowsById = new Map<string, Record<string, unknown>>()
+    for (const row of data as Record<string, unknown>[]) {
+      const rawId = typeof row.id === "string" ? row.id : ""
+      if (!isServiceTypeId(rawId)) continue
+      rowsById.set(rawId, row)
+    }
+
+    const mapped = FALLBACK_SERVICE_TYPES.map((fallback) => {
+      const row = rowsById.get(fallback.id)
+      if (!row) return fallback
+      return {
+        id: fallback.id,
+        display_name:
+          typeof row.display_name === "string" ? row.display_name : fallback.display_name,
+        icon: typeof row.icon === "string" ? row.icon : fallback.icon,
+        tagline:
+          typeof row.tagline === "string" ? row.tagline : fallback.tagline,
+        booking_model:
+          row.booking_model === "fixed_session" || row.booking_model === "hourly"
+            ? row.booking_model
+            : fallback.booking_model,
+        health_disclaimer:
+          typeof row.health_disclaimer === "string" ? row.health_disclaimer : fallback.health_disclaimer,
+      }
+    })
+
+    return filterLaunchVisibleServiceTypeMeta(mapped.length ? mapped : FALLBACK_SERVICE_TYPES)
+  },
+  ["service-types"],
+  { revalidate: 3600, tags: ["service-types"] }
+)
+
+export async function getServiceTypes(): Promise<ServiceTypeMeta[]> {
+  return loadServiceTypes()
 }

@@ -4,7 +4,8 @@ import { useEffect } from "react"
 
 import { trackMetaEvent } from "@/components/meta-pixel"
 import { trackGaEvent } from "@/lib/analytics/ga"
-import { getGtag } from "@/lib/analytics/gtag"
+import { gtagIfConsented } from "@/lib/analytics/gtag"
+import { isAnalyticsConsented } from "@/lib/cookie-consent"
 
 type BookingConfirmationTrackerProps = {
   bookingId: string
@@ -28,6 +29,8 @@ export function BookingConfirmationTracker({
   userLastName,
 }: BookingConfirmationTrackerProps) {
   useEffect(() => {
+    if (!isAnalyticsConsented()) return
+
     const purchaseEventId = `purchase_${bookingId}`
     const googleAdsIdRaw = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18014799415").trim()
     const googleAdsId = googleAdsIdRaw && /^AW-\d+$/.test(googleAdsIdRaw) ? googleAdsIdRaw : null
@@ -59,10 +62,8 @@ export function BookingConfirmationTracker({
     })
 
     // Google Ads Enhanced Conversions.
-    const gtag = getGtag()
-
-    if (googleAdsId && gtag) {
-      gtag("event", "conversion", {
+    if (googleAdsId) {
+      gtagIfConsented("event", "conversion", {
         send_to: googleAdsId,
         transaction_id: bookingId,
         value: totalAmount,

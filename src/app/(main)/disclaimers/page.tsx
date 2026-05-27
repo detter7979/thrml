@@ -1,3 +1,5 @@
+export const revalidate = 3600
+
 export default function DisclaimersPage() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-12 text-[#1A1410] md:px-8">

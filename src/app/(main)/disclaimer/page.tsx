@@ -1,5 +1,7 @@
 import type { Metadata } from "next"
 
+export const revalidate = 3600
+
 export const metadata: Metadata = {
   title: "Disclaimers",
   description: "Important disclaimers regarding wellness activities and use of thrml's platform.",

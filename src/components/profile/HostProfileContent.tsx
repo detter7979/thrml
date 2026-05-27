@@ -6,6 +6,11 @@ import { ListingCard, type ListingCardData } from "@/components/listings/Listing
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { isLikelyValidAvatarUrl } from "@/lib/avatar-url"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  PUBLIC_PROFILE_COLUMNS,
+  PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 import { createClient } from "@/lib/supabase/server"
 
 type ReviewItem = {
@@ -69,44 +74,27 @@ function toNumberOrNull(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-async function getProfileCompat(
+async function getPublicProfileCompat(
   admin: ReturnType<typeof createAdminClient>,
-  lookupColumn: "id" | "user_id",
-  lookupValue: string
+  hostId: string
 ) {
-  const selectableColumns = [
-    "id",
-    "user_id",
-    "full_name",
-    "avatar_url",
-    "tagline",
-    "bio",
-    "host_since",
-    "created_at",
-    "average_rating",
-    "total_reviews",
-    "response_rate",
-    "response_time",
-    "response_time_hours",
-    "languages",
-  ]
+  const selectableColumns = PUBLIC_PROFILE_COLUMNS.split(", ").slice()
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const { data, error } = await admin
-      .from("profiles")
+      .from(PUBLIC_PROFILES_TABLE)
       .select(selectableColumns.join(", "))
-      .eq(lookupColumn, lookupValue)
+      .eq("id", hostId)
       .maybeSingle()
 
     if (!error) return data as Record<string, unknown> | null
 
     const missingColumn =
-      error.message.match(/column\s+profiles\.([a-z_]+)\s+does not exist/i)?.[1] ??
+      error.message.match(/column\s+public_profiles\.([a-z_]+)\s+does not exist/i)?.[1] ??
       error.message.match(/column\s+([a-z_]+)\s+does not exist/i)?.[1] ??
       null
 
     if (!missingColumn) return null
-    if (missingColumn === lookupColumn) return null
 
     const index = selectableColumns.indexOf(missingColumn)
     if (index === -1) return null
@@ -134,16 +122,10 @@ export async function HostProfileContent({
   } = await supabase.auth.getUser()
   const canViewAsOwner = user?.id === hostId
 
-  const profileById = await getProfileCompat(admin, "id", hostId)
-  const profileByUserId = profileById ? null : await getProfileCompat(admin, "user_id", hostId)
-  const profile = (profileById ?? profileByUserId) as Record<string, unknown> | null
+  const profile = await getPublicProfileCompat(admin, hostId)
 
   const hostIds = Array.from(
-    new Set(
-      [hostId, profile?.id, profile?.user_id].filter(
-        (value): value is string => typeof value === "string" && value.length > 0
-      )
-    )
+    new Set([hostId, profile?.id].filter((value): value is string => typeof value === "string" && value.length > 0))
   )
 
   const { data: listingsAll } = hostIds.length
@@ -216,25 +198,14 @@ export async function HostProfileContent({
     )
   )
 
-  const [{ data: reviewerProfilesById }, { data: reviewerProfilesByUserId }] = await Promise.all([
-    reviewerIds.length
-      ? admin.from("profiles").select("id, full_name, avatar_url").in("id", reviewerIds)
-      : { data: [] as Array<Record<string, unknown>> },
-    reviewerIds.length
-      ? admin.from("profiles").select("id, user_id, full_name, avatar_url").in("user_id", reviewerIds)
-      : { data: [] as Array<Record<string, unknown>> },
-  ])
+  const { data: reviewerProfiles } = reviewerIds.length
+    ? await admin.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS).in("id", reviewerIds)
+    : { data: [] as Array<Record<string, unknown>> }
 
   const reviewerMap = new Map<string, { full_name: string | null; avatar_url: string | null }>()
-  for (const row of [...(reviewerProfilesById ?? []), ...(reviewerProfilesByUserId ?? [])]) {
+  for (const row of reviewerProfiles ?? []) {
     if (typeof row.id === "string") {
       reviewerMap.set(row.id, {
-        full_name: typeof row.full_name === "string" ? row.full_name : null,
-        avatar_url: typeof row.avatar_url === "string" ? row.avatar_url : null,
-      })
-    }
-    if ("user_id" in row && typeof row.user_id === "string") {
-      reviewerMap.set(row.user_id, {
         full_name: typeof row.full_name === "string" ? row.full_name : null,
         avatar_url: typeof row.avatar_url === "string" ? row.avatar_url : null,
       })
@@ -272,11 +243,9 @@ export async function HostProfileContent({
     tagline: null,
     bio: null,
     host_since: null,
-    created_at: null,
     average_rating: null,
     total_reviews: null,
     response_rate: null,
-    response_time: null,
     languages: null,
   }
 
@@ -287,11 +256,7 @@ export async function HostProfileContent({
   const hostFirstName = firstName(hostName)
   const hostInitials = initials(hostName || "Host")
   const hostSinceSource =
-    typeof profileSafe.host_since === "string"
-      ? profileSafe.host_since
-      : typeof profileSafe.created_at === "string"
-        ? profileSafe.created_at
-        : null
+    typeof profileSafe.host_since === "string" ? profileSafe.host_since : null
   const hostSinceYear = hostSinceSource ? new Date(hostSinceSource).getFullYear() : new Date().getFullYear()
 
   const listingCards: ListingCardData[] = (activeListings ?? []).map((listing) => {
@@ -378,11 +343,9 @@ export async function HostProfileContent({
   const hasBio = Boolean(hostBio)
   const responseRate = toNumberOrNull(profileSafe.response_rate)
   const responseTime =
-    typeof profileSafe.response_time === "string"
-      ? profileSafe.response_time
-      : toNumberOrNull(profileSafe.response_time_hours) !== null
-        ? `${toNumberOrNull(profileSafe.response_time_hours)}h`
-        : null
+    toNumberOrNull(profileSafe.response_time_hours) !== null
+      ? `${toNumberOrNull(profileSafe.response_time_hours)}h`
+      : null
   const hasResponseRate = responseRate !== null
   const hasResponseTime = Boolean(responseTime && responseTime.trim().length > 0)
   const normalizedLanguages = Array.isArray(profileSafe.languages)

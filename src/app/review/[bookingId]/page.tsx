@@ -5,6 +5,10 @@ import { ReviewForm } from "@/components/reviews/ReviewForm"
 import { shouldMarkBookingCompleted } from "@/lib/booking-session"
 import { extractServiceIcon, formatSessionDate } from "@/lib/reviews"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  PUBLIC_PROFILE_NAME_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 import { createClient } from "@/lib/supabase/server"
 
 type Params = { bookingId: string }
@@ -113,7 +117,7 @@ export default async function ReviewPage({
       .order("order_index", { ascending: true })
       .limit(1)
       .maybeSingle(),
-    supabase.from("profiles").select("full_name").eq("id", booking.host_id).maybeSingle(),
+    supabase.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_COLUMNS).eq("id", booking.host_id).maybeSingle(),
   ])
 
   if (review?.id || !listing) {

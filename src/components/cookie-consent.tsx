@@ -6,9 +6,9 @@ import {
   COOKIE_CONSENT_ACCEPTED,
   COOKIE_CONSENT_DECLINED,
   COOKIE_CONSENT_KEY,
-  disableAnalyticsStorage,
-  enableAnalyticsStorage,
+  grantAnalyticsConsent,
   notifyConsentChanged,
+  revokeAnalyticsConsent,
 } from "@/lib/cookie-consent"
 
 type CookieConsentBannerProps = {
@@ -20,14 +20,14 @@ export function CookieConsentBanner({ visible, onClose }: CookieConsentBannerPro
   function handleAccept() {
     localStorage.setItem(COOKIE_CONSENT_KEY, COOKIE_CONSENT_ACCEPTED)
     notifyConsentChanged(COOKIE_CONSENT_ACCEPTED)
-    enableAnalyticsStorage()
+    grantAnalyticsConsent()
     onClose()
   }
 
   function handleDecline() {
     localStorage.setItem(COOKIE_CONSENT_KEY, COOKIE_CONSENT_DECLINED)
     notifyConsentChanged(COOKIE_CONSENT_DECLINED)
-    disableAnalyticsStorage()
+    revokeAnalyticsConsent()
     onClose()
   }
 

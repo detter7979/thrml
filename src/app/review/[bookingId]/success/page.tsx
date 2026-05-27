@@ -2,6 +2,10 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 
 import { firstName } from "@/lib/reviews"
+import {
+  PUBLIC_PROFILE_NAME_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 import { createClient } from "@/lib/supabase/server"
 
 type Params = { bookingId: string }
@@ -28,7 +32,7 @@ export default async function ReviewSuccessPage({ params }: { params: Promise<Pa
   }
 
   const [{ data: host }, { data: listing }] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", booking.host_id).maybeSingle(),
+    supabase.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_COLUMNS).eq("id", booking.host_id).maybeSingle(),
     supabase.from("listings").select("id").eq("id", booking.listing_id).maybeSingle(),
   ])
 

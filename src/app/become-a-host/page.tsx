@@ -3,15 +3,13 @@ import type { Metadata } from "next"
 
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { formatHostKeepPercent, getPlatformFeePercentsCached } from "@/lib/fees"
-import { createAdminClient } from "@/lib/supabase/admin"
 
 import { BecomeAHostClient } from "./become-a-host-client"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 3600
 
 export async function generateMetadata(): Promise<Metadata> {
-  const admin = createAdminClient()
-  const { hostFeePercent } = await getPlatformFeePercentsCached(admin)
+  const { hostFeePercent } = await getPlatformFeePercentsCached()
   const hostKeep = formatHostKeepPercent(hostFeePercent)
 
   return {
@@ -28,8 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function BecomeAHostPage() {
-  const admin = createAdminClient()
-  const feePercents = await getPlatformFeePercentsCached(admin)
+  const feePercents = await getPlatformFeePercentsCached()
 
   return (
     <Suspense

@@ -27,6 +27,8 @@ type BookingRow = {
   reminder_24h_sent: boolean | null
   post_session_email_sent: boolean | null
   host_payout: number | null
+  host_review_submitted?: boolean | null
+  host_review_requested_at?: string | null
 }
 
 type ListingRow = {
@@ -134,7 +136,7 @@ export async function GET(request: NextRequest) {
   const { data: bookingsRaw, error: bookingError } = await supabase
     .from("bookings")
     .select(
-      "id, guest_id, host_id, listing_id, session_date, start_time, end_time, status, access_code_sent, access_code_sent_at, reminder_24h_sent, post_session_email_sent, host_payout"
+      "id, guest_id, host_id, listing_id, session_date, start_time, end_time, status, access_code_sent, access_code_sent_at, reminder_24h_sent, post_session_email_sent, host_payout, host_review_submitted, host_review_requested_at"
     )
     .eq("status", "confirmed")
 
@@ -304,6 +306,8 @@ export async function GET(request: NextRequest) {
       host_id: booking.host_id,
       host_payout: booking.host_payout,
       post_session_email_sent: booking.post_session_email_sent,
+      host_review_submitted: booking.host_review_submitted,
+      host_review_requested_at: booking.host_review_requested_at,
       listings: {
         id: listing.id,
         title: listing.title,

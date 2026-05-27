@@ -58,14 +58,20 @@ begin
     execute 'create or replace view public.public_profiles as
       select
         id,
-        user_id,
         full_name,
+        first_name,
         avatar_url,
         bio,
         tagline,
-        host_since,
+        languages,
+        house_rules,
         average_rating,
-        total_reviews
+        total_reviews,
+        response_rate,
+        response_time_hours,
+        host_since,
+        is_host,
+        id_verified
       from public.profiles';
     execute 'grant select on public.public_profiles to anon, authenticated';
   end if;

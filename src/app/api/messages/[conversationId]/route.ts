@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { requireAuth } from "@/lib/auth-check"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 
 type Params = { conversationId: string }
 
@@ -53,8 +57,8 @@ export async function GET(_: NextRequest, { params }: { params: Promise<Params> 
 
   const [{ data: profile }, { data: listing }, { data: booking }] = await Promise.all([
     access.supabase
-      .from("profiles")
-      .select("id, full_name, avatar_url")
+      .from(PUBLIC_PROFILES_TABLE)
+      .select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS)
       .eq("id", otherPartyId)
       .maybeSingle(),
     access.supabase

@@ -7,12 +7,13 @@ import { DeferredMainWithMotion } from "@/components/layout/deferred-motion-boun
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { getPlatformFeePercentsCached } from "@/lib/fees"
 import { Navbar } from "@/components/shared/Navbar"
-import { createAdminClient } from "@/lib/supabase/admin"
+
+/** Shared shell for public marketing pages — fee percents are ISR-cached, not per-request. */
+export const revalidate = 3600
 
 export default async function MainLayout({ children }: { children: ReactNode }) {
   const currentYear = new Date().getFullYear()
-  const admin = createAdminClient()
-  const feePercents = await getPlatformFeePercentsCached(admin)
+  const feePercents = await getPlatformFeePercentsCached()
 
   return (
     <div className="min-h-screen bg-warm-50">

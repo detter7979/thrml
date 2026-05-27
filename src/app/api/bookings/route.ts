@@ -4,6 +4,10 @@ import { shouldMarkBookingCompleted } from "@/lib/booking-session"
 import { requireAuth } from "@/lib/auth-check"
 import { rateLimit } from "@/lib/rate-limit"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 
 type BookingRow = Record<string, unknown>
 const LISTING_SAFE_FIELDS =
@@ -117,7 +121,10 @@ export async function GET(req: NextRequest) {
             .order("order_index", { ascending: true })
         : Promise.resolve({ data: [] as Record<string, unknown>[] }),
       hostIds.length
-        ? supabase.from("profiles").select("id, full_name, avatar_url").in("id", hostIds)
+        ? supabase
+            .from(PUBLIC_PROFILES_TABLE)
+            .select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS)
+            .in("id", hostIds)
         : Promise.resolve({ data: [] as Record<string, unknown>[] }),
       listingIds.length
         ? supabase

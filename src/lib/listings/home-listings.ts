@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 /** Fields required for home page cards, trending strip, and filters — no description or heavy joins. */
 const HOME_LISTINGS_SELECT =
@@ -45,7 +45,7 @@ function deriveLocation(listing: Record<string, unknown>): string {
 /** Server-only: fast payload for home grid (caps row count; separate count for totals). */
 export async function getHomeListingsForCards(params?: { limit?: number }) {
   const limit = params?.limit ?? 250
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const [listingsResult, countResult] = await Promise.all([
     supabase

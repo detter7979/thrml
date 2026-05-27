@@ -1,4 +1,4 @@
-import { sendGuestReviewRequest, sendHostPayoutNotice } from "@/lib/emails"
+import { sendGuestReviewRequest, sendHostGuestReviewRequestEmail, sendHostPayoutNotice } from "@/lib/emails"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type PostSessionBooking = {
@@ -7,6 +7,8 @@ type PostSessionBooking = {
   host_id: string
   host_payout: number | null
   post_session_email_sent?: boolean | null
+  host_review_submitted?: boolean | null
+  host_review_requested_at?: string | null
   listings: {
     id: string
     title: string | null
@@ -36,7 +38,7 @@ export async function sendPostSessionEmails(
   }
 
   try {
-    await Promise.all([
+    const hostReviewTasks: Promise<unknown>[] = [
       sendGuestReviewRequest({
         bookingId: booking.id,
         guestId: booking.guest_id,
@@ -53,12 +55,29 @@ export async function sendPostSessionEmails(
         sessionDate: null,
         hostPayout: Number(booking.host_payout ?? 0),
       }),
-    ])
+    ]
 
-    await supabase
-      .from("bookings")
-      .update({ post_session_email_sent: true })
-      .eq("id", booking.id)
+    if (!booking.host_review_submitted && !booking.host_review_requested_at) {
+      hostReviewTasks.push(
+        sendHostGuestReviewRequestEmail({
+          hostId: booking.host_id,
+          hostEmail: host.email,
+          hostFirstName: host.full_name,
+          guestFullName: guest.full_name,
+          listingTitle: listing.title ?? "your listing",
+          bookingId: booking.id,
+        })
+      )
+    }
+
+    await Promise.all(hostReviewTasks)
+
+    const bookingUpdates: Record<string, unknown> = { post_session_email_sent: true }
+    if (!booking.host_review_submitted && !booking.host_review_requested_at) {
+      bookingUpdates.host_review_requested_at = new Date().toISOString()
+    }
+
+    await supabase.from("bookings").update(bookingUpdates).eq("id", booking.id)
 
     return { sent: true }
   } catch (error) {

@@ -2,13 +2,19 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { normalizePhotoUrls, normalizeSubRatings } from "@/lib/reviews"
-import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  PUBLIC_PROFILE_COLUMNS,
+  PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
+  PUBLIC_PROFILES_TABLE,
+} from "@/lib/supabase/public-profiles"
 import type { PricingTiers } from "@/lib/pricing"
 import { roundUpTo30 } from "@/lib/slots"
 import { getServiceTypes } from "@/lib/supabase/queries"
 
 import { ListingDetailClient } from "./listing-detail-client"
+
+export const revalidate = 60
 
 type Params = {
   id: string
@@ -41,10 +47,8 @@ type HostProfileRow = {
   id?: string | null
   full_name?: string | null
   avatar_url?: string | null
-  is_superhost?: boolean | null
-  created_at?: string | null
+  host_since?: string | null
   response_rate?: number | null
-  response_time?: string | null
   response_time_hours?: number | null
   bio?: string | null
   average_rating?: number | null
@@ -54,35 +58,21 @@ type HostProfileRow = {
 
 async function getHostProfile(
   admin: ReturnType<typeof createAdminClient>,
-  lookupColumn: "id" | "user_id",
-  lookupValue: string
+  hostId: string
 ): Promise<HostProfileRow | null> {
-  const selectableColumns = [
-    "id",
-    "full_name",
-    "avatar_url",
-    "is_superhost",
-    "created_at",
-    "response_rate",
-    "response_time",
-    "response_time_hours",
-    "bio",
-    "average_rating",
-    "total_reviews",
-    "id_verified",
-  ]
+  const selectableColumns = PUBLIC_PROFILE_COLUMNS.split(", ").slice()
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const { data, error } = await admin
-      .from("profiles")
+      .from(PUBLIC_PROFILES_TABLE)
       .select(selectableColumns.join(", "))
-      .eq(lookupColumn, lookupValue)
+      .eq("id", hostId)
       .maybeSingle()
 
     if (!error) return data as HostProfileRow | null
 
-    const missingColumnMatch = error.message.match(/column\s+profiles\.([a-z_]+)\s+does not exist/i)
-    const missingColumn = missingColumnMatch?.[1]
+    const missingColumnMatch = error.message.match(/column\s+public_profiles\.([a-z_]+)\s+does not exist/i)
+    const missingColumn = missingColumnMatch?.[1] ?? error.message.match(/column\s+([a-z_]+)\s+does not exist/i)?.[1]
     if (!missingColumn || !selectableColumns.includes(missingColumn)) {
       return null
     }
@@ -96,8 +86,8 @@ async function getHostProfile(
 }
 
 async function fetchListingById(id: string) {
-  const supabase = await createClient()
-  const { data: listing } = await supabase
+  const admin = createAdminClient()
+  const { data: listing } = await admin
     .from("listings")
     .select(
       "id, title, description, city, state, service_type, price_solo, fixed_session_price, session_type, listing_photos(url, order_index)"
@@ -168,11 +158,16 @@ function fallbackPhoto(index: number) {
   return `https://images.unsplash.com/photo-1518609878373-06d740f60d8b?auto=format&fit=crop&w=1200&q=80&sig=${index}`
 }
 
-function mapLegacyReviewsTableRows(reviewRows: Record<string, unknown>[]): ReviewRecord[] {
+function mapLegacyReviewsTableRows(
+  reviewRows: Record<string, unknown>[],
+  reviewerMap: Map<string, { full_name: string | null; avatar_url: string | null }>
+): ReviewRecord[] {
   return reviewRows.map((row) => {
     const metadata =
       typeof row.metadata === "object" && row.metadata ? (row.metadata as Record<string, unknown>) : {}
     const recommendedRaw = metadata.recommended
+    const reviewerId = typeof row.reviewer_id === "string" ? row.reviewer_id : null
+    const reviewerProfile = reviewerId ? reviewerMap.get(reviewerId) : null
     return {
       id: typeof row.id === "string" ? row.id : "",
       rating_overall: Number(row.rating_overall ?? 0),
@@ -189,19 +184,15 @@ function mapLegacyReviewsTableRows(reviewRows: Record<string, unknown>[]): Revie
       host_response: typeof row.host_response === "string" ? row.host_response : null,
       host_responded_at: typeof row.host_responded_at === "string" ? row.host_responded_at : null,
       created_at: typeof row.created_at === "string" ? row.created_at : null,
-      profile:
-        Array.isArray(row.profiles) && row.profiles[0] && typeof row.profiles[0] === "object"
-          ? {
-              full_name:
-                typeof (row.profiles[0] as Record<string, unknown>).full_name === "string"
-                  ? ((row.profiles[0] as Record<string, unknown>).full_name as string)
-                  : null,
-              avatar_url:
-                typeof (row.profiles[0] as Record<string, unknown>).avatar_url === "string"
-                  ? ((row.profiles[0] as Record<string, unknown>).avatar_url as string)
-                  : null,
-            }
-          : null,
+      profile: reviewerProfile
+        ? {
+            full_name: reviewerProfile.full_name ?? "Guest",
+            avatar_url: reviewerProfile.avatar_url ?? null,
+          }
+        : {
+            full_name: "Guest",
+            avatar_url: null,
+          },
       recommended:
         typeof recommendedRaw === "boolean"
           ? recommendedRaw
@@ -215,11 +206,24 @@ function mapLegacyReviewsTableRows(reviewRows: Record<string, unknown>[]): Revie
 }
 
 async function mapListingReviewsToRecords(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  admin: ReturnType<typeof createAdminClient>,
   reviewRows: Record<string, unknown>[]
 ): Promise<ReviewRecord[]> {
-  return Promise.all(
-    reviewRows.map(async (review) => {
+  const guestIds = Array.from(
+    new Set(
+      reviewRows
+        .map((review) => (typeof review.guest_id === "string" ? review.guest_id : null))
+        .filter((value): value is string => Boolean(value))
+    )
+  )
+  const { data: guestProfiles } = guestIds.length
+    ? await admin.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS).in("id", guestIds)
+    : { data: [] as Array<{ id?: string; full_name?: string | null; avatar_url?: string | null }> }
+  const guestProfileById = new Map(
+    (guestProfiles ?? []).map((row) => [typeof row.id === "string" ? row.id : "", row])
+  )
+
+  return reviewRows.map((review) => {
       const reviewId = typeof review.id === "string" ? review.id : ""
       const subRatings = normalizeSubRatings(
         review.sub_ratings ??
@@ -231,14 +235,8 @@ async function mapListingReviewsToRecords(
         typeof review.metadata === "object" && review.metadata
           ? (review.metadata as Record<string, unknown>)
           : {}
-      const { data: guestProfile } =
-        typeof review.guest_id === "string"
-          ? await supabase
-              .from("profiles")
-              .select("full_name, avatar_url")
-              .eq("id", review.guest_id)
-              .single()
-          : { data: null as null }
+      const guestId = typeof review.guest_id === "string" ? review.guest_id : null
+      const guestProfile = guestId ? guestProfileById.get(guestId) : null
 
       const recommendedRaw = metadata.recommend
       return {
@@ -273,7 +271,6 @@ async function mapListingReviewsToRecords(
                 : null,
       }
     })
-  )
 }
 
 function trimStr(value: unknown): string {
@@ -323,14 +320,10 @@ export default async function ListingDetailPage({
   const query = await searchParams
   const backToResultsPath =
     typeof query.from === "string" && query.from.startsWith("/explore") ? query.from : null
-  const supabase = await createClient()
   const admin = createAdminClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   const [{ data: listing, error }, { data: availabilityRows }] = await Promise.all([
-    supabase
+    admin
       .from("listings")
       .select(
         "id, host_id, title, description, service_type, sauna_type, is_active, location, location_address, location_city, location_state, city, state, country, capacity, price_solo, fixed_session_price, price_2, price_3, price_4plus, min_duration_override_minutes, max_duration_override_minutes, fixed_session_minutes, service_attributes, service_duration_min, service_duration_max, service_duration_unit, amenities, house_rules, cancellation_policy, availability, listing_photos(url, order_index), listing_blackout_dates(blackout_date)"
@@ -338,31 +331,14 @@ export default async function ListingDetailPage({
       .eq("id", id)
       .eq("is_deleted", false)
       .single(),
-    supabase
+    admin
       .from("availability")
       .select("day_of_week, start_time, end_time, is_available")
       .eq("listing_id", id)
       .order("day_of_week", { ascending: true }),
   ])
 
-  if (error || !listing) {
-    notFound()
-  }
-
-  let hasPastBooking = false
-  if (user?.id) {
-    const { count } = await supabase
-      .from("bookings")
-      .select("id", { count: "exact", head: true })
-      .eq("listing_id", id)
-      .eq("guest_id", user.id)
-      .in("status", ["pending", "confirmed", "completed", "cancelled"])
-    hasPastBooking = Number(count ?? 0) > 0
-  }
-
-  const isHost = Boolean(user?.id && listing.host_id === user.id)
-  const canViewInactive = isHost || hasPastBooking
-  if (!listing.is_active && !canViewInactive) {
+  if (error || !listing || !listing.is_active) {
     notFound()
   }
 
@@ -370,7 +346,7 @@ export default async function ListingDetailPage({
   const serviceTypeId =
     typeof listing.service_type === "string" ? listing.service_type : "sauna"
   const serviceType = serviceTypes.find((item) => item.id === serviceTypeId) ?? serviceTypes[0]
-  const { data: serviceTypeConstraints } = await supabase
+  const { data: serviceTypeConstraints } = await admin
     .from("service_types")
     .select("min_duration_minutes, max_duration_minutes, duration_increment_minutes, session_type")
     .eq("id", serviceTypeId)
@@ -401,10 +377,7 @@ export default async function ListingDetailPage({
       ? serviceTypeConstraints.session_type
       : serviceType?.booking_model ?? "hourly"
 
-  const hostProfileById = listing.host_id ? await getHostProfile(admin, "id", listing.host_id) : null
-  const hostProfileByUserId =
-    listing.host_id && !hostProfileById ? await getHostProfile(admin, "user_id", listing.host_id) : null
-  const hostProfile = hostProfileById ?? hostProfileByUserId
+  const hostProfile = listing.host_id ? await getHostProfile(admin, listing.host_id) : null
 
   const { data: hostStripeById } = listing.host_id
     ? await admin
@@ -426,16 +399,16 @@ export default async function ListingDetailPage({
   const isMockHost = host?.stripe_account_id?.startsWith("acct_mock_")
 
   const [{ data: ratingsRow, error: ratingsError }, reviewsResult, listingReviewsResult] = await Promise.all([
-    supabase.from("listing_ratings").select("avg_overall, review_count").eq("listing_id", id).maybeSingle(),
-    supabase
+    admin.from("listing_ratings").select("avg_overall, review_count").eq("listing_id", id).maybeSingle(),
+    admin
       .from("reviews")
       .select(
-        "id, rating_overall, rating_cleanliness, rating_accuracy, rating_communication, rating_value, comment, photo_urls, host_response, host_responded_at, created_at, metadata, profiles!reviewer_id(full_name, avatar_url)"
+        "id, reviewer_id, rating_overall, rating_cleanliness, rating_accuracy, rating_communication, rating_value, comment, photo_urls, host_response, host_responded_at, created_at, metadata"
       )
       .eq("listing_id", id)
       .eq("is_published", true)
       .order("created_at", { ascending: false }),
-    supabase
+    admin
       .from("listing_reviews")
       .select(
         "id, guest_id, rating, rating_overall, comment, photo_urls, host_response, host_responded_at, created_at, sub_ratings, metadata"
@@ -450,13 +423,34 @@ export default async function ListingDetailPage({
 
   let reviews: ReviewRecord[] = []
   if (listingReviewsRows.length > 0) {
-    reviews = await mapListingReviewsToRecords(supabase, listingReviewsRows)
+    reviews = await mapListingReviewsToRecords(admin, listingReviewsRows)
   } else if (!reviewsResult.error && legacyReviewsRows.length > 0) {
-    reviews = mapLegacyReviewsTableRows(legacyReviewsRows)
+    const reviewerIds = Array.from(
+      new Set(
+        legacyReviewsRows
+          .map((row) => (typeof row.reviewer_id === "string" ? row.reviewer_id : null))
+          .filter((value): value is string => Boolean(value))
+      )
+    )
+    const { data: reviewerProfiles } = reviewerIds.length
+      ? await admin.from(PUBLIC_PROFILES_TABLE).select(PUBLIC_PROFILE_NAME_AVATAR_COLUMNS).in("id", reviewerIds)
+      : { data: [] as Array<{ id?: string; full_name?: string | null; avatar_url?: string | null }> }
+    const reviewerMap = new Map(
+      (reviewerProfiles ?? [])
+        .filter((row) => typeof row.id === "string")
+        .map((row) => [
+          row.id as string,
+          {
+            full_name: typeof row.full_name === "string" ? row.full_name : null,
+            avatar_url: typeof row.avatar_url === "string" ? row.avatar_url : null,
+          },
+        ])
+    )
+    reviews = mapLegacyReviewsTableRows(legacyReviewsRows, reviewerMap)
   } else if (!reviewsResult.error) {
     reviews = []
   } else {
-    reviews = await mapListingReviewsToRecords(supabase, listingReviewsRows)
+    reviews = await mapListingReviewsToRecords(admin, listingReviewsRows)
   }
 
   const ratingsFromRow = {
@@ -610,14 +604,16 @@ export default async function ListingDetailPage({
                 id: typeof hostProfile.id === "string" ? hostProfile.id : listing.host_id,
                 full_name: hostProfile.full_name ?? null,
                 avatar_url: hostProfile.avatar_url ?? null,
-                is_superhost: hostProfile.is_superhost ?? null,
-                created_at: hostProfile.created_at ?? null,
+                is_superhost: null,
+                created_at: hostProfile.host_since ?? null,
                 response_rate:
                   typeof hostProfile.response_rate === "number"
                     ? Number(hostProfile.response_rate)
                     : null,
                 response_time:
-                  typeof hostProfile.response_time === "string" ? hostProfile.response_time : null,
+                  typeof hostProfile.response_time_hours === "number"
+                    ? `${hostProfile.response_time_hours}h`
+                    : null,
                 response_time_hours:
                   typeof hostProfile.response_time_hours === "number"
                     ? Number(hostProfile.response_time_hours)

@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 
 import { CookieSettingsLink } from "@/components/cookie-settings-link"
 
+export const revalidate = 3600
+
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description: "Learn how thrml collects, uses, and protects your personal information.",
@@ -76,12 +78,27 @@ With Host consent, we may share listing content (photos, descriptions, location)
 We may disclose information when required by law, court order, or government authority, or to protect the rights, property, or safety of thrml, our users, or the public.
 
 3.5 Business Transfers
-In the event of a merger, acquisition, or sale of substantially all of thrml's assets, user information may be transferred as part of that transaction. We will provide notice before your information is transferred and becomes subject to a different privacy policy.
-
-4. Cookies and Tracking
-We use cookies and similar technologies to maintain sessions, remember preferences, and analyze platform usage. You can control cookie settings through your browser, but disabling cookies may affect platform functionality.
-We use the Meta Pixel and similar advertising technologies to measure the performance of our advertising. Under some state privacy laws (including California's CPRA), the use of these technologies may be considered a "sale" or "sharing" of personal information. You can opt out of this sharing at any time using the "Do Not Sell or Share My Personal Information" mechanism described in Section 7, or by adjusting your cookie preferences.`}
+In the event of a merger, acquisition, or sale of substantially all of thrml's assets, user information may be transferred as part of that transaction. We will provide notice before your information is transferred and becomes subject to a different privacy policy.`}
       </div>
+
+      <section id="cookies" className="mt-8 text-sm leading-relaxed text-[#2F241E]">
+        <h2 className="text-base font-semibold text-[#1A1410]">4. Cookies and Tracking</h2>
+        <p className="mt-3">
+          We use cookies and similar technologies to maintain sessions, remember preferences, and analyze platform
+          usage. You can manage analytics and advertising cookies at any time through{" "}
+          <CookieSettingsLink className="text-[#C4623A] underline hover:text-[#b05530]" /> (also available in the site
+          footer). Declining analytics cookies stops Google Analytics and the Meta Pixel from loading on your device.
+          Disabling essential cookies in your browser may affect platform functionality.
+        </p>
+        <p className="mt-3">
+          We use the Meta Pixel and similar advertising technologies to measure the performance of our advertising.
+          Under some state privacy laws (including California&apos;s CPRA), the use of these technologies may be
+          considered a &quot;sale&quot; or &quot;sharing&quot; of personal information. You can opt out of this sharing
+          at any time using the &quot;Do Not Sell or Share My Personal Information&quot; mechanism described in Section
+          7, or by adjusting your cookie preferences via{" "}
+          <CookieSettingsLink className="text-[#C4623A] underline hover:text-[#b05530]" />.
+        </p>
+      </section>
 
       <section id="data-retention" className="mt-8 text-sm leading-relaxed text-[#2F241E]">
         <h2 className="text-base font-semibold text-[#1A1410]">5. Data Retention</h2>

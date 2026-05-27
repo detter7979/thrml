@@ -640,6 +640,40 @@ export async function sendGuestReviewRequest(args: {
   return sendPostSessionReviewRequestEmail(args)
 }
 
+export async function sendHostGuestReviewRequestEmail(args: {
+  hostId: string | null
+  hostEmail: string | null
+  hostFirstName: string | null
+  guestFullName: string | null
+  listingTitle: string
+  bookingId: string
+}) {
+  if (!args.hostEmail) return { sent: false, error: "Missing host email" }
+  const guestLabel = (args.guestFullName ?? "your guest").trim() || "your guest"
+  const guestFirstName = guestLabel.split(" ")[0] ?? "your guest"
+
+  return sendThrmlLayoutEmail({
+    to: args.hostEmail,
+    subject: `Rate ${guestFirstName} — how was your guest?`,
+    userId: args.hostId ?? null,
+    preferenceKey: "new_review",
+    layout: {
+      preview: `Rate ${guestFirstName} after their session`,
+      kicker: "Guest rating",
+      title: `How was ${guestFirstName} as a guest?`,
+      summary: [
+        { label: "Guest", value: guestLabel },
+        { label: "Listing", value: args.listingTitle },
+        { label: "Your rating", value: "⭐ ⭐ ⭐ ⭐ ⭐" },
+      ],
+      paragraphs: [
+        "Quick star ratings help other hosts know what to expect. Optional notes are only visible to hosts.",
+      ],
+      cta: { label: "Rate your guest", href: `${APP_URL}/review-guest/${args.bookingId}` },
+    },
+  })
+}
+
 export async function sendHostBookingRequestEmail(booking: BookingRequestEmailPayload) {
   if (!booking.host_email) return { sent: false, error: "Missing host email" }
   const title = booking.listing_title ?? "Your listing"

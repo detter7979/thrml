@@ -1,4 +1,4 @@
--- Manual copy of supabase/migrations/20260531160000_security_rls_hardening.sql
+-- Manual copy of db/security-rls-hardening.sql
 
 -- Security hardening migration for Supabase RLS policies.
 -- This migration uses conditional table checks because this repo contains additive SQL files

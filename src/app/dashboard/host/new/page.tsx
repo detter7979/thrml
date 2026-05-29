@@ -17,7 +17,7 @@ export default async function NewHostListingPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "stripe_account_id, stripe_onboarding_complete, house_rules, id_verification_status, id_verified, id_verified_at"
+      "stripe_account_id, stripe_onboarding_complete, house_rules, id_verification_status, id_verified, id_verified_at, insurance_attested, insurance_attested_at"
     )
     .eq("id", user.id)
     .single()
@@ -37,6 +37,10 @@ export default async function NewHostListingPage() {
       }
       idVerified={Boolean(profile?.id_verified)}
       idVerifiedAt={typeof profile?.id_verified_at === "string" ? profile.id_verified_at : null}
+      insuranceAttested={Boolean(profile?.insurance_attested)}
+      insuranceAttestedAt={
+        typeof profile?.insurance_attested_at === "string" ? profile.insurance_attested_at : null
+      }
     />
   )
 }

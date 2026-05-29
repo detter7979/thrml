@@ -54,7 +54,7 @@ You will provide the agreed access code or entry method to confirmed Guests
 Hosts are solely responsible for:
 The safety and condition of their wellness space
 Compliance with applicable health, safety, and zoning regulations
-Maintaining valid liability insurance appropriate for hosting paid guests, and providing proof of such coverage to thrml as a condition of listing. Hosts must keep coverage active for as long as their listing is available for booking and must provide updated proof upon thrml's request.
+Maintaining valid liability insurance appropriate for hosting paid guests. Hosts warrant that such coverage is in place when they list and remains in place for as long as their listing is available for booking. thrml reserves the right to request proof of coverage at any time, and any false warranty, lapse in coverage, or failure to provide requested proof is grounds for immediate listing suspension or removal.
 Responding to Guest inquiries and messages in a timely manner
 Honoring confirmed bookings
 Managing their own tax obligations arising from hosting income

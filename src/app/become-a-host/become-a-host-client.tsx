@@ -329,12 +329,11 @@ export function BecomeAHostClient() {
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="font-semibold">Insurance recommendation</p>
+                      <p className="font-semibold">Liability insurance</p>
                       <p className="text-xs text-neutral-500">
-                        Thrml does not provide insurance coverage for hosts or guests. We strongly
-                        recommend carrying appropriate property and liability insurance for short-term
-                        wellness space rental activities. Consult an insurance professional to confirm
-                        your coverage.
+                        Thrml does not provide insurance coverage for hosts or guests. You warrant that you
+                        maintain liability insurance appropriate for hosting paid guests and will keep coverage
+                        in place while your listing is active. Thrml may request proof of coverage at any time.
                       </p>
                     </div>
                     <div className="space-y-1">

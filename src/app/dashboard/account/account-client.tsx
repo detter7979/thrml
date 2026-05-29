@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle2, Loader2 } from "lucide-react"
 
+import { HostInsuranceAttestation } from "@/components/host/HostInsuranceAttestation"
 import { IdentityVerificationCTA, type IdentityUiStatus } from "@/components/profile/IdentityVerificationCTA"
 import { AvatarUpload } from "@/components/profile/AvatarUpload"
 import { StripeConnectBanner } from "@/components/host/StripeConnectBanner"
@@ -101,6 +102,8 @@ export function AccountClient({
   idVerificationStatus,
   idVerified,
   idVerifiedAt,
+  insuranceAttested: initialInsuranceAttested,
+  insuranceAttestedAt,
 }: {
   userId: string
   fullName: string
@@ -121,6 +124,8 @@ export function AccountClient({
   idVerificationStatus: string | null
   idVerified: boolean
   idVerifiedAt: string | null
+  insuranceAttested: boolean
+  insuranceAttestedAt: string | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -171,6 +176,15 @@ export function AccountClient({
   const [passwordResetError, setPasswordResetError] = useState<string | null>(null)
   const [passwordResetNotice, setPasswordResetNotice] = useState<string | null>(null)
   const [passwordResetCooldown, setPasswordResetCooldown] = useState(0)
+  const [insuranceAttested, setInsuranceAttested] = useState(initialInsuranceAttested)
+  const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(false)
+  const [savingInsuranceAttestation, setSavingInsuranceAttestation] = useState(false)
+  const [insuranceAttestationMessage, setInsuranceAttestationMessage] = useState<string | null>(null)
+  const [insuranceAttestationError, setInsuranceAttestationError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setInsuranceAttested(initialInsuranceAttested)
+  }, [initialInsuranceAttested])
 
   useEffect(() => {
     setName(fullName)
@@ -560,6 +574,35 @@ export function AccountClient({
     }
   }
 
+  async function saveInsuranceAttestation() {
+    if (insuranceAttested) return
+    if (!insuranceAttestationChecked) {
+      setInsuranceAttestationError("Please confirm the insurance attestation to continue.")
+      return
+    }
+
+    setSavingInsuranceAttestation(true)
+    setInsuranceAttestationError(null)
+    setInsuranceAttestationMessage(null)
+
+    try {
+      const response = await fetch("/api/account/insurance-attestation", { method: "POST" })
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Unable to save insurance attestation.")
+      }
+      setInsuranceAttested(true)
+      setInsuranceAttestationChecked(false)
+      setInsuranceAttestationMessage("Insurance attestation saved.")
+    } catch (error) {
+      setInsuranceAttestationError(
+        error instanceof Error ? error.message : "Unable to save insurance attestation."
+      )
+    } finally {
+      setSavingInsuranceAttestation(false)
+    }
+  }
+
   useEffect(() => {
     if (!hostingEnabled) return
     if (!stripeAccountId) return
@@ -921,6 +964,43 @@ export function AccountClient({
           )}
           {isSyncingStripe ? <p className="text-xs text-[#7A6A5D]">Refreshing payout status...</p> : null}
           {stripeError ? <p className="text-sm text-destructive">{stripeError}</p> : null}
+        </section>
+      ) : null}
+
+      {hostingEnabled ? (
+        <section id="insurance-attestation" className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">HOST INSURANCE ATTESTATION</h2>
+          <p className="text-sm text-[#6A5848]">
+            Required before you can publish or reactivate a listing. You warrant that liability insurance is in
+            place; thrml may request proof at any time.
+          </p>
+          <HostInsuranceAttestation
+            attested={insuranceAttested}
+            attestedAt={insuranceAttestedAt}
+            checked={insuranceAttestationChecked}
+            onCheckedChange={setInsuranceAttestationChecked}
+            error={insuranceAttestationError}
+          />
+          {!insuranceAttested ? (
+            <Button
+              type="button"
+              className="btn-primary"
+              disabled={!insuranceAttestationChecked || savingInsuranceAttestation}
+              onClick={() => void saveInsuranceAttestation()}
+            >
+              {savingInsuranceAttestation ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save attestation"
+              )}
+            </Button>
+          ) : null}
+          {insuranceAttestationMessage ? (
+            <p className="text-sm text-[#6A5848]">{insuranceAttestationMessage}</p>
+          ) : null}
         </section>
       ) : null}
 

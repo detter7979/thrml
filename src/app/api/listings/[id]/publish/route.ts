@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { assertHostInsuranceAttested } from "@/lib/host/insurance-attestation"
 import { assertPublishableListingCopy } from "@/lib/listings/host-claim-policy"
 import { createClient } from "@/lib/supabase/server"
 
@@ -60,6 +61,11 @@ export async function POST(
   })
   if (!claimCheck.ok) {
     return NextResponse.json({ error: claimCheck.error }, { status: 400 })
+  }
+
+  const attestationCheck = await assertHostInsuranceAttested(supabase, user.id)
+  if (!attestationCheck.ok) {
+    return NextResponse.json({ error: attestationCheck.error }, { status: 400 })
   }
 
   const accessTypeRaw =

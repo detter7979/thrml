@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { assertHostInsuranceAttested } from "@/lib/host/insurance-attestation"
 import { assertPublishableListingCopy } from "@/lib/listings/host-claim-policy"
 import { insertListingWithColumnFallback } from "@/lib/listings/insert-listing"
 import { rateLimit } from "@/lib/rate-limit"
@@ -46,6 +47,11 @@ export async function POST(request: NextRequest) {
   const claimCheck = assertPublishableListingCopy({ title, description })
   if (!claimCheck.ok) {
     return NextResponse.json({ error: claimCheck.error }, { status: 400 })
+  }
+
+  const attestationCheck = await assertHostInsuranceAttested(supabase, user.id)
+  if (!attestationCheck.ok) {
+    return NextResponse.json({ error: attestationCheck.error }, { status: 400 })
   }
 
   const listingPayload: Record<string, unknown> = {

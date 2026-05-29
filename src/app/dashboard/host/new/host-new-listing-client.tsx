@@ -56,7 +56,9 @@ import { createClient } from "@/lib/supabase/client"
 import { getPricePerPerson } from "@/lib/pricing"
 import type { ServiceTypeId } from "@/lib/service-types"
 import { getFacebookPixelCookies, trackMetaEvent } from "@/components/meta-pixel"
+import { HostInsuranceAttestation } from "@/components/host/HostInsuranceAttestation"
 import { IdentityVerificationCTA, type IdentityUiStatus } from "@/components/profile/IdentityVerificationCTA"
+import { INSURANCE_ATTESTATION_BLOCK_MESSAGE } from "@/lib/host/insurance-attestation"
 
 const saunaTypes = ["Finnish", "Infrared", "Steam", "Barrel", "Wood-Fired"] as const
 const doorOperations = DOOR_OPERATION_OPTIONS.map((option) => option.value)
@@ -381,6 +383,8 @@ export function HostNewListingClient({
   idVerificationStatus,
   idVerified,
   idVerifiedAt,
+  insuranceAttested: initialInsuranceAttested,
+  insuranceAttestedAt,
 }: {
   userId: string
   stripeConnected: boolean
@@ -389,6 +393,8 @@ export function HostNewListingClient({
   idVerificationStatus: string | null
   idVerified: boolean
   idVerifiedAt: string | null
+  insuranceAttested: boolean
+  insuranceAttestedAt: string | null
 }) {
   const router = useRouter()
   const [step, setStep] = useState(FIRST_STEP)
@@ -403,6 +409,9 @@ export function HostNewListingClient({
   const [stripeConnected, setStripeConnected] = useState(initialStripeConnected)
   const [hasStripeAccount, setHasStripeAccount] = useState(initialHasStripeAccount)
   const [showMoreAmenities, setShowMoreAmenities] = useState(false)
+  const [insuranceAttested, setInsuranceAttested] = useState(initialInsuranceAttested)
+  const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(false)
+  const [insuranceAttestationError, setInsuranceAttestationError] = useState<string | null>(null)
   const allowNavigationRef = useRef(false)
   const hostOnboardingPhase2TrackedRef = useRef(false)
 
@@ -810,8 +819,25 @@ export function HostNewListingClient({
     })
   }
 
+  async function persistInsuranceAttestation() {
+    const response = await fetch("/api/account/insurance-attestation", { method: "POST" })
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null
+    if (!response.ok) {
+      throw new Error(payload?.error ?? "Unable to save insurance attestation.")
+    }
+    setInsuranceAttested(true)
+  }
+
   async function onSubmit(values: ListingFormValues) {
     setPhotoError(null)
+    setInsuranceAttestationError(null)
+
+    if (!insuranceAttested && !insuranceAttestationChecked) {
+      setInsuranceAttestationError(INSURANCE_ATTESTATION_BLOCK_MESSAGE)
+      setStep(5)
+      return
+    }
+
     const hasEnabledDay = values.availability.some((day) => day.enabled)
     if (!hasEnabledDay) {
       setError("availability", {
@@ -861,6 +887,18 @@ export function HostNewListingClient({
       return
     }
     const sanitizedHouseRules = defaultHouseRules.map((rule) => sanitizeText(rule)).filter(Boolean)
+
+    if (!insuranceAttested) {
+      try {
+        await persistInsuranceAttestation()
+      } catch (error) {
+        setInsuranceAttestationError(
+          error instanceof Error ? error.message : "Unable to save insurance attestation."
+        )
+        setStep(5)
+        return
+      }
+    }
 
     const listingPayload: Record<string, unknown> = {
       title: sanitizedTitle,
@@ -926,7 +964,13 @@ export function HostNewListingClient({
     const createPayload = (await createResponse.json()) as { listingId?: string; error?: string }
 
     if (!createResponse.ok || !createPayload.listingId) {
-      setPhotoError(createPayload.error ?? "Failed to create listing.")
+      const createError = createPayload.error ?? "Failed to create listing."
+      if (createError === INSURANCE_ATTESTATION_BLOCK_MESSAGE) {
+        setInsuranceAttestationError(createError)
+        setStep(5)
+        return
+      }
+      setPhotoError(createError)
       if (createResponse.status === 400 && createPayload.error?.includes("can't publish")) {
         setStep(2)
       }
@@ -1650,6 +1694,18 @@ export function HostNewListingClient({
                       <p className="text-sm text-destructive">{errors.availability.message as string}</p>
                     ) : null}
                   </div>
+
+                  <div className="space-y-2 border-t border-[#E5E0D8] pt-5">
+                    <Label>Host insurance attestation</Label>
+                    <HostInsuranceAttestation
+                      attested={insuranceAttested}
+                      attestedAt={insuranceAttestedAt}
+                      checked={insuranceAttestationChecked}
+                      onCheckedChange={setInsuranceAttestationChecked}
+                      error={insuranceAttestationError}
+                      showAccountLink
+                    />
+                  </div>
                 </div>
               ) : null}
 
@@ -1893,7 +1949,7 @@ export function HostNewListingClient({
                 <Button
                   type="submit"
                   className="btn-primary"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || (!insuranceAttested && !insuranceAttestationChecked)}
                 >
                   {isSubmitting ? "Creating listing..." : "Publish listing"}
                 </Button>

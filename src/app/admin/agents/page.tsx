@@ -5,7 +5,14 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
-import type { RenderJob, VideoConfig, VideoCopyVariant } from "@/lib/agent/types"
+import type { RenderJob, VideoConfig } from "@/lib/agent/types"
+import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
+import {
+  BriefEditorModal,
+  structuredEditorFromBrief,
+  structuredEditorToPatch,
+  type StructuredBriefEditorState,
+} from "@/components/admin/creative/brief-editor-modal"
 
 type AgentRun = {
   id: string; agent_name: string; status: string; started_at: string
@@ -64,19 +71,6 @@ type CreativePipelineData = {
   activeMetaAdsets: MetaAdset[]
 }
 
-type VideoBriefDraft = {
-  conceptSlug: string
-  assetSlug: string
-  source: VideoConfig["source"]
-  runwayPrompt: string
-  uploadedGcsPath: string
-  templateVersion: number
-  duration: 5 | 10
-  ratio: "768:1280" | "1280:768"
-  copyVariants: VideoCopyVariant[]
-  hypothesis: string
-}
-
 function isVideoBrief(brief: CreativeBrief) {
   return Boolean(brief.video_config && typeof brief.video_config === "object")
 }
@@ -90,11 +84,6 @@ function jobStatusClass(status: RenderJob["status"]) {
     cancelled: "bg-muted text-muted-foreground",
   }
   return map[status] ?? "bg-muted text-muted-foreground"
-}
-type BriefEditorState = Omit<CreativeBrief, "trigger_data" | "success_criteria" | "reference_image_urls"> & {
-  trigger_data: string
-  success_criteria: string
-  reference_image_urls: string
 }
 
 function fmt(n: number) {
@@ -161,21 +150,6 @@ function sourceLabel(value: string | null | undefined) {
   if (value === "replicate_mj") return "replicate"
   return value
 }
-function briefEditorState(brief: CreativeBrief): BriefEditorState {
-  return {
-    ...brief,
-    trigger_data: JSON.stringify(brief.trigger_data ?? {}, null, 2),
-    success_criteria: JSON.stringify(brief.success_criteria ?? {}, null, 2),
-    reference_image_urls: (brief.reference_image_urls ?? []).join("\n"),
-  }
-}
-function parseJsonObject(value: string, label: string) {
-  const parsed = value.trim() ? JSON.parse(value) : {}
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${label} must be a JSON object`)
-  }
-  return parsed as Record<string, unknown>
-}
 
 const STATUS_COLOR: Record<string, string> = {
   success: "text-green-600", error: "text-red-500", running: "text-yellow-500",
@@ -200,26 +174,12 @@ export default function AgentsDashboard() {
   const [launchAssetIds, setLaunchAssetIds] = useState<string[]>([])
   const [selectedAdsetId, setSelectedAdsetId] = useState("")
   const [pipelineMessage, setPipelineMessage] = useState<string | null>(null)
-  const [editBrief, setEditBrief] = useState<BriefEditorState | null>(null)
+  const [editBrief, setEditBrief] = useState<StructuredBriefEditorState | null>(null)
   const [selectedAssetIds, setSelectedAssetIds] = useState<Record<string, boolean>>({})
   const [viewingAsset, setViewingAsset] = useState<CreativeAsset | null>(null)
   const [launchProgress, setLaunchProgress] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showVideoBriefForm, setShowVideoBriefForm] = useState(false)
-  const [videoDraft, setVideoDraft] = useState<VideoBriefDraft>({
-    conceptSlug: "",
-    assetSlug: "",
-    source: "uploaded",
-    runwayPrompt: "",
-    uploadedGcsPath: "",
-    templateVersion: 1,
-    duration: 5,
-    ratio: "768:1280",
-    copyVariants: [{ slug: "", copy: "" }],
-    hypothesis: "",
-  })
-  const [videoUploadName, setVideoUploadName] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const router = useRouter()
   const [tab, setTab] = useState<AgentTabKey>("overview")
@@ -315,76 +275,6 @@ export default function AgentsDashboard() {
     return json
   }
 
-  const buildVideoConfig = (): VideoConfig => ({
-    source: videoDraft.source,
-    runwayPrompt: videoDraft.source === "runway" ? videoDraft.runwayPrompt.trim() : undefined,
-    uploadedGcsPath:
-      videoDraft.source === "uploaded" ? videoDraft.uploadedGcsPath.trim() : undefined,
-    copyVariants: videoDraft.copyVariants
-      .map((v) => ({ slug: v.slug.trim(), copy: v.copy.trim() }))
-      .filter((v) => v.slug && v.copy),
-    templateVersion: videoDraft.templateVersion,
-    conceptSlug: videoDraft.conceptSlug.trim(),
-    assetSlug: videoDraft.assetSlug.trim(),
-    duration: videoDraft.duration,
-    ratio: videoDraft.ratio,
-  })
-
-  const createVideoBrief = async (saveAndApprove: boolean) => {
-    setBusyAction(saveAndApprove ? "create-video-approve" : "create-video-draft")
-    setPipelineMessage(null)
-    try {
-      const video_config = buildVideoConfig()
-      if (!video_config.conceptSlug || !video_config.assetSlug) {
-        throw new Error("Concept slug and asset slug are required.")
-      }
-      if (!video_config.copyVariants.length) {
-        throw new Error("Add at least one copy variant.")
-      }
-      await patchPipeline({
-        action: "create_video_brief",
-        brief: {
-          video_config,
-          hook: video_config.copyVariants[0]?.copy,
-          hypothesis: videoDraft.hypothesis.trim() || null,
-          saveAndApprove,
-        },
-      })
-      await mutatePipeline()
-      setShowVideoBriefForm(false)
-      setVideoUploadName(null)
-      setPipelineMessage(saveAndApprove ? "Video brief created and approved." : "Video brief saved.")
-    } catch (err) {
-      setPipelineMessage(err instanceof Error ? err.message : "Could not create video brief.")
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
-  const uploadBaseVideoFile = async (file: File) => {
-    if (!videoDraft.conceptSlug.trim() || !videoDraft.assetSlug.trim()) {
-      throw new Error("Enter concept slug and asset slug before uploading.")
-    }
-    const res = await fetch("/api/admin/agent/upload-base-video", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conceptSlug: videoDraft.conceptSlug.trim(),
-        assetSlug: videoDraft.assetSlug.trim(),
-      }),
-    })
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error((json as { error?: string }).error ?? "Upload URL request failed")
-    const { uploadUrl, gcsPath } = json as { uploadUrl: string; gcsPath: string }
-    const put = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type || "video/mp4" },
-      body: file,
-    })
-    if (!put.ok) throw new Error(`GCS upload failed (${put.status})`)
-    setVideoDraft((prev) => ({ ...prev, uploadedGcsPath: gcsPath }))
-    setVideoUploadName(file.name)
-  }
 
   const generateVideoVariants = async (briefId: string) => {
     setBusyAction(`generate-video-${briefId}`)
@@ -461,30 +351,28 @@ export default function AgentsDashboard() {
     setBusyAction(`edit-brief-${editBrief.id}`)
     setPipelineMessage(null)
     try {
-      const brief = {
-        trigger_type: editBrief.trigger_type,
-        trigger_data: parseJsonObject(editBrief.trigger_data, "Trigger data"),
-        status: editBrief.status,
-        hypothesis: editBrief.hypothesis,
-        target_audience: editBrief.target_audience,
-        hook: editBrief.hook,
-        format: editBrief.format,
-        visual_direction: editBrief.visual_direction,
-        copy_primary: editBrief.copy_primary,
-        copy_headline: editBrief.copy_headline,
-        copy_subtext: editBrief.copy_subtext,
-        cta: editBrief.cta,
-        reference_image_urls: editBrief.reference_image_urls.split("\n").map((url) => url.trim()).filter(Boolean),
-        rationale: editBrief.rationale,
-        campaign_short_name: editBrief.campaign_short_name,
-        success_criteria: parseJsonObject(editBrief.success_criteria, "Success criteria"),
-      }
+      const brief = structuredEditorToPatch(editBrief)
       await patchPipeline({ action: "update_brief", brief_id: editBrief.id, brief })
       setEditBrief(null)
       await mutatePipeline()
       setPipelineMessage("Brief saved.")
     } catch (err) {
       setPipelineMessage(err instanceof Error ? err.message : "Could not save brief.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const generatePreview = async (briefId: string) => {
+    setBusyAction(`preview-${briefId}`)
+    setPipelineMessage(null)
+    try {
+      await patchPipeline({ action: "generate_preview", brief_id: briefId })
+      await mutatePipeline()
+      setPipelineMessage("Preview generated (1× 1x1). Approve brief for full batch.")
+      setEditBrief(null)
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Preview generation failed.")
     } finally {
       setBusyAction(null)
     }
@@ -623,6 +511,12 @@ export default function AgentsDashboard() {
   const activeLaunchAssets = launchAssetIds
     .map((id) => generatedAssets.find((asset) => asset.id === id))
     .filter((asset): asset is CreativeAsset => Boolean(asset))
+
+  const launchBrief = useMemo(() => {
+    const asset = activeLaunchAssets[0]
+    if (!asset) return null
+    return briefFor(asset)
+  }, [activeLaunchAssets])
 
   const TABS = [
     { key: "overview", label: `Overview${criticalCount > 0 ? ` 🚨${criticalCount}` : ""}` },
@@ -839,53 +733,13 @@ export default function AgentsDashboard() {
             <p className="text-sm text-red-500">{pipelineError instanceof Error ? pipelineError.message : "Could not load creative pipeline."}</p>
           ) : null}
 
-          <section className="rounded-xl border bg-card p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Video Briefs</h2>
-                <p className="text-xs text-muted-foreground mt-1">Create, approve, then generate variants explicitly.</p>
-              </div>
-              <button type="button" onClick={() => setShowVideoBriefForm((v) => !v)} className="text-xs px-3 py-1.5 border rounded hover:bg-muted">
-                {showVideoBriefForm ? "Hide" : "+ Video Brief"}
-              </button>
-            </div>
-            {showVideoBriefForm ? (
-              <div className="space-y-3 border-t pt-3">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <label className="space-y-1 text-xs font-medium text-muted-foreground">Concept slug
-                    <input value={videoDraft.conceptSlug} onChange={(e) => setVideoDraft((p) => ({ ...p, conceptSlug: e.target.value }))} className="w-full rounded-md border px-3 py-2 text-sm" />
-                  </label>
-                  <label className="space-y-1 text-xs font-medium text-muted-foreground">Asset slug
-                    <input value={videoDraft.assetSlug} onChange={(e) => setVideoDraft((p) => ({ ...p, assetSlug: e.target.value }))} className="w-full rounded-md border px-3 py-2 text-sm" />
-                  </label>
-                </div>
-                <div className="flex gap-4 text-sm">
-                  <label className="flex items-center gap-2"><input type="radio" checked={videoDraft.source === "runway"} onChange={() => setVideoDraft((p) => ({ ...p, source: "runway" }))} />Runway</label>
-                  <label className="flex items-center gap-2"><input type="radio" checked={videoDraft.source === "uploaded"} onChange={() => setVideoDraft((p) => ({ ...p, source: "uploaded" }))} />Upload</label>
-                </div>
-                {videoDraft.source === "runway" ? (
-                  <textarea value={videoDraft.runwayPrompt} onChange={(e) => setVideoDraft((p) => ({ ...p, runwayPrompt: e.target.value }))} className="min-h-24 w-full rounded-md border px-3 py-2 text-sm" />
-                ) : (
-                  <div>
-                    <input type="file" accept="video/*" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setBusyAction("upload-base-video"); void uploadBaseVideoFile(f).catch((err) => setPipelineMessage(err instanceof Error ? err.message : "Upload failed")).finally(() => setBusyAction(null)) }} />
-                    {videoDraft.uploadedGcsPath ? <p className="text-xs font-mono text-green-700">{videoDraft.uploadedGcsPath}</p> : null}
-                  </div>
-                )}
-                {videoDraft.copyVariants.map((variant, index) => (
-                  <div key={index} className="grid gap-2 md:grid-cols-[1fr_2fr_auto]">
-                    <input value={variant.slug} onChange={(e) => setVideoDraft((p) => ({ ...p, copyVariants: p.copyVariants.map((v, i) => i === index ? { ...v, slug: e.target.value } : v) }))} className="rounded-md border px-2 py-1 text-sm" />
-                    <input value={variant.copy} onChange={(e) => setVideoDraft((p) => ({ ...p, copyVariants: p.copyVariants.map((v, i) => i === index ? { ...v, copy: e.target.value } : v) }))} className="rounded-md border px-2 py-1 text-sm" />
-                    <button type="button" onClick={() => setVideoDraft((p) => ({ ...p, copyVariants: p.copyVariants.filter((_, i) => i !== index) }))} className="text-xs border rounded px-2">×</button>
-                  </div>
-                ))}
-                <button type="button" onClick={() => setVideoDraft((p) => ({ ...p, copyVariants: [...p.copyVariants, { slug: "", copy: "" }] }))} className="text-xs border rounded px-2 py-1">+ variant</button>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => void createVideoBrief(false)} className="text-xs border rounded px-3 py-1.5">Save draft</button>
-                  <button type="button" onClick={() => void createVideoBrief(true)} className="text-xs bg-green-600 text-white rounded px-3 py-1.5">Save &amp; approve</button>
-                </div>
-              </div>
-            ) : null}
-          </section>
+          <BriefIntakePanel
+            onCreated={() => void mutatePipeline()}
+            onMessage={setPipelineMessage}
+            busyAction={busyAction}
+            setBusyAction={setBusyAction}
+            patchPipeline={patchPipeline}
+          />
 
           <div className="grid gap-4 xl:grid-cols-2">
             <section className="rounded-xl border bg-card p-4">
@@ -952,7 +806,7 @@ export default function AgentsDashboard() {
                           ) : null}
                           <div className="flex gap-2">
                             <button
-                              onClick={() => setEditBrief(briefEditorState(brief))}
+                              onClick={() => setEditBrief(structuredEditorFromBrief(brief))}
                               className="flex-1 text-xs px-3 py-1.5 border rounded hover:bg-muted"
                             >
                               Edit
@@ -1235,76 +1089,15 @@ export default function AgentsDashboard() {
       )}
 
       {editBrief && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-background border shadow-xl p-5 space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">Edit Creative Brief</h2>
-              <p className="text-sm text-muted-foreground">Update any brief field before approval.</p>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {[
-                ["trigger_type", "Trigger Type"],
-                ["status", "Status"],
-                ["hook", "Hook"],
-                ["hypothesis", "Hypothesis"],
-                ["target_audience", "Target Audience"],
-                ["format", "Format"],
-                ["visual_direction", "Visual Direction"],
-                ["copy_primary", "Primary Copy"],
-                ["copy_headline", "Headline"],
-                ["copy_subtext", "Subtext"],
-                ["cta", "CTA"],
-                ["campaign_short_name", "Campaign Short Name"],
-                ["rationale", "Rationale"],
-              ].map(([field, label]) => (
-                <label key={field} className="space-y-1 text-xs font-medium text-muted-foreground">
-                  {label}
-                  <textarea
-                    value={String(editBrief[field as keyof BriefEditorState] ?? "")}
-                    onChange={(event) => setEditBrief((prev) => prev ? { ...prev, [field]: event.target.value } : prev)}
-                    className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
-                  />
-                </label>
-              ))}
-              <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                Reference Image URLs
-                <textarea
-                  value={editBrief.reference_image_urls}
-                  onChange={(event) => setEditBrief((prev) => prev ? { ...prev, reference_image_urls: event.target.value } : prev)}
-                  className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                Trigger Data JSON
-                <textarea
-                  value={editBrief.trigger_data}
-                  onChange={(event) => setEditBrief((prev) => prev ? { ...prev, trigger_data: event.target.value } : prev)}
-                  className="min-h-24 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs text-foreground"
-                />
-              </label>
-              <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                Success Criteria JSON
-                <textarea
-                  value={editBrief.success_criteria}
-                  onChange={(event) => setEditBrief((prev) => prev ? { ...prev, success_criteria: event.target.value } : prev)}
-                  className="min-h-24 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs text-foreground"
-                />
-              </label>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEditBrief(null)} className="text-sm px-3 py-1.5 border rounded hover:bg-muted">
-                Cancel
-              </button>
-              <button
-                onClick={saveBrief}
-                disabled={busyAction === `edit-brief-${editBrief.id}`}
-                className="text-sm px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
-              >
-                Save Brief
-              </button>
-            </div>
-          </div>
-        </div>
+        <BriefEditorModal
+          state={editBrief}
+          onChange={setEditBrief}
+          onSave={() => void saveBrief()}
+          onCancel={() => setEditBrief(null)}
+          onGeneratePreview={() => void generatePreview(editBrief.id)}
+          busy={busyAction === `edit-brief-${editBrief.id}` || busyAction === `preview-${editBrief.id}`}
+          isVideo={Boolean(briefs.find((b) => b.id === editBrief.id && isVideoBrief(b)))}
+        />
       )}
 
       {viewingAsset && (
@@ -1370,6 +1163,13 @@ export default function AgentsDashboard() {
                   </p>
                   {!activeLaunchAssets[0].convention_name ? (
                     <p className="text-amber-700">No convention_name. Launch will use a legacy name.</p>
+                  ) : null}
+                  {launchBrief ? (
+                    <div className="mt-2 space-y-1 border-t pt-2">
+                      <p><span className="text-muted-foreground">Headline:</span> {launchBrief.copy_headline ?? launchBrief.hook ?? "—"}</p>
+                      <p><span className="text-muted-foreground">Primary:</span> {shortText(launchBrief.copy_primary, 80)}</p>
+                      <p><span className="text-muted-foreground">CTA:</span> {launchBrief.cta ?? "—"}</p>
+                    </div>
                   ) : null}
                 </div>
               </div>

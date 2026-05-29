@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const { data: brief, error: briefErr } = await admin!
     .from("creative_briefs")
-    .select("id, status, video_config, hook")
+    .select("id, status, video_config, hook, trigger_data")
     .eq("id", briefId)
     .single()
 
@@ -52,6 +52,15 @@ export async function POST(req: NextRequest) {
   }
 
   const config = brief.video_config
+  const triggerData =
+    brief.trigger_data && typeof brief.trigger_data === "object"
+      ? (brief.trigger_data as Record<string, unknown>)
+      : {}
+  const pathCategory = typeof triggerData.category === "string" ? triggerData.category : "Hosts"
+  const pathAngleSlug =
+    typeof triggerData.angle === "string"
+      ? triggerData.angle
+      : config.conceptSlug.replace(/-/g, "_")
 
   if (!config.copyVariants?.length) {
     return NextResponse.json({ error: "video_config.copyVariants is empty" }, { status: 400 })
@@ -127,6 +136,8 @@ export async function POST(req: NextRequest) {
         assetSlug: config.assetSlug,
         source: "runway",
         taskId,
+        category: pathCategory,
+        angleSlug: pathAngleSlug,
       })
 
       const uploaded = await uploadRemoteToCreativeObject(task.output[0], baseGcsPath)

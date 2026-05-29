@@ -1,0 +1,131 @@
+# thrml creative concept presets (T1–T4)
+# Used by admin Creative Pipeline "New from template" intake.
+# Each preset uses the locked master static or video overlay template;
+# swap background imagery/video and copy per brief.
+
+version: 1
+
+templates:
+  - id: T1
+    label: "POV Earns — Static"
+    type: static
+    category: Hosts
+    angle: pov_earnings
+    formats: ["1x1", "9x16"]
+    default_variations: 1
+    concept_verify_default: true
+    full_batch_variations: 3
+    naming:
+      test_id: T05
+      format: Static_9x16
+      cta: list_now
+    defaults:
+      trigger_type: manual
+      hypothesis: "Host POV earnings angle converts idle sauna owners."
+      target_audience: "Homeowners with private sauna or cold plunge in PNW metros"
+      hook: "Your sauna could be earning you $1,200/mo."
+      copy_primary: "List your private sauna on thrml and earn when you're not using it."
+      copy_headline: "Turn your idle sauna into a $1,200/mo asset."
+      copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
+      cta: "List Your Space"
+      visual_direction: "Extreme close-up hero shot of a pristine modern cedar barrel sauna at golden sunset, warm rim light on vertical staves, shallow depth of field, photorealistic architectural photography, no text, no logos, no people"
+      campaign_short_name: pov-earnings
+    static_variations:
+      - variation_label: A
+        headline: "Turn your idle sauna into a $1,200/mo asset."
+        background_image_prompt: "Extreme close-up hero shot of a pristine modern cedar barrel sauna at golden sunset, warm rim light on vertical staves and brushed stainless hardware, shallow depth of field"
+      - variation_label: B
+        headline: "Let your sauna pay its own electric bill."
+        background_image_prompt: "High-end residential backyard wellness circuit with compact Nordic sauna cabin beside a cedar cold plunge tub, Pacific Northwest evergreens beyond, mist in the trees"
+      - variation_label: C
+        headline: "Earn while you recover."
+        background_image_prompt: "Sleek full-glass indoor infrared sauna in a modern home gym, matte black frame, towel on bench, sauna glowing as the clear hero subject"
+
+  - id: T2
+    label: "POV Earns — Video (Runway)"
+    type: video
+    category: Hosts
+    angle: pov_earnings
+    formats: ["9x16"]
+    default_variations: 2
+    concept_verify_default: true
+    full_batch_variations: 3
+    naming:
+      test_id: T05
+      format: Video_15s
+      cta: list_now
+    defaults:
+      trigger_type: manual
+      hypothesis: "POV earnings video with overlay copy tests hook strength."
+      hook: "pov: your sauna earns you $1,000/mo"
+      campaign_short_name: pov-earnings
+    video:
+      source: runway
+      concept_slug: pov-earnings
+      asset_slug: sauna
+      template_version: 1
+      duration: 5
+      ratio: "768:1280"
+      runway_prompt: "First-person POV walking toward a private cedar barrel sauna in a Pacific Northwest backyard at golden hour, slow cinematic motion, no people, no text"
+      copy_variants:
+        - slug: pov-earn-1200
+          copy: "pov: your sauna earns you $1,200/mo"
+          variant: A
+        - slug: pov-earn-idle
+          copy: "pov: stop letting your sauna sit idle"
+          variant: B
+
+  - id: T3
+    label: "Host Monetization — Static Ladder"
+    type: static
+    category: Hosts
+    angle: pov_earnings
+    formats: ["1x1", "9x16"]
+    default_variations: 3
+    concept_verify_default: false
+    full_batch_variations: 3
+    static_playbook: host_monetization_v3
+    naming:
+      test_id: T05
+      format: Static_1x1
+      cta: list_now
+    defaults:
+      trigger_type: winner_variation
+      hypothesis: "Canonical host monetization 3-variant ladder with locked proof subtext."
+      target_audience: "Verified hosts and sauna owners in active metros"
+      hook: "HostEarn"
+      copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
+      cta: "List Your Space"
+      campaign_short_name: host-monetization
+      visual_direction: "See static_variations in template — uses host_monetization_v3 playbook"
+
+  - id: T4
+    label: "POV Earns — Video (Uploaded B-roll)"
+    type: video
+    category: Hosts
+    angle: pov_earnings
+    formats: ["9x16"]
+    default_variations: 2
+    concept_verify_default: true
+    full_batch_variations: 3
+    naming:
+      test_id: T05
+      format: Video_15s
+      cta: list_now
+    defaults:
+      trigger_type: manual
+      hypothesis: "Pre-uploaded POV b-roll with copy overlay — no Runway spend."
+      hook: "pov: your sauna earns you $1,000/mo"
+      campaign_short_name: pov-earnings
+    video:
+      source: uploaded
+      concept_slug: pov-earnings
+      asset_slug: sauna
+      template_version: 1
+      copy_variants:
+        - slug: pov-earn-1000
+          copy: "pov: your sauna earns you $1,000/mo"
+          variant: A
+        - slug: pov-earn-proof
+          copy: "pov: hosts earn $1,200/mo on average"
+          variant: B

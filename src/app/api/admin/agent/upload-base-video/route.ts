@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
     conceptSlug?: string
     assetSlug?: string
     version?: number
+    category?: string
+    angleSlug?: string
   } | null
 
   const conceptSlug = body?.conceptSlug?.trim()
@@ -23,12 +25,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "conceptSlug and assetSlug required" }, { status: 400 })
   }
 
+  const category = body?.category?.trim() || "Hosts"
+  const angleSlug = body?.angleSlug?.trim() || conceptSlug.replace(/-/g, "_")
+
   const gcsPath = baseVideoPath({
     date: new Date(),
     conceptSlug,
     assetSlug,
     source: "uploaded",
     version: body?.version ?? 1,
+    category,
+    angleSlug,
   })
 
   const uploadUrl = await getCreativeSignedWriteUrl(gcsPath, "video/mp4")

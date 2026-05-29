@@ -1,4 +1,7 @@
 import { uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
+import { resolveNamingFromBrief } from "@/lib/agent/creative-templates"
+import { buildAdName } from "@/lib/agent/naming-builder"
+import { unifiedStaticPath } from "@/lib/agent/gcs-paths"
 import {
   HOST_PROOF_SUBTEXT,
   matchesHostMonetizationPlaybook,
@@ -39,6 +42,39 @@ type CreativeBriefRow = {
   hook: string | null
   format: string | null
   campaign_short_name: string | null
+}
+
+function taxonomyFromBrief(brief: CreativeBriefRow) {
+  const td = brief.trigger_data ?? {}
+  const category = typeof td.category === "string" ? td.category : "Hosts"
+  const angleSlug =
+    typeof td.angle === "string"
+      ? td.angle
+      : (brief.campaign_short_name ?? "general").replace(/-/g, "_")
+  return { category, angleSlug }
+}
+
+function conventionNameForStatic(
+  brief: CreativeBriefRow,
+  format: StaticFormat,
+  variationLabel: string
+): string | null {
+  const naming = resolveNamingFromBrief(brief)
+  if (!naming) return null
+  const formatToken = naming.format.includes("Static")
+    ? `Static_${format}`
+    : naming.format
+  try {
+    return buildAdName({
+      testId: naming.test_id,
+      variant: variationLabel.toUpperCase().slice(0, 1) as "A" | "B" | "C" | "D",
+      angle: typeof brief.trigger_data?.angle === "string" ? brief.trigger_data.angle : "pov_earnings",
+      format: formatToken,
+      cta: naming.cta,
+    })
+  } catch {
+    return null
+  }
 }
 
 type BaseImage = {
@@ -362,12 +398,22 @@ async function processStaticBriefInner(
           copyHeadline: step.headline,
           copySubtext: subtextLocked ?? brief.copy_subtext,
         })
+        const { category, angleSlug } = taxonomyFromBrief(brief)
+        const conventionName = conventionNameForStatic(brief, format, variationLabel)
+        const unifiedPath = unifiedStaticPath({
+          date: new Date(),
+          category,
+          angleSlug,
+          variant: variationLabel,
+          format,
+        })
         const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
           campaignShortName: brief.campaign_short_name ?? brief.id,
           briefId: brief.id,
           kind: "static",
           filename: `static_${format}_${sanitizeFilename(`${baseImage.generationTool}_${baseImage.sourceIndex}_${variationLabel}`)}.png`,
           contentType: "image/png",
+          unifiedObjectPath: unifiedPath,
         })
 
         const { error: insertError } = await admin.from("creative_assets").insert({
@@ -379,6 +425,7 @@ async function processStaticBriefInner(
           format,
           gcs_path: gcsPath,
           gcs_url: gcsUrl,
+          convention_name: conventionName,
           status: "generated",
           performance_data: {
             source_image_url: baseImage.sourceUrl ?? null,
@@ -412,12 +459,22 @@ async function processStaticBriefInner(
         copyHeadline: brief.copy_headline,
         copySubtext: subtextLocked ?? brief.copy_subtext,
       })
+      const { category, angleSlug } = taxonomyFromBrief(brief)
+      const conventionName = conventionNameForStatic(brief, format, variationLabel)
+      const unifiedPath = unifiedStaticPath({
+        date: new Date(),
+        category,
+        angleSlug,
+        variant: variationLabel,
+        format,
+      })
       const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
         campaignShortName: brief.campaign_short_name ?? brief.id,
         briefId: brief.id,
         kind: "static",
         filename: `static_${format}_${sanitizeFilename(`${baseImage.generationTool}_${baseImage.sourceIndex}_${variationLabel}`)}.png`,
         contentType: "image/png",
+        unifiedObjectPath: unifiedPath,
       })
 
       const { error: insertError } = await admin.from("creative_assets").insert({
@@ -429,6 +486,7 @@ async function processStaticBriefInner(
         format,
         gcs_path: gcsPath,
         gcs_url: gcsUrl,
+        convention_name: conventionName,
         status: "generated",
         performance_data: {
           source_image_url: baseImage.sourceUrl ?? null,

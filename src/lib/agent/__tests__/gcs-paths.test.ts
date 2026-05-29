@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest"
-import { baseVideoPath, renderedVideoPath } from "../gcs-paths"
+import {
+  baseVideoPath,
+  renderedVideoPath,
+  unifiedStaticPath,
+  unifiedVideoRenderPath,
+} from "../gcs-paths"
 
 describe("gcs-paths", () => {
   const may2026 = new Date("2026-05-19T00:00:00Z")
@@ -48,5 +53,40 @@ describe("gcs-paths", () => {
         templateVersion: 1,
       })
     ).toBe("renders/2026/05/sauna-pov-earnings/pov-earn-1000_v1.mp4")
+  })
+
+  it("builds unified static path", () => {
+    expect(
+      unifiedStaticPath({
+        date: may2026,
+        category: "Hosts",
+        angleSlug: "pov_earnings",
+        variant: "A",
+        format: "9x16",
+      })
+    ).toBe("2026/05/hosts/pov_earnings/Static/A_9x16.png")
+  })
+
+  it("builds unified video paths when category set", () => {
+    expect(
+      baseVideoPath({
+        date: may2026,
+        conceptSlug: "pov-earnings",
+        assetSlug: "sauna",
+        source: "uploaded",
+        category: "Hosts",
+        angleSlug: "pov_earnings",
+      })
+    ).toBe("2026/05/hosts/pov_earnings/Video/base_sauna_v1.mp4")
+
+    expect(
+      unifiedVideoRenderPath({
+        date: may2026,
+        category: "Hosts",
+        angleSlug: "pov_earnings",
+        variantSlug: "pov-earn-1000",
+        templateVersion: 1,
+      })
+    ).toBe("2026/05/hosts/pov_earnings/Video/pov-earn-1000_9x16_v1.mp4")
   })
 })

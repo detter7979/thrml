@@ -78,6 +78,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/dompurify": "^3.0.5",
     "@types/ioredis": "^4.28.10",
+    "@types/js-yaml": "^4.0.9",
     "@types/mapbox__point-geometry": "^1.0.87",
     "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20",

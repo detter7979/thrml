@@ -6,6 +6,7 @@ import type { Config } from "./config.js"
 import type { GcsClient } from "./gcs.js"
 import { logger } from "./logger.js"
 import { render } from "./renderer.js"
+import { angleSlugFromConcept, unifiedVideoRenderPath } from "./paths.js"
 import { getTemplate } from "./template.js"
 import {
   type RenderJob,
@@ -41,9 +42,14 @@ export async function processJob(job: RenderJob, deps: ProcessorDeps): Promise<v
   log.info("Processing job")
 
   const now = new Date()
-  const yyyy = now.getUTCFullYear()
-  const mm = String(now.getUTCMonth() + 1).padStart(2, "0")
-  const renderedGcsPath = `renders/${yyyy}/${mm}/${job.concept_slug}/${job.variant_slug}_v${job.template_version}.mp4`
+  const angleSlug = angleSlugFromConcept(job.concept_slug)
+  const renderedGcsPath = unifiedVideoRenderPath({
+    date: now,
+    category: "Hosts",
+    angleSlug,
+    variantSlug: job.variant_slug,
+    templateVersion: job.template_version,
+  })
 
   const workDir = await mkdtemp(join(tmpdir(), `render-${job.id.slice(0, 8)}-`))
   const baseLocal = join(workDir, "base.mp4")

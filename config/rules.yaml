@@ -135,6 +135,7 @@ creative:
   preserve_winner_as_control: true     # winning variant becomes A in next batch
   generate_via_agent: true             # creative agent auto-generates new variants
   approval_required: true              # even when generated, new creatives need human approve
+  legacy_brief_insert: false           # when false, agent-evaluate cron does NOT auto-insert creative_briefs (use evaluator-agent instead)
 
 # -----------------------------------------------------------------------------
 # Geo expansion gates

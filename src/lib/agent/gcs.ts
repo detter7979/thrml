@@ -12,6 +12,8 @@ export type UploadCreativeAssetOptions = {
   kind: CreativeAssetKind
   filename: string
   contentType: string
+  /** When set, writes to this exact object path instead of legacy month/campaign/brief layout. */
+  unifiedObjectPath?: string
 }
 
 export type UploadedCreativeAsset = {
@@ -164,11 +166,18 @@ export async function getSignedGcsReadUrl(gcsPath: string, opts?: { expiresInSec
 export async function refreshCreativeAssetUrl(gcsPath: string) {
   const { bucketName, objectPath } = parseGcsPath(gcsPath)
   const configuredBucket = requireEnv("GCS_BUCKET_NAME")
-  if (bucketName !== configuredBucket) {
-    throw new Error(`GCS path bucket ${bucketName} does not match configured bucket ${configuredBucket}`)
+  const creativeBucket = process.env.GCS_CREATIVE_BUCKET?.trim()
+
+  if (bucketName === configuredBucket) {
+    return signedReadUrl(getBucket().file(objectPath))
+  }
+  if (creativeBucket && bucketName === creativeBucket) {
+    return signedReadUrl(getCreativeBucket().file(objectPath))
   }
 
-  return signedReadUrl(getBucket().file(objectPath))
+  throw new Error(
+    `GCS path bucket ${bucketName} does not match configured buckets (${configuredBucket}${creativeBucket ? `, ${creativeBucket}` : ""})`
+  )
 }
 
 export async function downloadCreativeAsset(gcsPath: string): Promise<DownloadedCreativeAsset> {
@@ -218,14 +227,18 @@ export async function uploadCreativeAsset(
   const bucket = getBucket()
   const bucketName = bucket.name
   const prefix = pathPrefix()
-  const objectParts = [
-    monthPath(),
-    pathSegment(opts.campaignShortName, "campaignShortName"),
-    pathSegment(opts.briefId, "briefId"),
-    kindFolder(opts.kind),
-    pathSegment(opts.filename, "filename"),
-  ]
-  const objectPath = prefix ? [prefix, ...objectParts].join("/") : objectParts.join("/")
+  const objectPath = opts.unifiedObjectPath
+    ? opts.unifiedObjectPath
+    : (() => {
+        const objectParts = [
+          monthPath(),
+          pathSegment(opts.campaignShortName, "campaignShortName"),
+          pathSegment(opts.briefId, "briefId"),
+          kindFolder(opts.kind),
+          pathSegment(opts.filename, "filename"),
+        ]
+        return prefix ? [prefix, ...objectParts].join("/") : objectParts.join("/")
+      })()
   const file = bucket.file(objectPath)
   const createdAt = new Date().toISOString()
 
@@ -326,6 +339,68 @@ export async function refreshCreativeObjectUrl(gcsPathOrObject: string) {
     ? parseGcsPath(gcsPathOrObject).objectPath
     : gcsPathOrObject
   return signedReadUrl(getCreativeBucket().file(objectPath))
+}
+
+export type AssetLibraryEntry = ListedCreativeAsset & {
+  bucket: "main" | "creative"
+  mediaType: "static" | "video" | "unknown"
+}
+
+function mediaTypeFromPath(objectPath: string): AssetLibraryEntry["mediaType"] {
+  const lower = objectPath.toLowerCase()
+  if (lower.includes("/static/") || /\.(png|jpg|jpeg|webp)$/.test(lower)) return "static"
+  if (lower.includes("/video/") || lower.startsWith("bases/") || lower.startsWith("renders/") || /\.(mp4|mov|webm)$/.test(lower)) {
+    return "video"
+  }
+  return "unknown"
+}
+
+/** List creative assets from main + creative buckets for admin asset library. */
+export async function listCreativeAssetLibrary(opts?: {
+  prefix?: string
+  mediaType?: "static" | "video" | "all"
+  limit?: number
+}): Promise<AssetLibraryEntry[]> {
+  const limit = opts?.limit ?? 200
+  const prefix = opts?.prefix?.trim() ?? ""
+  const mediaFilter = opts?.mediaType ?? "all"
+  const entries: AssetLibraryEntry[] = []
+
+  async function collect(bucketKind: "main" | "creative", bucket: ReturnType<typeof getBucket>) {
+    const [files] = await bucket.getFiles({ prefix: prefix || undefined, maxResults: limit })
+    for (const file of files) {
+      if (file.name.startsWith(ARCHIVE_PREFIX) || file.name.endsWith("/")) continue
+      const metadata = file.metadata as Record<string, unknown>
+      const customMetadata = (metadata.metadata ?? {}) as Record<string, string>
+      const mediaType = mediaTypeFromPath(file.name)
+      if (mediaFilter !== "all" && mediaType !== mediaFilter) continue
+
+      entries.push({
+        name: file.name,
+        filename: file.name.split("/").at(-1) ?? file.name,
+        kind: assetKindFromPath(file.name),
+        contentType: typeof metadata.contentType === "string" ? metadata.contentType : null,
+        createdAt: assetCreatedAt(metadata),
+        updatedAt: typeof metadata.updated === "string" ? metadata.updated : null,
+        size: (metadata.size as string | number | undefined) ?? null,
+        metadata: customMetadata,
+        gcsPath: `gs://${bucket.name}/${file.name}`,
+        gcsUrl: await signedReadUrl(file),
+        publicUrl: publicUrl(bucket.name, file.name),
+        bucket: bucketKind,
+        mediaType,
+      })
+    }
+  }
+
+  await collect("main", getBucket())
+  if (entries.length < limit) {
+    await collect("creative", getCreativeBucket())
+  }
+
+  return entries
+    .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))
+    .slice(0, limit)
 }
 
 export async function archiveOldAssets(daysOld = 90): Promise<{ archived: number; assets: ArchivedCreativeAsset[] }> {

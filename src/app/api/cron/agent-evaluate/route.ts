@@ -341,12 +341,22 @@ export async function GET(req: NextRequest) {
         .filter((row): row is NonNullable<typeof row> => row != null)
 
       if (briefRows.length) {
-        const { error: briefError } = await supabase.from("creative_briefs").insert(briefRows)
-        if (briefError) {
-          results[platform].errors++
-          console.error("[agent-evaluate] creative_briefs insert failed", briefError)
+        const legacyBriefInsert =
+          process.env.CREATIVE_LEGACY_BRIEF_INSERT === "true" ||
+          process.env.AGENT_EVALUATE_LEGACY_CREATIVE_BRIEFS === "true"
+        if (!legacyBriefInsert) {
+          console.log(
+            "[agent-evaluate] skipping creative_briefs insert (legacy path disabled; use evaluator-agent GENERATE_CREATIVE)",
+            { count: briefRows.length }
+          )
         } else {
-          results[platform].briefs += briefRows.length
+          const { error: briefError } = await supabase.from("creative_briefs").insert(briefRows)
+          if (briefError) {
+            results[platform].errors++
+            console.error("[agent-evaluate] creative_briefs insert failed", briefError)
+          } else {
+            results[platform].briefs += briefRows.length
+          }
         }
       }
 

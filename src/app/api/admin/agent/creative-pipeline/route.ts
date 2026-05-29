@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
+import { processStaticBrief } from "@/lib/agent/static-generator"
 import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { requireAdminApi } from "@/lib/admin-guard"
 
@@ -10,6 +11,8 @@ const PIPELINE_ACTIONS = new Set([
   "approve_asset",
   "reject_asset",
   "create_video_brief",
+  "create_static_brief",
+  "generate_preview",
 ])
 
 type AdminClient = NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>
@@ -343,6 +346,64 @@ export async function PATCH(req: NextRequest) {
 
     if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
     return NextResponse.json({ brief: data })
+  }
+
+  if (body.action === "create_static_brief") {
+    const b = body.brief ?? {}
+    const visualDirection =
+      typeof b.visual_direction === "string" ? b.visual_direction.trim() : ""
+    if (!visualDirection && !Array.isArray((b.trigger_data as Record<string, unknown> | undefined)?.static_variations)) {
+      return NextResponse.json({ error: "visual_direction or static_variations required" }, { status: 400 })
+    }
+
+    const saveAndApprove = Boolean(b.saveAndApprove)
+    const now = new Date().toISOString()
+    const triggerData =
+      b.trigger_data && typeof b.trigger_data === "object" && !Array.isArray(b.trigger_data)
+        ? b.trigger_data
+        : {}
+
+    const { data, error: insertError } = await admin!
+      .from("creative_briefs")
+      .insert({
+        trigger_type: typeof b.trigger_type === "string" ? b.trigger_type : "manual",
+        trigger_data: triggerData,
+        status: saveAndApprove ? "approved" : "briefed",
+        hypothesis: typeof b.hypothesis === "string" ? b.hypothesis : null,
+        target_audience: typeof b.target_audience === "string" ? b.target_audience : null,
+        hook: typeof b.hook === "string" ? b.hook : null,
+        format: typeof b.format === "string" ? b.format : "1x1,9x16",
+        visual_direction: visualDirection || null,
+        copy_primary: typeof b.copy_primary === "string" ? b.copy_primary : null,
+        copy_headline: typeof b.copy_headline === "string" ? b.copy_headline : null,
+        copy_subtext: typeof b.copy_subtext === "string" ? b.copy_subtext : null,
+        cta: typeof b.cta === "string" ? b.cta : null,
+        campaign_short_name: typeof b.campaign_short_name === "string" ? b.campaign_short_name : null,
+        success_criteria:
+          b.success_criteria && typeof b.success_criteria === "object" ? b.success_criteria : { variations: 1 },
+        approved_at: saveAndApprove ? now : null,
+        created_by: "admin",
+      })
+      .select("*")
+      .maybeSingle()
+
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return NextResponse.json({ brief: data })
+  }
+
+  if (body.action === "generate_preview") {
+    if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
+    try {
+      const generated = await processStaticBrief({
+        briefId: body.brief_id,
+        variations: 1,
+        formats: ["1x1"],
+      })
+      return NextResponse.json({ ok: true, generated })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Preview generation failed"
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
   }
 
   if (body.action === "reject_brief") {

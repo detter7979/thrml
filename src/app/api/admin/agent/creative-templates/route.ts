@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { getCreativeTemplate, buildBriefFromTemplate, loadCreativeTemplates } from "@/lib/agent/creative-templates"
+import { loadSvgTemplateRegistry } from "@/lib/agent/svg-template-generator"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
@@ -21,9 +22,13 @@ export async function GET() {
     concept_verify_default: t.concept_verify_default,
     full_batch_variations: t.full_batch_variations,
     naming: t.naming,
+    generation_tool: t.generation_tool ?? null,
+    svg_template_id: t.svg_template_id ?? null,
   }))
 
-  return NextResponse.json({ templates })
+  const svgTemplates = loadSvgTemplateRegistry()
+
+  return NextResponse.json({ templates, svgTemplates })
 }
 
 export async function POST(req: NextRequest) {

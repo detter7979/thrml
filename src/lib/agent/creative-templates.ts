@@ -20,6 +20,12 @@ export type CreativeTemplateStaticVariation = {
   background_image_prompt: string
 }
 
+export type CreativeTemplateSvgVariation = {
+  variation_label: string
+  tokens: Record<string, string>
+  photo_gcs_path?: string
+}
+
 export type CreativeTemplateVideoBlock = {
   source: "runway" | "uploaded"
   concept_slug: string
@@ -46,9 +52,13 @@ export type CreativeTemplate = {
   concept_verify_default: boolean
   full_batch_variations: 1 | 2 | 3
   static_playbook?: string
+  generation_tool?: "svg_template" | "imagen" | "replicate" | "both"
+  svg_template_id?: string
+  svg_tokens?: Record<string, string>
   naming: CreativeTemplateNaming
   defaults: Record<string, string>
   static_variations?: CreativeTemplateStaticVariation[]
+  svg_variations?: CreativeTemplateSvgVariation[]
   video?: CreativeTemplateVideoBlock
 }
 
@@ -109,9 +119,34 @@ export function buildBriefFromTemplate(
     triggerData.static_playbook = template.static_playbook
   }
 
+  if (template.generation_tool) {
+    triggerData.generation_tool = template.generation_tool
+  }
+  if (template.svg_template_id) {
+    triggerData.svg_template_id = template.svg_template_id
+  }
+
   const staticVars = staticVariationsForTemplate(template)
   if (staticVars.length) {
     triggerData.static_variations = staticVars.slice(0, variations)
+  }
+
+  if (template.svg_variations?.length) {
+    triggerData.svg_variations = template.svg_variations.slice(0, variations).map((variation) => ({
+      ...variation,
+      tokens: {
+        ...(template.svg_tokens ?? {}),
+        ...variation.tokens,
+      },
+    }))
+    if (template.svg_template_id) {
+      triggerData.svg_tokens = {
+        ...(template.svg_tokens ?? {}),
+        ...(template.svg_variations[0]?.tokens ?? {}),
+      }
+    }
+  } else if (template.svg_tokens && template.svg_template_id) {
+    triggerData.svg_tokens = template.svg_tokens
   }
 
   const format = template.formats.join(",")

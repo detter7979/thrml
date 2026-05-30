@@ -13,6 +13,11 @@ import {
 import { sendThrmlLayoutEmail } from "@/lib/emails/transactional-send"
 import { generateImagen } from "@/lib/agent/imagen"
 import { renderMasterAdTemplate } from "@/lib/agent/static-layouts/master-ad-template"
+import {
+  briefUsesSvgTemplate,
+  generateSvgVariantsForBrief,
+  type SvgStaticFormat,
+} from "@/lib/agent/svg-template-generator"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
@@ -22,10 +27,10 @@ const VARIATION_LABELS = ["A", "B", "C"] as const
 const DEFAULT_STATIC_VARIATION_COUNT: StaticVariationCount = 1
 
 export type StaticGenerator = "imagen" | "replicate" | "both"
-export type StaticFormat = "1x1" | "9x16"
+export type StaticFormat = "1x1" | "4x5" | "9x16"
 export type StaticVariationCount = 1 | 2 | 3
 
-type AspectRatio = "1:1" | "9:16"
+type AspectRatio = "1:1" | "4:5" | "9:16"
 type BaseImageGenerator = "imagen" | "replicate"
 
 type CreativeBriefRow = {
@@ -148,7 +153,7 @@ function normalizeGenerator(value: unknown): StaticGenerator | null {
 }
 
 function normalizeFormat(value: unknown): StaticFormat | null {
-  return value === "1x1" || value === "9x16" ? value : null
+  return value === "1x1" || value === "4x5" || value === "9x16" ? value : null
 }
 
 function normalizeVariationCount(value: unknown): StaticVariationCount | null {
@@ -186,7 +191,20 @@ function generatorsFor(generator: StaticGenerator): BaseImageGenerator[] {
 }
 
 function aspectForFormat(format: StaticFormat): AspectRatio {
-  return format === "9x16" ? "9:16" : "1:1"
+  if (format === "9x16") return "9:16"
+  if (format === "4x5") return "4:5"
+  return "1:1"
+}
+
+function parseFormatsFromBrief(format: unknown, override?: StaticFormat[]): StaticFormat[] {
+  if (override?.length) return Array.from(new Set(override)).slice(0, 3)
+  if (typeof format !== "string") return ["1x1"]
+  const formats = new Set<StaticFormat>()
+  for (const value of format.split(/[,/+\s]+/)) {
+    const normalized = normalizeFormat(value)
+    if (normalized) formats.add(normalized)
+  }
+  return formats.size > 0 ? Array.from(formats) : ["1x1"]
 }
 
 function countBaseImages(generatorCount: number, formatCount: number, requestedVariations: number) {
@@ -355,6 +373,24 @@ async function processStaticBriefInner(
   options: ProcessStaticBriefOptions
 ) {
   const brief = await getBrief(admin, options.briefId)
+
+  if (briefUsesSvgTemplate(brief.trigger_data)) {
+    await admin.from("creative_briefs").update({ status: "generating" }).eq("id", brief.id)
+    const formats = parseFormatsFromBrief(brief.format, options.formats) as SvgStaticFormat[]
+    const requestedVariations = options.variations ?? briefRequestedVariationCount(brief) ?? defaultVariationCount()
+    const results = await generateSvgVariantsForBrief(brief.id, {
+      formats,
+      variations: requestedVariations,
+    })
+    const { error: updateError } = await admin
+      .from("creative_briefs")
+      .update({ status: "variations_ready" })
+      .eq("id", brief.id)
+    if (updateError) throw updateError
+    await sendReadyEmail(results.length, brief)
+    return results.length
+  }
+
   const staticPlan = resolveStaticVariationPlan(brief)
   if (!staticPlan?.length && !brief.visual_direction?.trim()) {
     throw new Error("Creative brief is missing visual_direction")
@@ -362,8 +398,7 @@ async function processStaticBriefInner(
 
   const generator = briefGenerator(brief, options.generator)
   const generators = generatorsFor(generator)
-  const requestedFormats = options.formats?.length ? options.formats : [normalizeFormat(brief.format) ?? "1x1"]
-  const formats = Array.from(new Set(requestedFormats)).slice(0, 2)
+  const formats = parseFormatsFromBrief(brief.format, options.formats)
   const requestedVariations = staticPlan?.length
     ? (Math.min(staticPlan.length, 3) as StaticVariationCount)
     : (options.variations ?? briefRequestedVariationCount(brief) ?? defaultVariationCount())

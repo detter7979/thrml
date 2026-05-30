@@ -44,6 +44,7 @@ type CreativeBrief = {
   cta: string | null
   hook: string | null
   campaign_short_name: string | null
+  trigger_data?: Record<string, unknown> | null
 }
 
 type CreativeAssetRow = {
@@ -327,7 +328,7 @@ export async function POST(req: NextRequest) {
     const { data: asset, error: assetError } = await admin!
       .from("creative_assets")
       .select(
-        "id, brief_id, asset_type, generation_tool, variation_index, variation_label, gcs_path, convention_name, status, meta_ad_id, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name)"
+        "id, brief_id, asset_type, generation_tool, variation_index, variation_label, gcs_path, convention_name, status, meta_ad_id, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name, trigger_data)"
       )
       .eq("id", assetId)
       .maybeSingle()
@@ -340,6 +341,20 @@ export async function POST(req: NextRequest) {
     if (!creativeAsset.brief_id) return jsonError("Creative asset is missing brief_id", 400)
     if (!brief) return jsonError("Creative brief not found for asset", 404)
     if (!creativeAsset.gcs_path) return jsonError("Creative asset is missing gcs_path", 400)
+
+    const claimWarning = brief.trigger_data?.claim_warning
+    if (
+      claimWarning &&
+      typeof claimWarning === "object" &&
+      !Array.isArray(claimWarning) &&
+      !(claimWarning as Record<string, unknown>).acknowledged_at
+    ) {
+      return jsonError(
+        "Ad copy flagged for health claims — acknowledge the claim warning on the brief before launch",
+        403,
+        { claimWarning }
+      )
+    }
 
     const tool = creativeAsset.generation_tool ?? ""
     if (BASE_VIDEO_TOOLS.has(tool)) {

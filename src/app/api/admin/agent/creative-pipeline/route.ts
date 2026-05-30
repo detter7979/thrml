@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
 import { processStaticBrief } from "@/lib/agent/static-generator"
+import {
+  generateFromSvgTemplate,
+  loadSvgTemplateRegistry,
+  type SvgAspectRatio,
+} from "@/lib/agent/svg-template-generator"
 import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { requireAdminApi } from "@/lib/admin-guard"
 
@@ -12,7 +17,10 @@ const PIPELINE_ACTIONS = new Set([
   "reject_asset",
   "create_video_brief",
   "create_static_brief",
+  "create_svg_static_brief",
   "generate_preview",
+  "generate_svg_static",
+  "acknowledge_claim_warning",
 ])
 
 type AdminClient = NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>
@@ -100,18 +108,45 @@ async function withSignedUrls<T extends CreativeAssetRow>(assets: T[]) {
   )
 }
 
-async function fetchMetaAdsets(admin: AdminClient) {
-  const metaRegistry = await admin
-    .from("meta_adset_registry")
-    .select("*")
-    .order("created_at", { ascending: false })
-  if (!metaRegistry.error) return metaRegistry
+type LaunchableMetaAdset = {
+  id: string
+  platform_id: string
+  adset_name: string
+  status: string | null
+  market: string | null
+  aud_type: string | null
+  goal_type: string | null
+}
 
-  return admin
-    .from("adset_registry")
-    .select("*")
-    .eq("platform", "meta")
+async function fetchMetaAdsets(admin: AdminClient) {
+  const { data, error } = await admin
+    .from("ad_sets")
+    .select("id, name, status, platform_adset_id, audience_src, conv_event, campaigns(geo, platform)")
+    .in("status", ["TEST", "SCALE"])
+    .not("platform_adset_id", "is", null)
     .order("created_at", { ascending: false })
+
+  if (error) return { data: null, error }
+
+  const mapped: LaunchableMetaAdset[] = (data ?? [])
+    .filter((row) => {
+      const camp = Array.isArray(row.campaigns) ? row.campaigns[0] : row.campaigns
+      return camp?.platform === "META"
+    })
+    .map((row) => {
+      const camp = Array.isArray(row.campaigns) ? row.campaigns[0] : row.campaigns
+      return {
+        id: row.id,
+        platform_id: row.platform_adset_id ?? row.id,
+        adset_name: row.name,
+        status: row.status,
+        market: camp?.geo ?? null,
+        aud_type: row.audience_src ?? null,
+        goal_type: row.conv_event ?? null,
+      }
+    })
+
+  return { data: mapped, error: null }
 }
 
 function numberMetric(value: unknown) {
@@ -210,9 +245,7 @@ export async function GET() {
     }
   }
 
-  const activeMetaAdsets = (adsets.data ?? []).filter((adset) =>
-    String(adset.status ?? "").toLowerCase() === "active"
-  )
+  const activeMetaAdsets = adsets.data ?? []
 
   const allBriefIds = [
     ...(briefs.data ?? []).map((b) => b.id),
@@ -350,18 +383,23 @@ export async function PATCH(req: NextRequest) {
 
   if (body.action === "create_static_brief") {
     const b = body.brief ?? {}
+    const triggerData =
+      b.trigger_data && typeof b.trigger_data === "object" && !Array.isArray(b.trigger_data)
+        ? (b.trigger_data as Record<string, unknown>)
+        : {}
     const visualDirection =
       typeof b.visual_direction === "string" ? b.visual_direction.trim() : ""
-    if (!visualDirection && !Array.isArray((b.trigger_data as Record<string, unknown> | undefined)?.static_variations)) {
-      return NextResponse.json({ error: "visual_direction or static_variations required" }, { status: 400 })
+    const usesSvg = typeof triggerData.svg_template_id === "string"
+    if (
+      !visualDirection &&
+      !Array.isArray(triggerData.static_variations) &&
+      !usesSvg
+    ) {
+      return NextResponse.json({ error: "visual_direction, static_variations, or svg_template_id required" }, { status: 400 })
     }
 
     const saveAndApprove = Boolean(b.saveAndApprove)
     const now = new Date().toISOString()
-    const triggerData =
-      b.trigger_data && typeof b.trigger_data === "object" && !Array.isArray(b.trigger_data)
-        ? b.trigger_data
-        : {}
 
     const { data, error: insertError } = await admin!
       .from("creative_briefs")
@@ -391,8 +429,205 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ brief: data })
   }
 
+  if (body.action === "create_svg_static_brief") {
+    const b = body.brief ?? {}
+    const templateId = typeof b.svg_template_id === "string" ? b.svg_template_id.trim() : ""
+    const aspectRatio = typeof b.aspect_ratio === "string" ? b.aspect_ratio.trim() : "1:1"
+    const tokens =
+      b.tokens && typeof b.tokens === "object" && !Array.isArray(b.tokens)
+        ? (b.tokens as Record<string, string>)
+        : null
+
+    if (!templateId) {
+      return NextResponse.json({ error: "svg_template_id is required" }, { status: 400 })
+    }
+    if (!tokens || !Object.keys(tokens).length) {
+      return NextResponse.json({ error: "tokens object is required" }, { status: 400 })
+    }
+
+    const registry = loadSvgTemplateRegistry()
+    const template = registry.find((entry) => entry.id === templateId)
+    if (!template) {
+      return NextResponse.json({ error: `Unknown SVG template: ${templateId}` }, { status: 400 })
+    }
+
+    const formatToken =
+      aspectRatio === "4:5" ? "4x5" : aspectRatio === "9:16" ? "9x16" : "1x1"
+    if (!template.aspect_ratios.includes(formatToken as "1x1" | "4x5" | "9x16")) {
+      return NextResponse.json({ error: `Template does not support aspect ratio ${aspectRatio}` }, { status: 400 })
+    }
+
+    const saveAndApprove = Boolean(b.saveAndApprove)
+    const generatePreview = b.generate_preview !== false
+    const now = new Date().toISOString()
+    const photoGcsPath = typeof b.photo_gcs_path === "string" ? b.photo_gcs_path.trim() : null
+
+    const triggerData: Record<string, unknown> = {
+      category: typeof b.category === "string" ? b.category : "Hosts",
+      angle: typeof b.angle === "string" ? b.angle : "pov_earnings",
+      generation_tool: "svg_template",
+      svg_template_id: templateId,
+      svg_tokens: tokens,
+      photo_gcs_path: photoGcsPath,
+      concept_verify: Boolean(b.concept_verify ?? true),
+      variations: 1,
+      naming:
+        b.naming && typeof b.naming === "object" && !Array.isArray(b.naming)
+          ? b.naming
+          : { test_id: "T05", format: `Static_${formatToken}`, cta: "list_now" },
+    }
+
+    const { data: brief, error: insertError } = await admin!
+      .from("creative_briefs")
+      .insert({
+        trigger_type: "manual",
+        trigger_data: triggerData,
+        status: saveAndApprove ? "approved" : "briefed",
+        hypothesis: typeof b.hypothesis === "string" ? b.hypothesis : null,
+        hook: typeof b.hook === "string" ? b.hook : null,
+        format: formatToken,
+        campaign_short_name: typeof b.campaign_short_name === "string" ? b.campaign_short_name : "pov-earnings",
+        success_criteria: {
+          variations: 1,
+          concept_verify: Boolean(b.concept_verify ?? true),
+          formats: [formatToken],
+        },
+        approved_at: saveAndApprove ? now : null,
+        created_by: "admin",
+      })
+      .select("*")
+      .maybeSingle()
+
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+    if (!brief) return NextResponse.json({ error: "Failed to create brief" }, { status: 500 })
+
+    if (!generatePreview) {
+      return NextResponse.json({ brief })
+    }
+
+    try {
+      const asset = await generateFromSvgTemplate(
+        brief.id,
+        templateId,
+        aspectRatio as SvgAspectRatio,
+        tokens,
+        photoGcsPath,
+      )
+      await admin!.from("creative_briefs").update({ status: "variations_ready" }).eq("id", brief.id)
+      return NextResponse.json({ brief: { ...brief, status: "variations_ready" }, asset })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "SVG generation failed"
+      return NextResponse.json({ error: message, brief }, { status: 500 })
+    }
+  }
+
+  if (body.action === "generate_svg_static") {
+    if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
+    const b = body.brief ?? {}
+    const templateId =
+      typeof b.svg_template_id === "string"
+        ? b.svg_template_id.trim()
+        : undefined
+    const aspectRatio = (typeof b.aspect_ratio === "string" ? b.aspect_ratio.trim() : "1:1") as SvgAspectRatio
+    const tokens =
+      b.tokens && typeof b.tokens === "object" && !Array.isArray(b.tokens)
+        ? (b.tokens as Record<string, string>)
+        : undefined
+    const photoGcsPath = typeof b.photo_gcs_path === "string" ? b.photo_gcs_path.trim() : undefined
+
+    const { data: brief, error: briefError } = await admin!
+      .from("creative_briefs")
+      .select("id, trigger_data")
+      .eq("id", body.brief_id)
+      .maybeSingle()
+
+    if (briefError) return NextResponse.json({ error: briefError.message }, { status: 500 })
+    if (!brief) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
+
+    const td = (brief.trigger_data as Record<string, unknown> | null) ?? {}
+    const resolvedTemplateId =
+      templateId ?? (typeof td.svg_template_id === "string" ? td.svg_template_id : "")
+    const resolvedTokens =
+      tokens ??
+      (td.svg_tokens && typeof td.svg_tokens === "object" && !Array.isArray(td.svg_tokens)
+        ? (td.svg_tokens as Record<string, string>)
+        : {})
+    const resolvedPhoto =
+      photoGcsPath ?? (typeof td.photo_gcs_path === "string" ? td.photo_gcs_path : undefined)
+
+    if (!resolvedTemplateId) {
+      return NextResponse.json({ error: "svg_template_id is required" }, { status: 400 })
+    }
+
+    try {
+      const asset = await generateFromSvgTemplate(
+        brief.id,
+        resolvedTemplateId,
+        aspectRatio,
+        resolvedTokens,
+        resolvedPhoto,
+      )
+      await admin!.from("creative_briefs").update({ status: "variations_ready" }).eq("id", brief.id)
+      return NextResponse.json({ ok: true, asset })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "SVG generation failed"
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+  }
+
+  if (body.action === "acknowledge_claim_warning") {
+    if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
+    const { data: brief, error: briefError } = await admin!
+      .from("creative_briefs")
+      .select("trigger_data")
+      .eq("id", body.brief_id)
+      .maybeSingle()
+
+    if (briefError) return NextResponse.json({ error: briefError.message }, { status: 500 })
+    if (!brief) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
+
+    const td = (brief.trigger_data as Record<string, unknown> | null) ?? {}
+    const claimWarning =
+      td.claim_warning && typeof td.claim_warning === "object" && !Array.isArray(td.claim_warning)
+        ? (td.claim_warning as Record<string, unknown>)
+        : null
+
+    if (!claimWarning) {
+      return NextResponse.json({ error: "Brief has no claim warning" }, { status: 400 })
+    }
+
+    const { data, error: updateError } = await admin!
+      .from("creative_briefs")
+      .update({
+        trigger_data: {
+          ...td,
+          claim_warning: {
+            ...claimWarning,
+            acknowledged_at: new Date().toISOString(),
+            acknowledged_by: "admin",
+          },
+        },
+      })
+      .eq("id", body.brief_id)
+      .select("*")
+      .maybeSingle()
+
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+    return NextResponse.json({ brief: data })
+  }
+
   if (body.action === "generate_preview") {
     if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
+
+    const { data: brief, error: briefError } = await admin!
+      .from("creative_briefs")
+      .select("id, trigger_data, format")
+      .eq("id", body.brief_id)
+      .maybeSingle()
+
+    if (briefError) return NextResponse.json({ error: briefError.message }, { status: 500 })
+    if (!brief) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
+
     try {
       const generated = await processStaticBrief({
         briefId: body.brief_id,

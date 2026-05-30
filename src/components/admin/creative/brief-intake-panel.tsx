@@ -12,7 +12,19 @@ export type CreativeTemplateSummary = {
   type: "static" | "video"
   concept_verify_default: boolean
   full_batch_variations: number
+  generation_tool?: string | null
+  svg_template_id?: string | null
 }
+
+export type SvgTemplateSummary = {
+  id: string
+  label: string
+  tokens: string[]
+  aspect_ratios: string[]
+}
+
+const SPLIT_HEADER_TOKENS = ["TAGLINE_EYEBROW", "HEADLINE", "SUBHEAD"] as const
+const POV_OVERLAY_TOKENS = ["POV_LINE_1", "POV_LINE_2"] as const
 
 async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" })
@@ -36,11 +48,12 @@ export function BriefIntakePanel({
   setBusyAction,
   patchPipeline,
 }: Props) {
-  const { data } = useSWR<{ templates: CreativeTemplateSummary[] }>(
+  const { data } = useSWR<{ templates: CreativeTemplateSummary[]; svgTemplates?: SvgTemplateSummary[] }>(
     "/api/admin/agent/creative-templates",
     fetcher
   )
   const templates = data?.templates ?? []
+  const svgTemplates = data?.svgTemplates ?? []
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
   const [conceptVerify, setConceptVerify] = useState(true)
@@ -67,7 +80,30 @@ export function BriefIntakePanel({
     campaign_short_name: "pov-earnings",
   })
 
+  const [staticMode, setStaticMode] = useState<"imagen" | "svg">("imagen")
+  const [svgTemplateId, setSvgTemplateId] = useState("")
+  const [svgAspectRatio, setSvgAspectRatio] = useState<"1:1" | "4:5" | "9:16">("1:1")
+  const [photoGcsPath, setPhotoGcsPath] = useState("")
+  const [svgTokens, setSvgTokens] = useState<Record<string, string>>({
+    TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR.",
+    HEADLINE: "Turn your idle sauna into a $1,200/mo asset.",
+    SUBHEAD: "Backyard and cabin saunas in Seattle + LA.",
+    POV_LINE_1: "pov: your sauna earns you $1,200/mo",
+    POV_LINE_2: "List on thrml. Get paid when you're not using it.",
+  })
+
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
+  const selectedSvgTemplate = svgTemplates.find((t) => t.id === svgTemplateId)
+  const activeSvgTokenKeys =
+    svgTemplateId === "thrml_pov_overlay_static"
+      ? POV_OVERLAY_TOKENS
+      : svgTemplateId === "thrml_split_header_static"
+        ? SPLIT_HEADER_TOKENS
+        : (selectedSvgTemplate?.tokens ?? []).filter((token) => token !== "PHOTO_URL")
+
+  const onPhotoLibrarySelect = (entry: AssetLibraryEntry) => {
+    setPhotoGcsPath(entry.gcsPath.replace(/^gs:\/\/[^/]+\//, ""))
+  }
 
   const createFromTemplate = async (saveAndApprove: boolean) => {
     if (!selectedTemplateId) {
@@ -167,6 +203,48 @@ export function BriefIntakePanel({
       onMessage(saveAndApprove ? "Static brief created and approved." : "Static brief saved.")
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Could not create static brief.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const createSvgStaticBrief = async () => {
+    setBusyAction("create-svg-static")
+    try {
+      if (!svgTemplateId) throw new Error("Select an SVG template.")
+      if (svgTemplateId === "thrml_pov_overlay_static" && !photoGcsPath.trim()) {
+        throw new Error("POV overlay requires a photo from the asset library.")
+      }
+
+      const tokens = Object.fromEntries(
+        activeSvgTokenKeys.map((key) => [key, svgTokens[key]?.trim() ?? ""]).filter(([, value]) => value),
+      )
+
+      const json = (await patchPipeline({
+        action: "create_svg_static_brief",
+        brief: {
+          svg_template_id: svgTemplateId,
+          aspect_ratio: svgAspectRatio,
+          tokens,
+          photo_gcs_path: photoGcsPath.trim() || undefined,
+          campaign_short_name: staticDraft.campaign_short_name.trim() || "pov-earnings",
+          hypothesis: staticDraft.hypothesis.trim() || null,
+          hook: svgTokens.POV_LINE_1?.trim() || svgTokens.HEADLINE?.trim() || null,
+          concept_verify: true,
+          generate_preview: true,
+          saveAndApprove: false,
+        },
+      })) as { asset?: { conventionName?: string | null; gcsPath?: string } }
+
+      onCreated()
+      const convention = json.asset?.conventionName
+      onMessage(
+        convention
+          ? `SVG preview generated (${convention}).`
+          : "SVG preview generated and linked to new brief.",
+      )
+    } catch (err) {
+      onMessage(err instanceof Error ? err.message : "Could not generate SVG static.")
     } finally {
       setBusyAction(null)
     }
@@ -288,42 +366,135 @@ export function BriefIntakePanel({
 
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase text-muted-foreground">Static brief</p>
-            <div className="grid gap-2 md:grid-cols-2">
-              <input
-                placeholder="Headline"
-                value={staticDraft.headline}
-                onChange={(e) => setStaticDraft((p) => ({ ...p, headline: e.target.value }))}
-                className="rounded-md border px-3 py-2 text-sm"
-              />
-              <input
-                placeholder="Campaign short name"
-                value={staticDraft.campaign_short_name}
-                onChange={(e) => setStaticDraft((p) => ({ ...p, campaign_short_name: e.target.value }))}
-                className="rounded-md border px-3 py-2 text-sm"
-              />
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="staticMode"
+                  checked={staticMode === "imagen"}
+                  onChange={() => setStaticMode("imagen")}
+                />
+                Imagen / Replicate
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="staticMode"
+                  checked={staticMode === "svg"}
+                  onChange={() => setStaticMode("svg")}
+                />
+                SVG template
+              </label>
             </div>
-            <textarea
-              placeholder="Visual direction (Imagen prompt)"
-              value={staticDraft.visual_direction}
-              onChange={(e) => setStaticDraft((p) => ({ ...p, visual_direction: e.target.value }))}
-              className="min-h-20 w-full rounded-md border px-3 py-2 text-sm"
-            />
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void createStaticBrief(false)}
-                className="text-xs border rounded px-3 py-1.5"
-              >
-                Save static draft
-              </button>
-              <button
-                type="button"
-                onClick={() => void createStaticBrief(true)}
-                className="text-xs bg-green-600 text-white rounded px-3 py-1.5"
-              >
-                Save static &amp; approve
-              </button>
-            </div>
+
+            {staticMode === "svg" ? (
+              <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+                <div className="grid gap-2 md:grid-cols-2">
+                  <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                    Template
+                    <select
+                      value={svgTemplateId}
+                      onChange={(e) => setSvgTemplateId(e.target.value)}
+                      className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                    >
+                      <option value="">Select SVG template…</option>
+                      {svgTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                    Aspect ratio
+                    <select
+                      value={svgAspectRatio}
+                      onChange={(e) =>
+                        setSvgAspectRatio(e.target.value as "1:1" | "4:5" | "9:16")
+                      }
+                      className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                    >
+                      <option value="1:1">1:1</option>
+                      <option value="4:5">4:5</option>
+                      <option value="9:16">9:16</option>
+                    </select>
+                  </label>
+                </div>
+
+                {activeSvgTokenKeys.map((key) => (
+                  <input
+                    key={key}
+                    placeholder={key.replaceAll("_", " ")}
+                    value={svgTokens[key] ?? ""}
+                    onChange={(e) => setSvgTokens((prev) => ({ ...prev, [key]: e.target.value }))}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                  />
+                ))}
+
+                {svgTemplateId === "thrml_pov_overlay_static" ? (
+                  <>
+                    <AssetLibraryPanel
+                      mediaType="static"
+                      selectedPath={photoGcsPath}
+                      onSelect={onPhotoLibrarySelect}
+                    />
+                    {photoGcsPath ? (
+                      <p className="text-xs font-mono text-green-700 truncate">{photoGcsPath}</p>
+                    ) : null}
+                  </>
+                ) : null}
+
+                <button
+                  type="button"
+                  disabled={!svgTemplateId || busyAction !== null}
+                  onClick={() => void createSvgStaticBrief()}
+                  className="text-xs bg-[#9A4A33] text-white rounded px-3 py-1.5 disabled:opacity-50"
+                >
+                  Generate preview asset
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <input
+                    placeholder="Headline"
+                    value={staticDraft.headline}
+                    onChange={(e) => setStaticDraft((p) => ({ ...p, headline: e.target.value }))}
+                    className="rounded-md border px-3 py-2 text-sm"
+                  />
+                  <input
+                    placeholder="Campaign short name"
+                    value={staticDraft.campaign_short_name}
+                    onChange={(e) =>
+                      setStaticDraft((p) => ({ ...p, campaign_short_name: e.target.value }))
+                    }
+                    className="rounded-md border px-3 py-2 text-sm"
+                  />
+                </div>
+                <textarea
+                  placeholder="Visual direction (Imagen prompt)"
+                  value={staticDraft.visual_direction}
+                  onChange={(e) => setStaticDraft((p) => ({ ...p, visual_direction: e.target.value }))}
+                  className="min-h-20 w-full rounded-md border px-3 py-2 text-sm"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void createStaticBrief(false)}
+                    className="text-xs border rounded px-3 py-1.5"
+                  >
+                    Save static draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void createStaticBrief(true)}
+                    className="text-xs bg-green-600 text-white rounded px-3 py-1.5"
+                  >
+                    Save static &amp; approve
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="space-y-3 border-t pt-3">

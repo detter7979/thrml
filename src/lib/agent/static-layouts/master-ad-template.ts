@@ -1,7 +1,10 @@
-import { readFile } from "node:fs/promises"
-import path from "node:path"
-
 import sharp from "sharp"
+
+import {
+  buildBrandAdFontStyleBlock,
+  loadBrandSansMediumDataUrl,
+  loadBrandSerifFontDataUrls,
+} from "@/lib/agent/static-layouts/brand-ad-fonts"
 
 /**
  * Master Ad Template renderer.
@@ -26,18 +29,6 @@ export type RenderMasterAdTemplateOptions = {
   headline: string
   subhead: string
 }
-
-const FONT_FILES = {
-  serif: path.resolve(
-    process.cwd(),
-    "node_modules/@fontsource/cormorant-garamond/files/cormorant-garamond-latin-400-normal.woff2",
-  ),
-  /** Sub-headline: Inter Medium (500) for editorial weight + legibility with proof-line numerals */
-  sansMedium: path.resolve(
-    process.cwd(),
-    "node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2",
-  ),
-} as const
 
 const PALETTE = {
   gradient: "#121212",
@@ -78,15 +69,12 @@ const SPECS: Record<MasterAdTemplateFormat, FormatSpec> = {
   "4x5": { width: 1080, height: 1350, padding: 64, wordmarkSize: 56, headlineSize: 80, subheadSize: 28 },
 }
 
-let fontDataUrlsPromise: Promise<{ serif: string; sansMedium: string }> | null = null
+let fontDataUrlsPromise: Promise<{ serif: { regular: string; italic: string }; sansMedium: string }> | null = null
 
 async function loadFontDataUrls() {
   if (!fontDataUrlsPromise) {
-    fontDataUrlsPromise = Promise.all([readFile(FONT_FILES.serif), readFile(FONT_FILES.sansMedium)]).then(
-      ([serif, sansMedium]) => ({
-        serif: `data:font/woff2;base64,${serif.toString("base64")}`,
-        sansMedium: `data:font/woff2;base64,${sansMedium.toString("base64")}`,
-      }),
+    fontDataUrlsPromise = Promise.all([loadBrandSerifFontDataUrls(), loadBrandSansMediumDataUrl()]).then(
+      ([serif, sansMedium]) => ({ serif, sansMedium }),
     )
   }
   return fontDataUrlsPromise
@@ -138,7 +126,7 @@ function multilineText(opts: {
   const lines = wrapText(opts.text, opts.fontSize, opts.maxWidth)
   const familyStack =
     opts.family === "serif"
-      ? '"thrml-serif", Georgia, "Times New Roman", serif'
+      ? '"DM Serif Display", Georgia, "Times New Roman", serif'
       : '"thrml-sans", "Geist", "Helvetica Neue", Arial, sans-serif'
   const fontWeight = opts.fontWeight ?? (opts.family === "sans" ? 500 : 400)
   const letterSpacing =
@@ -160,6 +148,7 @@ function multilineText(opts: {
 
 async function buildOverlay(spec: FormatSpec, headline: string, subhead: string) {
   const { serif, sansMedium } = await loadFontDataUrls()
+  const fontStyles = buildBrandAdFontStyleBlock(serif, sansMedium)
 
   const { width, height, padding, wordmarkSize, headlineSize, subheadSize } = spec
   const wordmarkBaseline = padding + wordmarkSize - 6
@@ -183,20 +172,7 @@ async function buildOverlay(spec: FormatSpec, headline: string, subhead: string)
 
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-      <style>
-        @font-face {
-          font-family: "thrml-serif";
-          src: url("${serif}") format("woff2");
-          font-weight: 400;
-          font-style: normal;
-        }
-        @font-face {
-          font-family: "thrml-sans";
-          src: url("${sansMedium}") format("woff2");
-          font-weight: 500;
-          font-style: normal;
-        }
-      </style>
+      ${fontStyles}
       <defs>
         <linearGradient id="bottom-gradient" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stop-color="${PALETTE.gradient}" stop-opacity="${GRADIENT_BOTTOM.topOpacity}" />
@@ -205,7 +181,7 @@ async function buildOverlay(spec: FormatSpec, headline: string, subhead: string)
         </linearGradient>
       </defs>
       <rect x="0" y="${gradientStartY}" width="${width}" height="${gradientHeight}" fill="url(#bottom-gradient)" />
-      <text x="${padding}" y="${wordmarkBaseline}" fill="${PALETTE.wordmark}" fill-opacity="${WORDMARK_OPACITY}" font-family='"thrml-serif", Georgia, "Times New Roman", serif' font-size="${wordmarkSize}" font-weight="400" letter-spacing="-1">thrml</text>
+      <text x="${padding}" y="${wordmarkBaseline}" fill="${PALETTE.wordmark}" fill-opacity="${WORDMARK_OPACITY}" font-family='"DM Serif Display", Georgia, "Times New Roman", serif' font-size="${wordmarkSize}" font-weight="400" letter-spacing="-1">thrml</text>
       ${multilineText({
         text: headline,
         x: padding,

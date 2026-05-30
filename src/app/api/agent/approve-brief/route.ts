@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { processStaticBrief } from "@/lib/agent/static-generator"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
+import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-generator"
 import { requireAdminApi } from "@/lib/admin-guard"
 
-type StaticFormat = "1x1" | "9x16"
+type StaticFormat = "1x1" | "4x5" | "9x16"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -15,7 +16,7 @@ function formatsForBrief(format: unknown): StaticFormat[] {
 
   const formats = new Set<StaticFormat>()
   for (const value of format.split(/[,/+\s]+/)) {
-    if (value === "1x1" || value === "9x16") formats.add(value)
+    if (value === "1x1" || value === "4x5" || value === "9x16") formats.add(value)
   }
   return formats.size > 0 ? Array.from(formats) : ["1x1"]
 }
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     brief.video_config && typeof brief.video_config === "object" ? brief.video_config : null
   const isVideoBrief = Boolean(videoConfig)
 
-  if (!isVideoBrief && !hasVisual && !staticPlan?.length) {
+  if (!isVideoBrief && !hasVisual && !staticPlan?.length && !briefUsesSvgTemplate(brief.trigger_data)) {
     return NextResponse.json({ error: "Brief needs a visual direction before approval." }, { status: 400 })
   }
 

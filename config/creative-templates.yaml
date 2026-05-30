@@ -80,10 +80,12 @@ templates:
     type: static
     category: Hosts
     angle: pov_earnings
-    formats: ["1x1", "9x16"]
+    formats: ["1x1", "4x5", "9x16"]
     default_variations: 3
     concept_verify_default: false
     full_batch_variations: 3
+    generation_tool: svg_template
+    svg_template_id: thrml_split_header_static
     static_playbook: host_monetization_v3
     naming:
       test_id: T05
@@ -91,13 +93,23 @@ templates:
       cta: list_now
     defaults:
       trigger_type: winner_variation
-      hypothesis: "Canonical host monetization 3-variant ladder with locked proof subtext."
+      hypothesis: "Host monetization split-header SVG ladder with tagline eyebrow and geo subhead."
       target_audience: "Verified hosts and sauna owners in active metros"
       hook: "HostEarn"
-      copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
-      cta: "List Your Space"
       campaign_short_name: host-monetization
-      visual_direction: "See static_variations in template — uses host_monetization_v3 playbook"
+    svg_tokens:
+      TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
+      SUBHEAD: "Backyard and cabin saunas in Seattle + LA."
+    svg_variations:
+      - variation_label: A
+        tokens:
+          HEADLINE: "Turn your idle sauna into a $1,200/mo asset."
+      - variation_label: B
+        tokens:
+          HEADLINE: "Let your sauna pay its own electric bill."
+      - variation_label: C
+        tokens:
+          HEADLINE: "Earn while you recover."
 
   - id: T4
     label: "POV Earns — Video (Uploaded B-roll)"
@@ -129,3 +141,81 @@ templates:
         - slug: pov-earn-proof
           copy: "pov: hosts earn $1,200/mo on average"
           variant: B
+
+  - id: T5
+    label: "Split Header — Static (SVG)"
+    type: static
+    category: Hosts
+    angle: pov_earnings
+    formats: ["1x1", "4x5", "9x16"]
+    default_variations: 1
+    concept_verify_default: true
+    full_batch_variations: 3
+    generation_tool: svg_template
+    svg_template_id: thrml_split_header_static
+    naming:
+      test_id: T05
+      format: Static_1x1
+      cta: list_now
+    defaults:
+      trigger_type: manual
+      hypothesis: "Split-header SVG template for host POV earnings."
+      hook: "Host earnings split header"
+      campaign_short_name: pov-earnings
+    svg_tokens:
+      TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
+      SUBHEAD: "Backyard and cabin saunas in Seattle + LA."
+    svg_variations:
+      - variation_label: A
+        tokens:
+          HEADLINE: "Turn your idle sauna into a $1,200/mo asset."
+      - variation_label: B
+        tokens:
+          HEADLINE: "Let your sauna pay its own electric bill."
+      - variation_label: C
+        tokens:
+          HEADLINE: "Earn while you recover."
+
+  - id: T6
+    label: "POV Overlay — Static (SVG)"
+    type: static
+    category: Hosts
+    angle: pov_earnings
+    formats: ["1x1", "4x5", "9x16"]
+    default_variations: 1
+    concept_verify_default: true
+    full_batch_variations: 3
+    generation_tool: svg_template
+    svg_template_id: thrml_pov_overlay_static
+    naming:
+      test_id: T05
+      format: Static_1x1
+      cta: list_now
+    defaults:
+      trigger_type: manual
+      hypothesis: "POV overlay SVG template with library photo background."
+      hook: "pov: your sauna earns you $1,200/mo"
+      campaign_short_name: pov-earnings
+    svg_variations:
+      - variation_label: A
+        tokens:
+          POV_LINE_1: "pov: your sauna earns you $1,200/mo"
+          POV_LINE_2: "List on thrml. Get paid when you're not using it."
+      - variation_label: B
+        tokens:
+          POV_LINE_1: "pov: stop letting your sauna sit idle"
+          POV_LINE_2: "Hosts earn an average of $1,200 / month."
+      - variation_label: C
+        tokens:
+          POV_LINE_1: "pov: your backyard wellness asset"
+          POV_LINE_2: "Turn downtime into income on thrml."
+
+svg_templates:
+  - id: thrml_split_header_static
+    label: "Split Header Static"
+    tokens: [TAGLINE_EYEBROW, HEADLINE, SUBHEAD]
+    aspect_ratios: ["1x1", "4x5", "9x16"]
+  - id: thrml_pov_overlay_static
+    label: "POV Overlay Static"
+    tokens: [POV_LINE_1, POV_LINE_2, PHOTO_URL]
+    aspect_ratios: ["1x1", "4x5", "9x16"]

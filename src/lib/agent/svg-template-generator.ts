@@ -141,9 +141,9 @@ type SplitHeaderLayoutSpec = {
 }
 
 const SPLIT_HEADER_LAYOUT: Record<SvgStaticFormat, SplitHeaderLayoutSpec> = {
-  "1x1": { padX: 72, headlineSize: 64, headlineLineHeight: 74, maxTextWidth: 820 },
-  "4x5": { padX: 72, headlineSize: 72, headlineLineHeight: 82, maxTextWidth: 820 },
-  "9x16": { padX: 80, headlineSize: 80, headlineLineHeight: 92, maxTextWidth: 800 },
+  "1x1": { padX: 72, headlineSize: 56, headlineLineHeight: 64, maxTextWidth: 900 },
+  "4x5": { padX: 72, headlineSize: 64, headlineLineHeight: 72, maxTextWidth: 900 },
+  "9x16": { padX: 80, headlineSize: 72, headlineLineHeight: 76, maxTextWidth: 920 },
 }
 
 /** Vrbo-style block split — headline sits in the colored top panel (9:16 uses top third). */

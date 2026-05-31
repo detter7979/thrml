@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
   <defs>
-    <linearGradient id="bottomScrim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#121212" stop-opacity="0"/>
-      <stop offset="45%" stop-color="#121212" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#121212" stop-opacity="0.72"/>
+    <linearGradient id="topScrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#121212" stop-opacity="0.72"/>
+      <stop offset="55%" stop-color="#121212" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#121212" stop-opacity="0"/>
     </linearGradient>
   </defs>
   <image href="{{PHOTO_URL}}" x="0" y="0" width="1080" height="1350" preserveAspectRatio="xMidYMid slice"/>
-  <rect x="0" y="600" width="1080" height="750" fill="url(#bottomScrim)"/>
-  <text x="72" y="96" fill="#FFFFFF" fill-opacity="0.78" font-family="DM Serif Display, Georgia, serif" font-size="56" letter-spacing="-0.02em">thrml</text>
-  <text x="72" y="984" fill="#FFFFFF" fill-opacity="0.75" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
-  <text x="72" y="1074" fill="#FFFFFF" fill-opacity="0.88" font-family="DM Serif Display, Georgia, serif" font-size="72" font-weight="400">{{HEADLINE_TSPANS}}</text>
-  <text x="72" y="1294" fill="#A0A0A0" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="26" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
+  <rect x="0" y="0" width="1080" height="750" fill="url(#topScrim)"/>
+  <text x="72" y="96" fill="#FFFFFF" fill-opacity="0.85" font-family="DM Serif Display, Georgia, serif" font-size="56" letter-spacing="-0.02em">thrml</text>
+  <text x="72" y="176" fill="#FFFFFF" fill-opacity="0.75" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="20" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
+  <text x="72" y="248" fill="#FFFFFF" fill-opacity="0.92" font-family="DM Serif Display, Georgia, serif" font-size="64" font-weight="400">{{HEADLINE_TSPANS}}</text>
+  <text x="72" y="620" fill="#FFFFFF" fill-opacity="0.78" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
 </svg>

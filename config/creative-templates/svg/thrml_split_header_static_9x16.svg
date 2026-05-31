@@ -1,8 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
-  <rect width="1080" height="1056" fill="#B5532E"/>
-  <image href="{{PHOTO_URL}}" x="0" y="1056" width="1080" height="864" preserveAspectRatio="xMidYMid slice"/>
+  <defs>
+    <linearGradient id="photoFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#B5532E" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#B5532E" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="640" fill="#B5532E"/>
+  <image href="{{PHOTO_URL}}" x="0" y="500" width="1080" height="1420" preserveAspectRatio="xMidYMid slice"/>
+  <rect x="0" y="500" width="1080" height="180" fill="url(#photoFade)"/>
   <text x="80" y="110" fill="#FFFFFF" fill-opacity="0.85" font-family="DM Serif Display, Georgia, serif" font-size="64" letter-spacing="-0.02em">thrml</text>
-  <text x="80" y="240" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="24" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
-  <text x="80" y="350" fill="#FFFFFF" font-family="DM Serif Display, Georgia, serif" font-size="80" font-weight="400">{{HEADLINE_TSPANS}}</text>
-  <text x="80" y="530" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="30" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
+  <text x="80" y="250" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="24" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
+  <text x="80" y="360" fill="#FFFFFF" font-family="DM Serif Display, Georgia, serif" font-size="80" font-weight="400">{{HEADLINE_TSPANS}}</text>
+  <text x="80" y="560" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="30" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
 </svg>

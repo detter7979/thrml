@@ -36,6 +36,28 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/api/agent/approve-brief": [
+      "./public/fonts/**/*",
+      "./config/creative-templates.yaml",
+      "./config/creative-templates/svg/**/*",
+    ],
+    "/api/agent/generate-static": [
+      "./public/fonts/**/*",
+      "./config/creative-templates.yaml",
+      "./config/creative-templates/svg/**/*",
+    ],
+    "/api/admin/agent/creative-pipeline": [
+      "./public/fonts/**/*",
+      "./config/creative-templates.yaml",
+      "./config/creative-templates/svg/**/*",
+    ],
+    "/api/admin/agent/creative-templates": [
+      "./public/fonts/**/*",
+      "./config/creative-templates.yaml",
+      "./config/creative-templates/svg/**/*",
+    ],
+  },
   outputFileTracingExcludes: {
     "*": [
       ".next/cache/**",

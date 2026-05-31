@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
   <rect width="1080" height="1920" fill="#B5532E"/>
-  <text x="80" y="110" fill="#FFFFFF" fill-opacity="0.85" font-family="var(--brand-serif, 'DM Serif Display', serif)" font-size="64" letter-spacing="-0.02em">thrml</text>
-  <text x="80" y="880" fill="#FFFFFF" fill-opacity="0.82" font-family="var(--brand-sans, 'thrml-sans', sans-serif)" font-size="24" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
-  <text x="80" y="990" fill="#FFFFFF" font-family="var(--brand-serif, 'DM Serif Display', serif)" font-size="80" font-weight="400">{{HEADLINE_TSPANS}}</text>
-  <text x="80" y="1165" fill="#FFFFFF" fill-opacity="0.82" font-family="var(--brand-sans, 'thrml-sans', sans-serif)" font-size="30" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
+  <text x="80" y="110" fill="#FFFFFF" fill-opacity="0.85" font-family="DM Serif Display, Georgia, serif" font-size="64" letter-spacing="-0.02em">thrml</text>
+  <text x="80" y="880" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="24" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
+  <text x="80" y="990" fill="#FFFFFF" font-family="DM Serif Display, Georgia, serif" font-size="80" font-weight="400">{{HEADLINE_TSPANS}}</text>
+  <text x="80" y="1165" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="30" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
 </svg>

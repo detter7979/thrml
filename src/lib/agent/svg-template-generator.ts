@@ -1,6 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
-import sharp from "sharp"
+import { Resvg } from "@resvg/resvg-js"
 import yaml from "js-yaml"
 
 import { resolveNamingFromBrief } from "@/lib/agent/creative-templates"
@@ -29,7 +29,7 @@ export {
   type SvgStaticFormat,
   type SvgTemplateId,
 } from "@/lib/agent/svg-template-shared"
-import { injectBrandAdFonts } from "@/lib/agent/static-layouts/brand-ad-fonts"
+import { brandAdFontFiles, injectBrandAdFonts } from "@/lib/agent/static-layouts/brand-ad-fonts"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export type SvgTemplateRegistryEntry = {
@@ -177,7 +177,14 @@ export function prepareSvgTokens(
 
 export async function renderSvgToPng(svg: string) {
   const withFonts = await injectBrandAdFonts(svg)
-  return sharp(Buffer.from(withFonts)).png().toBuffer()
+  const resvg = new Resvg(withFonts, {
+    font: {
+      fontFiles: brandAdFontFiles(),
+      loadSystemFonts: false,
+      defaultFontFamily: "DM Serif Display",
+    },
+  })
+  return Buffer.from(resvg.render().asPng())
 }
 
 export function findAdCopyClaimViolations(tokens: Record<string, string>): HostClaimViolation[] {

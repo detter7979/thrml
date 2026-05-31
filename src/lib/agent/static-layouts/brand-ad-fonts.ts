@@ -5,6 +5,11 @@ const SERIF_REGULAR = path.join(process.cwd(), "public", "fonts", "DMSerifDispla
 const SERIF_ITALIC = path.join(process.cwd(), "public", "fonts", "DMSerifDisplay-Italic.ttf")
 const SANS_MEDIUM = path.join(process.cwd(), "public", "fonts", "Inter-Medium.woff2")
 
+/** Absolute paths passed to @resvg/resvg-js (and Next output tracing). */
+export function brandAdFontFiles() {
+  return [SERIF_REGULAR, SERIF_ITALIC, SANS_MEDIUM]
+}
+
 let serifDataUrlsPromise: Promise<{ regular: string; italic: string }> | null = null
 let sansMediumDataUrlPromise: Promise<string> | null = null
 

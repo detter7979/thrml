@@ -13,8 +13,8 @@ describe.skipIf(!TEST_BASE_VIDEO)("renderer (integration)", () => {
     await render({
       baseVideoPath: TEST_BASE_VIDEO!,
       outputPath: outPath,
-      copyText: "pov: your sauna earns you $1,000/mo",
-      template: templateV1,
+      copyText: "pov: you turned your idle sauna\ninto income",
+      template: templateV2,
     })
     expect(existsSync(outPath)).toBe(true)
     const stats = await stat(outPath)

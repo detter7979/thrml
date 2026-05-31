@@ -11,7 +11,7 @@ import {
 async function main() {
   const tokens = prepareSplitHeaderTokens("1x1", {
     TAGLINE_EYEBROW: SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW,
-    HEADLINE: "Turn your idle sauna into a $1,200/mo asset.",
+    HEADLINE: SPLIT_HEADER_DEFAULTS.HEADLINE,
     SUBHEAD: SPLIT_HEADER_DEFAULTS.SUBHEAD,
   })
 

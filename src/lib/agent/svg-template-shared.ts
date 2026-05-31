@@ -3,11 +3,26 @@
 export type SvgAspectRatio = "1:1" | "4:5" | "9:16"
 export type SvgStaticFormat = "1x1" | "4x5" | "9x16"
 
-export type SvgTemplateId = "thrml_split_header_static" | "thrml_pov_overlay_static"
+export type SvgTemplateId =
+  | "thrml_split_header_static"
+  | "thrml_block_split_static"
+  | "thrml_pov_overlay_static"
+
+export const SPLIT_HEADER_SVG_TEMPLATE_IDS = [
+  "thrml_split_header_static",
+  "thrml_block_split_static",
+] as const satisfies readonly SvgTemplateId[]
+
+export function isSplitHeaderSvgTemplate(templateId: string | null | undefined) {
+  return SPLIT_HEADER_SVG_TEMPLATE_IDS.includes(templateId as (typeof SPLIT_HEADER_SVG_TEMPLATE_IDS)[number])
+}
+
+export const DEFAULT_HOST_HEADLINE = "Turn your idle sauna into income." as const
 
 export const SPLIT_HEADER_DEFAULTS = {
   TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR.",
   SUBHEAD: "Backyard and cabin saunas in Seattle + LA.",
+  HEADLINE: DEFAULT_HOST_HEADLINE,
 } as const
 
 export function aspectRatioToFormat(aspectRatio: SvgAspectRatio): SvgStaticFormat {

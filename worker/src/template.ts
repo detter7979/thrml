@@ -11,8 +11,16 @@ export interface VideoTemplate {
   width: number
   height: number
   textColor: string
+  /** Fixed fontsize when fontSizeRatio is omitted. */
   textSize: number
+  /** Legacy v1: fixed drawtext y. */
   textTopOffset: number
+  /** POV v2: vertically center the text block at this fraction of frame height. */
+  textTopRatio?: number
+  /** POV v2: drawtext line_spacing between wrapped lines (px). */
+  textLineSpacing?: number
+  /** POV v2: fontsize = round(h * fontSizeRatio). */
+  fontSizeRatio?: number
   fontPath: string
   logoPath: string
   logoWidth: number
@@ -20,8 +28,11 @@ export interface VideoTemplate {
   logoOpacity: number
   gradientHeight: number
   gradientMaxOpacity: number
+  showGradient?: boolean
+  showLogo?: boolean
 }
 
+/** v1 — bottom gradient scrim, centered copy mid-frame, thrml logo lockup. */
 export const templateV1: VideoTemplate = {
   version: 1,
   width: 720,
@@ -36,9 +47,39 @@ export const templateV1: VideoTemplate = {
   logoOpacity: 0.75,
   gradientHeight: 500,
   gradientMaxOpacity: 0.7,
+  showGradient: true,
+  showLogo: true,
+}
+
+/**
+ * v2 — IG Story POV overlay: centered DM Serif, upper third, no scrim or logo.
+ * Matches static POV creative direction; see `DEFAULT_POV_VIDEO_OVERLAY`.
+ */
+export const templateV2: VideoTemplate = {
+  version: 2,
+  width: 1080,
+  height: 1920,
+  textColor: "FFFFFF",
+  textSize: 52,
+  textTopOffset: 0,
+  textTopRatio: 0.34,
+  textLineSpacing: 14,
+  fontSizeRatio: 0.041,
+  fontPath: "assets/DMSerifDisplay-Regular.ttf",
+  logoPath: "assets/thrml-logo.png",
+  logoWidth: 0,
+  logoBottomMargin: 0,
+  logoOpacity: 0,
+  gradientHeight: 0,
+  gradientMaxOpacity: 0,
+  showGradient: false,
+  showLogo: false,
 }
 
 export function getTemplate(version: number): VideoTemplate {
   if (version === 1) return templateV1
+  if (version === 2) return templateV2
   throw new Error(`Unknown template version: ${version}`)
 }
+
+export const DEFAULT_POV_SAUNA_TEMPLATE_VERSION = 2

@@ -22,6 +22,7 @@ import {
   type SvgTemplateId,
 } from "@/lib/agent/svg-template-shared"
 export {
+  DEFAULT_HOST_HEADLINE,
   SPLIT_HEADER_DEFAULTS,
   aspectRatioToFormat,
   briefUsesSvgTemplate,
@@ -49,6 +50,7 @@ const VARIATION_LABELS = ["A", "B", "C"] as const
 /** Bundled fallbacks when a brief has no `photo_gcs_path` (must exist in repo + Vercel trace). */
 const SVG_DEFAULT_BACKDROP: Record<SvgTemplateId, string> = {
   thrml_split_header_static: path.join(process.cwd(), "public", "hero-sauna.png"),
+  thrml_block_split_static: path.join(process.cwd(), "public", "hero-sauna.png"),
   thrml_pov_overlay_static: path.join(process.cwd(), "public", "hero-sauna.png"),
 }
 
@@ -144,6 +146,13 @@ const SPLIT_HEADER_LAYOUT: Record<SvgStaticFormat, SplitHeaderLayoutSpec> = {
   "9x16": { padX: 80, headlineSize: 80, headlineLineHeight: 92, maxTextWidth: 800 },
 }
 
+/** Vrbo-style block split — headline sits in the colored top panel (9:16 uses top third). */
+const BLOCK_SPLIT_LAYOUT: Record<SvgStaticFormat, SplitHeaderLayoutSpec> = {
+  "1x1": { padX: 72, headlineSize: 56, headlineLineHeight: 64, maxTextWidth: 900 },
+  "4x5": { padX: 72, headlineSize: 64, headlineLineHeight: 72, maxTextWidth: 900 },
+  "9x16": { padX: 80, headlineSize: 72, headlineLineHeight: 76, maxTextWidth: 920 },
+}
+
 function estimateTextWidth(value: string, fontSize: number) {
   return value.length * fontSize * 0.52
 }
@@ -188,7 +197,11 @@ export function renderPreparedSvg(rawSvg: string, preparedTokens: Record<string,
 }
 
 /** Normalize legacy split-header tokens and expand HEADLINE into wrapped tspans. */
-export function prepareSplitHeaderTokens(format: SvgStaticFormat, tokens: Record<string, string>) {
+export function prepareSplitHeaderTokens(
+  format: SvgStaticFormat,
+  tokens: Record<string, string>,
+  layout: SplitHeaderLayoutSpec = SPLIT_HEADER_LAYOUT[format],
+) {
   const resolved: Record<string, string> = {
     ...tokens,
     TAGLINE_EYEBROW:
@@ -203,7 +216,7 @@ export function prepareSplitHeaderTokens(format: SvgStaticFormat, tokens: Record
   }
 
   if (resolved.HEADLINE) {
-    resolved.HEADLINE_TSPANS = headlineToTspans(resolved.HEADLINE, SPLIT_HEADER_LAYOUT[format])
+    resolved.HEADLINE_TSPANS = headlineToTspans(resolved.HEADLINE, layout)
   } else {
     resolved.HEADLINE_TSPANS = ""
   }
@@ -218,6 +231,9 @@ export function prepareSvgTokens(
 ) {
   if (templateId === "thrml_split_header_static") {
     return prepareSplitHeaderTokens(format, tokens)
+  }
+  if (templateId === "thrml_block_split_static") {
+    return prepareSplitHeaderTokens(format, tokens, BLOCK_SPLIT_LAYOUT[format])
   }
   return tokens
 }

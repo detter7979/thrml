@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { templateV1, getTemplate } from "../src/template.js"
+import { templateV1, templateV2, getTemplate, DEFAULT_POV_SAUNA_TEMPLATE_VERSION } from "../src/template.js"
+import { buildFilterComplex } from "../src/renderer.js"
 
 describe("template", () => {
   it("v1 has expected locked values", () => {
@@ -8,13 +9,53 @@ describe("template", () => {
     expect(templateV1.height).toBe(1280)
     expect(templateV1.textColor).toBe("F5F0E8")
     expect(templateV1.fontPath).toBe("assets/DMSerifDisplay-Regular.ttf")
+    expect(templateV1.showGradient).toBe(true)
+    expect(templateV1.showLogo).toBe(true)
   })
 
-  it("getTemplate returns v1", () => {
+  it("v2 is POV upper-third overlay without scrim or logo", () => {
+    expect(templateV2.version).toBe(2)
+    expect(templateV2.textTopRatio).toBe(0.34)
+    expect(templateV2.showGradient).toBe(false)
+    expect(templateV2.showLogo).toBe(false)
+    expect(templateV2.fontPath).toBe("assets/DMSerifDisplay-Regular.ttf")
+  })
+
+  it("getTemplate returns v1 and v2", () => {
     expect(getTemplate(1)).toBe(templateV1)
+    expect(getTemplate(2)).toBe(templateV2)
+  })
+
+  it("default POV sauna template is v2", () => {
+    expect(DEFAULT_POV_SAUNA_TEMPLATE_VERSION).toBe(2)
   })
 
   it("getTemplate throws on unknown version", () => {
     expect(() => getTemplate(99)).toThrow(/Unknown template version/)
+  })
+})
+
+describe("buildFilterComplex", () => {
+  it("v2 uses upper-third drawtext and single input", () => {
+    const { filter, inputs } = buildFilterComplex({
+      template: templateV2,
+      copyTextFile: "/tmp/overlay-copy.txt",
+    })
+    expect(inputs).toBe(1)
+    expect(filter).toContain("textfile=")
+    expect(filter).toContain("y=(h*0.34)-(text_h/2)")
+    expect(filter).not.toContain("overlay=0:H-h:format=auto[bg]")
+    expect(filter).not.toContain("[logo]")
+  })
+
+  it("v1 keeps gradient, logo, and fixed y", () => {
+    const { filter, inputs } = buildFilterComplex({
+      template: templateV1,
+      copyTextFile: "/tmp/overlay-copy.txt",
+    })
+    expect(inputs).toBe(2)
+    expect(filter).toContain("overlay=0:H-h:format=auto[bg]")
+    expect(filter).toContain("y=546")
+    expect(filter).toContain("[logo]")
   })
 })

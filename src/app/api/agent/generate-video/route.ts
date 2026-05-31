@@ -5,6 +5,7 @@ import { uploadRemoteToCreativeObject } from "@/lib/agent/gcs"
 import { buildAdName, InvalidAdNameError } from "@/lib/agent/naming-builder"
 import { generateVideo as runwayGenerate, pollTask } from "@/lib/agent/runway"
 import type { VideoConfig } from "@/lib/agent/types"
+import { formatPovVideoOverlay } from "@/lib/agent/video-template-copy"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
@@ -216,7 +217,10 @@ export async function POST(req: NextRequest) {
         brief_id: brief.id,
         base_video_gcs_path: baseGcsPath,
         variant_slug: variant.slug,
-        copy_text: variant.copy,
+        copy_text:
+          (config.templateVersion ?? 1) >= 2
+            ? formatPovVideoOverlay(variant.copy)
+            : variant.copy,
         concept_slug: config.conceptSlug,
         template_version: config.templateVersion ?? 1,
         ad_name: adName,

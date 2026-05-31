@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 
 import { buildAdName } from "@/lib/agent/naming-builder"
-import { SPLIT_HEADER_DEFAULTS } from "@/lib/agent/svg-template-shared"
+import { DEFAULT_HOST_HEADLINE, SPLIT_HEADER_DEFAULTS, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
 import {
   Dialog,
   DialogContent,
@@ -239,7 +239,7 @@ export function BriefEditorModal({
   busy,
   isVideo,
 }: Props) {
-  const isSplitHeaderSvg = state.svg_template_id === "thrml_split_header_static"
+  const isSplitHeaderSvg = isSplitHeaderSvgTemplate(state.svg_template_id)
 
   const namingPreview = useMemo(() => {
     try {
@@ -264,7 +264,7 @@ export function BriefEditorModal({
   const ensureSvgVariationRows = (count: number) => {
     const labels = ["A", "B", "C"] as const
     const defaults = [
-      "Turn your idle sauna into a $1,200/mo asset.",
+      DEFAULT_HOST_HEADLINE,
       "Let your sauna pay its own electric bill.",
       "Earn while you recover.",
     ]
@@ -287,7 +287,7 @@ export function BriefEditorModal({
           <DialogTitle>Edit Creative Brief</DialogTitle>
           <DialogDescription>
             {isSplitHeaderSvg
-              ? "Split-header SVG template — edit tagline, subhead, and per-variant headlines."
+              ? "Split copy SVG template — edit tagline, subhead, and per-variant headlines."
               : "Structured fields — naming preview updates live."}
           </DialogDescription>
         </DialogHeader>

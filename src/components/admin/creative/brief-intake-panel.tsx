@@ -5,6 +5,11 @@ import useSWR from "swr"
 
 import { AssetLibraryPanel, type AssetLibraryEntry } from "./asset-library-panel"
 import type { VideoConfig, VideoCopyVariant } from "@/lib/agent/types"
+import {
+  DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
+  DEFAULT_POV_VIDEO_OVERLAY,
+} from "@/lib/agent/video-template-copy"
+import { DEFAULT_HOST_HEADLINE, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
 
 export type CreativeTemplateSummary = {
   id: string
@@ -65,10 +70,10 @@ export function BriefIntakePanel({
     assetSlug: "",
     source: "uploaded" as VideoConfig["source"],
     runwayPrompt: "",
-    templateVersion: 1,
+    templateVersion: DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
     duration: 5 as 5 | 10,
     ratio: "768:1280" as "768:1280" | "1280:768",
-    copyVariants: [{ slug: "", copy: "" }] as VideoCopyVariant[],
+    copyVariants: [{ slug: "pov-idle-income", copy: DEFAULT_POV_VIDEO_OVERLAY }] as VideoCopyVariant[],
     hypothesis: "",
   })
 
@@ -86,7 +91,7 @@ export function BriefIntakePanel({
   const [photoGcsPath, setPhotoGcsPath] = useState("")
   const [svgTokens, setSvgTokens] = useState<Record<string, string>>({
     TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR.",
-    HEADLINE: "Turn your idle sauna into a $1,200/mo asset.",
+    HEADLINE: DEFAULT_HOST_HEADLINE,
     SUBHEAD: "Backyard and cabin saunas in Seattle + LA.",
     POV_LINE_1: "pov: your sauna earns you $1,200/mo",
     POV_LINE_2: "List on thrml. Get paid when you're not using it.",
@@ -97,7 +102,7 @@ export function BriefIntakePanel({
   const activeSvgTokenKeys =
     svgTemplateId === "thrml_pov_overlay_static"
       ? POV_OVERLAY_TOKENS
-      : svgTemplateId === "thrml_split_header_static"
+      : isSplitHeaderSvgTemplate(svgTemplateId)
         ? SPLIT_HEADER_TOKENS
         : (selectedSvgTemplate?.tokens ?? []).filter((token) => token !== "PHOTO_URL")
 
@@ -305,7 +310,7 @@ export function BriefIntakePanel({
             }}
             className="w-full rounded-md border px-3 py-2 text-sm"
           >
-            <option value="">Select template (T1–T4)…</option>
+            <option value="">Select template (T1–T7)…</option>
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.id}: {t.label} ({t.type})
@@ -428,8 +433,7 @@ export function BriefIntakePanel({
                   />
                 ))}
 
-                {svgTemplateId === "thrml_pov_overlay_static" ||
-                svgTemplateId === "thrml_split_header_static" ? (
+                {svgTemplateId === "thrml_pov_overlay_static" || isSplitHeaderSvgTemplate(svgTemplateId) ? (
                   <>
                     <AssetLibraryPanel
                       mediaType="static"

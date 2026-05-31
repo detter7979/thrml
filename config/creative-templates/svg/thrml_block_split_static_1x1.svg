@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <clipPath id="photoClip">
+      <rect x="0" y="540" width="1080" height="540"/>
+    </clipPath>
+  </defs>
+  <image href="{{PHOTO_URL}}" x="0" y="540" width="1080" height="540" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"/>
+  <rect x="0" y="0" width="1080" height="540" fill="#C75B3A"/>
+  <text x="72" y="88" fill="#FFFFFF" fill-opacity="0.85" font-family="DM Serif Display, Georgia, serif" font-size="52" letter-spacing="-0.02em">thrml</text>
+  <text x="72" y="160" fill="#FFFFFF" fill-opacity="0.75" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
+  <text x="72" y="220" fill="#FFFFFF" fill-opacity="0.92" font-family="DM Serif Display, Georgia, serif" font-size="56" font-weight="400">{{HEADLINE_TSPANS}}</text>
+  <text x="72" y="490" fill="#FFFFFF" fill-opacity="0.78" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="20" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
+</svg>

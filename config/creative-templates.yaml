@@ -23,16 +23,16 @@ templates:
       trigger_type: manual
       hypothesis: "Host POV earnings angle converts idle sauna owners."
       target_audience: "Homeowners with private sauna or cold plunge in PNW metros"
-      hook: "Your sauna could be earning you $1,200/mo."
+      hook: "Turn your idle sauna into income."
       copy_primary: "List your private sauna on thrml and earn when you're not using it."
-      copy_headline: "Turn your idle sauna into a $1,200/mo asset."
+      copy_headline: "Turn your idle sauna into income."
       copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
       cta: "List Your Space"
       visual_direction: "Extreme close-up hero shot of a pristine modern cedar barrel sauna at golden sunset, warm rim light on vertical staves, shallow depth of field, photorealistic architectural photography, no text, no logos, no people"
       campaign_short_name: pov-earnings
     static_variations:
       - variation_label: A
-        headline: "Turn your idle sauna into a $1,200/mo asset."
+        headline: "Turn your idle sauna into income."
         background_image_prompt: "Extreme close-up hero shot of a pristine modern cedar barrel sauna at golden sunset, warm rim light on vertical staves and brushed stainless hardware, shallow depth of field"
       - variation_label: B
         headline: "Let your sauna pay its own electric bill."
@@ -57,19 +57,19 @@ templates:
     defaults:
       trigger_type: manual
       hypothesis: "POV earnings video with overlay copy tests hook strength."
-      hook: "pov: your sauna earns you $1,000/mo"
+      hook: "pov: you turned your idle sauna into income"
       campaign_short_name: pov-earnings
     video:
       source: runway
       concept_slug: pov-earnings
       asset_slug: sauna
-      template_version: 1
+      template_version: 2
       duration: 5
       ratio: "768:1280"
       runway_prompt: "First-person POV walking toward a private cedar barrel sauna in a Pacific Northwest backyard at golden hour, slow cinematic motion, no people, no text"
       copy_variants:
-        - slug: pov-earn-1200
-          copy: "pov: your sauna earns you $1,200/mo"
+        - slug: pov-idle-income
+          copy: "pov: you turned your idle sauna\ninto income"
           variant: A
         - slug: pov-earn-idle
           copy: "pov: stop letting your sauna sit idle"
@@ -103,7 +103,7 @@ templates:
     svg_variations:
       - variation_label: A
         tokens:
-          HEADLINE: "Turn your idle sauna into a $1,200/mo asset."
+          HEADLINE: "Turn your idle sauna into income."
       - variation_label: B
         tokens:
           HEADLINE: "Let your sauna pay its own electric bill."
@@ -127,19 +127,19 @@ templates:
     defaults:
       trigger_type: manual
       hypothesis: "Pre-uploaded POV b-roll with copy overlay — no Runway spend."
-      hook: "pov: your sauna earns you $1,000/mo"
+      hook: "pov: you turned your idle sauna into income"
       campaign_short_name: pov-earnings
     video:
       source: uploaded
       concept_slug: pov-earnings
       asset_slug: sauna
-      template_version: 1
+      template_version: 2
       copy_variants:
-        - slug: pov-earn-1000
-          copy: "pov: your sauna earns you $1,000/mo"
+        - slug: pov-idle-income
+          copy: "pov: you turned your idle sauna\ninto income"
           variant: A
-        - slug: pov-earn-proof
-          copy: "pov: hosts earn $1,200/mo on average"
+        - slug: pov-earn-idle
+          copy: "pov: stop letting your sauna sit idle"
           variant: B
 
   - id: T5
@@ -168,7 +168,7 @@ templates:
     svg_variations:
       - variation_label: A
         tokens:
-          HEADLINE: "Turn your idle sauna into a $1,200/mo asset."
+          HEADLINE: "Turn your idle sauna into income."
       - variation_label: B
         tokens:
           HEADLINE: "Let your sauna pay its own electric bill."
@@ -210,9 +210,47 @@ templates:
           POV_LINE_1: "pov: your backyard wellness asset"
           POV_LINE_2: "Turn downtime into income on thrml."
 
+  - id: T7
+    label: "Block Split — Static (SVG)"
+    type: static
+    category: Hosts
+    angle: pov_earnings
+    formats: ["1x1", "4x5", "9x16"]
+    default_variations: 1
+    concept_verify_default: true
+    full_batch_variations: 3
+    generation_tool: svg_template
+    svg_template_id: thrml_block_split_static
+    naming:
+      test_id: T05
+      format: Static_9x16
+      cta: list_now
+    defaults:
+      trigger_type: manual
+      hypothesis: "Vrbo-style 50/50 block split — brand color top, photo bottom."
+      hook: "Host earnings block split"
+      campaign_short_name: pov-earnings
+    svg_tokens:
+      TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
+      SUBHEAD: "Backyard and cabin saunas in Seattle + LA."
+    svg_variations:
+      - variation_label: A
+        tokens:
+          HEADLINE: "Turn your idle sauna into income."
+      - variation_label: B
+        tokens:
+          HEADLINE: "Let your sauna pay its own electric bill."
+      - variation_label: C
+        tokens:
+          HEADLINE: "Earn while you recover."
+
 svg_templates:
   - id: thrml_split_header_static
     label: "Split Header Static"
+    tokens: [TAGLINE_EYEBROW, HEADLINE, SUBHEAD, PHOTO_URL]
+    aspect_ratios: ["1x1", "4x5", "9x16"]
+  - id: thrml_block_split_static
+    label: "Block Split Static"
     tokens: [TAGLINE_EYEBROW, HEADLINE, SUBHEAD, PHOTO_URL]
     aspect_ratios: ["1x1", "4x5", "9x16"]
   - id: thrml_pov_overlay_static

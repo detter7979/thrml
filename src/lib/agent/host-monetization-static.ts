@@ -3,6 +3,8 @@
  * See `agents/design.md` §5 / host monetization playbook.
  */
 
+import { DEFAULT_HOST_HEADLINE } from "@/lib/agent/svg-template-shared"
+
 export const HOST_MONETIZATION_PLAYBOOK_ID = "host_monetization_v3" as const
 
 /** Locked proof line for Meta host monetization tests (control variable). */
@@ -18,7 +20,7 @@ export type HostMonetizationVariation = {
 export const HOST_MONETIZATION_CANONICAL_VARIATIONS: readonly HostMonetizationVariation[] = [
   {
     variation_label: "A",
-    headline: "Turn your idle sauna into a $1,200/mo asset.",
+    headline: DEFAULT_HOST_HEADLINE,
     background_image_prompt:
       "Extreme close-up hero shot of a pristine modern cedar barrel sauna at golden sunset, warm rim light on vertical staves and brushed stainless hardware, shallow depth of field, sauna fills the frame as the unmistakable focal subject",
   },

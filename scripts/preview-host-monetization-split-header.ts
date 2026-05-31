@@ -15,7 +15,7 @@ async function main() {
   const heroMime = heroPhoto[0] === 0xff && heroPhoto[1] === 0xd8 ? "image/jpeg" : "image/png"
   const tokens = prepareSplitHeaderTokens("1x1", {
     TAGLINE_EYEBROW: SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW,
-    HEADLINE: "Turn your idle sauna into a $1,200/mo asset.",
+    HEADLINE: SPLIT_HEADER_DEFAULTS.HEADLINE,
     SUBHEAD: SPLIT_HEADER_DEFAULTS.SUBHEAD,
     PHOTO_URL: `data:${heroMime};base64,${heroPhoto.toString("base64")}`,
   })

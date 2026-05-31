@@ -273,6 +273,10 @@ type BriefRow = {
   campaign_short_name: string | null
 }
 
+function svgTemplateStaticPathSlug(templateId: string) {
+  return templateId.replace(/^thrml_/, "").replace(/_static$/, "")
+}
+
 function taxonomyFromBrief(brief: BriefRow) {
   const td = brief.trigger_data ?? {}
   const category = typeof td.category === "string" ? td.category : "Hosts"
@@ -425,6 +429,7 @@ export async function generateFromSvgTemplate(
     angleSlug,
     variant: variationLabel,
     format,
+    templateSlug: svgTemplateStaticPathSlug(templateId),
   })
 
   const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(pngBuffer, {

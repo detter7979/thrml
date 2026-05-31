@@ -67,6 +67,19 @@ describe("gcs-paths", () => {
     ).toBe("2026/05/hosts/pov_earnings/Static/A_9x16.png")
   })
 
+  it("builds unified static path with template slug", () => {
+    expect(
+      unifiedStaticPath({
+        date: may2026,
+        category: "Hosts",
+        angleSlug: "pov_earnings",
+        variant: "A",
+        format: "1x1",
+        templateSlug: "block_split",
+      })
+    ).toBe("2026/05/hosts/pov_earnings/Static/block_split/A_1x1.png")
+  })
+
   it("builds unified video paths when category set", () => {
     expect(
       baseVideoPath({

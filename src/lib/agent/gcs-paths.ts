@@ -1,5 +1,5 @@
 // Path builder utilities for thrml creative GCS buckets.
-// Unified taxonomy: {year}/{month}/{category}/{angle}/Static|Video/{variant}_{format}.{ext}
+// Unified taxonomy: {year}/{month}/{category}/{angle}/Static[/{templateSlug}]/{variant}_{format}.{ext}
 // Legacy bases/renders paths remain readable via asset library.
 
 /** Legacy default when env is unset; prefer resolveCreativeBucketName() for writes/URLs. */
@@ -39,6 +39,8 @@ export interface UnifiedStaticPathArgs {
   variant: string
   format: "1x1" | "9x16" | "4x5"
   ext?: string
+  /** When set (e.g. SVG template id slug), isolates paths per template under Static/. */
+  templateSlug?: string
 }
 
 export interface UnifiedVideoBasePathArgs {
@@ -74,7 +76,8 @@ function slug(value: string): string {
 /** Unified static output path on main bucket. */
 export function unifiedStaticPath(args: UnifiedStaticPathArgs): string {
   const ext = args.ext ?? "png"
-  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/${args.variant}_${args.format}.${ext}`
+  const templateSegment = args.templateSlug ? `${slug(args.templateSlug)}/` : ""
+  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/${templateSegment}${args.variant}_${args.format}.${ext}`
 }
 
 /** Unified video base path on creative bucket. */

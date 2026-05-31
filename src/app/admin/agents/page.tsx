@@ -859,7 +859,15 @@ export default function AgentsDashboard() {
                           <div className="flex items-center justify-between gap-2 flex-wrap">
                             <div>
                               <p className="text-sm font-medium">{config.conceptSlug}</p>
-                              <p className="text-xs text-muted-foreground">Approved · {variantCount} variant{variantCount === 1 ? "" : "s"} · source: {config.source}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Approved · {variantCount} variant{variantCount === 1 ? "" : "s"} · source:{" "}
+                                {config.source}
+                                {typeof brief.trigger_data === "object" &&
+                                brief.trigger_data &&
+                                typeof (brief.trigger_data as Record<string, unknown>).template_id === "string"
+                                  ? ` · ${(brief.trigger_data as Record<string, unknown>).template_id}`
+                                  : ""}
+                              </p>
                             </div>
                             <span className="text-[11px] font-mono bg-green-100 text-green-800 px-2 py-0.5 rounded">approved</span>
                           </div>

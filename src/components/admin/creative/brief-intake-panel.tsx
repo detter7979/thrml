@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import useSWR from "swr"
 
 import { AssetLibraryPanel, type AssetLibraryEntry } from "./asset-library-panel"
@@ -41,6 +41,45 @@ const T4_UPLOAD_DEFAULTS = {
 
 function normalizeObjectPath(path: string) {
   return path.replace(/^gs:\/\/[^/]+\//, "")
+}
+
+function VideoUploadButton({
+  onFile,
+  disabled,
+  busy,
+  label = "Choose video file",
+}: {
+  onFile: (file: File) => void
+  disabled?: boolean
+  busy?: boolean
+  label?: string
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="video/mp4,video/quicktime,video/webm,video/*"
+        className="sr-only"
+        disabled={disabled || busy}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onFile(file)
+          e.target.value = ""
+        }}
+      />
+      <button
+        type="button"
+        disabled={disabled || busy}
+        onClick={() => inputRef.current?.click()}
+        className="text-xs px-3 py-1.5 rounded-md border bg-background hover:bg-muted disabled:opacity-50"
+      >
+        {busy ? "Uploading…" : label}
+      </button>
+    </div>
+  )
 }
 
 async function fetcher<T>(url: string): Promise<T> {
@@ -124,6 +163,8 @@ export function BriefIntakePanel({
 
   const needsUploadedBaseVideo =
     selectedTemplate?.type === "video" && selectedTemplate.id === "T4"
+  const needsRunwayApiKey =
+    selectedTemplate?.type === "video" && selectedTemplate.id === "T2"
 
   const createFromTemplate = async (saveAndApprove: boolean) => {
     if (!selectedTemplateId) {
@@ -280,26 +321,28 @@ export function BriefIntakePanel({
     if (!conceptSlug || !assetSlug) {
       throw new Error("Enter concept slug and asset slug before uploading.")
     }
-    const res = await fetch("/api/admin/agent/upload-base-video", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        conceptSlug,
-        assetSlug,
-        category: opts?.category ?? "Hosts",
-        angleSlug: opts?.angleSlug ?? conceptSlug.replace(/-/g, "_"),
-      }),
-    })
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error((json as { error?: string }).error ?? "Upload URL request failed")
-    const { uploadUrl, gcsPath } = json as { uploadUrl: string; gcsPath: string }
-    const put = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type || "video/mp4" },
-      body: file,
-    })
-    if (!put.ok) throw new Error(`GCS upload failed (${put.status})`)
-    setUploadedGcsPath(normalizeObjectPath(gcsPath))
+
+    const form = new FormData()
+    form.set("file", file)
+    form.set("conceptSlug", conceptSlug)
+    form.set("assetSlug", assetSlug)
+    form.set("category", opts?.category ?? "Hosts")
+    form.set("angleSlug", opts?.angleSlug ?? conceptSlug.replace(/-/g, "_"))
+
+    let res: Response
+    try {
+      res = await fetch("/api/admin/agent/upload-base-video", { method: "POST", body: form })
+    } catch {
+      throw new Error("Upload request failed — check your connection and try again.")
+    }
+
+    const json = (await res.json().catch(() => ({}))) as { error?: string; detail?: string; gcsPath?: string }
+    if (!res.ok) {
+      const detail = json.detail ? `: ${json.detail}` : ""
+      throw new Error(`${json.error ?? "Upload failed"}${detail}`)
+    }
+    if (!json.gcsPath) throw new Error("Upload succeeded but storage path was missing.")
+    setUploadedGcsPath(normalizeObjectPath(json.gcsPath))
   }
 
   const onLibrarySelect = (entry: AssetLibraryEntry) => {
@@ -360,26 +403,24 @@ export function BriefIntakePanel({
         </label>
       </div>
 
+      {needsRunwayApiKey ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          T2 calls Runway to generate base video and requires <code className="font-mono">RUNWAY_API_KEY</code> on
+          the server. To overlay copy on your own POV sauna MP4, use{" "}
+          <strong>T4: POV Sauna Video — Upload MP4</strong> instead.
+        </p>
+      ) : null}
+
       {needsUploadedBaseVideo ? (
         <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
           <p className="text-xs text-muted-foreground">
             T4 needs a POV sauna base MP4. Pick one from the library or upload before creating the brief.
           </p>
-          <label className="block text-xs font-medium text-muted-foreground">
-            Upload base video
-            <input
-              type="file"
-              accept="video/*"
-              disabled={busyAction !== null}
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                void uploadT4BaseVideo(file)
-                e.target.value = ""
-              }}
-              className="mt-1 block w-full text-xs"
-            />
-          </label>
+          <VideoUploadButton
+            busy={busyAction === "upload-base-video"}
+            disabled={busyAction !== null && busyAction !== "upload-base-video"}
+            onFile={(file) => void uploadT4BaseVideo(file)}
+          />
           <AssetLibraryPanel
             mediaType="video"
             selectedPath={uploadedGcsPath}
@@ -606,14 +647,13 @@ export function BriefIntakePanel({
               />
             ) : (
               <>
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    if (!f) return
+                <VideoUploadButton
+                  busy={busyAction === "upload-base-video"}
+                  disabled={busyAction !== null && busyAction !== "upload-base-video"}
+                  onFile={(file) => {
                     setBusyAction("upload-base-video")
-                    void uploadBaseVideoFile(f)
+                    void uploadBaseVideoFile(file)
+                      .then(() => onMessage("Base video uploaded."))
                       .catch((err) => onMessage(err instanceof Error ? err.message : "Upload failed"))
                       .finally(() => setBusyAction(null))
                   }}

@@ -69,6 +69,16 @@ export async function POST(req: NextRequest) {
   if (config.source === "runway" && !config.runwayPrompt?.trim()) {
     return NextResponse.json({ error: "video_config.runwayPrompt required for runway source" }, { status: 400 })
   }
+  if (config.source === "runway" && !process.env.RUNWAY_API_KEY?.trim()) {
+    return NextResponse.json(
+      {
+        error: "Runway is not configured on this server",
+        detail:
+          "This brief uses template T2 (Runway). Set RUNWAY_API_KEY in Vercel, or create a new brief from T4 (Upload MP4) with your POV sauna video instead.",
+      },
+      { status: 503 },
+    )
+  }
   if (config.source === "uploaded" && !config.uploadedGcsPath?.trim()) {
     return NextResponse.json(
       { error: "video_config.uploadedGcsPath required for uploaded source" },

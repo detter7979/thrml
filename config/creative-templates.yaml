@@ -42,7 +42,7 @@ templates:
         background_image_prompt: "Sleek full-glass indoor infrared sauna in a modern home gym, matte black frame, towel on bench, sauna glowing as the clear hero subject"
 
   - id: T2
-    label: "POV Earns — Video (Runway)"
+    label: "POV Sauna Video — Runway (needs API key)"
     type: video
     category: Hosts
     angle: pov_earnings
@@ -112,7 +112,7 @@ templates:
           HEADLINE: "Earn while you recover."
 
   - id: T4
-    label: "POV Earns — Video (Uploaded B-roll)"
+    label: "POV Sauna Video — Upload MP4 (recommended)"
     type: video
     category: Hosts
     angle: pov_earnings

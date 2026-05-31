@@ -31,6 +31,18 @@ export type SvgTemplateSummary = {
 const SPLIT_HEADER_TOKENS = ["TAGLINE_EYEBROW", "HEADLINE", "SUBHEAD"] as const
 const POV_OVERLAY_TOKENS = ["POV_LINE_1", "POV_LINE_2"] as const
 
+/** Matches T4 `config/creative-templates.yaml` video block. */
+const T4_UPLOAD_DEFAULTS = {
+  conceptSlug: "pov-earnings",
+  assetSlug: "sauna",
+  category: "Hosts",
+  angleSlug: "pov_earnings",
+} as const
+
+function normalizeObjectPath(path: string) {
+  return path.replace(/^gs:\/\/[^/]+\//, "")
+}
+
 async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" })
   const json = await res.json().catch(() => ({}))
@@ -107,12 +119,19 @@ export function BriefIntakePanel({
         : (selectedSvgTemplate?.tokens ?? []).filter((token) => token !== "PHOTO_URL")
 
   const onPhotoLibrarySelect = (entry: AssetLibraryEntry) => {
-    setPhotoGcsPath(entry.gcsPath.replace(/^gs:\/\/[^/]+\//, ""))
+    setPhotoGcsPath(normalizeObjectPath(entry.gcsPath))
   }
+
+  const needsUploadedBaseVideo =
+    selectedTemplate?.type === "video" && selectedTemplate.id === "T4"
 
   const createFromTemplate = async (saveAndApprove: boolean) => {
     if (!selectedTemplateId) {
       onMessage("Select a template first.")
+      return
+    }
+    if (needsUploadedBaseVideo && !uploadedGcsPath.trim()) {
+      onMessage("Select or upload a POV sauna base video before creating a T4 brief.")
       return
     }
     setBusyAction("create-from-template")
@@ -123,7 +142,7 @@ export function BriefIntakePanel({
         body: JSON.stringify({
           templateId: selectedTemplateId,
           conceptVerify,
-          uploadedGcsPath: uploadedGcsPath || undefined,
+          uploadedGcsPath: normalizeObjectPath(uploadedGcsPath.trim()) || undefined,
           saveAndApprove,
         }),
       })
@@ -252,18 +271,23 @@ export function BriefIntakePanel({
     }
   }
 
-  const uploadBaseVideoFile = async (file: File) => {
-    if (!videoDraft.conceptSlug.trim() || !videoDraft.assetSlug.trim()) {
+  const uploadBaseVideoFile = async (
+    file: File,
+    opts?: { conceptSlug?: string; assetSlug?: string; category?: string; angleSlug?: string },
+  ) => {
+    const conceptSlug = opts?.conceptSlug ?? videoDraft.conceptSlug.trim()
+    const assetSlug = opts?.assetSlug ?? videoDraft.assetSlug.trim()
+    if (!conceptSlug || !assetSlug) {
       throw new Error("Enter concept slug and asset slug before uploading.")
     }
     const res = await fetch("/api/admin/agent/upload-base-video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        conceptSlug: videoDraft.conceptSlug.trim(),
-        assetSlug: videoDraft.assetSlug.trim(),
-        category: "Hosts",
-        angleSlug: videoDraft.conceptSlug.trim().replace(/-/g, "_"),
+        conceptSlug,
+        assetSlug,
+        category: opts?.category ?? "Hosts",
+        angleSlug: opts?.angleSlug ?? conceptSlug.replace(/-/g, "_"),
       }),
     })
     const json = await res.json().catch(() => ({}))
@@ -275,11 +299,23 @@ export function BriefIntakePanel({
       body: file,
     })
     if (!put.ok) throw new Error(`GCS upload failed (${put.status})`)
-    setUploadedGcsPath(gcsPath)
+    setUploadedGcsPath(normalizeObjectPath(gcsPath))
   }
 
   const onLibrarySelect = (entry: AssetLibraryEntry) => {
-    setUploadedGcsPath(entry.gcsPath.replace(/^gs:\/\/[^/]+\//, ""))
+    setUploadedGcsPath(normalizeObjectPath(entry.gcsPath))
+  }
+
+  const uploadT4BaseVideo = async (file: File) => {
+    setBusyAction("upload-base-video")
+    try {
+      await uploadBaseVideoFile(file, T4_UPLOAD_DEFAULTS)
+      onMessage("Sauna base video uploaded — you can create the T4 brief now.")
+    } catch (err) {
+      onMessage(err instanceof Error ? err.message : "Upload failed")
+    } finally {
+      setBusyAction(null)
+    }
   }
 
   return (
@@ -324,18 +360,43 @@ export function BriefIntakePanel({
         </label>
       </div>
 
-      {selectedTemplate?.type === "video" && selectedTemplate.id === "T4" ? (
-        <AssetLibraryPanel
-          mediaType="video"
-          selectedPath={uploadedGcsPath}
-          onSelect={onLibrarySelect}
-        />
+      {needsUploadedBaseVideo ? (
+        <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">
+            T4 needs a POV sauna base MP4. Pick one from the library or upload before creating the brief.
+          </p>
+          <label className="block text-xs font-medium text-muted-foreground">
+            Upload base video
+            <input
+              type="file"
+              accept="video/*"
+              disabled={busyAction !== null}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                void uploadT4BaseVideo(file)
+                e.target.value = ""
+              }}
+              className="mt-1 block w-full text-xs"
+            />
+          </label>
+          <AssetLibraryPanel
+            mediaType="video"
+            selectedPath={uploadedGcsPath}
+            onSelect={onLibrarySelect}
+          />
+          {uploadedGcsPath ? (
+            <p className="text-xs font-mono text-green-700 truncate">{uploadedGcsPath}</p>
+          ) : (
+            <p className="text-xs text-amber-700">Base video required</p>
+          )}
+        </div>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={!selectedTemplateId || busyAction !== null}
+          disabled={!selectedTemplateId || busyAction !== null || (needsUploadedBaseVideo && !uploadedGcsPath.trim())}
           onClick={() => void createFromTemplate(false)}
           className="text-xs border rounded px-3 py-1.5 disabled:opacity-50"
         >
@@ -343,7 +404,7 @@ export function BriefIntakePanel({
         </button>
         <button
           type="button"
-          disabled={!selectedTemplateId || busyAction !== null}
+          disabled={!selectedTemplateId || busyAction !== null || (needsUploadedBaseVideo && !uploadedGcsPath.trim())}
           onClick={() => void createFromTemplate(true)}
           className="text-xs bg-green-600 text-white rounded px-3 py-1.5 disabled:opacity-50"
         >

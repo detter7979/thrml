@@ -20,6 +20,10 @@ async function fetcher<T>(url: string): Promise<T> {
   return json as T
 }
 
+function normalizeObjectPath(path: string) {
+  return path.replace(/^gs:\/\/[^/]+\//, "")
+}
+
 type Props = {
   mediaType?: "static" | "video" | "all"
   selectedPath?: string
@@ -34,6 +38,7 @@ export function AssetLibraryPanel({ mediaType = "video", selectedPath, onSelect 
   )
 
   const assets = (data?.assets ?? []).filter((a) => a.mediaType === mediaType || mediaType === "all")
+  const normalizedSelected = selectedPath ? normalizeObjectPath(selectedPath) : ""
 
   return (
     <div className="rounded-lg border bg-muted/30 p-3 space-y-2 max-h-48 overflow-y-auto">
@@ -52,7 +57,7 @@ export function AssetLibraryPanel({ mediaType = "video", selectedPath, onSelect 
                 type="button"
                 onClick={() => onSelect(asset)}
                 className={`w-full text-left text-xs px-2 py-1.5 rounded border truncate ${
-                  selectedPath === asset.gcsPath
+                  normalizedSelected === normalizeObjectPath(asset.gcsPath)
                     ? "border-[#9A4A33] bg-[#9A4A33]/10"
                     : "border-transparent hover:bg-muted"
                 }`}

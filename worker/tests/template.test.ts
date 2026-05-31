@@ -37,16 +37,21 @@ describe("template", () => {
 })
 
 describe("buildFilterComplex", () => {
-  it("v2 uses centered drawtext and single input", () => {
+  it("v2 uses per-line centered drawtext and single input", () => {
     const { filter, inputs } = buildFilterComplex({
       template: templateV2,
       copyTextFile: "/tmp/overlay-copy.txt",
+      copyLineFiles: ["/tmp/overlay-line-0.txt", "/tmp/overlay-line-1.txt"],
     })
     expect(inputs).toBe(1)
-    expect(filter).toContain("textfile=")
-    expect(filter).toContain("y=(h*0.54)-(text_h/2)")
-    expect(filter).toContain("text_align=C")
+    expect(filter).toContain("textfile='/tmp/overlay-line-0.txt'")
+    expect(filter).toContain("textfile='/tmp/overlay-line-1.txt'")
+    expect(filter).toContain("y=(h*0.54)-text_h-6")
+    expect(filter).toContain("y=(h*0.54)+6")
+    expect(filter).toContain("x=(w-text_w)/2")
     expect(filter).toContain("fontsize=h*0.0328")
+    expect(filter).not.toContain("text_align")
+    expect(filter).not.toContain("fix_bounds")
     expect(filter).not.toContain("overlay=0:H-h:format=auto[bg]")
     expect(filter).not.toContain("[logo]")
   })

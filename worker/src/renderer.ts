@@ -22,9 +22,28 @@ function escapeDrawtextPath(filePath: string): string {
   return filePath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'")
 }
 
+function drawtextChain(args: {
+  inputLabel: string
+  outputLabel: string
+  fontPath: string
+  textFile: string
+  fontSizeExpr: string
+  textColor: string
+  yExpr: string
+  lineSpacing?: string
+}): string {
+  const lineSpacing =
+    args.lineSpacing != null ? `:line_spacing=${args.lineSpacing}` : ""
+  return (
+    `${args.inputLabel}drawtext=fontfile='${args.fontPath}':textfile='${args.textFile}'` +
+    `:${args.fontSizeExpr}:fontcolor=0x${args.textColor}:x=(w-text_w)/2:${args.yExpr}${lineSpacing}${args.outputLabel}`
+  )
+}
+
 export function buildFilterComplex(args: {
   template: VideoTemplate
   copyTextFile: string
+  copyLineFiles?: string[]
 }): { filter: string; outputLabel: string; inputs: number } {
   const t = args.template
   const fontPath = escapeDrawtextPath(resolveWorkerPath(t.fontPath))
@@ -33,11 +52,7 @@ export function buildFilterComplex(args: {
   const showLogo = t.showLogo !== false && t.logoWidth > 0
 
   const fontSizeExpr = t.fontSizeRatio ? `fontsize=h*${t.fontSizeRatio}` : `fontsize=${t.textSize}`
-  const yExpr = t.textTopRatio != null ? `y=(h*${t.textTopRatio})-(text_h/2)` : `y=${t.textTopOffset}`
-  const lineSpacing =
-    t.textLineSpacing != null ? `:line_spacing=${t.textLineSpacing}` : ""
-  const textAlign =
-    t.textTopRatio != null ? ":text_align=C:fix_bounds=1" : ""
+  const lineSpacing = t.textLineSpacing ?? 11
 
   const parts: string[] = []
   let current = "[0:v]"
@@ -52,10 +67,49 @@ export function buildFilterComplex(args: {
     current = "[bg]"
   }
 
-  parts.push(
-    `${current}drawtext=fontfile='${fontPath}':textfile='${copyFile}':${fontSizeExpr}:fontcolor=0x${t.textColor}:x=(w-text_w)/2:${yExpr}${lineSpacing}${textAlign}[txt]`,
-  )
-  current = "[txt]"
+  const lineFiles =
+    t.textTopRatio != null && args.copyLineFiles?.length
+      ? args.copyLineFiles.map(escapeDrawtextPath)
+      : null
+
+  if (lineFiles && lineFiles.length > 0) {
+    const centerRatio = t.textTopRatio!
+    const gap = Math.round(lineSpacing / 2)
+    lineFiles.forEach((lineFile, index) => {
+      const yExpr =
+        index === 0
+          ? `y=(h*${centerRatio})-text_h-${gap}`
+          : `y=(h*${centerRatio})+${gap}`
+      const outLabel = index === lineFiles.length - 1 ? "[txt]" : `[txt${index}]`
+      parts.push(
+        drawtextChain({
+          inputLabel: current,
+          outputLabel: outLabel,
+          fontPath,
+          textFile: lineFile,
+          fontSizeExpr,
+          textColor: t.textColor,
+          yExpr,
+        }),
+      )
+      current = outLabel
+    })
+  } else {
+    const yExpr = t.textTopRatio != null ? `y=(h*${t.textTopRatio})-(text_h/2)` : `y=${t.textTopOffset}`
+    parts.push(
+      drawtextChain({
+        inputLabel: current,
+        outputLabel: "[txt]",
+        fontPath,
+        textFile: copyFile,
+        fontSizeExpr,
+        textColor: t.textColor,
+        yExpr,
+        lineSpacing: t.textLineSpacing != null ? String(t.textLineSpacing) : undefined,
+      }),
+    )
+    current = "[txt]"
+  }
 
   if (showLogo) {
     const logoPath = escapeDrawtextPath(resolveWorkerPath(t.logoPath))
@@ -80,7 +134,24 @@ export async function render(args: RenderArgs): Promise<void> {
   const copyTextFile = join(workDir, "overlay-copy.txt")
   await writeFile(copyTextFile, copyText, "utf8")
 
-  const { filter, outputLabel, inputs } = buildFilterComplex({ template: t, copyTextFile })
+  const copyLines = copyText
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const copyLineFiles: string[] = []
+  if (t.textTopRatio != null && copyLines.length > 1) {
+    for (let i = 0; i < copyLines.length; i++) {
+      const lineFile = join(workDir, `overlay-line-${i}.txt`)
+      await writeFile(lineFile, copyLines[i]!, "utf8")
+      copyLineFiles.push(lineFile)
+    }
+  }
+
+  const { filter, outputLabel, inputs } = buildFilterComplex({
+    template: t,
+    copyTextFile,
+    copyLineFiles: copyLineFiles.length > 0 ? copyLineFiles : undefined,
+  })
 
   return new Promise<void>((resolvePromise, reject) => {
     const cmd = ffmpeg().input(baseVideoPath)

@@ -124,9 +124,36 @@ function parseGcsPath(gcsPath: string) {
   return { bucketName: match[1], objectPath: match[2] }
 }
 
+function fileForStoredGcsPath(bucketName: string, objectPath: string) {
+  const mainBucket = requireEnv("GCS_BUCKET_NAME")
+  const creativeBucket = process.env.GCS_CREATIVE_BUCKET?.trim() || mainBucket
+
+  // Legacy rows store gs://thrml-creative/... when no separate creative bucket exists.
+  if (bucketName === "thrml-creative" && !process.env.GCS_CREATIVE_BUCKET?.trim()) {
+    return getBucket().file(objectPath)
+  }
+  if (bucketName === mainBucket) return getBucket().file(objectPath)
+  if (bucketName === creativeBucket) return getCreativeBucket().file(objectPath)
+
+  throw new Error(
+    `GCS path bucket ${bucketName} does not match configured buckets (${mainBucket}${creativeBucket !== mainBucket ? `, ${creativeBucket}` : ""})`
+  )
+}
+
 export function normalizeCreativeAssetGcsPath(gcsPath: string) {
   const { bucketName, objectPath } = parseGcsPath(gcsPath)
-  return `gs://${bucketName}/${objectPath}`
+  const mainBucket = requireEnv("GCS_BUCKET_NAME")
+  const creativeBucket = process.env.GCS_CREATIVE_BUCKET?.trim() || mainBucket
+
+  let effectiveBucket = bucketName
+  if (bucketName === "thrml-creative" && !process.env.GCS_CREATIVE_BUCKET?.trim()) {
+    effectiveBucket = mainBucket
+  } else if (bucketName !== mainBucket && bucketName !== creativeBucket) {
+    throw new Error(
+      `GCS path bucket ${bucketName} does not match configured buckets (${mainBucket}${creativeBucket !== mainBucket ? `, ${creativeBucket}` : ""})`
+    )
+  }
+  return `gs://${effectiveBucket}/${objectPath}`
 }
 
 async function signedReadUrl(file: ReturnType<ReturnType<typeof getBucket>["file"]>) {
@@ -165,19 +192,7 @@ export async function getSignedGcsReadUrl(gcsPath: string, opts?: { expiresInSec
 
 export async function refreshCreativeAssetUrl(gcsPath: string) {
   const { bucketName, objectPath } = parseGcsPath(gcsPath)
-  const configuredBucket = requireEnv("GCS_BUCKET_NAME")
-  const creativeBucket = process.env.GCS_CREATIVE_BUCKET?.trim()
-
-  if (bucketName === configuredBucket) {
-    return signedReadUrl(getBucket().file(objectPath))
-  }
-  if (creativeBucket && bucketName === creativeBucket) {
-    return signedReadUrl(getCreativeBucket().file(objectPath))
-  }
-
-  throw new Error(
-    `GCS path bucket ${bucketName} does not match configured buckets (${configuredBucket}${creativeBucket ? `, ${creativeBucket}` : ""})`
-  )
+  return signedReadUrl(fileForStoredGcsPath(bucketName, objectPath))
 }
 
 export async function downloadCreativeAsset(gcsPath: string): Promise<DownloadedCreativeAsset> {

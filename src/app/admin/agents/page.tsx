@@ -455,10 +455,10 @@ export default function AgentsDashboard() {
     }
   }
 
-  const refreshAssetUrl = async (asset: CreativeAsset, img: HTMLImageElement) => {
-    if (img.dataset.refreshing === "true" || img.dataset.refreshed === "true") return
-    img.dataset.refreshing = "true"
-    img.dataset.refreshed = "true"
+  const refreshAssetUrl = async (asset: CreativeAsset, media: HTMLImageElement | HTMLVideoElement) => {
+    if (media.dataset.refreshing === "true" || media.dataset.refreshed === "true") return
+    media.dataset.refreshing = "true"
+    media.dataset.refreshed = "true"
     try {
       const res = await fetch("/api/admin/agent/refresh-asset-url", {
         method: "POST",
@@ -467,10 +467,10 @@ export default function AgentsDashboard() {
       })
       if (res.ok) {
         const { gcsUrl } = (await res.json()) as { gcsUrl?: string }
-        if (gcsUrl) img.src = gcsUrl
+        if (gcsUrl) media.src = gcsUrl
       }
     } finally {
-      img.dataset.refreshing = "false"
+      media.dataset.refreshing = "false"
     }
   }
 
@@ -983,6 +983,9 @@ export default function AgentsDashboard() {
                                     onMouseLeave={(e) => {
                                       e.currentTarget.pause()
                                       e.currentTarget.currentTime = 0
+                                    }}
+                                    onError={(event) => {
+                                      void refreshAssetUrl(asset, event.currentTarget)
                                     }}
                                   />
                                 ) : (

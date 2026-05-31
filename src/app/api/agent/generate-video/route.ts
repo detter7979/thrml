@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { baseVideoPath, gcsUrl } from "@/lib/agent/gcs-paths"
-import { uploadRemoteToCreativeObject } from "@/lib/agent/gcs"
+import { baseVideoPath, gcsUrl, resolveCreativeBucketName } from "@/lib/agent/gcs-paths"
+import { refreshCreativeAssetUrl, uploadRemoteToCreativeObject } from "@/lib/agent/gcs"
 import { buildAdName, InvalidAdNameError } from "@/lib/agent/naming-builder"
 import { generateVideo as runwayGenerate, pollTask } from "@/lib/agent/runway"
 import type { VideoConfig } from "@/lib/agent/types"
@@ -177,7 +177,9 @@ export async function POST(req: NextRequest) {
       baseSourceAssetId = assetRow.id
     } else {
       baseGcsPath = config.uploadedGcsPath!.replace(/^gs:\/\/[^/]+\//, "")
-      const fullGcsPath = gcsUrl(baseGcsPath)
+      const creativeBucket = resolveCreativeBucketName()
+      const fullGcsPath = gcsUrl(baseGcsPath, creativeBucket)
+      const signedBaseUrl = await refreshCreativeAssetUrl(fullGcsPath)
 
       const { data: existing } = await admin!
         .from("creative_assets")
@@ -196,6 +198,7 @@ export async function POST(req: NextRequest) {
             asset_type: "video",
             generation_tool: "manual",
             gcs_path: fullGcsPath,
+            gcs_url: signedBaseUrl,
             status: "generated",
             variation_label: "base",
           })

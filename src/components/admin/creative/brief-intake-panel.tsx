@@ -10,6 +10,11 @@ import {
   DEFAULT_POV_VIDEO_OVERLAY,
 } from "@/lib/agent/video-template-copy"
 import { DEFAULT_HOST_HEADLINE, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
+import {
+  normalizeGcsObjectPath,
+  suggestedT4BaseVideoObjectPath,
+  T4_BASE_VIDEO_UPLOAD,
+} from "@/lib/agent/t4-base-video-upload"
 
 export type CreativeTemplateSummary = {
   id: string
@@ -31,16 +36,14 @@ export type SvgTemplateSummary = {
 const SPLIT_HEADER_TOKENS = ["TAGLINE_EYEBROW", "HEADLINE", "SUBHEAD"] as const
 const POV_OVERLAY_TOKENS = ["POV_LINE_1", "POV_LINE_2"] as const
 
-/** Matches T4 `config/creative-templates.yaml` video block. */
-const T4_UPLOAD_DEFAULTS = {
-  conceptSlug: "pov-earnings",
-  assetSlug: "sauna",
-  category: "Hosts",
-  angleSlug: "pov_earnings",
-} as const
-
-function normalizeObjectPath(path: string) {
-  return path.replace(/^gs:\/\/[^/]+\//, "")
+type CreativeStorageInfo = {
+  mainBucket: string
+  creativeBucket: string
+  suggestedObjectPath: string
+  suggestedGsUri: string
+  gsutilCommand: string
+  legacyBaseExample: string
+  canonicalPrefix: string
 }
 
 function VideoUploadButton({
@@ -158,13 +161,22 @@ export function BriefIntakePanel({
         : (selectedSvgTemplate?.tokens ?? []).filter((token) => token !== "PHOTO_URL")
 
   const onPhotoLibrarySelect = (entry: AssetLibraryEntry) => {
-    setPhotoGcsPath(normalizeObjectPath(entry.gcsPath))
+    setPhotoGcsPath(normalizeGcsObjectPath(entry.gcsPath))
   }
 
   const needsUploadedBaseVideo =
     selectedTemplate?.type === "video" && selectedTemplate.id === "T4"
   const needsRunwayApiKey =
     selectedTemplate?.type === "video" && selectedTemplate.id === "T2"
+
+  const { data: storageInfo } = useSWR<CreativeStorageInfo>(
+    needsUploadedBaseVideo ? "/api/admin/agent/creative-storage-info" : null,
+    fetcher,
+  )
+  const t4ObjectPath = storageInfo?.suggestedObjectPath ?? suggestedT4BaseVideoObjectPath()
+  const t4GsutilCommand = storageInfo?.gsutilCommand ?? ""
+  const t4CreativeBucket = storageInfo?.creativeBucket ?? "your-creative-bucket"
+  const t4LegacyExample = storageInfo?.legacyBaseExample ?? "bases/YYYY/MM/pov-earnings/sauna_v1.mp4"
 
   const createFromTemplate = async (saveAndApprove: boolean) => {
     if (!selectedTemplateId) {
@@ -183,7 +195,7 @@ export function BriefIntakePanel({
         body: JSON.stringify({
           templateId: selectedTemplateId,
           conceptVerify,
-          uploadedGcsPath: normalizeObjectPath(uploadedGcsPath.trim()) || undefined,
+          uploadedGcsPath: normalizeGcsObjectPath(uploadedGcsPath.trim()) || undefined,
           saveAndApprove,
         }),
       })
@@ -342,17 +354,17 @@ export function BriefIntakePanel({
       throw new Error(`${json.error ?? "Upload failed"}${detail}`)
     }
     if (!json.gcsPath) throw new Error("Upload succeeded but storage path was missing.")
-    setUploadedGcsPath(normalizeObjectPath(json.gcsPath))
+    setUploadedGcsPath(normalizeGcsObjectPath(json.gcsPath))
   }
 
   const onLibrarySelect = (entry: AssetLibraryEntry) => {
-    setUploadedGcsPath(normalizeObjectPath(entry.gcsPath))
+    setUploadedGcsPath(normalizeGcsObjectPath(entry.gcsPath))
   }
 
   const uploadT4BaseVideo = async (file: File) => {
     setBusyAction("upload-base-video")
     try {
-      await uploadBaseVideoFile(file, T4_UPLOAD_DEFAULTS)
+      await uploadBaseVideoFile(file, T4_BASE_VIDEO_UPLOAD)
       onMessage("Sauna base video uploaded — you can create the T4 brief now.")
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Upload failed")
@@ -412,24 +424,74 @@ export function BriefIntakePanel({
       ) : null}
 
       {needsUploadedBaseVideo ? (
-        <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+        <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
           <p className="text-xs text-muted-foreground">
-            T4 needs a POV sauna base MP4. Pick one from the library or upload before creating the brief.
+            T4 needs a POV sauna base MP4 in the creative GCS bucket. Upload via gsutil (below), pick from the
+            library, paste a path, or try the in-app uploader.
           </p>
+
+          <details className="rounded-md border bg-background px-3 py-2 text-xs">
+            <summary className="cursor-pointer font-medium text-foreground">
+              Upload directly to GCS (recommended)
+            </summary>
+            <div className="mt-2 space-y-2 text-muted-foreground">
+              <p>
+                Your creative bucket is <code className="font-mono text-foreground">{t4CreativeBucket}</code>{" "}
+                (from env). Statics use{" "}
+                <code className="font-mono text-foreground">{storageInfo?.mainBucket ?? "GCS_BUCKET_NAME"}</code>.
+                Older test uploads are often under legacy{" "}
+                <code className="font-mono">{t4LegacyExample}</code> — paste any existing object path below.
+              </p>
+              <p>
+                <strong>New canonical folder</strong> (use for all new POV sauna bases):
+              </p>
+              <pre className="overflow-x-auto rounded bg-muted p-2 font-mono text-[11px] text-foreground">
+                {t4GsutilCommand || `gsutil cp your-sauna.mp4 gs://${t4CreativeBucket}/${t4ObjectPath}`}
+              </pre>
+              <p>
+                List everything:{" "}
+                <code className="font-mono">gsutil ls -r gs://{t4CreativeBucket}/**/*.mp4</code>
+              </p>
+            </div>
+          </details>
+
+          <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+            GCS object path
+            <input
+              value={uploadedGcsPath}
+              onChange={(e) => setUploadedGcsPath(normalizeGcsObjectPath(e.target.value))}
+              placeholder={t4ObjectPath}
+              className="w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+            />
+          </label>
+          <button
+            type="button"
+            className="text-xs underline text-muted-foreground hover:text-foreground"
+            onClick={() => setUploadedGcsPath(t4ObjectPath)}
+          >
+            Use suggested path for this month
+          </button>
+
           <VideoUploadButton
             busy={busyAction === "upload-base-video"}
             disabled={busyAction !== null && busyAction !== "upload-base-video"}
+            label="Try in-app upload"
             onFile={(file) => void uploadT4BaseVideo(file)}
           />
+
           <AssetLibraryPanel
             mediaType="video"
             selectedPath={uploadedGcsPath}
             onSelect={onLibrarySelect}
           />
+          <p className="text-xs text-muted-foreground">
+            Library searches both buckets. Hover a row to see the full path — paste that path above if select does not
+            stick.
+          </p>
           {uploadedGcsPath ? (
-            <p className="text-xs font-mono text-green-700 truncate">{uploadedGcsPath}</p>
+            <p className="text-xs font-mono text-green-700 truncate">Selected: {uploadedGcsPath}</p>
           ) : (
-            <p className="text-xs text-amber-700">Base video required</p>
+            <p className="text-xs text-amber-700">Base video path required</p>
           )}
         </div>
       ) : null}

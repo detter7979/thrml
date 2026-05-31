@@ -2,7 +2,13 @@
 // Unified taxonomy: {year}/{month}/{category}/{angle}/Static|Video/{variant}_{format}.{ext}
 // Legacy bases/renders paths remain readable via asset library.
 
+/** Legacy default when env is unset; prefer resolveCreativeBucketName() for writes/URLs. */
 export const BUCKET_NAME = process.env.GCS_CREATIVE_BUCKET ?? "thrml-creative"
+
+/** Same resolution as getCreativeBucket() in gcs.ts */
+export function resolveCreativeBucketName(mainBucket?: string) {
+  return process.env.GCS_CREATIVE_BUCKET?.trim() || mainBucket?.trim() || process.env.GCS_BUCKET_NAME?.trim() || BUCKET_NAME
+}
 
 export interface BasePathArgs {
   date: Date
@@ -132,12 +138,12 @@ export function renderedVideoPath(args: RenderPathArgs): string {
   return `renders/${yyyy(date)}/${mm(date)}/${conceptSlug}/${variantSlug}_v${templateVersion}.mp4`
 }
 
-export function gcsUrl(objectPath: string): string {
-  return `gs://${BUCKET_NAME}/${objectPath}`
+export function gcsUrl(objectPath: string, bucket = resolveCreativeBucketName()): string {
+  return `gs://${bucket}/${objectPath}`
 }
 
-export function gcsPublicUrl(objectPath: string): string {
-  return `https://storage.googleapis.com/${BUCKET_NAME}/${encodeURI(objectPath)}`
+export function gcsPublicUrl(objectPath: string, bucket = resolveCreativeBucketName()): string {
+  return `https://storage.googleapis.com/${bucket}/${encodeURI(objectPath)}`
 }
 
 /** Prefixes searched by the admin asset library. */

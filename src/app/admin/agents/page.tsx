@@ -120,6 +120,10 @@ function isLaunchableVideo(asset: CreativeAsset) {
   return asset.generation_tool === "composite-video"
 }
 
+function isSourceBaseVideo(asset: CreativeAsset) {
+  return asset.variation_label === "base" && asset.generation_tool === "manual"
+}
+
 function isVideoAsset(asset: CreativeAsset) {
   const kind = `${asset.asset_type ?? ""} ${asset.gcs_path ?? ""} ${asset.signed_url ?? asset.gcs_url ?? ""}`.toLowerCase()
   return (
@@ -131,8 +135,84 @@ function isVideoAsset(asset: CreativeAsset) {
     kind.endsWith(".webm")
   )
 }
+function isSignedStorageUrl(url: string) {
+  return url.includes("X-Goog-Signature=") || url.includes("GoogleAccessId=")
+}
+
 function assetUrl(asset: CreativeAsset) {
-  return asset.signed_url ?? asset.gcs_url ?? ""
+  if (asset.signed_url?.trim()) return asset.signed_url
+  const stored = asset.gcs_url?.trim() ?? ""
+  if (stored && isSignedStorageUrl(stored)) return stored
+  return ""
+}
+
+function CreativeVideoPreview({
+  asset,
+  resolveUrl,
+  className,
+  style,
+  interactive = false,
+}: {
+  asset: CreativeAsset
+  resolveUrl: (asset: CreativeAsset, media?: HTMLVideoElement) => Promise<string | null>
+  className?: string
+  style?: React.CSSProperties
+  interactive?: boolean
+}) {
+  const [src, setSrc] = useState(() => assetUrl(asset))
+
+  useEffect(() => {
+    setSrc(assetUrl(asset))
+  }, [asset.id, asset.signed_url, asset.gcs_url])
+
+  useEffect(() => {
+    if (src) return
+    let cancelled = false
+    void resolveUrl(asset).then((url) => {
+      if (!cancelled && url) setSrc(url)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [asset, resolveUrl, src])
+
+  if (!src) {
+    return (
+      <div className={`flex h-full items-center justify-center text-xs text-muted-foreground ${className ?? ""}`}>
+        Loading…
+      </div>
+    )
+  }
+
+  return (
+    <video
+      src={src}
+      className={className}
+      style={style}
+      preload="metadata"
+      muted
+      loop={interactive}
+      playsInline
+      controls={!interactive}
+      onLoadedMetadata={(e) => {
+        e.currentTarget.currentTime = 0.1
+      }}
+      onMouseEnter={interactive ? (e) => void e.currentTarget.play() : undefined}
+      onMouseLeave={
+        interactive
+          ? (e) => {
+              e.currentTarget.pause()
+              e.currentTarget.currentTime = 0
+            }
+          : undefined
+      }
+      onError={(event) => {
+        void resolveUrl(asset, event.currentTarget).then((url) => {
+          if (url) setSrc(url)
+        })
+      }}
+    />
+  )
 }
 function briefFor(asset: CreativeAsset) {
   if (Array.isArray(asset.creative_briefs)) return asset.creative_briefs[0] ?? null
@@ -455,24 +535,36 @@ export default function AgentsDashboard() {
     }
   }
 
-  const refreshAssetUrl = async (asset: CreativeAsset, media: HTMLImageElement | HTMLVideoElement) => {
-    if (media.dataset.refreshing === "true" || media.dataset.refreshed === "true") return
-    media.dataset.refreshing = "true"
-    media.dataset.refreshed = "true"
+  const refreshAssetUrl = useCallback(async (asset: CreativeAsset, media?: HTMLImageElement | HTMLVideoElement) => {
+    if (media?.dataset.refreshing === "true" || media?.dataset.refreshed === "true") return null
+    if (media) media.dataset.refreshing = "true"
     try {
       const res = await fetch("/api/admin/agent/refresh-asset-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assetId: asset.id }),
       })
-      if (res.ok) {
-        const { gcsUrl } = (await res.json()) as { gcsUrl?: string }
-        if (gcsUrl) media.src = gcsUrl
+      if (!res.ok) return null
+      const { gcsUrl } = (await res.json()) as { gcsUrl?: string }
+      if (gcsUrl && media) {
+        media.src = gcsUrl
+        media.dataset.refreshed = "true"
       }
+      return gcsUrl ?? null
     } finally {
-      media.dataset.refreshing = "false"
+      if (media) media.dataset.refreshing = "false"
     }
-  }
+  }, [])
+
+  const openAssetPreview = useCallback(async (asset: CreativeAsset) => {
+    setViewingAsset(asset)
+    const gcsUrl = await refreshAssetUrl(asset)
+    if (gcsUrl) {
+      setViewingAsset((prev) =>
+        prev?.id === asset.id ? { ...prev, signed_url: gcsUrl, gcs_url: gcsUrl } : prev
+      )
+    }
+  }, [refreshAssetUrl])
 
   const criticalCount = alerts.filter(a => a.severity === "CRITICAL").length
   const latestFinance = finance[0]
@@ -496,14 +588,24 @@ export default function AgentsDashboard() {
   const assetsByBrief = useMemo(() => {
     const grouped = new Map<string, CreativeAsset[]>()
     for (const asset of generatedAssets) {
+      if (isSourceBaseVideo(asset)) continue
       const key = asset.brief_id ?? "unlinked"
       grouped.set(key, [...(grouped.get(key) ?? []), asset])
     }
-    return Array.from(grouped.entries()).map(([briefId, assets]) => ({
-      briefId,
-      brief: briefFor(assets[0]),
-      assets: assets.slice(0, 6),
-    }))
+    return Array.from(grouped.entries())
+      .filter(([, assets]) => assets.length > 0)
+      .map(([briefId, assets]) => ({
+        briefId,
+        brief: briefFor(assets[0]),
+        assets: assets.slice(0, 6),
+      }))
+  }, [generatedAssets])
+  const baseVideoByBrief = useMemo(() => {
+    const map = new Map<string, CreativeAsset>()
+    for (const asset of generatedAssets) {
+      if (isSourceBaseVideo(asset) && asset.brief_id) map.set(asset.brief_id, asset)
+    }
+    return map
   }, [generatedAssets])
   const variationReadyCount =
     generatingBriefs.length +
@@ -885,13 +987,50 @@ export default function AgentsDashboard() {
                     {videoGeneratingBriefs.map((brief) => {
                       const jobs = renderJobsByBrief[brief.id] ?? []
                       const config = brief.video_config
+                      const baseAsset = baseVideoByBrief.get(brief.id)
+                      const waitingForWorker = jobs.some(
+                        (job) => job.status === "pending" && job.attempts === 0
+                      )
                       return (
-                        <div key={brief.id} className="rounded-lg border p-3 space-y-3">
+                        <div key={brief.id} className="rounded-lg border p-3 space-y-3 border-amber-200 bg-amber-50/40">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-medium">{config?.conceptSlug ?? brief.hook}</p>
                             <span className="h-4 w-4 rounded-full border-2 border-muted border-t-foreground animate-spin" />
                           </div>
-                          <p className="text-xs text-muted-foreground">Video rendering in progress</p>
+                          <p className="text-xs text-muted-foreground">
+                            Compositing POV overlay onto your upload. Final variants appear here when the Railway
+                            FFmpeg worker finishes.
+                          </p>
+                          {waitingForWorker ? (
+                            <p className="rounded-md bg-amber-100 px-3 py-2 text-xs text-amber-900">
+                              Queued at attempt 0 — the render worker is not running or cannot reach Supabase/GCS.
+                              On Railway set <code className="font-mono">GCS_CREATIVE_BUCKET=thrml</code> and confirm
+                              the worker service is deployed.
+                            </p>
+                          ) : null}
+                          {baseAsset && assetUrl(baseAsset) ? (
+                            <div className="flex items-start gap-3">
+                              <div className="aspect-[9/16] w-[90px] shrink-0 overflow-hidden rounded border bg-muted">
+                                <video
+                                  src={assetUrl(baseAsset)}
+                                  className="h-full w-full object-cover"
+                                  preload="metadata"
+                                  muted
+                                  playsInline
+                                  onLoadedMetadata={(e) => {
+                                    e.currentTarget.currentTime = 0.1
+                                  }}
+                                  onError={(event) => {
+                                    void refreshAssetUrl(baseAsset, event.currentTarget)
+                                  }}
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Source upload registered. Waiting for composited render — do not approve this base
+                                file for Meta.
+                              </p>
+                            </div>
+                          ) : null}
                           <div className="space-y-1">
                             {jobs.map((job) => (
                               <div key={job.id} className="flex items-center justify-between text-xs gap-2">
@@ -969,35 +1108,23 @@ export default function AgentsDashboard() {
                         {group.assets.map((asset) => (
                           <div key={asset.id} className="rounded-md border bg-background p-2 space-y-2">
                             <div className={`rounded bg-muted overflow-hidden border ${isVideoAsset(asset) ? "aspect-[9/16] max-w-[180px]" : "aspect-video"}`}>
-                              {assetUrl(asset) ? (
-                                isVideoAsset(asset) ? (
-                                  <video
-                                    src={assetUrl(asset)}
-                                    className="h-full w-full object-cover rounded-lg"
-                                    style={{ width: 180, aspectRatio: "9/16" }}
-                                    preload="metadata"
-                                    muted
-                                    loop
-                                    playsInline
-                                    onMouseEnter={(e) => void e.currentTarget.play()}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.pause()
-                                      e.currentTarget.currentTime = 0
-                                    }}
-                                    onError={(event) => {
-                                      void refreshAssetUrl(asset, event.currentTarget)
-                                    }}
-                                  />
-                                ) : (
-                                  <img
-                                    src={assetUrl(asset)}
-                                    alt="Creative asset"
-                                    className="h-full w-full object-cover"
-                                    onError={(event) => {
-                                      void refreshAssetUrl(asset, event.currentTarget)
-                                    }}
-                                  />
-                                )
+                              {isVideoAsset(asset) ? (
+                                <CreativeVideoPreview
+                                  asset={asset}
+                                  resolveUrl={refreshAssetUrl}
+                                  className="h-full w-full object-cover rounded-lg"
+                                  style={{ width: 180, aspectRatio: "9/16" }}
+                                  interactive
+                                />
+                              ) : assetUrl(asset) ? (
+                                <img
+                                  src={assetUrl(asset)}
+                                  alt="Creative asset"
+                                  className="h-full w-full object-cover"
+                                  onError={(event) => {
+                                    void refreshAssetUrl(asset, event.currentTarget)
+                                  }}
+                                />
                               ) : (
                                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                                   No preview
@@ -1031,7 +1158,7 @@ export default function AgentsDashboard() {
                                 Reject
                               </button>
                               <button
-                                onClick={() => setViewingAsset(asset)}
+                                onClick={() => void openAssetPreview(asset)}
                                 className="flex-1 text-[11px] px-2 py-1 border rounded hover:bg-muted"
                               >
                                 View full
@@ -1152,8 +1279,12 @@ export default function AgentsDashboard() {
             </div>
             <div className="max-h-[75vh] overflow-hidden rounded-lg bg-muted">
               {isVideoAsset(viewingAsset) ? (
-                <video src={assetUrl(viewingAsset)} className="max-h-[75vh] w-full object-contain" controls />
-              ) : (
+                <CreativeVideoPreview
+                  asset={viewingAsset}
+                  resolveUrl={refreshAssetUrl}
+                  className="max-h-[75vh] w-full object-contain"
+                />
+              ) : assetUrl(viewingAsset) ? (
                 <img
                   src={assetUrl(viewingAsset)}
                   alt="Creative asset full preview"

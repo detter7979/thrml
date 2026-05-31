@@ -43,7 +43,8 @@ async function main(): Promise<void> {
     try {
       await tick()
     } catch (err) {
-      logger.error({ err }, "Tick failed (will continue)")
+      const message = err instanceof Error ? err.message : String(err)
+      logger.error({ err: message }, "Tick failed (will continue)")
     }
     if (!shutdownRequested) {
       await new Promise((r) => setTimeout(r, config.POLL_INTERVAL_MS))

@@ -28,7 +28,12 @@ export async function claimNextJob(
   const { data, error } = await supabase.rpc("claim_render_job", {
     p_worker_id: workerId,
   })
-  if (error) throw error
+  if (error) {
+    throw new Error(
+      `claim_render_job failed: ${error.message}${error.code ? ` (${error.code})` : ""}. ` +
+        "Apply supabase/migrations/20260520120000_render_jobs.sql on production if this RPC is missing."
+    )
+  }
   if (!data) return null
   const rows = Array.isArray(data) ? data : [data]
   return rows.length > 0 ? (rows[0] as RenderJob) : null
@@ -81,7 +86,6 @@ export async function insertCreativeAsset(
   }
 ): Promise<string> {
   const gcsPath = `gs://${config.GCS_CREATIVE_BUCKET}/${args.renderedGcsPath}`
-  const publicUrl = `https://storage.googleapis.com/${config.GCS_CREATIVE_BUCKET}/${encodeURI(args.renderedGcsPath)}`
 
   const { data, error } = await supabase
     .from("creative_assets")
@@ -92,7 +96,7 @@ export async function insertCreativeAsset(
       variation_label: args.variantSlug,
       format: "9x16",
       gcs_path: gcsPath,
-      gcs_url: publicUrl,
+      gcs_url: null,
       status: "generated",
       source_asset_id: args.sourceAssetId ?? null,
       convention_name: args.conventionName,

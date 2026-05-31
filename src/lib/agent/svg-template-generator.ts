@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import { readFile } from "node:fs/promises"
 import { Resvg } from "@resvg/resvg-js"
 import yaml from "js-yaml"
 
@@ -44,6 +45,51 @@ type SvgTemplatesFile = {
 }
 
 const VARIATION_LABELS = ["A", "B", "C"] as const
+
+/** Bundled fallbacks when a brief has no `photo_gcs_path` (must exist in repo + Vercel trace). */
+const SVG_DEFAULT_BACKDROP: Record<SvgTemplateId, string> = {
+  thrml_split_header_static: path.join(process.cwd(), "public", "hero-sauna.png"),
+  thrml_pov_overlay_static: path.join(process.cwd(), "public", "hero-sauna.png"),
+}
+
+const defaultBackdropDataUrlCache = new Map<string, Promise<string>>()
+
+function bufferToPhotoDataUrl(buffer: Buffer) {
+  const mime = buffer[0] === 0xff && buffer[1] === 0xd8 ? "image/jpeg" : "image/png"
+  return `data:${mime};base64,${buffer.toString("base64")}`
+}
+
+function templateUsesBackdropPhoto(templateId: string) {
+  return templateId in SVG_DEFAULT_BACKDROP
+}
+
+async function loadDefaultBackdropDataUrl(filePath: string) {
+  let cached = defaultBackdropDataUrlCache.get(filePath)
+  if (!cached) {
+    cached = readFile(filePath).then(bufferToPhotoDataUrl)
+    defaultBackdropDataUrlCache.set(filePath, cached)
+  }
+  return cached
+}
+
+/** Signed GCS URL when provided; otherwise bundled hero photo for the template. */
+export async function resolveSvgBackdropPhotoUrl(
+  templateId: SvgTemplateId,
+  photoGcsPath?: string | null,
+) {
+  if (photoGcsPath?.trim()) {
+    return getSignedGcsReadUrl(photoGcsPath.trim(), { expiresInSec: 3600 })
+  }
+
+  const defaultPath = SVG_DEFAULT_BACKDROP[templateId]
+  if (!defaultPath) {
+    throw new Error(`Template ${templateId} has no default backdrop photo configured`)
+  }
+  if (!fs.existsSync(defaultPath)) {
+    throw new Error(`Default backdrop photo not found: ${defaultPath}`)
+  }
+  return loadDefaultBackdropDataUrl(defaultPath)
+}
 
 let registryCache: SvgTemplateRegistryEntry[] | null = null
 
@@ -144,6 +190,7 @@ export function renderPreparedSvg(rawSvg: string, preparedTokens: Record<string,
 /** Normalize legacy split-header tokens and expand HEADLINE into wrapped tspans. */
 export function prepareSplitHeaderTokens(format: SvgStaticFormat, tokens: Record<string, string>) {
   const resolved: Record<string, string> = {
+    ...tokens,
     TAGLINE_EYEBROW:
       tokens.TAGLINE_EYEBROW?.trim() ||
       tokens.EYEBROW?.trim() ||
@@ -335,9 +382,11 @@ export async function generateFromSvgTemplate(
   if (!brief) throw new Error("Creative brief not found")
 
   const resolvedTokens = { ...tokens }
-  if (photoGcsPath?.trim()) {
-    const signedUrl = await getSignedGcsReadUrl(photoGcsPath.trim(), { expiresInSec: 3600 })
-    resolvedTokens.PHOTO_URL = signedUrl
+  if (templateUsesBackdropPhoto(templateId)) {
+    resolvedTokens.PHOTO_URL = await resolveSvgBackdropPhotoUrl(
+      templateId as SvgTemplateId,
+      photoGcsPath,
+    )
   }
 
   const claimViolations = findAdCopyClaimViolations(resolvedTokens)

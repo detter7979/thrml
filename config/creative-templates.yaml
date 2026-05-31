@@ -213,7 +213,7 @@ templates:
 svg_templates:
   - id: thrml_split_header_static
     label: "Split Header Static"
-    tokens: [TAGLINE_EYEBROW, HEADLINE, SUBHEAD]
+    tokens: [TAGLINE_EYEBROW, HEADLINE, SUBHEAD, PHOTO_URL]
     aspect_ratios: ["1x1", "4x5", "9x16"]
   - id: thrml_pov_overlay_static
     label: "POV Overlay Static"

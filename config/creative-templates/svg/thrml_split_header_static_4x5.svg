@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350">
-  <rect width="1080" height="1350" fill="#B5532E"/>
+  <rect width="1080" height="742" fill="#B5532E"/>
+  <image href="{{PHOTO_URL}}" x="0" y="742" width="1080" height="608" preserveAspectRatio="xMidYMid slice"/>
   <text x="72" y="96" fill="#FFFFFF" fill-opacity="0.85" font-family="DM Serif Display, Georgia, serif" font-size="56" letter-spacing="-0.02em">thrml</text>
-  <text x="72" y="585" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
-  <text x="72" y="680" fill="#FFFFFF" font-family="DM Serif Display, Georgia, serif" font-size="72" font-weight="400">{{HEADLINE_TSPANS}}</text>
-  <text x="72" y="845" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="26" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
+  <text x="72" y="200" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
+  <text x="72" y="300" fill="#FFFFFF" font-family="DM Serif Display, Georgia, serif" font-size="72" font-weight="400">{{HEADLINE_TSPANS}}</text>
+  <text x="72" y="470" fill="#FFFFFF" fill-opacity="0.82" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="26" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
 </svg>

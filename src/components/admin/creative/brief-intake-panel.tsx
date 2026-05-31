@@ -212,9 +212,6 @@ export function BriefIntakePanel({
     setBusyAction("create-svg-static")
     try {
       if (!svgTemplateId) throw new Error("Select an SVG template.")
-      if (svgTemplateId === "thrml_pov_overlay_static" && !photoGcsPath.trim()) {
-        throw new Error("POV overlay requires a photo from the asset library.")
-      }
 
       const tokens = Object.fromEntries(
         activeSvgTokenKeys.map((key) => [key, svgTokens[key]?.trim() ?? ""]).filter(([, value]) => value),
@@ -431,7 +428,8 @@ export function BriefIntakePanel({
                   />
                 ))}
 
-                {svgTemplateId === "thrml_pov_overlay_static" ? (
+                {svgTemplateId === "thrml_pov_overlay_static" ||
+                svgTemplateId === "thrml_split_header_static" ? (
                   <>
                     <AssetLibraryPanel
                       mediaType="static"
@@ -440,7 +438,11 @@ export function BriefIntakePanel({
                     />
                     {photoGcsPath ? (
                       <p className="text-xs font-mono text-green-700 truncate">{photoGcsPath}</p>
-                    ) : null}
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Optional photo override — defaults to bundled hero sauna image.
+                      </p>
+                    )}
                   </>
                 ) : null}
 

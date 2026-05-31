@@ -41,6 +41,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/api/agent/approve-brief": [
       "./public/fonts/**/*",
+      "./public/hero-sauna.png",
       "./config/creative-templates.yaml",
       "./config/creative-templates/svg/**/*",
       "./node_modules/@resvg/resvg-js/**",
@@ -48,6 +49,7 @@ const nextConfig: NextConfig = {
     ],
     "/api/agent/generate-static": [
       "./public/fonts/**/*",
+      "./public/hero-sauna.png",
       "./config/creative-templates.yaml",
       "./config/creative-templates/svg/**/*",
       "./node_modules/@resvg/resvg-js/**",
@@ -55,6 +57,7 @@ const nextConfig: NextConfig = {
     ],
     "/api/admin/agent/creative-pipeline": [
       "./public/fonts/**/*",
+      "./public/hero-sauna.png",
       "./config/creative-templates.yaml",
       "./config/creative-templates/svg/**/*",
       "./node_modules/@resvg/resvg-js/**",
@@ -62,6 +65,7 @@ const nextConfig: NextConfig = {
     ],
     "/api/admin/agent/creative-templates": [
       "./public/fonts/**/*",
+      "./public/hero-sauna.png",
       "./config/creative-templates.yaml",
       "./config/creative-templates/svg/**/*",
       "./node_modules/@resvg/resvg-js/**",

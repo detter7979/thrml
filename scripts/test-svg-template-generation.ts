@@ -79,23 +79,17 @@ async function main() {
     claimViolations: splitResult.claimViolations.length,
   })
 
-  const povPhotoPath = process.env.TEST_POV_PHOTO_GCS_PATH?.trim()
-  const povTokens = { ...SAMPLE_POV_TOKENS }
-  if (!povPhotoPath) {
-    povTokens.PHOTO_URL =
-      "https://storage.googleapis.com/thrml-creative/2026/05/hosts/pov_earnings/Static/A_1x1.png"
-    console.warn("[svg-test] TEST_POV_PHOTO_GCS_PATH unset — using placeholder PHOTO_URL token")
-  }
+  const povPhotoPath = process.env.TEST_POV_PHOTO_GCS_PATH?.trim() || null
 
   console.log("[svg-test] Creating POV overlay brief…")
-  const povBriefId = await createTestBrief("SVG POV overlay test", "thrml_pov_overlay_static", povTokens)
+  const povBriefId = await createTestBrief("SVG POV overlay test", "thrml_pov_overlay_static", SAMPLE_POV_TOKENS)
 
   const povResult = await generateFromSvgTemplate(
     povBriefId,
     "thrml_pov_overlay_static",
     "1:1",
-    povTokens,
-    povPhotoPath ?? null,
+    SAMPLE_POV_TOKENS,
+    povPhotoPath,
   )
 
   console.log("[svg-test] POV overlay result:", {

@@ -36,26 +36,36 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  /** Native addons — must not be webpack-bundled (`.node` binaries). */
+  serverExternalPackages: ["@resvg/resvg-js", "sharp"],
   outputFileTracingIncludes: {
     "/api/agent/approve-brief": [
       "./public/fonts/**/*",
       "./config/creative-templates.yaml",
       "./config/creative-templates/svg/**/*",
+      "./node_modules/@resvg/resvg-js/**",
+      "./node_modules/@resvg/resvg-js-linux-x64-gnu/**",
     ],
     "/api/agent/generate-static": [
       "./public/fonts/**/*",
       "./config/creative-templates.yaml",
       "./config/creative-templates/svg/**/*",
+      "./node_modules/@resvg/resvg-js/**",
+      "./node_modules/@resvg/resvg-js-linux-x64-gnu/**",
     ],
     "/api/admin/agent/creative-pipeline": [
       "./public/fonts/**/*",
       "./config/creative-templates.yaml",
       "./config/creative-templates/svg/**/*",
+      "./node_modules/@resvg/resvg-js/**",
+      "./node_modules/@resvg/resvg-js-linux-x64-gnu/**",
     ],
     "/api/admin/agent/creative-templates": [
       "./public/fonts/**/*",
       "./config/creative-templates.yaml",
       "./config/creative-templates/svg/**/*",
+      "./node_modules/@resvg/resvg-js/**",
+      "./node_modules/@resvg/resvg-js-linux-x64-gnu/**",
     ],
   },
   outputFileTracingExcludes: {

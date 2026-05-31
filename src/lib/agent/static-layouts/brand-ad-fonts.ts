@@ -3,10 +3,7 @@ import { readFile } from "node:fs/promises"
 
 const SERIF_REGULAR = path.join(process.cwd(), "public", "fonts", "DMSerifDisplay-Regular.ttf")
 const SERIF_ITALIC = path.join(process.cwd(), "public", "fonts", "DMSerifDisplay-Italic.ttf")
-const SANS_MEDIUM = path.resolve(
-  process.cwd(),
-  "node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2",
-)
+const SANS_MEDIUM = path.join(process.cwd(), "public", "fonts", "Inter-Medium.woff2")
 
 let serifDataUrlsPromise: Promise<{ regular: string; italic: string }> | null = null
 let sansMediumDataUrlPromise: Promise<string> | null = null

@@ -19,11 +19,43 @@ import {
 export type CreativeTemplateSummary = {
   id: string
   label: string
+  short_label: string
+  description: string | null
+  group: "static_photo" | "static_svg" | "video_pov" | null
+  recommended: boolean
   type: "static" | "video"
+  formats: string[]
   concept_verify_default: boolean
   full_batch_variations: number
   generation_tool?: string | null
   svg_template_id?: string | null
+}
+
+const TEMPLATE_GROUP_ORDER = ["static_photo", "static_svg", "video_pov"] as const
+
+const TEMPLATE_GROUP_LABELS: Record<(typeof TEMPLATE_GROUP_ORDER)[number], string> = {
+  static_photo: "Static · Photo + overlay",
+  static_svg: "Static · SVG layouts",
+  video_pov: "Video · POV overlay",
+}
+
+function templatesByGroup(templates: CreativeTemplateSummary[]) {
+  const grouped = new Map<string, CreativeTemplateSummary[]>()
+  for (const group of TEMPLATE_GROUP_ORDER) grouped.set(group, [])
+  for (const template of templates) {
+    const key = template.group ?? "static_photo"
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)!.push(template)
+  }
+  return TEMPLATE_GROUP_ORDER.map((group) => ({
+    group,
+    label: TEMPLATE_GROUP_LABELS[group],
+    templates: grouped.get(group) ?? [],
+  })).filter((section) => section.templates.length > 0)
+}
+
+function formatTemplateFormats(formats: string[]) {
+  return formats.map((f) => f.replace("x", ":")).join(", ")
 }
 
 export type SvgTemplateSummary = {
@@ -34,7 +66,6 @@ export type SvgTemplateSummary = {
 }
 
 const SPLIT_HEADER_TOKENS = ["TAGLINE_EYEBROW", "HEADLINE", "SUBHEAD"] as const
-const POV_OVERLAY_TOKENS = ["POV_LINE_1", "POV_LINE_2"] as const
 
 type CreativeStorageInfo = {
   mainBucket: string
@@ -147,18 +178,14 @@ export function BriefIntakePanel({
     TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR.",
     HEADLINE: DEFAULT_HOST_HEADLINE,
     SUBHEAD: "Backyard and cabin saunas in Seattle + LA.",
-    POV_LINE_1: "pov: your sauna earns you $1,200/mo",
-    POV_LINE_2: "List on thrml. Get paid when you're not using it.",
   })
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
   const selectedSvgTemplate = svgTemplates.find((t) => t.id === svgTemplateId)
-  const activeSvgTokenKeys =
-    svgTemplateId === "thrml_pov_overlay_static"
-      ? POV_OVERLAY_TOKENS
-      : isSplitHeaderSvgTemplate(svgTemplateId)
-        ? SPLIT_HEADER_TOKENS
-        : (selectedSvgTemplate?.tokens ?? []).filter((token) => token !== "PHOTO_URL")
+  const templateSections = templatesByGroup(templates)
+  const activeSvgTokenKeys = isSplitHeaderSvgTemplate(svgTemplateId)
+    ? SPLIT_HEADER_TOKENS
+    : (selectedSvgTemplate?.tokens ?? []).filter((token) => token !== "PHOTO_URL")
 
   const onPhotoLibrarySelect = (entry: AssetLibraryEntry) => {
     setPhotoGcsPath(normalizeGcsObjectPath(entry.gcsPath))
@@ -406,13 +433,20 @@ export function BriefIntakePanel({
                 }))
               }
             }}
-            className="w-full rounded-md border px-3 py-2 text-sm"
+            className="w-full rounded-md border bg-background px-3 py-2.5 text-sm"
           >
-            <option value="">Select template (T1–T7)…</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id}: {t.label} ({t.type})
-              </option>
+            <option value="">Choose a creative template…</option>
+            {templateSections.map((section) => (
+              <optgroup key={section.group} label={section.label}>
+                {section.templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.id} · {t.short_label}
+                    {t.recommended ? " ★" : ""}
+                    {" — "}
+                    {t.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
@@ -422,11 +456,36 @@ export function BriefIntakePanel({
         </label>
       </div>
 
+      {selectedTemplate ? (
+        <div className="rounded-lg border bg-muted/30 px-3 py-2.5 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-[#9A4A33]">
+              {selectedTemplate.id}
+            </span>
+            <span className="text-xs rounded-full border bg-background px-2 py-0.5 text-muted-foreground">
+              {selectedTemplate.type === "video" ? "Video" : "Static"}
+            </span>
+            {selectedTemplate.recommended ? (
+              <span className="text-xs rounded-full bg-[#9A4A33]/10 px-2 py-0.5 text-[#9A4A33]">
+                Recommended
+              </span>
+            ) : null}
+            <span className="text-xs text-muted-foreground">
+              {formatTemplateFormats(selectedTemplate.formats)}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-foreground">{selectedTemplate.label}</p>
+          {selectedTemplate.description ? (
+            <p className="text-xs text-muted-foreground leading-relaxed">{selectedTemplate.description}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {needsRunwayApiKey ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           T2 calls Runway to generate base video and requires <code className="font-mono">RUNWAY_API_KEY</code> on
           the server. To overlay copy on your own POV sauna MP4, use{" "}
-          <strong>T4: POV Sauna Video — Upload MP4</strong> instead.
+          <strong>T4 · POV Sauna (Upload)</strong> instead.
         </p>
       ) : null}
 
@@ -605,7 +664,7 @@ export function BriefIntakePanel({
                   />
                 ))}
 
-                {svgTemplateId === "thrml_pov_overlay_static" || isSplitHeaderSvgTemplate(svgTemplateId) ? (
+                {isSplitHeaderSvgTemplate(svgTemplateId) ? (
                   <>
                     <AssetLibraryPanel
                       mediaType="static"

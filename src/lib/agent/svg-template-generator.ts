@@ -31,6 +31,10 @@ export {
   type SvgStaticFormat,
   type SvgTemplateId,
 } from "@/lib/agent/svg-template-shared"
+import {
+  BRAND_AD_TYPE_SCALE,
+  type BrandAdFormat,
+} from "@/lib/agent/static-layouts/brand-ad-typography"
 import { brandAdFontFiles, injectBrandAdFonts } from "@/lib/agent/static-layouts/brand-ad-fonts"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -140,17 +144,26 @@ type SplitHeaderLayoutSpec = {
   maxTextWidth: number
 }
 
-const SPLIT_HEADER_LAYOUT: Record<SvgStaticFormat, SplitHeaderLayoutSpec> = {
-  "1x1": { padX: 72, headlineSize: 56, headlineLineHeight: 64, maxTextWidth: 900 },
-  "4x5": { padX: 72, headlineSize: 64, headlineLineHeight: 72, maxTextWidth: 900 },
-  "9x16": { padX: 80, headlineSize: 72, headlineLineHeight: 76, maxTextWidth: 920 },
+function layoutFromTypeScale(format: SvgStaticFormat): SplitHeaderLayoutSpec {
+  const scale = BRAND_AD_TYPE_SCALE[format as BrandAdFormat]
+  return {
+    padX: scale.padX,
+    headlineSize: scale.headlineSize,
+    headlineLineHeight: scale.headlineLineHeight,
+    maxTextWidth: scale.maxTextWidth,
+  }
 }
 
-/** Vrbo-style block split — headline sits in the colored top panel (9:16 uses top third). */
+const SPLIT_HEADER_LAYOUT: Record<SvgStaticFormat, SplitHeaderLayoutSpec> = {
+  "1x1": layoutFromTypeScale("1x1"),
+  "4x5": layoutFromTypeScale("4x5"),
+  "9x16": layoutFromTypeScale("9x16"),
+}
+
 const BLOCK_SPLIT_LAYOUT: Record<SvgStaticFormat, SplitHeaderLayoutSpec> = {
-  "1x1": { padX: 72, headlineSize: 56, headlineLineHeight: 64, maxTextWidth: 900 },
-  "4x5": { padX: 72, headlineSize: 64, headlineLineHeight: 72, maxTextWidth: 900 },
-  "9x16": { padX: 80, headlineSize: 72, headlineLineHeight: 76, maxTextWidth: 920 },
+  "1x1": layoutFromTypeScale("1x1"),
+  "4x5": layoutFromTypeScale("4x5"),
+  "9x16": layoutFromTypeScale("9x16"),
 }
 
 function estimateTextWidth(value: string, fontSize: number) {

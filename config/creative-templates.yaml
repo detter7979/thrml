@@ -1,13 +1,14 @@
-# thrml creative concept presets (T1–T4)
+# thrml creative concept presets (T1, T2, T4, T5, T7)
 # Used by admin Creative Pipeline "New from template" intake.
-# Each preset uses the locked master static or video overlay template;
-# swap background imagery/video and copy per brief.
 
 version: 1
 
 templates:
   - id: T1
-    label: "POV Earns — Static"
+    label: "POV Earns — Photo + Text"
+    short_label: "POV Earns"
+    description: "AI sauna photo with Master Ad overlay (logo, eyebrow, headline, proof line)."
+    group: static_photo
     type: static
     category: Hosts
     angle: pov_earnings
@@ -20,6 +21,7 @@ templates:
       test_id: T05
       format: Static_9x16
       cta: list_now
+      template_slug: pov_earns_photo
     defaults:
       trigger_type: manual
       hypothesis: "Host POV earnings angle converts idle sauna owners."
@@ -43,7 +45,10 @@ templates:
         background_image_prompt: "Indoor infrared sauna with matte black glass frame in a modern home gym, one folded towel on the bench, even natural window light, authentic lived-in gym not a showroom"
 
   - id: T2
-    label: "POV Sauna Video — Runway (needs API key)"
+    label: "POV Sauna — Runway AI"
+    short_label: "POV Sauna (Runway)"
+    description: "Runway generates POV sauna video; worker composites centered overlay copy."
+    group: video_pov
     type: video
     category: Hosts
     angle: pov_earnings
@@ -55,6 +60,7 @@ templates:
       test_id: T05
       format: Video_15s
       cta: list_now
+      template_slug: pov_sauna_runway
     defaults:
       trigger_type: manual
       hypothesis: "POV earnings video with overlay copy tests hook strength."
@@ -76,44 +82,12 @@ templates:
           copy: "pov: stop letting your sauna sit idle"
           variant: B
 
-  - id: T3
-    label: "Host Monetization — Static Ladder"
-    type: static
-    category: Hosts
-    angle: pov_earnings
-    formats: ["1x1", "4x5", "9x16"]
-    default_variations: 3
-    concept_verify_default: false
-    full_batch_variations: 3
-    generation_tool: svg_template
-    svg_template_id: thrml_split_header_static
-    static_playbook: host_monetization_v3
-    naming:
-      test_id: T05
-      format: Static_1x1
-      cta: list_now
-    defaults:
-      trigger_type: winner_variation
-      hypothesis: "Host monetization split-header SVG ladder with tagline eyebrow and geo subhead."
-      target_audience: "Verified hosts and sauna owners in active metros"
-      hook: "HostEarn"
-      campaign_short_name: host-monetization
-    svg_tokens:
-      TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
-      SUBHEAD: "Backyard and cabin saunas in Seattle + LA."
-    svg_variations:
-      - variation_label: A
-        tokens:
-          HEADLINE: "Turn your idle sauna into income."
-      - variation_label: B
-        tokens:
-          HEADLINE: "Let your sauna pay its own electric bill."
-      - variation_label: C
-        tokens:
-          HEADLINE: "Earn while you recover."
-
   - id: T4
-    label: "POV Sauna Video — Upload MP4 (recommended)"
+    label: "POV Sauna — Upload MP4"
+    short_label: "POV Sauna (Upload)"
+    description: "Your POV sauna MP4 + same overlay as T2. No Runway spend."
+    group: video_pov
+    recommended: true
     type: video
     category: Hosts
     angle: pov_earnings
@@ -125,6 +99,7 @@ templates:
       test_id: T05
       format: Video_15s
       cta: list_now
+      template_slug: pov_sauna_upload
     defaults:
       trigger_type: manual
       hypothesis: "Pre-uploaded POV b-roll with copy overlay — no Runway spend."
@@ -134,7 +109,6 @@ templates:
       source: uploaded
       concept_slug: pov-earnings
       asset_slug: sauna
-      # Same FFmpeg overlay template as T2 (worker template v2 — centered POV copy).
       template_version: 2
       copy_variants:
         - slug: pov-idle-income
@@ -145,7 +119,10 @@ templates:
           variant: B
 
   - id: T5
-    label: "Split Header — Static (SVG)"
+    label: "Split Header — Photo + Text"
+    short_label: "Split Header"
+    description: "Full-bleed photo with top scrim, logo, eyebrow, headline, and subhead."
+    group: static_svg
     type: static
     category: Hosts
     angle: pov_earnings
@@ -159,6 +136,7 @@ templates:
       test_id: T05
       format: Static_1x1
       cta: list_now
+      template_slug: split_header
     defaults:
       trigger_type: manual
       hypothesis: "Split-header SVG template for host POV earnings."
@@ -178,42 +156,11 @@ templates:
         tokens:
           HEADLINE: "Earn while you recover."
 
-  - id: T6
-    label: "POV Overlay — Static (SVG)"
-    type: static
-    category: Hosts
-    angle: pov_earnings
-    formats: ["1x1", "4x5", "9x16"]
-    default_variations: 1
-    concept_verify_default: true
-    full_batch_variations: 3
-    generation_tool: svg_template
-    svg_template_id: thrml_pov_overlay_static
-    naming:
-      test_id: T05
-      format: Static_1x1
-      cta: list_now
-    defaults:
-      trigger_type: manual
-      hypothesis: "POV overlay SVG template with library photo background."
-      hook: "pov: your sauna earns you $1,200/mo"
-      campaign_short_name: pov-earnings
-    svg_variations:
-      - variation_label: A
-        tokens:
-          POV_LINE_1: "pov: your sauna earns you $1,200/mo"
-          POV_LINE_2: "List on thrml. Get paid when you're not using it."
-      - variation_label: B
-        tokens:
-          POV_LINE_1: "pov: stop letting your sauna sit idle"
-          POV_LINE_2: "Hosts earn an average of $1,200 / month."
-      - variation_label: C
-        tokens:
-          POV_LINE_1: "pov: your backyard wellness asset"
-          POV_LINE_2: "Turn downtime into income on thrml."
-
   - id: T7
-    label: "Block Split — Static (SVG)"
+    label: "Block Split — Orange + Photo"
+    short_label: "Block Split"
+    description: "Vrbo-style orange top block with copy; photo fills the bottom half."
+    group: static_svg
     type: static
     category: Hosts
     angle: pov_earnings
@@ -227,6 +174,7 @@ templates:
       test_id: T05
       format: Static_9x16
       cta: list_now
+      template_slug: block_split
     defaults:
       trigger_type: manual
       hypothesis: "Vrbo-style 50/50 block split — brand color top, photo bottom."
@@ -248,14 +196,10 @@ templates:
 
 svg_templates:
   - id: thrml_split_header_static
-    label: "Split Header Static"
+    label: "Split Header"
     tokens: [TAGLINE_EYEBROW, HEADLINE, SUBHEAD, PHOTO_URL]
     aspect_ratios: ["1x1", "4x5", "9x16"]
   - id: thrml_block_split_static
-    label: "Block Split Static"
+    label: "Block Split"
     tokens: [TAGLINE_EYEBROW, HEADLINE, SUBHEAD, PHOTO_URL]
-    aspect_ratios: ["1x1", "4x5", "9x16"]
-  - id: thrml_pov_overlay_static
-    label: "POV Overlay Static"
-    tokens: [POV_LINE_1, POV_LINE_2, PHOTO_URL]
     aspect_ratios: ["1x1", "4x5", "9x16"]

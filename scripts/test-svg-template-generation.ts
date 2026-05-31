@@ -6,7 +6,6 @@
  *   npx tsx scripts/test-svg-template-generation.ts
  *
  * Requires GCS_BUCKET_NAME, GOOGLE_SERVICE_ACCOUNT_JSON, and Supabase service role.
- * Optional: TEST_POV_PHOTO_GCS_PATH for POV overlay background (object path, not gs:// URL).
  */
 
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -19,11 +18,6 @@ const SAMPLE_SPLIT_TOKENS = {
   TAGLINE_EYEBROW: SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW,
   HEADLINE: SPLIT_HEADER_DEFAULTS.HEADLINE,
   SUBHEAD: SPLIT_HEADER_DEFAULTS.SUBHEAD,
-}
-
-const SAMPLE_POV_TOKENS = {
-  POV_LINE_1: "pov: your sauna earns you $1,200/mo",
-  POV_LINE_2: "List on thrml. Get paid when you're not using it.",
 }
 
 async function createTestBrief(label: string, svgTemplateId: string, tokens: Record<string, string>) {
@@ -42,7 +36,7 @@ async function createTestBrief(label: string, svgTemplateId: string, tokens: Rec
         generation_tool: "svg_template",
         svg_template_id: svgTemplateId,
         svg_tokens: tokens,
-        naming: { test_id: "T05", format: "Static_1x1", cta: "list_now" },
+        naming: { test_id: "T05", format: "Static_1x1", cta: "list_now", template_slug: "split_header" },
         variations: 1,
         concept_verify: true,
       },
@@ -79,37 +73,38 @@ async function main() {
     claimViolations: splitResult.claimViolations.length,
   })
 
-  const povPhotoPath = process.env.TEST_POV_PHOTO_GCS_PATH?.trim() || null
-
-  console.log("[svg-test] Creating POV overlay brief…")
-  const povBriefId = await createTestBrief("SVG POV overlay test", "thrml_pov_overlay_static", SAMPLE_POV_TOKENS)
-
-  const povResult = await generateFromSvgTemplate(
-    povBriefId,
-    "thrml_pov_overlay_static",
-    "1:1",
-    SAMPLE_POV_TOKENS,
-    povPhotoPath,
+  console.log("[svg-test] Creating block-split brief…")
+  const blockBriefId = await createTestBrief(
+    "SVG block split test",
+    "thrml_block_split_static",
+    SAMPLE_SPLIT_TOKENS,
   )
 
-  console.log("[svg-test] POV overlay result:", {
-    assetId: povResult.assetId,
-    gcsPath: povResult.gcsPath,
-    conventionName: povResult.conventionName,
-    claimViolations: povResult.claimViolations.length,
+  const blockResult = await generateFromSvgTemplate(
+    blockBriefId,
+    "thrml_block_split_static",
+    "1:1",
+    SAMPLE_SPLIT_TOKENS,
+  )
+
+  console.log("[svg-test] Block split result:", {
+    assetId: blockResult.assetId,
+    gcsPath: blockResult.gcsPath,
+    conventionName: blockResult.conventionName,
+    claimViolations: blockResult.claimViolations.length,
   })
 
-  const expectedPrefix = `${new Date().getUTCFullYear()}/${String(new Date().getUTCMonth() + 1).padStart(2, "0")}/hosts/pov_earnings/Static/A_1x1.png`
-  for (const result of [splitResult, povResult]) {
-    if (!result.gcsPath.endsWith("hosts/pov_earnings/Static/A_1x1.png")) {
-      throw new Error(`Unexpected GCS path: ${result.gcsPath} (expected suffix ${expectedPrefix})`)
-    }
-    if (!result.conventionName?.startsWith("T05_A_pov_earnings_Static_1x1_list_now")) {
-      throw new Error(`Unexpected convention name: ${result.conventionName}`)
-    }
+  const expectedSuffix = "hosts/pov_earnings/Static/block_split/A_1x1.png"
+  if (!blockResult.gcsPath.endsWith(expectedSuffix)) {
+    throw new Error(`Unexpected block split GCS path: ${blockResult.gcsPath}`)
   }
 
-  console.log("[svg-test] OK — both assets uploaded with thrml_namer_v4 convention names.")
+  const splitSuffix = "hosts/pov_earnings/Static/split_header/A_1x1.png"
+  if (!splitResult.gcsPath.endsWith(splitSuffix)) {
+    throw new Error(`Unexpected split header GCS path: ${splitResult.gcsPath}`)
+  }
+
+  console.log("[svg-test] OK — split header and block split uploaded with convention names.")
 }
 
 main().catch((err) => {

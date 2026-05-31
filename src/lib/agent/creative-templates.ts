@@ -12,7 +12,11 @@ export type CreativeTemplateNaming = {
   test_id: string
   format: string
   cta: string
+  /** Snake_case layout id for future namer extensions (e.g. split_header, block_split). */
+  template_slug?: string
 }
+
+export type CreativeTemplateGroup = "static_photo" | "static_svg" | "video_pov"
 
 export type CreativeTemplateStaticVariation = {
   variation_label: string
@@ -44,6 +48,10 @@ export type CreativeTemplateVideoBlock = {
 export type CreativeTemplate = {
   id: string
   label: string
+  short_label?: string
+  description?: string
+  group?: CreativeTemplateGroup
+  recommended?: boolean
   type: CreativeTemplateType
   category: string
   angle: string
@@ -228,5 +236,10 @@ export function resolveNamingFromBrief(brief: {
   if (typeof n.test_id !== "string" || typeof n.format !== "string" || typeof n.cta !== "string") {
     return null
   }
-  return { test_id: n.test_id, format: n.format, cta: n.cta }
+  return {
+    test_id: n.test_id,
+    format: n.format,
+    cta: n.cta,
+    ...(typeof n.template_slug === "string" ? { template_slug: n.template_slug } : {}),
+  }
 }

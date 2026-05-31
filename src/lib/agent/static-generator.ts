@@ -14,6 +14,7 @@ import {
 import { sendThrmlLayoutEmail } from "@/lib/emails/transactional-send"
 import { generateImagen } from "@/lib/agent/imagen"
 import { renderMasterAdTemplate } from "@/lib/agent/static-layouts/master-ad-template"
+import { SPLIT_HEADER_DEFAULTS } from "@/lib/agent/svg-template-shared"
 import {
   briefUsesSvgTemplate,
   generateSvgVariantsForBrief,
@@ -97,6 +98,19 @@ type CompositeStaticOptions = {
   copyPrimary?: string | null
   copyHeadline?: string | null
   copySubtext?: string | null
+  copyTaglineEyebrow?: string | null
+}
+
+function taglineEyebrowFromBrief(triggerData: Record<string, unknown> | null | undefined): string {
+  const td = triggerData ?? {}
+  const direct = typeof td.TAGLINE_EYEBROW === "string" ? td.TAGLINE_EYEBROW.trim() : ""
+  if (direct) return direct
+  const tokens = td.svg_tokens
+  if (tokens && typeof tokens === "object") {
+    const fromTokens = (tokens as Record<string, unknown>).TAGLINE_EYEBROW
+    if (typeof fromTokens === "string" && fromTokens.trim()) return fromTokens.trim()
+  }
+  return SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW
 }
 
 function isHostMonetizationStaticBrief(brief: CreativeBriefRow): boolean {
@@ -332,6 +346,7 @@ export async function compositeStatic(opts: CompositeStaticOptions) {
     format: opts.format,
     headline,
     subhead,
+    taglineEyebrow: opts.copyTaglineEyebrow?.trim() || SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW,
   })
 }
 
@@ -443,6 +458,7 @@ async function processStaticBriefInner(
           copyPrimary: brief.copy_primary,
           copyHeadline: step.headline,
           copySubtext: subtextLocked ?? brief.copy_subtext,
+          copyTaglineEyebrow: taglineEyebrowFromBrief(brief.trigger_data),
         })
         const { category, angleSlug } = taxonomyFromBrief(brief)
         const conventionName = conventionNameForStatic(brief, format, variationLabel)
@@ -504,6 +520,7 @@ async function processStaticBriefInner(
         copyPrimary: brief.copy_primary,
         copyHeadline: brief.copy_headline,
         copySubtext: subtextLocked ?? brief.copy_subtext,
+        copyTaglineEyebrow: taglineEyebrowFromBrief(brief.trigger_data),
       })
       const { category, angleSlug } = taxonomyFromBrief(brief)
       const conventionName = conventionNameForStatic(brief, format, variationLabel)

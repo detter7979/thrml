@@ -16,6 +16,10 @@ export async function GET() {
   const templates = loadCreativeTemplates().map((t) => ({
     id: t.id,
     label: t.label,
+    short_label: t.short_label ?? t.label,
+    description: t.description ?? null,
+    group: t.group ?? null,
+    recommended: Boolean(t.recommended),
     type: t.type,
     category: t.category,
     angle: t.angle,

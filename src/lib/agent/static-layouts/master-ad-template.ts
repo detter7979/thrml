@@ -1,77 +1,98 @@
 import sharp from "sharp"
 
 import {
+  BRAND_AD_BLOCK_SPLIT_Y,
+  BRAND_AD_LETTER_SPACING_EM,
+  BRAND_AD_OPACITY,
+  BRAND_AD_TOP_SCRIM,
+  BRAND_AD_TYPE_SCALE,
+  type BrandAdFormat,
+} from "@/lib/agent/static-layouts/brand-ad-typography"
+import {
   buildBrandAdFontStyleBlock,
   loadBrandSansMediumDataUrl,
   loadBrandSerifFontDataUrls,
   renderBrandAdSvgToPng,
 } from "@/lib/agent/static-layouts/brand-ad-fonts"
+import { SPLIT_HEADER_DEFAULTS } from "@/lib/agent/svg-template-shared"
 
 /**
- * Master Ad Template renderer.
+ * Master Ad Template renderer (T1).
  *
- * Single source of truth for the visual composition described in
- * `agents/design.md` §1 (Master Ad Template). Both the production composer
- * (`src/lib/agent/static-generator.ts`) and the local preview script
- * (`scripts/render-design-sample.ts`) call this module so that locally-rendered
- * previews always match what gets shipped to Meta.
- *
- * The renderer composites a fixed text overlay onto a Replicate-generated base
- * photo. The two fields that may legally vary across A/B variants are
- * `headline` and the upstream `baseImage` prompt. Sub-headline is locked across
- * variants of the same parent brief.
+ * Text positions mirror block-split Y baselines; scrim matches split-header.
+ * Typography constants live in `brand-ad-typography.ts`.
  */
 
-export type MasterAdTemplateFormat = "1x1" | "9x16" | "4x5"
+export type MasterAdTemplateFormat = BrandAdFormat
 
 export type RenderMasterAdTemplateOptions = {
   baseImage: Buffer
   format: MasterAdTemplateFormat
   headline: string
   subhead: string
+  taglineEyebrow?: string
 }
 
 const PALETTE = {
-  gradient: "#121212",
+  gradient: BRAND_AD_TOP_SCRIM.color,
   headline: "#FFFFFF",
   subhead: "#FFFFFF",
   wordmark: "#FFFFFF",
 } as const
 
-const WORDMARK_OPACITY = 0.85
-const HEADLINE_OPACITY = 0.92
-const SUBHEAD_OPACITY = 0.78
-const HEADLINE_GAP = 18
-const HEADLINE_LINE_HEIGHT = 1.2
-const SUBHEAD_LINE_HEIGHT = 1.2
-
-/** Sub-headline tracking (premium editorial; headline stays default tracking). */
-const SUBHEAD_LETTER_SPACING_EM = 0.03
-
-/**
- * Bottom-half overlay: `#121212` ramp. Base stop at **50%** opacity per host
- * monetization legibility spec (`agents/design.md` §1.3).
- */
-const GRADIENT_BOTTOM = {
-  topOpacity: 0,
-  midOffsetPercent: 60,
-  midOpacity: 0.2,
-  bottomOpacity: 0.5,
-} as const
+const CANVAS: Record<MasterAdTemplateFormat, { width: number; height: number }> = {
+  "9x16": { width: 1080, height: 1920 },
+  "1x1": { width: 1080, height: 1080 },
+  "4x5": { width: 1080, height: 1350 },
+}
 
 type FormatSpec = {
   width: number
   height: number
-  padding: number
+  padX: number
+  wordmarkY: number
   wordmarkSize: number
+  eyebrowY: number
+  eyebrowSize: number
+  headlineY: number
   headlineSize: number
+  headlineLineHeight: number
+  subheadY: number
   subheadSize: number
+  subheadLineHeight: number
+  maxTextWidth: number
+  scrimHeight: number
+  scrimTopOpacity: number
+}
+
+function buildFormatSpec(format: MasterAdTemplateFormat): FormatSpec {
+  const canvas = CANVAS[format]
+  const type = BRAND_AD_TYPE_SCALE[format]
+  const y = BRAND_AD_BLOCK_SPLIT_Y[format]
+  return {
+    width: canvas.width,
+    height: canvas.height,
+    padX: type.padX,
+    wordmarkY: y.wordmarkY,
+    wordmarkSize: type.wordmarkSize,
+    eyebrowY: y.eyebrowY,
+    eyebrowSize: type.eyebrowSize,
+    headlineY: y.headlineY,
+    headlineSize: type.headlineSize,
+    headlineLineHeight: type.headlineLineHeight,
+    subheadY: y.subheadY,
+    subheadSize: type.subheadSize,
+    subheadLineHeight: type.subheadLineHeight,
+    maxTextWidth: type.maxTextWidth,
+    scrimHeight: BRAND_AD_TOP_SCRIM.heightByFormat[format],
+    scrimTopOpacity: BRAND_AD_TOP_SCRIM.topOpacityByFormat[format],
+  }
 }
 
 const SPECS: Record<MasterAdTemplateFormat, FormatSpec> = {
-  "9x16": { width: 1080, height: 1920, padding: 80, wordmarkSize: 64, headlineSize: 80, subheadSize: 24 },
-  "1x1": { width: 1080, height: 1080, padding: 72, wordmarkSize: 52, headlineSize: 64, subheadSize: 20 },
-  "4x5": { width: 1080, height: 1350, padding: 72, wordmarkSize: 56, headlineSize: 72, subheadSize: 22 },
+  "9x16": buildFormatSpec("9x16"),
+  "1x1": buildFormatSpec("1x1"),
+  "4x5": buildFormatSpec("4x5"),
 }
 
 let fontDataUrlsPromise: Promise<{ serif: { regular: string; italic: string }; sansMedium: string }> | null = null
@@ -95,7 +116,7 @@ function escapeXml(value: string) {
 }
 
 function estimateTextWidth(value: string, fontSize: number) {
-  return value.length * fontSize * 0.55
+  return value.length * fontSize * 0.52
 }
 
 function wrapText(value: string, fontSize: number, maxWidth: number) {
@@ -151,65 +172,68 @@ function multilineText(opts: {
   `
 }
 
-async function buildOverlay(spec: FormatSpec, headline: string, subhead: string) {
+async function buildOverlay(
+  spec: FormatSpec,
+  headline: string,
+  subhead: string,
+  taglineEyebrow: string,
+) {
   const { serif, sansMedium } = await loadFontDataUrls()
   const fontStyles = buildBrandAdFontStyleBlock(serif, sansMedium)
 
-  const { width, height, padding, wordmarkSize, headlineSize, subheadSize } = spec
-  const wordmarkBaseline = padding + wordmarkSize - 6
-
-  const headlineLineHeight = Math.round(headlineSize * HEADLINE_LINE_HEIGHT)
-  const subheadLineHeight = Math.round(subheadSize * SUBHEAD_LINE_HEIGHT)
-
-  const subheadLines = wrapText(subhead, subheadSize, width - padding * 2)
-  const headlineLines = wrapText(headline, headlineSize, width - padding * 2)
-
-  // Bottom-anchored stack: subhead sits with `padding` from the canvas bottom,
-  // headline sits directly above with `HEADLINE_GAP` between them. This keeps
-  // the text snug in the bottom-left corner regardless of line counts.
-  const subheadBaselineLast = height - padding
-  const subheadBaselineFirst = subheadBaselineLast - (subheadLines.length - 1) * subheadLineHeight
-  const headlineBaselineLast = subheadBaselineFirst - subheadSize - HEADLINE_GAP
-  const headlineBaselineFirst = headlineBaselineLast - (headlineLines.length - 1) * headlineLineHeight
-
-  const gradientStartY = Math.round(height * 0.55)
-  const gradientHeight = height - gradientStartY
+  const {
+    width,
+    padX,
+    wordmarkY,
+    wordmarkSize,
+    eyebrowY,
+    eyebrowSize,
+    headlineY,
+    headlineSize,
+    headlineLineHeight,
+    subheadY,
+    subheadSize,
+    subheadLineHeight,
+    maxTextWidth,
+    scrimHeight,
+    scrimTopOpacity,
+  } = spec
 
   const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${spec.height}" viewBox="0 0 ${width} ${spec.height}">
       ${fontStyles}
       <defs>
-        <linearGradient id="bottom-gradient" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stop-color="${PALETTE.gradient}" stop-opacity="${GRADIENT_BOTTOM.topOpacity}" />
-          <stop offset="${GRADIENT_BOTTOM.midOffsetPercent}%" stop-color="${PALETTE.gradient}" stop-opacity="${GRADIENT_BOTTOM.midOpacity}" />
-          <stop offset="100%" stop-color="${PALETTE.gradient}" stop-opacity="${GRADIENT_BOTTOM.bottomOpacity}" />
+        <linearGradient id="top-scrim" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="${PALETTE.gradient}" stop-opacity="${scrimTopOpacity}" />
+          <stop offset="100%" stop-color="${PALETTE.gradient}" stop-opacity="${BRAND_AD_TOP_SCRIM.bottomOpacity}" />
         </linearGradient>
       </defs>
-      <rect x="0" y="${gradientStartY}" width="${width}" height="${gradientHeight}" fill="url(#bottom-gradient)" />
-      <text x="${padding}" y="${wordmarkBaseline}" fill="${PALETTE.wordmark}" fill-opacity="${WORDMARK_OPACITY}" font-family='"DM Serif Display", Georgia, "Times New Roman", serif' font-size="${wordmarkSize}" font-weight="400" letter-spacing="-0.02em">thrml</text>
+      <rect x="0" y="0" width="${width}" height="${scrimHeight}" fill="url(#top-scrim)" />
+      <text x="${padX}" y="${wordmarkY}" fill="${PALETTE.wordmark}" fill-opacity="${BRAND_AD_OPACITY.wordmark}" font-family='"DM Serif Display", Georgia, "Times New Roman", serif' font-size="${wordmarkSize}" font-weight="400" letter-spacing="${BRAND_AD_LETTER_SPACING_EM.wordmark}em">thrml</text>
+      <text x="${padX}" y="${eyebrowY}" fill="${PALETTE.subhead}" fill-opacity="${BRAND_AD_OPACITY.eyebrow}" font-family='"thrml-sans", "Geist", "Helvetica Neue", Arial, sans-serif' font-size="${eyebrowSize}" font-weight="500" letter-spacing="${BRAND_AD_LETTER_SPACING_EM.eyebrow}em">${escapeXml(taglineEyebrow)}</text>
       ${multilineText({
         text: headline,
-        x: padding,
-        yBaseline: headlineBaselineFirst,
+        x: padX,
+        yBaseline: headlineY,
         fontSize: headlineSize,
         lineHeight: headlineLineHeight,
-        maxWidth: width - padding * 2,
+        maxWidth: maxTextWidth,
         family: "serif",
         fill: PALETTE.headline,
-        fillOpacity: HEADLINE_OPACITY,
+        fillOpacity: BRAND_AD_OPACITY.headline,
       })}
       ${multilineText({
         text: subhead,
-        x: padding,
-        yBaseline: subheadBaselineFirst,
+        x: padX,
+        yBaseline: subheadY,
         fontSize: subheadSize,
         lineHeight: subheadLineHeight,
-        maxWidth: width - padding * 2,
+        maxWidth: maxTextWidth,
         family: "sans",
         fill: PALETTE.subhead,
-        fillOpacity: SUBHEAD_OPACITY,
+        fillOpacity: BRAND_AD_OPACITY.subhead,
         fontWeight: 500,
-        letterSpacingEm: SUBHEAD_LETTER_SPACING_EM,
+        letterSpacingEm: BRAND_AD_LETTER_SPACING_EM.subhead,
       })}
     </svg>
   `
@@ -226,7 +250,12 @@ export async function renderMasterAdTemplate(opts: RenderMasterAdTemplateOptions
     .png()
     .toBuffer()
 
-  const overlaySvg = await buildOverlay(spec, opts.headline, opts.subhead)
+  const overlaySvg = await buildOverlay(
+    spec,
+    opts.headline,
+    opts.subhead,
+    opts.taglineEyebrow?.trim() || SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW,
+  )
   const overlay = await renderBrandAdSvgToPng(overlaySvg.toString("utf8"))
 
   return sharp(base).composite([{ input: overlay, top: 0, left: 0 }]).png().toBuffer()
@@ -235,12 +264,7 @@ export async function renderMasterAdTemplate(opts: RenderMasterAdTemplateOptions
 export const __internal = {
   SPECS,
   PALETTE,
-  WORDMARK_OPACITY,
-  HEADLINE_OPACITY,
-  SUBHEAD_OPACITY,
-  HEADLINE_GAP,
-  HEADLINE_LINE_HEIGHT,
-  SUBHEAD_LINE_HEIGHT,
-  GRADIENT_BOTTOM,
-  SUBHEAD_LETTER_SPACING_EM,
+  BRAND_AD_OPACITY,
+  BRAND_AD_TOP_SCRIM,
+  BRAND_AD_LETTER_SPACING_EM,
 }

@@ -6,6 +6,7 @@ export type SvgStaticFormat = "1x1" | "4x5" | "9x16"
 export type SvgTemplateId =
   | "thrml_split_header_static"
   | "thrml_block_split_static"
+  /** Legacy layout — removed from intake; kept for existing brief regeneration. */
   | "thrml_pov_overlay_static"
 
 export const SPLIT_HEADER_SVG_TEMPLATE_IDS = [

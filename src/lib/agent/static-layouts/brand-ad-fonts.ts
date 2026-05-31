@@ -70,3 +70,17 @@ export async function injectBrandAdFonts(svg: string) {
   }
   return svg.replace(/<svg([^>]*)>/, `<svg$1>${styleBlock}`)
 }
+
+/** Rasterize brand SVG overlays with embedded DM Serif + thrml-sans (Sharp/librsvg cannot). */
+export async function renderBrandAdSvgToPng(svg: string): Promise<Buffer> {
+  const { Resvg } = await import("@resvg/resvg-js")
+  const withFonts = await injectBrandAdFonts(svg)
+  const resvg = new Resvg(withFonts, {
+    font: {
+      fontFiles: brandAdFontFiles(),
+      loadSystemFonts: false,
+      defaultFontFamily: "DM Serif Display",
+    },
+  })
+  return Buffer.from(resvg.render().asPng())
+}

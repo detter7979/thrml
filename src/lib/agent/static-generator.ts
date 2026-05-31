@@ -4,6 +4,7 @@ import { buildAdName } from "@/lib/agent/naming-builder"
 import { unifiedStaticPath } from "@/lib/agent/gcs-paths"
 import {
   HOST_PROOF_SUBTEXT,
+  HOST_MONETIZATION_PLAYBOOK_ID,
   matchesHostMonetizationPlaybook,
   parseStoredStaticVariations,
   type StoredStaticVariation,
@@ -98,21 +99,31 @@ type CompositeStaticOptions = {
   copySubtext?: string | null
 }
 
+function isHostMonetizationStaticBrief(brief: CreativeBriefRow): boolean {
+  if (matchesHostMonetizationPlaybook(brief.trigger_data, brief.trigger_type)) return true
+  const td = brief.trigger_data ?? {}
+  return td.template_id === "T1" || td.static_playbook === HOST_MONETIZATION_PLAYBOOK_ID
+}
+
 function resolveStaticVariationPlan(brief: CreativeBriefRow): StoredStaticVariation[] | null {
+  if (isHostMonetizationStaticBrief(brief)) {
+    const stored = parseStoredStaticVariations(brief.trigger_data)
+    return HOST_MONETIZATION_CANONICAL_VARIATIONS.map((canonical) => {
+      const storedRow = stored?.find((row) => row.variation_label === canonical.variation_label)
+      return {
+        variation_label: canonical.variation_label,
+        headline: storedRow?.headline?.trim() || canonical.headline,
+        background_image_prompt: finalizeHostStaticImagePrompt(canonical.background_image_prompt),
+      }
+    })
+  }
   const stored = parseStoredStaticVariations(brief.trigger_data)
   if (stored?.length) return stored.slice(0, 3)
-  if (matchesHostMonetizationPlaybook(brief.trigger_data, brief.trigger_type)) {
-    return HOST_MONETIZATION_CANONICAL_VARIATIONS.map((v) => ({
-      variation_label: v.variation_label,
-      headline: v.headline,
-      background_image_prompt: finalizeHostStaticImagePrompt(v.background_image_prompt),
-    }))
-  }
   return null
 }
 
 function lockedSubtextForBrief(brief: CreativeBriefRow): string | null {
-  if (matchesHostMonetizationPlaybook(brief.trigger_data, brief.trigger_type)) return HOST_PROOF_SUBTEXT
+  if (isHostMonetizationStaticBrief(brief)) return HOST_PROOF_SUBTEXT
   return brief.copy_subtext?.trim() || null
 }
 
@@ -412,7 +423,7 @@ async function processStaticBriefInner(
     if (staticPlan?.length) {
       const steps = staticPlan.slice(0, requestedVariations)
       for (const [i, step] of steps.entries()) {
-        const baseImages = await generateLifestyleImage(step.background_image_prompt, {
+        const baseImages = await generateLifestyleImage(finalizeHostStaticImagePrompt(step.background_image_prompt), {
           generator,
           aspectRatio: aspectForFormat(format),
           count: 1,

@@ -7,7 +7,7 @@
   <image href="{{PHOTO_URL}}" x="0" y="640" width="1080" height="1280" preserveAspectRatio="xMidYMid slice" clip-path="url(#photoClip)"/>
   <rect x="0" y="0" width="1080" height="640" fill="#C75B3A"/>
   <text x="80" y="96" fill="#FFFFFF" fill-opacity="0.85" font-family="DM Serif Display, Georgia, serif" font-size="64" letter-spacing="-0.02em">thrml</text>
-  <text x="80" y="168" fill="#FFFFFF" fill-opacity="0.75" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
-  <text x="80" y="240" fill="#FFFFFF" fill-opacity="0.92" font-family="DM Serif Display, Georgia, serif" font-size="72" font-weight="400">{{HEADLINE_TSPANS}}</text>
+  <text x="80" y="232" fill="#FFFFFF" fill-opacity="0.75" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="22" font-weight="500" letter-spacing="0.14em">{{TAGLINE_EYEBROW}}</text>
+  <text x="80" y="304" fill="#FFFFFF" fill-opacity="0.92" font-family="DM Serif Display, Georgia, serif" font-size="72" font-weight="400">{{HEADLINE_TSPANS}}</text>
   <text x="80" y="560" fill="#FFFFFF" fill-opacity="0.78" font-family="thrml-sans, Helvetica Neue, Arial, sans-serif" font-size="24" font-weight="500" letter-spacing="0.03em">{{SUBHEAD}}</text>
 </svg>

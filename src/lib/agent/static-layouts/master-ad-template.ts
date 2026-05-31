@@ -4,6 +4,7 @@ import {
   buildBrandAdFontStyleBlock,
   loadBrandSansMediumDataUrl,
   loadBrandSerifFontDataUrls,
+  renderBrandAdSvgToPng,
 } from "@/lib/agent/static-layouts/brand-ad-fonts"
 
 /**
@@ -33,12 +34,16 @@ export type RenderMasterAdTemplateOptions = {
 const PALETTE = {
   gradient: "#121212",
   headline: "#FFFFFF",
-  subhead: "#A0A0A0",
+  subhead: "#FFFFFF",
   wordmark: "#FFFFFF",
 } as const
 
-const WORDMARK_OPACITY = 0.8
-const HEADLINE_GAP = 24
+const WORDMARK_OPACITY = 0.85
+const HEADLINE_OPACITY = 0.92
+const SUBHEAD_OPACITY = 0.78
+const HEADLINE_GAP = 18
+const HEADLINE_LINE_HEIGHT = 1.2
+const SUBHEAD_LINE_HEIGHT = 1.2
 
 /** Sub-headline tracking (premium editorial; headline stays default tracking). */
 const SUBHEAD_LETTER_SPACING_EM = 0.03
@@ -64,9 +69,9 @@ type FormatSpec = {
 }
 
 const SPECS: Record<MasterAdTemplateFormat, FormatSpec> = {
-  "9x16": { width: 1080, height: 1920, padding: 80, wordmarkSize: 64, headlineSize: 88, subheadSize: 30 },
-  "1x1": { width: 1080, height: 1080, padding: 64, wordmarkSize: 56, headlineSize: 76, subheadSize: 28 },
-  "4x5": { width: 1080, height: 1350, padding: 64, wordmarkSize: 56, headlineSize: 80, subheadSize: 28 },
+  "9x16": { width: 1080, height: 1920, padding: 80, wordmarkSize: 64, headlineSize: 80, subheadSize: 24 },
+  "1x1": { width: 1080, height: 1080, padding: 72, wordmarkSize: 52, headlineSize: 64, subheadSize: 20 },
+  "4x5": { width: 1080, height: 1350, padding: 72, wordmarkSize: 56, headlineSize: 72, subheadSize: 22 },
 }
 
 let fontDataUrlsPromise: Promise<{ serif: { regular: string; italic: string }; sansMedium: string }> | null = null
@@ -153,8 +158,8 @@ async function buildOverlay(spec: FormatSpec, headline: string, subhead: string)
   const { width, height, padding, wordmarkSize, headlineSize, subheadSize } = spec
   const wordmarkBaseline = padding + wordmarkSize - 6
 
-  const headlineLineHeight = Math.round(headlineSize * 1.05)
-  const subheadLineHeight = Math.round(subheadSize * 1.4)
+  const headlineLineHeight = Math.round(headlineSize * HEADLINE_LINE_HEIGHT)
+  const subheadLineHeight = Math.round(subheadSize * SUBHEAD_LINE_HEIGHT)
 
   const subheadLines = wrapText(subhead, subheadSize, width - padding * 2)
   const headlineLines = wrapText(headline, headlineSize, width - padding * 2)
@@ -167,7 +172,7 @@ async function buildOverlay(spec: FormatSpec, headline: string, subhead: string)
   const headlineBaselineLast = subheadBaselineFirst - subheadSize - HEADLINE_GAP
   const headlineBaselineFirst = headlineBaselineLast - (headlineLines.length - 1) * headlineLineHeight
 
-  const gradientStartY = Math.round(height * 0.5)
+  const gradientStartY = Math.round(height * 0.55)
   const gradientHeight = height - gradientStartY
 
   const svg = `
@@ -181,7 +186,7 @@ async function buildOverlay(spec: FormatSpec, headline: string, subhead: string)
         </linearGradient>
       </defs>
       <rect x="0" y="${gradientStartY}" width="${width}" height="${gradientHeight}" fill="url(#bottom-gradient)" />
-      <text x="${padding}" y="${wordmarkBaseline}" fill="${PALETTE.wordmark}" fill-opacity="${WORDMARK_OPACITY}" font-family='"DM Serif Display", Georgia, "Times New Roman", serif' font-size="${wordmarkSize}" font-weight="400" letter-spacing="-1">thrml</text>
+      <text x="${padding}" y="${wordmarkBaseline}" fill="${PALETTE.wordmark}" fill-opacity="${WORDMARK_OPACITY}" font-family='"DM Serif Display", Georgia, "Times New Roman", serif' font-size="${wordmarkSize}" font-weight="400" letter-spacing="-0.02em">thrml</text>
       ${multilineText({
         text: headline,
         x: padding,
@@ -191,6 +196,7 @@ async function buildOverlay(spec: FormatSpec, headline: string, subhead: string)
         maxWidth: width - padding * 2,
         family: "serif",
         fill: PALETTE.headline,
+        fillOpacity: HEADLINE_OPACITY,
       })}
       ${multilineText({
         text: subhead,
@@ -201,6 +207,7 @@ async function buildOverlay(spec: FormatSpec, headline: string, subhead: string)
         maxWidth: width - padding * 2,
         family: "sans",
         fill: PALETTE.subhead,
+        fillOpacity: SUBHEAD_OPACITY,
         fontWeight: 500,
         letterSpacingEm: SUBHEAD_LETTER_SPACING_EM,
       })}
@@ -219,7 +226,8 @@ export async function renderMasterAdTemplate(opts: RenderMasterAdTemplateOptions
     .png()
     .toBuffer()
 
-  const overlay = await buildOverlay(spec, opts.headline, opts.subhead)
+  const overlaySvg = await buildOverlay(spec, opts.headline, opts.subhead)
+  const overlay = await renderBrandAdSvgToPng(overlaySvg.toString("utf8"))
 
   return sharp(base).composite([{ input: overlay, top: 0, left: 0 }]).png().toBuffer()
 }
@@ -228,7 +236,11 @@ export const __internal = {
   SPECS,
   PALETTE,
   WORDMARK_OPACITY,
+  HEADLINE_OPACITY,
+  SUBHEAD_OPACITY,
   HEADLINE_GAP,
+  HEADLINE_LINE_HEIGHT,
+  SUBHEAD_LINE_HEIGHT,
   GRADIENT_BOTTOM,
   SUBHEAD_LETTER_SPACING_EM,
 }

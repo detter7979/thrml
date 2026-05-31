@@ -22,6 +22,12 @@ function escapeDrawtextPath(filePath: string): string {
   return filePath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'")
 }
 
+function formatDrawtextColor(hex: string, opacity?: number): string {
+  const rgb = hex.replace(/^0x/i, "")
+  if (opacity == null || opacity >= 1) return `0x${rgb}`
+  return `0x${rgb}@${opacity}`
+}
+
 function drawtextChain(args: {
   inputLabel: string
   outputLabel: string
@@ -29,14 +35,16 @@ function drawtextChain(args: {
   textFile: string
   fontSizeExpr: string
   textColor: string
+  textOpacity?: number
   yExpr: string
   lineSpacing?: string
 }): string {
   const lineSpacing =
     args.lineSpacing != null ? `:line_spacing=${args.lineSpacing}` : ""
+  const fontColor = formatDrawtextColor(args.textColor, args.textOpacity)
   return (
     `${args.inputLabel}drawtext=fontfile='${args.fontPath}':textfile='${args.textFile}'` +
-    `:${args.fontSizeExpr}:fontcolor=0x${args.textColor}:x=(w-text_w)/2:${args.yExpr}${lineSpacing}${args.outputLabel}`
+    `:${args.fontSizeExpr}:fontcolor=${fontColor}:x=(w-text_w)/2:${args.yExpr}${lineSpacing}${args.outputLabel}`
   )
 }
 
@@ -74,12 +82,15 @@ export function buildFilterComplex(args: {
 
   if (lineFiles && lineFiles.length > 0) {
     const centerRatio = t.textTopRatio!
-    const gap = Math.round(lineSpacing / 2)
+    const fontRatio = t.fontSizeRatio ?? 0.0295
+    const lineHeightRatio = t.textLineHeightRatio ?? 1.2
+    const leadHalf = `(h*${fontRatio})*(${lineHeightRatio}-1)/2`
+    const lineStep = `(h*${fontRatio})*${lineHeightRatio}`
     lineFiles.forEach((lineFile, index) => {
       const yExpr =
         index === 0
-          ? `y=(h*${centerRatio})-text_h-${gap}`
-          : `y=(h*${centerRatio})+${gap}`
+          ? `y=(h*${centerRatio})-text_h-${leadHalf}`
+          : `y=(h*${centerRatio})-text_h-${leadHalf}+${lineStep}`
       const outLabel = index === lineFiles.length - 1 ? "[txt]" : `[txt${index}]`
       parts.push(
         drawtextChain({
@@ -89,6 +100,7 @@ export function buildFilterComplex(args: {
           textFile: lineFile,
           fontSizeExpr,
           textColor: t.textColor,
+          textOpacity: t.textOpacity,
           yExpr,
         }),
       )
@@ -104,6 +116,7 @@ export function buildFilterComplex(args: {
         textFile: copyFile,
         fontSizeExpr,
         textColor: t.textColor,
+        textOpacity: t.textOpacity,
         yExpr,
         lineSpacing: t.textLineSpacing != null ? String(t.textLineSpacing) : undefined,
       }),

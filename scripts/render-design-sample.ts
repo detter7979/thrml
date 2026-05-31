@@ -89,7 +89,7 @@ async function getBaseImage(format: MasterAdTemplateFormat, prompt: string): Pro
 }
 
 const HOST_ACQUISITION_BASE_PROMPT =
-  "Photorealistic owner POV looking down at a thriving private cedar sauna and cold plunge nestled in a lush manicured backyard at golden hour, premium architectural detail, warm editorial lighting"
+  "Close exterior detail of a cedar barrel sauna on a residential Pacific Northwest deck, vertical staves and brushed stainless door hardware, natural cedar grain with subtle knots, soft overcast afternoon light, 85mm lens shallow depth of field, editorial residential architectural photograph, luxurious but authentic"
 
 const SAMPLES: Sample[] = [
   {

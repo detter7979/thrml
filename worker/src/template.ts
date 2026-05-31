@@ -11,14 +11,18 @@ export interface VideoTemplate {
   width: number
   height: number
   textColor: string
+  /** POV v2: drawtext alpha (0–1). Split-header headline uses 0.92. */
+  textOpacity?: number
   /** Fixed fontsize when fontSizeRatio is omitted. */
   textSize: number
   /** Legacy v1: fixed drawtext y. */
   textTopOffset: number
   /** POV v2: vertically center the text block at this fraction of frame height. */
   textTopRatio?: number
-  /** POV v2: drawtext line_spacing between wrapped lines (px). */
+  /** POV v2: drawtext line_spacing between wrapped lines (px) — single-block fallback only. */
   textLineSpacing?: number
+  /** POV v2: line-height ratio between stacked overlay lines (max ~1.2). */
+  textLineHeightRatio?: number
   /** POV v2: fontsize = round(h * fontSizeRatio). */
   fontSizeRatio?: number
   fontPath: string
@@ -60,11 +64,13 @@ export const templateV2: VideoTemplate = {
   width: 1080,
   height: 1920,
   textColor: "FFFFFF",
+  textOpacity: 0.92,
   textSize: 42,
   textTopOffset: 0,
-  /** Vertical center of copy block on black fascia above doors (~36% frame height). */
-  textTopRatio: 0.36,
+  /** Vertical center of copy block (~40% frame height — fascia / door header band). */
+  textTopRatio: 0.4,
   textLineSpacing: 8,
+  textLineHeightRatio: 1.2,
   /** 0.0328 prior size × 0.9 for fascia band + side padding. */
   fontSizeRatio: 0.0295,
   fontPath: "assets/DMSerifDisplay-Regular.ttf",

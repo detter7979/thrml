@@ -13,10 +13,11 @@ describe("template", () => {
     expect(templateV1.showLogo).toBe(true)
   })
 
-  it("v2 is POV centered overlay without scrim or logo", () => {
+  it("v2 is POV fascia overlay without scrim or logo", () => {
     expect(templateV2.version).toBe(2)
-    expect(templateV2.textTopRatio).toBe(0.54)
-    expect(templateV2.fontSizeRatio).toBe(0.0328)
+    expect(templateV2.textTopRatio).toBe(0.36)
+    expect(templateV2.fontSizeRatio).toBe(0.0295)
+    expect(templateV2.textLineSpacing).toBe(8)
     expect(templateV2.showGradient).toBe(false)
     expect(templateV2.showLogo).toBe(false)
     expect(templateV2.fontPath).toBe("assets/DMSerifDisplay-Regular.ttf")
@@ -46,10 +47,10 @@ describe("buildFilterComplex", () => {
     expect(inputs).toBe(1)
     expect(filter).toContain("textfile='/tmp/overlay-line-0.txt'")
     expect(filter).toContain("textfile='/tmp/overlay-line-1.txt'")
-    expect(filter).toContain("y=(h*0.54)-text_h-6")
-    expect(filter).toContain("y=(h*0.54)+6")
+    expect(filter).toContain("y=(h*0.36)-text_h-4")
+    expect(filter).toContain("y=(h*0.36)+4")
     expect(filter).toContain("x=(w-text_w)/2")
-    expect(filter).toContain("fontsize=h*0.0328")
+    expect(filter).toContain("fontsize=h*0.0295")
     expect(filter).not.toContain("text_align")
     expect(filter).not.toContain("fix_bounds")
     expect(filter).not.toContain("overlay=0:H-h:format=auto[bg]")

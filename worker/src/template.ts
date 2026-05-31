@@ -52,8 +52,8 @@ export const templateV1: VideoTemplate = {
 }
 
 /**
- * v2 — IG Story POV overlay for T2 (Runway) and T4 (upload): centered DM Serif, mid-frame.
- * Matches static POV creative direction; see `DEFAULT_POV_VIDEO_OVERLAY`.
+ * v2 — IG Story POV overlay for T2 (Runway) and T4 (upload): centered DM Serif on
+ * the sauna fascia (between roof line and door header). See `DEFAULT_POV_VIDEO_OVERLAY`.
  */
 export const templateV2: VideoTemplate = {
   version: 2,
@@ -62,11 +62,11 @@ export const templateV2: VideoTemplate = {
   textColor: "FFFFFF",
   textSize: 42,
   textTopOffset: 0,
-  /** Vertical center of text block — moved down ~20% from prior upper-third (0.34 → 0.54). */
-  textTopRatio: 0.54,
-  textLineSpacing: 11,
-  /** ~20% smaller than prior 0.041 for side padding on 9:16. */
-  fontSizeRatio: 0.0328,
+  /** Vertical center of copy block on black fascia above doors (~36% frame height). */
+  textTopRatio: 0.36,
+  textLineSpacing: 8,
+  /** 0.0328 prior size × 0.9 for fascia band + side padding. */
+  fontSizeRatio: 0.0295,
   fontPath: "assets/DMSerifDisplay-Regular.ttf",
   logoPath: "assets/thrml-logo.png",
   logoWidth: 0,

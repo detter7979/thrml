@@ -398,6 +398,13 @@ export function BriefIntakePanel({
               setSelectedTemplateId(e.target.value)
               const t = templates.find((x) => x.id === e.target.value)
               if (t) setConceptVerify(t.concept_verify_default)
+              if (e.target.value === "T2" || e.target.value === "T4") {
+                setVideoDraft((p) => ({
+                  ...p,
+                  templateVersion: DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
+                  source: e.target.value === "T4" ? "uploaded" : "runway",
+                }))
+              }
             }}
             className="w-full rounded-md border px-3 py-2 text-sm"
           >
@@ -427,7 +434,8 @@ export function BriefIntakePanel({
         <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
           <p className="text-xs text-muted-foreground">
             T4 needs a POV sauna base MP4 in the creative GCS bucket. Upload via gsutil (below), pick from the
-            library, paste a path, or try the in-app uploader.
+            library, paste a path, or try the in-app uploader. After approval, the Railway worker composites the
+            same centered POV overlay as T2 (template v{DEFAULT_POV_SAUNA_TEMPLATE_VERSION}).
           </p>
 
           <details className="rounded-md border bg-background px-3 py-2 text-xs">

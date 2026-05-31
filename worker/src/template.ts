@@ -52,7 +52,7 @@ export const templateV1: VideoTemplate = {
 }
 
 /**
- * v2 — IG Story POV overlay: centered DM Serif, upper third, no scrim or logo.
+ * v2 — IG Story POV overlay for T2 (Runway) and T4 (upload): centered DM Serif, mid-frame.
  * Matches static POV creative direction; see `DEFAULT_POV_VIDEO_OVERLAY`.
  */
 export const templateV2: VideoTemplate = {
@@ -60,11 +60,13 @@ export const templateV2: VideoTemplate = {
   width: 1080,
   height: 1920,
   textColor: "FFFFFF",
-  textSize: 52,
+  textSize: 42,
   textTopOffset: 0,
-  textTopRatio: 0.34,
-  textLineSpacing: 14,
-  fontSizeRatio: 0.041,
+  /** Vertical center of text block — moved down ~20% from prior upper-third (0.34 → 0.54). */
+  textTopRatio: 0.54,
+  textLineSpacing: 11,
+  /** ~20% smaller than prior 0.041 for side padding on 9:16. */
+  fontSizeRatio: 0.0328,
   fontPath: "assets/DMSerifDisplay-Regular.ttf",
   logoPath: "assets/thrml-logo.png",
   logoWidth: 0,

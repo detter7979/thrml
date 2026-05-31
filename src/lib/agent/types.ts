@@ -16,7 +16,7 @@ export interface VideoConfig {
   runwayPrompt?: string // required if source = 'runway'
   uploadedGcsPath?: string // required if source = 'uploaded', format: bases/...
   copyVariants: VideoCopyVariant[] // 1+ variants to render from the base
-  templateVersion: number // 1 = legacy scrim+logo, 2 = POV upper-third overlay
+  templateVersion: number // 1 = legacy scrim+logo; 2 = centered POV overlay (T2 Runway + T4 upload)
   conceptSlug: string // e.g. "sauna-pov-earnings"
   assetSlug: string // e.g. "sauna"
   duration?: 5 | 10 // Runway only

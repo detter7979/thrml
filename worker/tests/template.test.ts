@@ -13,9 +13,10 @@ describe("template", () => {
     expect(templateV1.showLogo).toBe(true)
   })
 
-  it("v2 is POV upper-third overlay without scrim or logo", () => {
+  it("v2 is POV centered overlay without scrim or logo", () => {
     expect(templateV2.version).toBe(2)
-    expect(templateV2.textTopRatio).toBe(0.34)
+    expect(templateV2.textTopRatio).toBe(0.54)
+    expect(templateV2.fontSizeRatio).toBe(0.0328)
     expect(templateV2.showGradient).toBe(false)
     expect(templateV2.showLogo).toBe(false)
     expect(templateV2.fontPath).toBe("assets/DMSerifDisplay-Regular.ttf")
@@ -36,14 +37,16 @@ describe("template", () => {
 })
 
 describe("buildFilterComplex", () => {
-  it("v2 uses upper-third drawtext and single input", () => {
+  it("v2 uses centered drawtext and single input", () => {
     const { filter, inputs } = buildFilterComplex({
       template: templateV2,
       copyTextFile: "/tmp/overlay-copy.txt",
     })
     expect(inputs).toBe(1)
     expect(filter).toContain("textfile=")
-    expect(filter).toContain("y=(h*0.34)-(text_h/2)")
+    expect(filter).toContain("y=(h*0.54)-(text_h/2)")
+    expect(filter).toContain("text_align=C")
+    expect(filter).toContain("fontsize=h*0.0328")
     expect(filter).not.toContain("overlay=0:H-h:format=auto[bg]")
     expect(filter).not.toContain("[logo]")
   })

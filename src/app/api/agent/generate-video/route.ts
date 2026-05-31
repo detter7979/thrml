@@ -5,7 +5,7 @@ import { refreshCreativeAssetUrl, uploadRemoteToCreativeObject } from "@/lib/age
 import { buildAdName, InvalidAdNameError } from "@/lib/agent/naming-builder"
 import { generateVideo as runwayGenerate, pollTask } from "@/lib/agent/runway"
 import type { VideoConfig } from "@/lib/agent/types"
-import { formatPovVideoOverlay } from "@/lib/agent/video-template-copy"
+import { formatPovVideoOverlay, DEFAULT_POV_SAUNA_TEMPLATE_VERSION } from "@/lib/agent/video-template-copy"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
   }
 
   const config = brief.video_config
+  const templateVersion = config.templateVersion ?? DEFAULT_POV_SAUNA_TEMPLATE_VERSION
   const triggerData =
     brief.trigger_data && typeof brief.trigger_data === "object"
       ? (brief.trigger_data as Record<string, unknown>)
@@ -231,11 +232,11 @@ export async function POST(req: NextRequest) {
         base_video_gcs_path: baseGcsPath,
         variant_slug: variant.slug,
         copy_text:
-          (config.templateVersion ?? 1) >= 2
+          templateVersion >= 2
             ? formatPovVideoOverlay(variant.copy)
             : variant.copy,
         concept_slug: config.conceptSlug,
-        template_version: config.templateVersion ?? 1,
+        template_version: templateVersion,
         ad_name: adName,
       }
     })

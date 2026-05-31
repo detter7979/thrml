@@ -133,6 +133,7 @@ templates:
       source: uploaded
       concept_slug: pov-earnings
       asset_slug: sauna
+      # Same FFmpeg overlay template as T2 (worker template v2 — centered POV copy).
       template_version: 2
       copy_variants:
         - slug: pov-idle-income

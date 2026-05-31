@@ -36,6 +36,8 @@ export function buildFilterComplex(args: {
   const yExpr = t.textTopRatio != null ? `y=(h*${t.textTopRatio})-(text_h/2)` : `y=${t.textTopOffset}`
   const lineSpacing =
     t.textLineSpacing != null ? `:line_spacing=${t.textLineSpacing}` : ""
+  const textAlign =
+    t.textTopRatio != null ? ":text_align=C:fix_bounds=1" : ""
 
   const parts: string[] = []
   let current = "[0:v]"
@@ -51,7 +53,7 @@ export function buildFilterComplex(args: {
   }
 
   parts.push(
-    `${current}drawtext=fontfile='${fontPath}':textfile='${copyFile}':${fontSizeExpr}:fontcolor=0x${t.textColor}:x=(w-text_w)/2:${yExpr}${lineSpacing}[txt]`,
+    `${current}drawtext=fontfile='${fontPath}':textfile='${copyFile}':${fontSizeExpr}:fontcolor=0x${t.textColor}:x=(w-text_w)/2:${yExpr}${lineSpacing}${textAlign}[txt]`,
   )
   current = "[txt]"
 

@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 
 import { buildAdName } from "@/lib/agent/naming-builder"
-import { SPLIT_HEADER_DEFAULTS } from "@/lib/agent/svg-template-generator"
+import { SPLIT_HEADER_DEFAULTS } from "@/lib/agent/svg-template-shared"
 import {
   Dialog,
   DialogContent,

@@ -12,13 +12,24 @@ import {
   type HostClaimViolation,
 } from "@/lib/listings/host-claim-policy"
 import { buildAdName } from "@/lib/agent/naming-builder"
+import {
+  SPLIT_HEADER_DEFAULTS,
+  aspectRatioToFormat,
+  formatToAspectRatio,
+  type SvgAspectRatio,
+  type SvgStaticFormat,
+} from "@/lib/agent/svg-template-shared"
+export {
+  SPLIT_HEADER_DEFAULTS,
+  aspectRatioToFormat,
+  briefUsesSvgTemplate,
+  formatToAspectRatio,
+  type SvgAspectRatio,
+  type SvgStaticFormat,
+  type SvgTemplateId,
+} from "@/lib/agent/svg-template-shared"
 import { injectBrandAdFonts } from "@/lib/agent/static-layouts/brand-ad-fonts"
 import { createAdminClient } from "@/lib/supabase/admin"
-
-export type SvgAspectRatio = "1:1" | "4:5" | "9:16"
-export type SvgStaticFormat = "1x1" | "4x5" | "9x16"
-
-export type SvgTemplateId = "thrml_split_header_static" | "thrml_pov_overlay_static"
 
 export type SvgTemplateRegistryEntry = {
   id: SvgTemplateId
@@ -41,18 +52,6 @@ function svgTemplatesPath() {
 
 function svgFilePath(templateId: string, format: SvgStaticFormat) {
   return path.join(process.cwd(), "config", "creative-templates", "svg", `${templateId}_${format}.svg`)
-}
-
-export function aspectRatioToFormat(aspectRatio: SvgAspectRatio): SvgStaticFormat {
-  if (aspectRatio === "4:5") return "4x5"
-  if (aspectRatio === "9:16") return "9x16"
-  return "1x1"
-}
-
-export function formatToAspectRatio(format: SvgStaticFormat): SvgAspectRatio {
-  if (format === "4x5") return "4:5"
-  if (format === "9x16") return "9:16"
-  return "1:1"
 }
 
 export function loadSvgTemplateRegistry(): SvgTemplateRegistryEntry[] {
@@ -84,11 +83,6 @@ export function substituteSvgTokens(svg: string, tokens: Record<string, string>)
   }
   return result
 }
-
-export const SPLIT_HEADER_DEFAULTS = {
-  TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR.",
-  SUBHEAD: "Backyard and cabin saunas in Seattle + LA.",
-} as const
 
 type SplitHeaderLayoutSpec = {
   padX: number
@@ -468,8 +462,4 @@ export async function generateSvgVariantsForBrief(
   }
 
   return results
-}
-
-export function briefUsesSvgTemplate(triggerData: Record<string, unknown> | null | undefined) {
-  return typeof triggerData?.svg_template_id === "string" && triggerData.svg_template_id.length > 0
 }

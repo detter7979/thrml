@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { getCreativeTemplate, buildBriefFromTemplate, loadCreativeTemplates } from "@/lib/agent/creative-templates"
 import { loadSvgTemplateRegistry } from "@/lib/agent/svg-template-generator"
+import { processStaticBrief } from "@/lib/agent/static-generator"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+export const maxDuration = 300
 
 export async function GET() {
   const { error } = await requireAdminApi()
@@ -79,5 +81,31 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: "Failed to create brief" }, { status: 500 })
+
+  if (saveAndApprove && !data.video_config) {
+    try {
+      const generated = await processStaticBrief({ briefId: data.id })
+      const { data: updated, error: reloadError } = await admin!
+        .from("creative_briefs")
+        .select("*")
+        .eq("id", data.id)
+        .maybeSingle()
+
+      if (reloadError) return NextResponse.json({ error: reloadError.message }, { status: 500 })
+      return NextResponse.json({ brief: updated ?? data, generated })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Static generation failed"
+      console.error("[creative-templates] saveAndApprove generation failed", err)
+
+      await admin!
+        .from("creative_briefs")
+        .update({ status: "briefed", approved_at: null })
+        .eq("id", data.id)
+
+      return NextResponse.json({ error: message, brief: data }, { status: 500 })
+    }
+  }
+
   return NextResponse.json({ brief: data })
 }

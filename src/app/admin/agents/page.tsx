@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
 import type { RenderJob, VideoConfig } from "@/lib/agent/types"
+import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
+import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
 import {
   BriefEditorModal,
@@ -752,7 +754,11 @@ export default function AgentsDashboard() {
                 ) : briefs.map((brief) => {
                   const isPendingExpansion = brief.status === "pending"
                   const briefIsVideo = isVideoBrief(brief)
-                  const canApproveBrief = briefIsVideo || Boolean(brief.visual_direction?.trim())
+                  const canApproveBrief =
+                    briefIsVideo ||
+                    Boolean(brief.visual_direction?.trim()) ||
+                    briefUsesSvgTemplate(brief.trigger_data) ||
+                    Boolean(parseStoredStaticVariations(brief.trigger_data)?.length)
 
                   return (
                     <div key={brief.id} className="rounded-lg border p-3 space-y-3">
@@ -891,19 +897,30 @@ export default function AgentsDashboard() {
                         </div>
                       )
                     })}
-                    {generatingBriefs.map((brief) => (
+                    {generatingBriefs.map((brief) => {
+                      const isActivelyGenerating = brief.status === "generating"
+                      return (
                       <div key={brief.id} className="rounded-lg border p-3 space-y-3">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded">{brief.format ?? "format"}</span>
-                            <span className="text-[11px] text-muted-foreground">Generating variations</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {isActivelyGenerating ? "Generating variations" : "Waiting for generation"}
+                            </span>
                           </div>
-                          <span className="h-4 w-4 rounded-full border-2 border-muted border-t-foreground animate-spin" aria-label="Generating" />
+                          {isActivelyGenerating ? (
+                            <span className="h-4 w-4 rounded-full border-2 border-muted border-t-foreground animate-spin" aria-label="Generating" />
+                          ) : null}
                         </div>
                         <div>
                           <p className="text-sm font-medium">{shortText(brief.copy_headline ?? brief.hook, 140)}</p>
                           <p className="text-xs text-muted-foreground">{shortText(brief.hypothesis, 140)}</p>
                         </div>
+                        {!isActivelyGenerating ? (
+                          <p className="rounded-md bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                            Approval succeeded but generation did not run. Click below to generate variations.
+                          </p>
+                        ) : null}
                         <div className="grid gap-3 md:grid-cols-3">
                           {[0, 1, 2].map((index) => (
                             <div key={index} className="rounded-md border bg-background p-2 space-y-2 animate-pulse">
@@ -913,8 +930,19 @@ export default function AgentsDashboard() {
                             </div>
                           ))}
                         </div>
+                        {!isActivelyGenerating ? (
+                          <button
+                            type="button"
+                            onClick={() => approveBrief(brief.id)}
+                            disabled={busyAction === `approve-brief-${brief.id}`}
+                            className="w-full text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          >
+                            Generate variations
+                          </button>
+                        ) : null}
                       </div>
-                    ))}
+                      )
+                    })}
                     {assetsByBrief.map((group) => {
                   const selected = selectedForBrief(group.briefId)
                   const selectedApproved = selected.filter((asset) => asset.status === "approved")

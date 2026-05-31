@@ -18,6 +18,7 @@ import {
   formatToAspectRatio,
   type SvgAspectRatio,
   type SvgStaticFormat,
+  type SvgTemplateId,
 } from "@/lib/agent/svg-template-shared"
 export {
   SPLIT_HEADER_DEFAULTS,

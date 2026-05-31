@@ -1293,6 +1293,10 @@ export default function AgentsDashboard() {
                     void refreshAssetUrl(viewingAsset, event.currentTarget)
                   }}
                 />
+              ) : (
+                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+                  No preview
+                </div>
               )}
             </div>
           </div>

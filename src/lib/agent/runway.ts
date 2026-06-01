@@ -23,6 +23,13 @@ export function resolveRunwayApiKey(): string | null {
   return null
 }
 
+export function resolveRunwayEnvKeyName(): (typeof RUNWAY_ENV_KEYS)[number] | null {
+  for (const name of RUNWAY_ENV_KEYS) {
+    if (normalizeSecret(process.env[name])) return name
+  }
+  return null
+}
+
 export function isRunwayConfigured(): boolean {
   return resolveRunwayApiKey() !== null
 }

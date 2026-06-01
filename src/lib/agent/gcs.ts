@@ -418,6 +418,30 @@ export async function listCreativeAssetLibrary(opts?: {
     .slice(0, limit)
 }
 
+export async function deleteCreativeObject(gcsPathOrObject: string): Promise<boolean> {
+  const objectPath = gcsPathOrObject.startsWith("gs://")
+    ? parseGcsPath(gcsPathOrObject).objectPath
+    : gcsPathOrObject.replace(/^\/+/, "")
+
+  try {
+    let file
+    if (gcsPathOrObject.startsWith("gs://")) {
+      const { bucketName } = parseGcsPath(gcsPathOrObject)
+      file = fileForStoredGcsPath(bucketName, objectPath)
+    } else {
+      const mainFile = getBucket().file(objectPath)
+      const [mainExists] = await mainFile.exists()
+      file = mainExists ? mainFile : getCreativeBucket().file(objectPath)
+    }
+
+    await file.delete({ ignoreNotFound: true })
+    return true
+  } catch (err) {
+    console.warn("[gcs] deleteCreativeObject failed", objectPath, err)
+    return false
+  }
+}
+
 export async function archiveOldAssets(daysOld = 90): Promise<{ archived: number; assets: ArchivedCreativeAsset[] }> {
   const bucket = getBucket()
   const cutoff = Date.now() - daysOld * 24 * 60 * 60 * 1000

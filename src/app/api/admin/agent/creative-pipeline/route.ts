@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { purgeCreativePipeline } from "@/lib/agent/creative-pipeline-purge"
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
+import { isRunwayConfigured } from "@/lib/agent/runway"
 import { processStaticBrief } from "@/lib/agent/static-generator"
 import { editStaticPhotoAsset } from "@/lib/agent/static-photo-recomposite"
 import {
@@ -27,6 +29,7 @@ const PIPELINE_ACTIONS = new Set([
   "generate_svg_static",
   "acknowledge_claim_warning",
   "edit_static_photo",
+  "purge_creative_pipeline",
 ])
 
 type AdminClient = NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>
@@ -326,6 +329,7 @@ export async function GET() {
     generatedAssets: signedGeneratedAssets,
     launchedAssets: launchedWithInsights,
     activeMetaAdsets,
+    runwayConfigured: isRunwayConfigured(),
   })
 }
 
@@ -688,6 +692,24 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true, result })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Photo edit failed"
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+  }
+
+  if (body.action === "purge_creative_pipeline") {
+    const confirm = typeof body.confirm === "string" ? body.confirm.trim() : ""
+    if (confirm !== "DELETE_ALL_CREATIVES") {
+      return NextResponse.json(
+        { error: 'Type confirm: "DELETE_ALL_CREATIVES" to purge all briefs and generated files.' },
+        { status: 400 }
+      )
+    }
+
+    try {
+      const summary = await purgeCreativePipeline()
+      return NextResponse.json({ ok: true, summary })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Creative purge failed"
       return NextResponse.json({ error: message }, { status: 500 })
     }
   }

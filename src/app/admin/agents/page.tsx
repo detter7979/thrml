@@ -9,6 +9,7 @@ import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
 import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
+import { CreativePipelinePurgePanel } from "@/components/admin/creative/creative-pipeline-purge-panel"
 import {
   canEditPhotoAsset,
   CreativeAssetCard,
@@ -75,6 +76,7 @@ type CreativePipelineData = {
   generatedAssets: CreativeAsset[]
   launchedAssets: CreativeAsset[]
   activeMetaAdsets: MetaAdset[]
+  runwayConfigured?: boolean
 }
 
 function isVideoBrief(brief: CreativeBrief) {
@@ -375,9 +377,11 @@ export default function AgentsDashboard() {
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
+        const hint = (json as { hint?: string }).hint
         const detail = (json as { detail?: string; error?: string }).detail
         const error = (json as { error?: string }).error ?? "Video generation failed"
-        throw new Error(detail ? `${error}: ${detail}` : error)
+        const parts = [error, detail, hint].filter(Boolean)
+        throw new Error(parts.join(" — "))
       }
       await mutatePipeline()
       setPipelineMessage("Video generation started. Render jobs are queued.")
@@ -622,6 +626,7 @@ export default function AgentsDashboard() {
   const generatedAssets = useMemo(() => pipeline?.generatedAssets ?? [], [pipeline?.generatedAssets])
   const launchedAssets = useMemo(() => pipeline?.launchedAssets ?? [], [pipeline?.launchedAssets])
   const metaAdsets = useMemo(() => pipeline?.activeMetaAdsets ?? [], [pipeline?.activeMetaAdsets])
+  const runwayConfigured = pipeline?.runwayConfigured ?? false
   const assetsByBrief = useMemo(() => {
     const grouped = new Map<string, CreativeAsset[]>()
     for (const asset of generatedAssets) {
@@ -873,6 +878,17 @@ export default function AgentsDashboard() {
           {pipelineError ? (
             <p className="text-sm text-red-500">{pipelineError instanceof Error ? pipelineError.message : "Could not load creative pipeline."}</p>
           ) : null}
+          {!pipelineLoading && pipeline ? (
+            <p
+              className={`text-xs rounded-lg border px-3 py-2 ${
+                runwayConfigured
+                  ? "border-green-200 bg-green-50 text-green-900"
+                  : "border-amber-200 bg-amber-50 text-amber-900"
+              }`}
+            >
+              Runway API: {runwayConfigured ? "detected on this server" : "not detected — T2 briefs need RUNWAY_API_KEY in Vercel (Production + Preview) with a redeploy, or use T4 (Upload MP4) instead"}
+            </p>
+          ) : null}
 
           <BriefIntakePanel
             onCreated={() => void mutatePipeline()}
@@ -1013,11 +1029,19 @@ export default function AgentsDashboard() {
                           <button
                             type="button"
                             onClick={() => void generateVideoVariants(brief.id)}
-                            disabled={busyAction === `generate-video-${brief.id}`}
+                            disabled={
+                              busyAction === `generate-video-${brief.id}` ||
+                              (config.source === "runway" && !runwayConfigured)
+                            }
                             className="text-xs px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
                           >
                             Generate Video Variants ({variantCount} copies, source: {config.source === "runway" ? "Runway" : "Upload"})
                           </button>
+                          {config.source === "runway" && !runwayConfigured ? (
+                            <p className="text-xs text-amber-800">
+                              Runway key not visible to this deployment. Redeploy after setting RUNWAY_API_KEY, or switch to T4.
+                            </p>
+                          ) : null}
                         </div>
                       )
                     })}
@@ -1282,6 +1306,14 @@ export default function AgentsDashboard() {
               </div>
             </section>
           </div>
+
+          <CreativePipelinePurgePanel
+            onPurged={() => void mutatePipeline()}
+            onMessage={setPipelineMessage}
+            patchPipeline={patchPipeline}
+            busyAction={busyAction}
+            setBusyAction={setBusyAction}
+          />
         </div>
       )}
 

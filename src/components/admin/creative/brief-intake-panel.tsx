@@ -492,7 +492,7 @@ export function BriefIntakePanel({
       {needsRunwayApiKey ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           T2 calls Runway to generate base video and requires <code className="font-mono">RUNWAY_API_KEY</code> on
-          the server. To overlay copy on your own POV sauna MP4, use{" "}
+          the server (Vercel Production + Preview, then redeploy). To overlay copy on your own POV sauna MP4, use{" "}
           <strong>T4 · POV Sauna (Upload)</strong> instead.
         </p>
       ) : null}

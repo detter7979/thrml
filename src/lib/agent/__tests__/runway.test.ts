@@ -48,4 +48,11 @@ describe("runway", () => {
     const r = await runway.pollTask("t", { intervalMs: 10 })
     expect(r.status).toBe("SUCCEEDED")
   })
+
+  it("resolveRunwayApiKey accepts alternate env names", () => {
+    delete process.env.RUNWAY_API_KEY
+    process.env.RUNWAYML_API_SECRET = " runway-secret "
+    expect(runway.resolveRunwayApiKey()).toBe("runway-secret")
+    expect(runway.isRunwayConfigured()).toBe(true)
+  })
 })

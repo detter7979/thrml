@@ -44,6 +44,42 @@ export function canEditPhotoAsset(asset: {
   return hasBase || hasSource
 }
 
+function IconAction({
+  label,
+  onClick,
+  disabled,
+  busy,
+  tone = "neutral",
+  children,
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  busy?: boolean
+  tone?: "approve" | "reject" | "neutral"
+  children: React.ReactNode
+}) {
+  const toneClass =
+    tone === "approve"
+      ? "bg-green-600 text-white hover:bg-green-700 border-green-600"
+      : tone === "reject"
+        ? "bg-white/95 text-foreground hover:bg-white border-white/80"
+        : "bg-white/95 text-foreground hover:bg-white border-white/80"
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      aria-label={label}
+      title={label}
+      className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition-colors disabled:opacity-40 ${toneClass}`}
+    >
+      {busy ? <Loader2 className="size-4 animate-spin" /> : children}
+    </button>
+  )
+}
+
 export function CreativeAssetCard({
   asset,
   sourceLabel,
@@ -66,51 +102,42 @@ export function CreativeAssetCard({
 
   return (
     <div className="rounded-md border bg-background p-2 space-y-2">
-      {preview}
+      <div className="relative overflow-hidden rounded-md">
+        {preview}
 
-      <div className="flex items-center justify-between gap-2">
+        <label className="absolute right-2 top-2 flex size-7 cursor-pointer items-center justify-center rounded-md bg-black/45 backdrop-blur-sm">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(event) => onSelectedChange(event.target.checked)}
+            aria-label="Select asset"
+            className="size-3.5 accent-[#9A4A33]"
+          />
+        </label>
+
+        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-end gap-1.5">
+          <IconAction
+            label={isApproved ? "Approved" : "Approve"}
+            onClick={onApprove}
+            disabled={isApproved}
+            busy={approveBusy}
+            tone="approve"
+          >
+            <Check className="size-4" strokeWidth={2.75} />
+          </IconAction>
+          <IconAction label="Reject" onClick={onReject} busy={rejectBusy} tone="reject">
+            <X className="size-4" strokeWidth={2.75} />
+          </IconAction>
+          <IconAction label="View full" onClick={onView} tone="neutral">
+            <Eye className="size-4" strokeWidth={2.75} />
+          </IconAction>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 px-0.5">
         <span className="text-[11px] text-muted-foreground">
           {sourceLabel} · {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`} · {status}
         </span>
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={(event) => onSelectedChange(event.target.checked)}
-          aria-label="Select asset"
-          className="size-3.5"
-        />
-      </div>
-
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onApprove}
-          disabled={approveBusy || isApproved}
-          aria-label="Approve"
-          title={isApproved ? "Approved" : "Approve"}
-          className="inline-flex size-8 items-center justify-center rounded-md border border-green-200 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-40"
-        >
-          {approveBusy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" strokeWidth={2.5} />}
-        </button>
-        <button
-          type="button"
-          onClick={onReject}
-          disabled={rejectBusy}
-          aria-label="Reject"
-          title="Reject"
-          className="inline-flex size-8 items-center justify-center rounded-md border hover:bg-muted disabled:opacity-40"
-        >
-          {rejectBusy ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" strokeWidth={2.5} />}
-        </button>
-        <button
-          type="button"
-          onClick={onView}
-          aria-label="View full"
-          title="View full"
-          className="inline-flex size-8 items-center justify-center rounded-md border hover:bg-muted"
-        >
-          <Eye className="size-4" strokeWidth={2.5} />
-        </button>
       </div>
 
       {canEditPhoto ? (

@@ -6,6 +6,27 @@ import { setTimeout as sleep } from "node:timers/promises"
 const RUNWAY_API_URL = "https://api.dev.runwayml.com/v1"
 const RUNWAY_API_VERSION = "2024-11-06"
 
+const RUNWAY_ENV_KEYS = ["RUNWAY_API_KEY", "RUNWAYML_API_SECRET", "RUNWAY_API_SECRET"] as const
+
+function normalizeSecret(value: string | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim().replace(/^['"]|['"]$/g, "")
+  return trimmed || null
+}
+
+/** Resolve Runway API key from common env var names (Vercel / local). */
+export function resolveRunwayApiKey(): string | null {
+  for (const name of RUNWAY_ENV_KEYS) {
+    const value = normalizeSecret(process.env[name])
+    if (value) return value
+  }
+  return null
+}
+
+export function isRunwayConfigured(): boolean {
+  return resolveRunwayApiKey() !== null
+}
+
 export interface RunwayGenerateArgs {
   prompt: string
   duration?: 5 | 10
@@ -26,7 +47,7 @@ export interface RunwayTask {
 }
 
 function apiKey(): string {
-  const k = process.env.RUNWAY_API_KEY
+  const k = resolveRunwayApiKey()
   if (!k) throw new Error("RUNWAY_API_KEY not set")
   return k
 }

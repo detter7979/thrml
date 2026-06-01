@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { baseVideoPath, gcsUrl, resolveCreativeBucketName } from "@/lib/agent/gcs-paths"
 import { refreshCreativeAssetUrl, uploadRemoteToCreativeObject } from "@/lib/agent/gcs"
 import { buildAdName, InvalidAdNameError } from "@/lib/agent/naming-builder"
-import { generateVideo as runwayGenerate, pollTask } from "@/lib/agent/runway"
+import { generateVideo as runwayGenerate, isRunwayConfigured, pollTask } from "@/lib/agent/runway"
 import type { VideoConfig } from "@/lib/agent/types"
 import { formatPovVideoOverlay, DEFAULT_POV_SAUNA_TEMPLATE_VERSION } from "@/lib/agent/video-template-copy"
 import { requireAdminApi } from "@/lib/admin-guard"
@@ -70,12 +70,17 @@ export async function POST(req: NextRequest) {
   if (config.source === "runway" && !config.runwayPrompt?.trim()) {
     return NextResponse.json({ error: "video_config.runwayPrompt required for runway source" }, { status: 400 })
   }
-  if (config.source === "runway" && !process.env.RUNWAY_API_KEY?.trim()) {
+  if (config.source === "runway" && !isRunwayConfigured()) {
+    const onVercel = Boolean(process.env.VERCEL)
     return NextResponse.json(
       {
         error: "Runway is not configured on this server",
         detail:
           "This brief uses template T2 (Runway). Set RUNWAY_API_KEY in Vercel, or create a new brief from T4 (Upload MP4) with your POV sauna video instead.",
+        hint: onVercel
+          ? "Add RUNWAY_API_KEY under Vercel → Settings → Environment Variables for Production and Preview, then redeploy. The admin Creative tab shows whether Runway is detected."
+          : "Add RUNWAY_API_KEY to .env.local for local dev, then restart `next dev`.",
+        runwayConfigured: false,
       },
       { status: 503 },
     )

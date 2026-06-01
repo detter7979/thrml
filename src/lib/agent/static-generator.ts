@@ -1,7 +1,7 @@
 import { uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
 import { resolveNamingFromBrief } from "@/lib/agent/creative-templates"
 import { buildAdName } from "@/lib/agent/naming-builder"
-import { unifiedStaticPath } from "@/lib/agent/gcs-paths"
+import { unifiedStaticBasePath, unifiedStaticPath } from "@/lib/agent/gcs-paths"
 import {
   HOST_PROOF_SUBTEXT,
   HOST_MONETIZATION_PLAYBOOK_ID,
@@ -49,6 +49,35 @@ type CreativeBriefRow = {
   hook: string | null
   format: string | null
   campaign_short_name: string | null
+}
+
+function templateSlugFromBrief(brief: CreativeBriefRow) {
+  return resolveNamingFromBrief(brief)?.template_slug ?? null
+}
+
+async function persistBasePhoto(
+  brief: CreativeBriefRow,
+  baseImage: Buffer,
+  format: StaticFormat,
+  variationLabel: string,
+) {
+  const { category, angleSlug } = taxonomyFromBrief(brief)
+  const { gcsPath } = await uploadGcsCreativeAsset(baseImage, {
+    campaignShortName: brief.campaign_short_name ?? brief.id,
+    briefId: brief.id,
+    kind: "static",
+    filename: `base_${format}_${sanitizeFilename(variationLabel)}.png`,
+    contentType: "image/png",
+    unifiedObjectPath: unifiedStaticBasePath({
+      date: new Date(),
+      category,
+      angleSlug,
+      variant: variationLabel,
+      format,
+      templateSlug: templateSlugFromBrief(brief) ?? undefined,
+    }),
+  })
+  return gcsPath
 }
 
 function taxonomyFromBrief(brief: CreativeBriefRow) {
@@ -451,6 +480,7 @@ async function processStaticBriefInner(
 
         const variationIndex = i + 1
         const variationLabel = (step.variation_label || VARIATION_LABELS[i] || "A").toUpperCase().slice(0, 1)
+        const baseGcsPath = await persistBasePhoto(brief, baseImage.buffer, format, variationLabel)
 
         const composite = await compositeStatic({
           baseImage: baseImage.buffer,
@@ -462,12 +492,14 @@ async function processStaticBriefInner(
         })
         const { category, angleSlug } = taxonomyFromBrief(brief)
         const conventionName = conventionNameForStatic(brief, format, variationLabel)
+        const templateSlug = templateSlugFromBrief(brief) ?? undefined
         const unifiedPath = unifiedStaticPath({
           date: new Date(),
           category,
           angleSlug,
           variant: variationLabel,
           format,
+          templateSlug,
         })
         const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
           campaignShortName: brief.campaign_short_name ?? brief.id,
@@ -493,6 +525,7 @@ async function processStaticBriefInner(
             source_image_url: baseImage.sourceUrl ?? null,
             source_index: baseImage.sourceIndex,
             base_mime_type: baseImage.mimeType,
+            base_gcs_path: baseGcsPath,
             static_variation_headline: step.headline,
             static_variation_label: variationLabel,
           },
@@ -513,6 +546,7 @@ async function processStaticBriefInner(
     for (const [baseIndex, baseImage] of eligibleBaseImages.entries()) {
       const variationIndex = baseIndex + 1
       const variationLabel = VARIATION_LABELS[Math.min(baseIndex, VARIATION_LABELS.length - 1)]
+      const baseGcsPath = await persistBasePhoto(brief, baseImage.buffer, format, variationLabel)
 
       const composite = await compositeStatic({
         baseImage: baseImage.buffer,
@@ -524,12 +558,14 @@ async function processStaticBriefInner(
       })
       const { category, angleSlug } = taxonomyFromBrief(brief)
       const conventionName = conventionNameForStatic(brief, format, variationLabel)
+      const templateSlug = templateSlugFromBrief(brief) ?? undefined
       const unifiedPath = unifiedStaticPath({
         date: new Date(),
         category,
         angleSlug,
         variant: variationLabel,
         format,
+        templateSlug,
       })
       const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
         campaignShortName: brief.campaign_short_name ?? brief.id,
@@ -555,6 +591,7 @@ async function processStaticBriefInner(
           source_image_url: baseImage.sourceUrl ?? null,
           source_index: baseImage.sourceIndex,
           base_mime_type: baseImage.mimeType,
+          base_gcs_path: baseGcsPath,
         },
       })
       if (insertError) throw insertError

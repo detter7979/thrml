@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
 import { processStaticBrief } from "@/lib/agent/static-generator"
+import { editStaticPhotoAsset } from "@/lib/agent/static-photo-recomposite"
 import {
   generateFromSvgTemplate,
   loadSvgTemplateRegistry,
@@ -25,6 +26,7 @@ const PIPELINE_ACTIONS = new Set([
   "generate_preview",
   "generate_svg_static",
   "acknowledge_claim_warning",
+  "edit_static_photo",
 ])
 
 type AdminClient = NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>
@@ -667,6 +669,24 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true, generated })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Preview generation failed"
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+  }
+
+  if (body.action === "edit_static_photo") {
+    if (!body.asset_id) return NextResponse.json({ error: "asset_id is required" }, { status: 400 })
+    const editPrompt = typeof body.edit_prompt === "string" ? body.edit_prompt.trim() : ""
+    if (!editPrompt) return NextResponse.json({ error: "edit_prompt is required" }, { status: 400 })
+
+    try {
+      const result = await editStaticPhotoAsset({
+        assetId: body.asset_id,
+        editPrompt,
+        saveAsNewVariant: Boolean(body.save_as_new_variant),
+      })
+      return NextResponse.json({ ok: true, result })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Photo edit failed"
       return NextResponse.json({ error: message }, { status: 500 })
     }
   }

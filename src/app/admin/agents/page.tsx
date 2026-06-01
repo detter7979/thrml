@@ -259,6 +259,7 @@ export default function AgentsDashboard() {
   const [editBrief, setEditBrief] = useState<StructuredBriefEditorState | null>(null)
   const [selectedAssetIds, setSelectedAssetIds] = useState<Record<string, boolean>>({})
   const [viewingAsset, setViewingAsset] = useState<CreativeAsset | null>(null)
+  const [photoEditPrompt, setPhotoEditPrompt] = useState("")
   const [launchProgress, setLaunchProgress] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -557,6 +558,7 @@ export default function AgentsDashboard() {
   }, [])
 
   const openAssetPreview = useCallback(async (asset: CreativeAsset) => {
+    setPhotoEditPrompt("")
     setViewingAsset(asset)
     const gcsUrl = await refreshAssetUrl(asset)
     if (gcsUrl) {
@@ -565,6 +567,30 @@ export default function AgentsDashboard() {
       )
     }
   }, [refreshAssetUrl])
+
+  const editStaticPhoto = async (assetId: string) => {
+    if (!photoEditPrompt.trim()) {
+      setPipelineMessage("Add edit instructions first (e.g. flip 180, remove blurred dumbbells).")
+      return
+    }
+    setBusyAction(`edit-photo-${assetId}`)
+    setPipelineMessage(null)
+    try {
+      await patchPipeline({
+        action: "edit_static_photo",
+        asset_id: assetId,
+        edit_prompt: photoEditPrompt.trim(),
+        save_as_new_variant: true,
+      })
+      await mutatePipeline()
+      setPipelineMessage("Photo edited and re-composited. A new variation was added.")
+      setViewingAsset(null)
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Photo edit failed.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
 
   const criticalCount = alerts.filter(a => a.severity === "CRITICAL").length
   const latestFinance = finance[0]
@@ -1299,6 +1325,30 @@ export default function AgentsDashboard() {
                 </div>
               )}
             </div>
+            {!isVideoAsset(viewingAsset) ? (
+              <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-foreground">Edit base photo &amp; re-composite</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Edits apply to the underlying photo only (text overlay is re-applied). Examples:{" "}
+                  <span className="font-mono">flip 180</span>,{" "}
+                  <span className="font-mono">remove blurred dumbbells and foreground gym props</span>.
+                </p>
+                <textarea
+                  value={photoEditPrompt}
+                  onChange={(e) => setPhotoEditPrompt(e.target.value)}
+                  placeholder="flip horizontal, remove blurred deck railing in foreground"
+                  className="min-h-16 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  disabled={busyAction === `edit-photo-${viewingAsset.id}` || !photoEditPrompt.trim()}
+                  onClick={() => void editStaticPhoto(viewingAsset.id)}
+                  className="text-xs px-3 py-1.5 rounded-md bg-[#9A4A33] text-white disabled:opacity-50"
+                >
+                  {busyAction === `edit-photo-${viewingAsset.id}` ? "Editing…" : "Apply edit & re-composite"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

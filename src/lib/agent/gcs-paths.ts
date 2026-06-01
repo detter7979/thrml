@@ -73,6 +73,13 @@ function slug(value: string): string {
   return value.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase()
 }
 
+/** Unified static base photo path (pre-overlay) on main bucket. */
+export function unifiedStaticBasePath(args: UnifiedStaticPathArgs): string {
+  const ext = args.ext ?? "png"
+  const templateSegment = args.templateSlug ? `${slug(args.templateSlug)}/` : ""
+  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/${templateSegment}base_${args.variant}_${args.format}.${ext}`
+}
+
 /** Unified static output path on main bucket. */
 export function unifiedStaticPath(args: UnifiedStaticPathArgs): string {
   const ext = args.ext ?? "png"

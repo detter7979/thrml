@@ -4,6 +4,12 @@ import { useMemo } from "react"
 
 import { buildAdName } from "@/lib/agent/naming-builder"
 import { DEFAULT_HOST_HEADLINE, SPLIT_HEADER_DEFAULTS, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
+import type { VideoConfig } from "@/lib/agent/types"
+import {
+  DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
+  DEFAULT_POV_VIDEO_OVERLAY,
+  DEFAULT_RUNWAY_POV_PROMPT,
+} from "@/lib/agent/video-template-copy"
 import {
   Dialog,
   DialogContent,
@@ -22,6 +28,12 @@ export type BriefVariationRow = {
 export type SvgVariationRow = {
   variation_label: string
   headline: string
+}
+
+export type VideoCopyVariantRow = {
+  slug: string
+  copy: string
+  variant: string
 }
 
 export type StructuredBriefEditorState = {
@@ -54,6 +66,16 @@ export type StructuredBriefEditorState = {
   subhead: string
   svg_variations: SvgVariationRow[]
   reference_image_urls: string
+  is_video_brief: boolean
+  video_source: "runway" | "uploaded"
+  runway_prompt: string
+  uploaded_gcs_path: string
+  video_concept_slug: string
+  video_asset_slug: string
+  video_duration: 5 | 10
+  video_ratio: "768:1280" | "1280:768"
+  video_template_version: number
+  video_copy_variants: VideoCopyVariantRow[]
 }
 
 type CreativeBriefLike = {
@@ -74,6 +96,7 @@ type CreativeBriefLike = {
   rationale: string | null
   success_criteria: Record<string, unknown> | null
   reference_image_urls: string[] | null
+  video_config?: VideoConfig | null
 }
 
 const STATIC_FORMATS = ["1x1", "4x5", "9x16"] as const
@@ -99,10 +122,24 @@ function parseSvgVariations(raw: unknown): SvgVariationRow[] {
   })
 }
 
+function parseVideoCopyVariants(raw: VideoConfig["copyVariants"] | undefined): VideoCopyVariantRow[] {
+  if (!raw?.length) {
+    return [{ slug: "pov-idle-income", copy: DEFAULT_POV_VIDEO_OVERLAY, variant: "A" }]
+  }
+  return raw.map((row, i) => ({
+    slug: row.slug ?? `variant-${i + 1}`,
+    copy: row.copy ?? "",
+    variant: row.variant ?? (["A", "B", "C"][i] ?? "A"),
+  }))
+}
+
 export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredBriefEditorState {
   const td = brief.trigger_data ?? {}
   const sc = brief.success_criteria ?? {}
   const naming = (td.naming ?? {}) as Record<string, unknown>
+  const vc =
+    brief.video_config && typeof brief.video_config === "object" ? brief.video_config : null
+  const isVideoBrief = Boolean(vc)
   const svgTokens =
     td.svg_tokens && typeof td.svg_tokens === "object" && !Array.isArray(td.svg_tokens)
       ? (td.svg_tokens as Record<string, unknown>)
@@ -154,6 +191,16 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
     subhead: String(svgTokens.SUBHEAD ?? svgTokens.FINEPRINT ?? SPLIT_HEADER_DEFAULTS.SUBHEAD),
     svg_variations,
     reference_image_urls: (brief.reference_image_urls ?? []).join("\n"),
+    is_video_brief: isVideoBrief,
+    video_source: vc?.source ?? "runway",
+    runway_prompt: vc?.runwayPrompt?.trim() || DEFAULT_RUNWAY_POV_PROMPT,
+    uploaded_gcs_path: vc?.uploadedGcsPath ?? "",
+    video_concept_slug: vc?.conceptSlug ?? brief.campaign_short_name ?? "pov-earnings",
+    video_asset_slug: vc?.assetSlug ?? "sauna",
+    video_duration: vc?.duration === 10 ? 10 : 5,
+    video_ratio: vc?.ratio === "1280:768" ? "1280:768" : "768:1280",
+    video_template_version: vc?.templateVersion ?? DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
+    video_copy_variants: parseVideoCopyVariants(vc?.copyVariants),
   }
 }
 
@@ -193,7 +240,7 @@ export function structuredEditorToPatch(state: StructuredBriefEditorState) {
     trigger_data.static_variations = state.static_variations.slice(0, effectiveVariations)
   }
 
-  return {
+  const patch: Record<string, unknown> = {
     trigger_type: state.trigger_type,
     status: state.status,
     hypothesis: state.hypothesis || null,
@@ -218,6 +265,35 @@ export function structuredEditorToPatch(state: StructuredBriefEditorState) {
       formats: state.formats,
     },
   }
+
+  if (state.is_video_brief) {
+    patch.video_config = {
+      source: state.video_source,
+      runwayPrompt: state.video_source === "runway" ? state.runway_prompt.trim() || DEFAULT_RUNWAY_POV_PROMPT : undefined,
+      uploadedGcsPath:
+        state.video_source === "uploaded" ? state.uploaded_gcs_path.trim() || undefined : undefined,
+      conceptSlug: state.video_concept_slug.trim() || state.campaign_short_name.trim() || "pov-earnings",
+      assetSlug: state.video_asset_slug.trim() || "sauna",
+      templateVersion: state.video_template_version || DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
+      duration: state.video_duration,
+      ratio: state.video_ratio,
+      copyVariants: state.video_copy_variants.slice(0, effectiveVariations).map((row, i) => ({
+        slug: row.slug.trim() || `variant-${i + 1}`,
+        copy: row.copy.trim(),
+        variant: (row.variant.trim() || ["A", "B", "C"][i] || "A") as "A" | "B" | "C",
+        angle: state.naming_angle.trim() || undefined,
+      })),
+      naming: {
+        testId: state.naming_test_id,
+        format: state.naming_format,
+        cta: state.naming_cta,
+      },
+    } satisfies VideoConfig
+    patch.format = "9x16"
+    patch.visual_direction = null
+  }
+
+  return patch
 }
 
 type Props = {
@@ -275,6 +351,24 @@ export function BriefEditorModal({
     set("svg_variations", next)
   }
 
+  const ensureVideoCopyVariantRows = (count: number) => {
+    const labels = ["A", "B", "C"] as const
+    const defaultCopies = [
+      DEFAULT_POV_VIDEO_OVERLAY,
+      "pov: stop letting your sauna sit idle",
+      "pov: earn while you recover",
+    ]
+    const defaultSlugs = ["pov-idle-income", "pov-earn-idle", "pov-earn-recover"]
+    const next = labels.slice(0, count).map((label, i) => ({
+      slug: state.video_copy_variants[i]?.slug ?? defaultSlugs[i] ?? `pov-variant-${label.toLowerCase()}`,
+      copy: state.video_copy_variants[i]?.copy ?? defaultCopies[i] ?? DEFAULT_POV_VIDEO_OVERLAY,
+      variant: label,
+    }))
+    set("video_copy_variants", next)
+  }
+
+  const showVideoFields = isVideo ?? state.is_video_brief
+
   return (
     <Dialog
       open
@@ -288,7 +382,9 @@ export function BriefEditorModal({
           <DialogDescription>
             {isSplitHeaderSvg
               ? "Split copy SVG template — edit tagline, subhead, and per-variant headlines."
-              : "Structured fields — naming preview updates live."}
+              : showVideoFields
+                ? "Edit the Runway base-video prompt and overlay copy before generating variants."
+                : "Structured fields — naming preview updates live."}
           </DialogDescription>
         </DialogHeader>
 
@@ -351,6 +447,153 @@ export function BriefEditorModal({
                 )}
               </div>
             </>
+          ) : showVideoFields ? (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1 text-xs font-medium text-muted-foreground md:col-span-2">
+                  Hook / internal label
+                  <input
+                    value={state.hook}
+                    onChange={(e) => set("hook", e.target.value)}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-medium text-muted-foreground md:col-span-2">
+                  Hypothesis
+                  <textarea
+                    value={state.hypothesis}
+                    onChange={(e) => set("hypothesis", e.target.value)}
+                    className="min-h-16 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                  Campaign short name
+                  <input
+                    value={state.campaign_short_name}
+                    onChange={(e) => set("campaign_short_name", e.target.value)}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                  Source
+                  <select
+                    value={state.video_source}
+                    onChange={(e) => set("video_source", e.target.value as "runway" | "uploaded")}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="runway">Runway (AI base video)</option>
+                    <option value="uploaded">Uploaded MP4</option>
+                  </select>
+                </label>
+              </div>
+
+              {state.video_source === "runway" ? (
+                <label className="block space-y-1 text-xs font-medium text-muted-foreground border-t pt-3">
+                  Runway prompt (base POV video)
+                  <textarea
+                    value={state.runway_prompt}
+                    onChange={(e) => set("runway_prompt", e.target.value)}
+                    placeholder={DEFAULT_RUNWAY_POV_PROMPT}
+                    className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  />
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    Describes the motion/scene Runway generates — not the on-screen overlay text.
+                  </span>
+                </label>
+              ) : (
+                <label className="block space-y-1 text-xs font-medium text-muted-foreground border-t pt-3">
+                  Uploaded base video (GCS path)
+                  <input
+                    value={state.uploaded_gcs_path}
+                    onChange={(e) => set("uploaded_gcs_path", e.target.value)}
+                    placeholder="2026/05/hosts/pov_earnings/Video/base_sauna_v1.mp4"
+                    className="w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+                  />
+                </label>
+              )}
+
+              <div className="grid gap-3 md:grid-cols-2 border-t pt-3">
+                <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                  Concept slug
+                  <input
+                    value={state.video_concept_slug}
+                    onChange={(e) => set("video_concept_slug", e.target.value)}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                  Asset slug
+                  <input
+                    value={state.video_asset_slug}
+                    onChange={(e) => set("video_asset_slug", e.target.value)}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
+                  />
+                </label>
+                {state.video_source === "runway" ? (
+                  <>
+                    <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                      Duration
+                      <select
+                        value={state.video_duration}
+                        onChange={(e) => set("video_duration", Number(e.target.value) as 5 | 10)}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value={5}>5s</option>
+                        <option value={10}>10s</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                      Aspect ratio
+                      <select
+                        value={state.video_ratio}
+                        onChange={(e) =>
+                          set("video_ratio", e.target.value as "768:1280" | "1280:768")
+                        }
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="768:1280">9:16 vertical</option>
+                        <option value="1280:768">16:9 horizontal</option>
+                      </select>
+                    </label>
+                  </>
+                ) : null}
+              </div>
+
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Overlay copy variants</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Composited onto the base video after Runway/upload. Use line breaks for two-line overlays.
+                </p>
+                {(state.video_copy_variants.length
+                  ? state.video_copy_variants
+                  : [{ slug: "pov-idle-income", copy: DEFAULT_POV_VIDEO_OVERLAY, variant: "A" }]
+                ).map((row, i) => (
+                  <div key={`${row.variant}-${i}`} className="grid gap-2 md:grid-cols-[auto_1fr_2fr]">
+                    <span className="text-sm font-mono pt-2">{row.variant || ["A", "B", "C"][i]}</span>
+                    <input
+                      value={row.slug}
+                      onChange={(e) => {
+                        const next = [...state.video_copy_variants]
+                        next[i] = { ...row, slug: e.target.value }
+                        set("video_copy_variants", next)
+                      }}
+                      placeholder="slug"
+                      className="rounded-md border px-2 py-1.5 text-xs font-mono"
+                    />
+                    <textarea
+                      value={row.copy}
+                      onChange={(e) => {
+                        const next = [...state.video_copy_variants]
+                        next[i] = { ...row, copy: e.target.value }
+                        set("video_copy_variants", next)
+                      }}
+                      placeholder={"pov: you turned your idle sauna\ninto income"}
+                      className="min-h-16 rounded-md border px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {(
@@ -387,6 +630,7 @@ export function BriefEditorModal({
                   const next = clampVariations(Number(e.target.value))
                   set("variations", next)
                   if (isSplitHeaderSvg) ensureSvgVariationRows(next)
+                  if (showVideoFields) ensureVideoCopyVariantRows(next)
                 }}
                 className="w-full rounded-md border px-2 py-1.5 text-sm"
                 disabled={state.concept_verify}
@@ -400,11 +644,16 @@ export function BriefEditorModal({
               <input
                 type="checkbox"
                 checked={state.concept_verify}
-                onChange={(e) => set("concept_verify", e.target.checked)}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  set("concept_verify", checked)
+                  const count = checked ? 1 : state.variations
+                  if (showVideoFields) ensureVideoCopyVariantRows(count)
+                }}
               />
               Concept verify (1 preview first)
             </label>
-            {!isVideo ? (
+            {!showVideoFields ? (
               <div className="space-y-1 text-xs">
                 <span className="font-medium text-muted-foreground">Formats</span>
                 <div className="flex flex-wrap gap-3 pt-1">
@@ -489,7 +738,7 @@ export function BriefEditorModal({
           <button type="button" onClick={onCancel} className="text-sm px-3 py-1.5 border rounded hover:bg-muted">
             Cancel
           </button>
-          {!isVideo && onGeneratePreview ? (
+          {!isVideo && !showVideoFields && onGeneratePreview ? (
             <button
               type="button"
               onClick={onGeneratePreview}

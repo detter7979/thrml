@@ -5,6 +5,7 @@ import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/g
 import { isRunwayConfigured } from "@/lib/agent/runway"
 import { processStaticBrief } from "@/lib/agent/static-generator"
 import { editStaticPhotoAsset } from "@/lib/agent/static-photo-recomposite"
+import { editRunwayVideoFromAsset } from "@/lib/agent/video-runway-edit"
 import {
   generateFromSvgTemplate,
   loadSvgTemplateRegistry,
@@ -29,6 +30,7 @@ const PIPELINE_ACTIONS = new Set([
   "generate_svg_static",
   "acknowledge_claim_warning",
   "edit_static_photo",
+  "edit_runway_video",
   "purge_creative_pipeline",
 ])
 
@@ -696,6 +698,23 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true, result })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Photo edit failed"
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+  }
+
+  if (body.action === "edit_runway_video") {
+    if (!body.asset_id) return NextResponse.json({ error: "asset_id is required" }, { status: 400 })
+    const editPrompt = typeof body.edit_prompt === "string" ? body.edit_prompt.trim() : ""
+    if (!editPrompt) return NextResponse.json({ error: "edit_prompt is required" }, { status: 400 })
+
+    try {
+      const result = await editRunwayVideoFromAsset({
+        assetId: body.asset_id,
+        editPrompt,
+      })
+      return NextResponse.json({ ok: true, result })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Video edit failed"
       return NextResponse.json({ error: message }, { status: 500 })
     }
   }

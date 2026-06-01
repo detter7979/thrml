@@ -7,6 +7,10 @@ export const DEFAULT_POV_VIDEO_OVERLAY = "pov: you turned your idle sauna\ninto 
 /** Compositing template for POV sauna b-roll briefs (T2/T4). */
 export const DEFAULT_POV_SAUNA_TEMPLATE_VERSION = 2
 
+/** Default Runway image-to-video prompt for T2 POV sauna briefs. */
+export const DEFAULT_RUNWAY_POV_PROMPT =
+  "First-person POV walking toward a private cedar barrel sauna in a Pacific Northwest backyard at golden hour, slow cinematic motion, no people, no text"
+
 export function formatPovVideoOverlay(copy: string): string {
   const trimmed = copy.trim()
   if (!trimmed) return DEFAULT_POV_VIDEO_OVERLAY

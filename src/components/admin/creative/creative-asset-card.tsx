@@ -27,13 +27,6 @@ type CreativeAssetCardProps = {
   editBusy: boolean
 }
 
-export function assetPreviewAspectClass(format?: string | null, isVideo = false) {
-  if (isVideo || format === "9x16") return "aspect-[9/16]"
-  if (format === "4x5") return "aspect-[4/5]"
-  if (format === "1x1") return "aspect-square"
-  return "aspect-[4/5]"
-}
-
 export function canEditPhotoAsset(asset: {
   asset_type?: string | null
   generation_tool?: string | null

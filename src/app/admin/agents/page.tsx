@@ -11,7 +11,6 @@ import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
 import { CreativePipelinePurgePanel } from "@/components/admin/creative/creative-pipeline-purge-panel"
 import {
-  assetPreviewAspectClass,
   canEditPhotoAsset,
   CreativeAssetCard,
 } from "@/components/admin/creative/creative-asset-card"
@@ -1072,10 +1071,10 @@ export default function AgentsDashboard() {
                           ) : null}
                           {baseAsset && assetUrl(baseAsset) ? (
                             <div className="flex items-start gap-3">
-                              <div className="aspect-[9/16] w-[90px] shrink-0 overflow-hidden rounded border bg-muted">
+                              <div className="aspect-square w-[90px] shrink-0 overflow-hidden rounded border bg-muted">
                                 <video
                                   src={assetUrl(baseAsset)}
-                                  className="h-full w-full object-cover"
+                                  className="h-full w-full object-contain"
                                   preload="metadata"
                                   muted
                                   playsInline
@@ -1133,7 +1132,7 @@ export default function AgentsDashboard() {
                         <div className="grid gap-3 md:grid-cols-3">
                           {[0, 1, 2].map((index) => (
                             <div key={index} className="rounded-md border bg-background p-2 space-y-2 animate-pulse">
-                              <div className="aspect-video rounded bg-muted" />
+                              <div className="aspect-square rounded bg-muted" />
                               <div className="h-3 w-3/4 rounded bg-muted" />
                               <div className="h-7 rounded bg-muted" />
                             </div>
@@ -1193,9 +1192,7 @@ export default function AgentsDashboard() {
                             }
                             editBusy={busyAction === `edit-photo-${asset.id}`}
                             preview={
-                              <div
-                                className={`w-full ${assetPreviewAspectClass(asset.format, isVideoAsset(asset))}`}
-                              >
+                              <div className={`aspect-square w-full`}>
                                 {isVideoAsset(asset) ? (
                                   <CreativeVideoPreview
                                     asset={asset}
@@ -1273,12 +1270,12 @@ export default function AgentsDashboard() {
                         <div className="size-14 overflow-hidden rounded bg-muted border">
                         {assetUrl(asset) ? (
                           isVideoAsset(asset) ? (
-                            <video src={assetUrl(asset)} className="h-full w-full object-cover" muted />
+                            <video src={assetUrl(asset)} className="h-full w-full object-contain" muted />
                           ) : (
                             <img
                               src={assetUrl(asset)}
                               alt="Launched creative"
-                              className="h-full w-full object-cover"
+                              className="h-full w-full object-contain"
                               onError={(event) => {
                                 void refreshAssetUrl(asset, event.currentTarget)
                               }}
@@ -1417,7 +1414,7 @@ export default function AgentsDashboard() {
                 {isLaunchableVideo(activeLaunchAssets[0]) ? (
                   <video
                     src={assetUrl(activeLaunchAssets[0])}
-                    className="w-[90px] aspect-[9/16] rounded object-cover bg-muted shrink-0"
+                    className="w-[90px] aspect-square rounded object-contain bg-muted shrink-0"
                     muted
                     playsInline
                     controls
@@ -1427,7 +1424,7 @@ export default function AgentsDashboard() {
                   <img
                     src={assetUrl(activeLaunchAssets[0])}
                     alt="Launch preview"
-                    className="w-24 h-24 rounded object-cover bg-muted shrink-0"
+                    className="w-[90px] aspect-square rounded object-contain bg-muted shrink-0"
                   />
                 )}
                 <div className="space-y-1 text-xs flex-1 min-w-0">

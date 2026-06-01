@@ -10,6 +10,10 @@ import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-stati
 import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
 import {
+  canEditPhotoAsset,
+  CreativeAssetCard,
+} from "@/components/admin/creative/creative-asset-card"
+import {
   BriefEditorModal,
   structuredEditorFromBrief,
   structuredEditorToPatch,
@@ -260,6 +264,7 @@ export default function AgentsDashboard() {
   const [selectedAssetIds, setSelectedAssetIds] = useState<Record<string, boolean>>({})
   const [viewingAsset, setViewingAsset] = useState<CreativeAsset | null>(null)
   const [photoEditPrompt, setPhotoEditPrompt] = useState("")
+  const [assetEditPrompts, setAssetEditPrompts] = useState<Record<string, string>>({})
   const [launchProgress, setLaunchProgress] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -558,7 +563,7 @@ export default function AgentsDashboard() {
   }, [])
 
   const openAssetPreview = useCallback(async (asset: CreativeAsset) => {
-    setPhotoEditPrompt("")
+    setPhotoEditPrompt(assetEditPrompts[asset.id] ?? "")
     setViewingAsset(asset)
     const gcsUrl = await refreshAssetUrl(asset)
     if (gcsUrl) {
@@ -566,10 +571,15 @@ export default function AgentsDashboard() {
         prev?.id === asset.id ? { ...prev, signed_url: gcsUrl, gcs_url: gcsUrl } : prev
       )
     }
-  }, [refreshAssetUrl])
+  }, [refreshAssetUrl, assetEditPrompts])
 
-  const editStaticPhoto = async (assetId: string) => {
-    if (!photoEditPrompt.trim()) {
+  const editStaticPhoto = async (
+    assetId: string,
+    prompt?: string,
+    opts?: { closeModal?: boolean; replaceInPlace?: boolean },
+  ) => {
+    const editPrompt = (prompt ?? photoEditPrompt).trim()
+    if (!editPrompt) {
       setPipelineMessage("Add edit instructions first (e.g. flip 180, remove blurred dumbbells).")
       return
     }
@@ -579,12 +589,13 @@ export default function AgentsDashboard() {
       await patchPipeline({
         action: "edit_static_photo",
         asset_id: assetId,
-        edit_prompt: photoEditPrompt.trim(),
-        save_as_new_variant: true,
+        edit_prompt: editPrompt,
+        replace_in_place: opts?.replaceInPlace ?? true,
+        save_as_new_variant: false,
       })
       await mutatePipeline()
-      setPipelineMessage("Photo edited and re-composited. A new variation was added.")
-      setViewingAsset(null)
+      setPipelineMessage("Photo edited and re-composited.")
+      if (opts?.closeModal) setViewingAsset(null)
     } catch (err) {
       setPipelineMessage(err instanceof Error ? err.message : "Photo edit failed.")
     } finally {
@@ -1132,65 +1143,59 @@ export default function AgentsDashboard() {
                       </div>
                       <div className="grid gap-3 md:grid-cols-3">
                         {group.assets.map((asset) => (
-                          <div key={asset.id} className="rounded-md border bg-background p-2 space-y-2">
-                            <div className={`rounded bg-muted overflow-hidden border ${isVideoAsset(asset) ? "aspect-[9/16] max-w-[180px]" : "aspect-video"}`}>
-                              {isVideoAsset(asset) ? (
-                                <CreativeVideoPreview
-                                  asset={asset}
-                                  resolveUrl={refreshAssetUrl}
-                                  className="h-full w-full object-cover rounded-lg"
-                                  style={{ width: 180, aspectRatio: "9/16" }}
-                                  interactive
-                                />
-                              ) : assetUrl(asset) ? (
-                                <img
-                                  src={assetUrl(asset)}
-                                  alt="Creative asset"
-                                  className="h-full w-full object-cover"
-                                  onError={(event) => {
-                                    void refreshAssetUrl(asset, event.currentTarget)
-                                  }}
-                                />
-                              ) : (
-                                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                                  No preview
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[11px] text-muted-foreground">
-                                {sourceLabel(asset.generation_tool)} · {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`} · {asset.status}
-                              </span>
-                              <input
-                                type="checkbox"
-                                checked={selectedAssetIds[asset.id] ?? false}
-                                onChange={(event) => setSelectedAssetIds((prev) => ({ ...prev, [asset.id]: event.target.checked }))}
-                                aria-label="Select asset"
-                              />
-                            </div>
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => reviewAsset(asset.id, "approve_asset")}
-                                disabled={busyAction === `approve_asset-${asset.id}`}
-                                className="flex-1 text-[11px] px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                          <CreativeAssetCard
+                            key={asset.id}
+                            asset={asset}
+                            sourceLabel={sourceLabel(asset.generation_tool)}
+                            selected={selectedAssetIds[asset.id] ?? false}
+                            onSelectedChange={(checked) =>
+                              setSelectedAssetIds((prev) => ({ ...prev, [asset.id]: checked }))
+                            }
+                            onApprove={() => reviewAsset(asset.id, "approve_asset")}
+                            onReject={() => reviewAsset(asset.id, "reject_asset")}
+                            onView={() => void openAssetPreview(asset)}
+                            approveBusy={busyAction === `approve_asset-${asset.id}`}
+                            rejectBusy={busyAction === `reject_asset-${asset.id}`}
+                            canEditPhoto={canEditPhotoAsset(asset) && !isVideoAsset(asset)}
+                            editPrompt={assetEditPrompts[asset.id] ?? ""}
+                            onEditPromptChange={(value) =>
+                              setAssetEditPrompts((prev) => ({ ...prev, [asset.id]: value }))
+                            }
+                            onApplyEdit={() =>
+                              void editStaticPhoto(asset.id, assetEditPrompts[asset.id], {
+                                replaceInPlace: true,
+                              })
+                            }
+                            editBusy={busyAction === `edit-photo-${asset.id}`}
+                            preview={
+                              <div
+                                className={`rounded bg-muted overflow-hidden border ${isVideoAsset(asset) ? "aspect-[9/16] max-w-[180px]" : "aspect-video"}`}
                               >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => reviewAsset(asset.id, "reject_asset")}
-                                disabled={busyAction === `reject_asset-${asset.id}`}
-                                className="flex-1 text-[11px] px-2 py-1 border rounded hover:bg-muted disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                              <button
-                                onClick={() => void openAssetPreview(asset)}
-                                className="flex-1 text-[11px] px-2 py-1 border rounded hover:bg-muted"
-                              >
-                                View full
-                              </button>
-                            </div>
-                          </div>
+                                {isVideoAsset(asset) ? (
+                                  <CreativeVideoPreview
+                                    asset={asset}
+                                    resolveUrl={refreshAssetUrl}
+                                    className="h-full w-full object-cover rounded-lg"
+                                    style={{ width: 180, aspectRatio: "9/16" }}
+                                    interactive
+                                  />
+                                ) : assetUrl(asset) ? (
+                                  <img
+                                    src={assetUrl(asset)}
+                                    alt="Creative asset"
+                                    className="h-full w-full object-cover"
+                                    onError={(event) => {
+                                      void refreshAssetUrl(asset, event.currentTarget)
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                                    No preview
+                                  </div>
+                                )}
+                              </div>
+                            }
+                          />
                         ))}
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1325,7 +1330,7 @@ export default function AgentsDashboard() {
                 </div>
               )}
             </div>
-            {!isVideoAsset(viewingAsset) ? (
+            {!isVideoAsset(viewingAsset) && canEditPhotoAsset(viewingAsset) ? (
               <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
                 <p className="text-xs font-medium text-foreground">Edit base photo &amp; re-composite</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
@@ -1335,19 +1340,32 @@ export default function AgentsDashboard() {
                 </p>
                 <textarea
                   value={photoEditPrompt}
-                  onChange={(e) => setPhotoEditPrompt(e.target.value)}
+                  onChange={(e) => {
+                    setPhotoEditPrompt(e.target.value)
+                    setAssetEditPrompts((prev) => ({ ...prev, [viewingAsset.id]: e.target.value }))
+                  }}
                   placeholder="flip horizontal, remove blurred deck railing in foreground"
                   className="min-h-16 w-full rounded-md border bg-background px-3 py-2 text-sm"
                 />
                 <button
                   type="button"
                   disabled={busyAction === `edit-photo-${viewingAsset.id}` || !photoEditPrompt.trim()}
-                  onClick={() => void editStaticPhoto(viewingAsset.id)}
+                  onClick={() =>
+                    void editStaticPhoto(viewingAsset.id, photoEditPrompt, {
+                      closeModal: false,
+                      replaceInPlace: true,
+                    })
+                  }
                   className="text-xs px-3 py-1.5 rounded-md bg-[#9A4A33] text-white disabled:opacity-50"
                 >
                   {busyAction === `edit-photo-${viewingAsset.id}` ? "Editing…" : "Apply edit & re-composite"}
                 </button>
               </div>
+            ) : !isVideoAsset(viewingAsset) ? (
+              <p className="text-xs text-muted-foreground rounded-lg border bg-muted/20 px-3 py-2">
+                Photo prompt edits are available on AI-generated statics (Replicate/Imagen) that have a saved base photo.
+                SVG template assets use the brief editor instead.
+              </p>
             ) : null}
           </div>
         </div>

@@ -14,6 +14,9 @@
  *
  *   # Existing pipeline asset (uses base_gcs_path or source_image_url):
  *   npx tsx scripts/edit-static-photo.ts --asset-id <uuid> --edit "flip horizontal, remove blurred deck railing"
+ *
+ *   # By GCS path (updates asset in place):
+ *   npx tsx scripts/edit-static-photo.ts --gcs-path gs://thrml/2026/05/hosts/pov_earnings/Static/A_9x16.png --edit "flip horizontal"
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -25,6 +28,7 @@ import { HOST_PROOF_SUBTEXT } from "@/lib/agent/host-monetization-static"
 import {
   editLocalBaseAndComposite,
   editStaticPhotoAsset,
+  editStaticPhotoByGcsPath,
 } from "@/lib/agent/static-photo-recomposite"
 import type { MasterAdTemplateFormat } from "@/lib/agent/static-layouts/master-ad-template"
 
@@ -38,6 +42,7 @@ function arg(name: string) {
 
 async function main() {
   const assetId = arg("--asset-id")
+  const gcsPath = arg("--gcs-path")
   const basePath = arg("--base")
   const format = (arg("--format") ?? "1x1") as MasterAdTemplateFormat
   const headline = arg("--headline") ?? "Turn your idle sauna into income."
@@ -61,8 +66,15 @@ async function main() {
     return
   }
 
+  if (gcsPath) {
+    const result = await editStaticPhotoByGcsPath(gcsPath, editPrompt, { replaceInPlace: true })
+    console.log("[edit-static-photo] GCS asset edited in place")
+    console.log(JSON.stringify(result, null, 2))
+    return
+  }
+
   if (!basePath || !fs.existsSync(basePath)) {
-    throw new Error("Pass --base <photo.png> or --asset-id <uuid>")
+    throw new Error("Pass --base <photo.png>, --gcs-path, or --asset-id <uuid>")
   }
 
   const baseImage = await readFile(basePath)

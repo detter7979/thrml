@@ -116,6 +116,8 @@ export type EditStaticPhotoOptions = {
   semanticPrompt?: string
   /** When true, inserts a new creative_assets row instead of replacing the composite path. */
   saveAsNewVariant?: boolean
+  /** When true, overwrites the existing composite GCS object (same path). */
+  replaceInPlace?: boolean
 }
 
 export type EditStaticPhotoResult = {
@@ -124,6 +126,33 @@ export type EditStaticPhotoResult = {
   compositeGcsPath: string
   compositeGcsUrl: string
   editSummary: string
+}
+
+function normalizeGcsObjectPath(value: string) {
+  return value.trim().replace(/^gs:\/\/[^/]+\//, "")
+}
+
+export async function findLatestAssetByGcsPath(gcsPath: string) {
+  const admin = createAdminClient()
+  const objectPath = normalizeGcsObjectPath(gcsPath)
+  const withPrefix = gcsPath.trim().startsWith("gs://") ? gcsPath.trim() : null
+
+  const queries = [objectPath]
+  if (withPrefix) queries.push(withPrefix)
+
+  for (const path of queries) {
+    const { data, error } = await admin
+      .from("creative_assets")
+      .select("id, brief_id, format, variation_label, variation_index, gcs_path, performance_data, convention_name, created_at")
+      .eq("gcs_path", path)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    if (data) return data as AssetRow & { created_at?: string }
+  }
+
+  return null
 }
 
 export async function editStaticPhotoAsset(opts: EditStaticPhotoOptions): Promise<EditStaticPhotoResult> {
@@ -212,14 +241,18 @@ export async function editStaticPhotoAsset(opts: EditStaticPhotoOptions): Promis
     copyTaglineEyebrow: taglineEyebrowFromBrief(brief.trigger_data),
   })
 
-  const compositePath = unifiedStaticPath({
-    date: new Date(),
-    category,
-    angleSlug,
-    variant: variationLabel,
-    format,
-    templateSlug,
-  })
+  const existingObjectPath = asset.gcs_path ? normalizeGcsObjectPath(asset.gcs_path) : null
+  const compositeObjectPath =
+    opts.replaceInPlace && existingObjectPath
+      ? existingObjectPath
+      : unifiedStaticPath({
+          date: new Date(),
+          category,
+          angleSlug,
+          variant: variationLabel,
+          format,
+          templateSlug,
+        })
 
   const { gcsPath: compositeGcsPath, gcsUrl: compositeGcsUrl } = await uploadGcsCreativeAsset(composite, {
     campaignShortName: brief.campaign_short_name ?? brief.id,
@@ -227,7 +260,7 @@ export async function editStaticPhotoAsset(opts: EditStaticPhotoOptions): Promis
     kind: "static",
     filename: `static_${format}_${variationLabel}_edited.png`,
     contentType: "image/png",
-    unifiedObjectPath: compositePath,
+    unifiedObjectPath: compositeObjectPath,
   })
 
   const naming = resolveNamingFromBrief(brief as BriefRow)
@@ -255,7 +288,7 @@ export async function editStaticPhotoAsset(opts: EditStaticPhotoOptions): Promis
       .insert({
         brief_id: brief.id,
         asset_type: "image",
-        generation_tool: "photo_edit",
+        generation_tool: "replicate_mj",
         variation_index: (asset.variation_index ?? 1) + 100,
         variation_label: `${variationLabel}e`,
         format,
@@ -285,7 +318,6 @@ export async function editStaticPhotoAsset(opts: EditStaticPhotoOptions): Promis
     .update({
       gcs_path: compositeGcsPath,
       gcs_url: compositeGcsUrl,
-      generation_tool: "photo_edit",
       performance_data: nextPerformance,
     })
     .eq("id", asset.id)
@@ -299,6 +331,23 @@ export async function editStaticPhotoAsset(opts: EditStaticPhotoOptions): Promis
     compositeGcsUrl,
     editSummary,
   }
+}
+
+export async function editStaticPhotoByGcsPath(
+  gcsPath: string,
+  editPrompt: string,
+  opts?: { replaceInPlace?: boolean; saveAsNewVariant?: boolean },
+) {
+  const asset = await findLatestAssetByGcsPath(gcsPath)
+  if (!asset) {
+    throw new Error(`No creative_assets row found for ${gcsPath}`)
+  }
+  return editStaticPhotoAsset({
+    assetId: asset.id,
+    editPrompt,
+    replaceInPlace: opts?.replaceInPlace ?? true,
+    saveAsNewVariant: opts?.saveAsNewVariant ?? false,
+  })
 }
 
 /** Edit a local base photo and render a Master Ad composite (no DB). */

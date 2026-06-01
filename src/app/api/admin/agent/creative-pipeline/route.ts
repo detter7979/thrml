@@ -683,6 +683,7 @@ export async function PATCH(req: NextRequest) {
         assetId: body.asset_id,
         editPrompt,
         saveAsNewVariant: Boolean(body.save_as_new_variant),
+        replaceInPlace: body.replace_in_place !== false && !body.save_as_new_variant,
       })
       return NextResponse.json({ ok: true, result })
     } catch (err) {

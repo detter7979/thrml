@@ -3,6 +3,14 @@
 import { useRef, useState } from "react"
 import useSWR from "swr"
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { AssetLibraryPanel, type AssetLibraryEntry } from "./asset-library-panel"
 import type { VideoConfig, VideoCopyVariant } from "@/lib/agent/types"
 import {
@@ -409,10 +417,10 @@ export function BriefIntakePanel({
         </div>
         <button
           type="button"
-          onClick={() => setShowManual((v) => !v)}
+          onClick={() => setShowManual(true)}
           className="text-xs px-3 py-1.5 border rounded hover:bg-muted"
         >
-          {showManual ? "Hide manual" : "Manual form"}
+          Manual form
         </button>
       </div>
 
@@ -582,8 +590,17 @@ export function BriefIntakePanel({
         </button>
       </div>
 
-      {showManual ? (
-        <div className="border-t pt-4 space-y-4">
+      <Dialog open={showManual} onOpenChange={setShowManual}>
+        <DialogContent className="flex max-h-[min(90vh,920px)] w-full max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+          <DialogHeader className="shrink-0 border-b px-5 py-4 text-left">
+            <DialogTitle>Manual brief</DialogTitle>
+            <DialogDescription>
+              Create a static or video brief without a template. Scroll to see all fields — press Escape or click
+              outside to close.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4">
           <div className="flex gap-4 text-sm">
             <span className="font-medium text-muted-foreground">Manual type:</span>
             <label className="flex items-center gap-2">
@@ -905,8 +922,22 @@ export function BriefIntakePanel({
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+          </div>
+
+          <DialogFooter className="shrink-0 border-t px-5 py-3 sm:justify-between">
+            <p className="text-xs text-muted-foreground hidden sm:block">
+              Changes are saved only when you click a save button above.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowManual(false)}
+              className="text-xs border rounded px-3 py-1.5 hover:bg-muted"
+            >
+              Close
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

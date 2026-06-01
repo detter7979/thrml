@@ -69,10 +69,10 @@ export function parsePhotoEditInstructions(prompt: string): {
   let semantic = raw
     .replace(/\b(flip|rotate|mirror)\s*(180|90|270|horizontal|vertical|degrees?)?\b/gi, " ")
     .replace(/\b(and then|then)\b/gi, " ")
+    .replace(/\s*,\s*/g, ", ")
+    .replace(/^[\s,]+|[\s,]+$/g, "")
     .replace(/\s{2,}/g, " ")
     .trim()
-
-  if (semantic.endsWith(",")) semantic = semantic.slice(0, -1).trim()
 
   return {
     geometric,

@@ -11,6 +11,7 @@ import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
 import { CreativePipelinePurgePanel } from "@/components/admin/creative/creative-pipeline-purge-panel"
 import {
+  assetPreviewAspectClass,
   canEditPhotoAsset,
   CreativeAssetCard,
 } from "@/components/admin/creative/creative-asset-card"
@@ -1193,27 +1194,26 @@ export default function AgentsDashboard() {
                             editBusy={busyAction === `edit-photo-${asset.id}`}
                             preview={
                               <div
-                                className={`rounded bg-muted overflow-hidden border ${isVideoAsset(asset) ? "aspect-[9/16] max-w-[180px]" : "aspect-video"}`}
+                                className={`w-full ${assetPreviewAspectClass(asset.format, isVideoAsset(asset))}`}
                               >
                                 {isVideoAsset(asset) ? (
                                   <CreativeVideoPreview
                                     asset={asset}
                                     resolveUrl={refreshAssetUrl}
-                                    className="h-full w-full object-cover rounded-lg"
-                                    style={{ width: 180, aspectRatio: "9/16" }}
+                                    className="h-full w-full object-contain"
                                     interactive
                                   />
                                 ) : assetUrl(asset) ? (
                                   <img
                                     src={assetUrl(asset)}
                                     alt="Creative asset"
-                                    className="h-full w-full object-cover"
+                                    className="h-full w-full object-contain"
                                     onError={(event) => {
                                       void refreshAssetUrl(asset, event.currentTarget)
                                     }}
                                   />
                                 ) : (
-                                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                                  <div className="flex h-full min-h-[120px] items-center justify-center text-xs text-muted-foreground">
                                     No preview
                                   </div>
                                 )}

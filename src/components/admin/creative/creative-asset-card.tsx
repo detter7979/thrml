@@ -27,6 +27,13 @@ type CreativeAssetCardProps = {
   editBusy: boolean
 }
 
+export function assetPreviewAspectClass(format?: string | null, isVideo = false) {
+  if (isVideo || format === "9x16") return "aspect-[9/16]"
+  if (format === "4x5") return "aspect-[4/5]"
+  if (format === "1x1") return "aspect-square"
+  return "aspect-[4/5]"
+}
+
 export function canEditPhotoAsset(asset: {
   asset_type?: string | null
   generation_tool?: string | null
@@ -49,23 +56,16 @@ function IconAction({
   onClick,
   disabled,
   busy,
-  tone = "neutral",
+  active,
   children,
 }: {
   label: string
   onClick: () => void
   disabled?: boolean
   busy?: boolean
-  tone?: "approve" | "reject" | "neutral"
+  active?: boolean
   children: React.ReactNode
 }) {
-  const toneClass =
-    tone === "approve"
-      ? "bg-green-600 text-white hover:bg-green-700 border-green-600"
-      : tone === "reject"
-        ? "bg-white/95 text-foreground hover:bg-white border-white/80"
-        : "bg-white/95 text-foreground hover:bg-white border-white/80"
-
   return (
     <button
       type="button"
@@ -73,9 +73,13 @@ function IconAction({
       disabled={disabled || busy}
       aria-label={label}
       title={label}
-      className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition-colors disabled:opacity-40 ${toneClass}`}
+      className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md border transition-colors disabled:opacity-40 ${
+        active
+          ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+          : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
+      }`}
     >
-      {busy ? <Loader2 className="size-4 animate-spin" /> : children}
+      {busy ? <Loader2 className="size-3.5 animate-spin" /> : children}
     </button>
   )
 }
@@ -102,43 +106,41 @@ export function CreativeAssetCard({
 
   return (
     <div className="rounded-md border bg-background p-2 space-y-2">
-      <div className="relative overflow-hidden rounded-md">
+      <div className="relative overflow-hidden rounded-md border bg-muted">
         {preview}
 
-        <label className="absolute right-2 top-2 flex size-7 cursor-pointer items-center justify-center rounded-md bg-black/45 backdrop-blur-sm">
+        <label className="absolute right-1.5 top-1.5 flex size-6 cursor-pointer items-center justify-center rounded border border-white/20 bg-black/50 backdrop-blur-sm">
           <input
             type="checkbox"
             checked={selected}
             onChange={(event) => onSelectedChange(event.target.checked)}
             aria-label="Select asset"
-            className="size-3.5 accent-[#9A4A33]"
+            className="size-3 accent-[#9A4A33]"
           />
         </label>
-
-        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-end gap-1.5">
-          <IconAction
-            label={isApproved ? "Approved" : "Approve"}
-            onClick={onApprove}
-            disabled={isApproved}
-            busy={approveBusy}
-            tone="approve"
-          >
-            <Check className="size-4" strokeWidth={2.75} />
-          </IconAction>
-          <IconAction label="Reject" onClick={onReject} busy={rejectBusy} tone="reject">
-            <X className="size-4" strokeWidth={2.75} />
-          </IconAction>
-          <IconAction label="View full" onClick={onView} tone="neutral">
-            <Eye className="size-4" strokeWidth={2.75} />
-          </IconAction>
-        </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 px-0.5">
-        <span className="text-[11px] text-muted-foreground">
-          {sourceLabel} · {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`} · {status}
-        </span>
+      <div className="flex items-center gap-1">
+        <IconAction
+          label={isApproved ? "Approved" : "Approve"}
+          onClick={onApprove}
+          disabled={isApproved}
+          busy={approveBusy}
+          active={!isApproved}
+        >
+          <Check className="size-3.5" strokeWidth={2.5} />
+        </IconAction>
+        <IconAction label="Reject" onClick={onReject} busy={rejectBusy}>
+          <X className="size-3.5" strokeWidth={2.5} />
+        </IconAction>
+        <IconAction label="View full" onClick={onView}>
+          <Eye className="size-3.5" strokeWidth={2.5} />
+        </IconAction>
       </div>
+
+      <p className="text-[11px] leading-snug text-muted-foreground">
+        {sourceLabel} · {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`} · {status}
+      </p>
 
       {canEditPhoto ? (
         <div className="space-y-1.5 rounded-md border border-dashed border-[#9A4A33]/30 bg-[#9A4A33]/5 p-2">

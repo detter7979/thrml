@@ -20,7 +20,7 @@ export interface VideoConfig {
   conceptSlug: string // e.g. "sauna-pov-earnings"
   assetSlug: string // e.g. "sauna"
   duration?: 5 | 10 // Runway only
-  ratio?: "768:1280" | "1280:768" // Runway only, default vertical
+  ratio?: "720:1280" | "1280:720" | "768:1280" | "1280:768" // legacy values normalized at Runway call
   naming?: NamingDefaults
 }
 

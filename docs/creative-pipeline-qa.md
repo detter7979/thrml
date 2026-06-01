@@ -58,7 +58,7 @@ Last verified against codebase: 2026-05-28
 2. Approve one rec → `/admin/agents?tab=creative` — confirm brief appears.
 3. Select template T1 → edit copy → concept verify → approve → preview 1 static.
 4. Generate full batch (3) → approve assets → launch PAUSED to test ad set.
-5. Template T4 → pick uploaded base from asset library → generate 2 copy variants → launch.
+5. Template T2 → pick uploaded base from asset library → generate 2 copy variants → launch.
 
 ## Success criteria (initiative complete)
 

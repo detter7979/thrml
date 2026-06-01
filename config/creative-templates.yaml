@@ -1,4 +1,4 @@
-# thrml creative concept presets (T1, T2, T4, T5, T7)
+# thrml creative concept presets (T1–T4)
 # Used by admin Creative Pipeline "New from template" intake.
 
 version: 1
@@ -45,47 +45,9 @@ templates:
         background_image_prompt: "Indoor infrared sauna with matte black glass frame in a modern home gym, one folded towel on the bench, even natural window light, authentic lived-in gym not a showroom"
 
   - id: T2
-    label: "POV Sauna — Runway AI"
-    short_label: "POV Sauna (Runway)"
-    description: "Runway generates POV sauna video; worker composites centered overlay copy."
-    group: video_pov
-    type: video
-    category: Hosts
-    angle: pov_earnings
-    formats: ["9x16"]
-    default_variations: 2
-    concept_verify_default: true
-    full_batch_variations: 3
-    naming:
-      test_id: T05
-      format: Video_15s
-      cta: list_now
-      template_slug: pov_sauna_runway
-    defaults:
-      trigger_type: manual
-      hypothesis: "POV earnings video with overlay copy tests hook strength."
-      hook: "pov: you turned your idle sauna into income"
-      campaign_short_name: pov-earnings
-    video:
-      source: runway
-      concept_slug: pov-earnings
-      asset_slug: sauna
-      template_version: 2
-      duration: 5
-      ratio: "768:1280"
-      runway_prompt: "First-person POV walking toward a private cedar barrel sauna in a Pacific Northwest backyard at golden hour, slow cinematic motion, no people, no text"
-      copy_variants:
-        - slug: pov-idle-income
-          copy: "pov: you turned your idle sauna\ninto income"
-          variant: A
-        - slug: pov-earn-idle
-          copy: "pov: stop letting your sauna sit idle"
-          variant: B
-
-  - id: T4
     label: "POV Sauna — Upload MP4"
     short_label: "POV Sauna (Upload)"
-    description: "Your POV sauna MP4 + same overlay as T2. No Runway spend."
+    description: "Your POV sauna MP4 from Runway (or any source) + centered overlay copy composited by the worker."
     group: video_pov
     recommended: true
     type: video
@@ -102,7 +64,7 @@ templates:
       template_slug: pov_sauna_upload
     defaults:
       trigger_type: manual
-      hypothesis: "Pre-uploaded POV b-roll with copy overlay — no Runway spend."
+      hypothesis: "Pre-uploaded POV b-roll with copy overlay — create base video in Runway, upload MP4, then generate variants here."
       hook: "pov: you turned your idle sauna into income"
       campaign_short_name: pov-earnings
     video:
@@ -118,7 +80,7 @@ templates:
           copy: "pov: stop letting your sauna sit idle"
           variant: B
 
-  - id: T5
+  - id: T3
     label: "Split Header — Photo + Text"
     short_label: "Split Header"
     description: "Full-bleed photo with top scrim, logo, eyebrow, headline, and subhead."
@@ -156,7 +118,7 @@ templates:
         tokens:
           HEADLINE: "Earn while you recover."
 
-  - id: T7
+  - id: T4
     label: "Block Split — Orange + Photo"
     short_label: "Block Split"
     description: "Vrbo-style orange top block with copy; photo fills the bottom half."

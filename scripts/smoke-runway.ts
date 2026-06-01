@@ -13,7 +13,7 @@ async function main() {
   const prompt = process.argv[2] ?? "A wooden sauna in Pacific Northwest forest, warm light, cinematic"
   console.log("Starting Runway generation:", prompt)
 
-  const { taskId } = await generateVideo({ prompt, duration: 5, ratio: "768:1280" })
+  const { taskId } = await generateVideo({ prompt, duration: 5, ratio: "720:1280" })
   console.log("Task ID:", taskId)
 
   const task = await pollTask(taskId, { intervalMs: 5_000 })

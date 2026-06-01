@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { appendApprovedCreativeToNamer } from "@/lib/agent/namer-creative-append"
 import { purgeCreativePipeline } from "@/lib/agent/creative-pipeline-purge"
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
 import { isRunwayConfigured } from "@/lib/agent/runway"
@@ -362,8 +363,14 @@ export async function PATCH(req: NextRequest) {
     if (!videoConfig.copyVariants.length) {
       return NextResponse.json({ error: "At least one copy variant is required" }, { status: 400 })
     }
-    if (videoConfig.source === "runway" && !videoConfig.runwayPrompt?.trim()) {
-      return NextResponse.json({ error: "runwayPrompt is required for Runway source" }, { status: 400 })
+    if (videoConfig.source === "runway") {
+      return NextResponse.json(
+        {
+          error:
+            "Runway-sourced briefs are no longer supported. Create video in Runway, upload MP4, and use template T2.",
+        },
+        { status: 400 },
+      )
     }
     if (videoConfig.source === "uploaded" && !videoConfig.uploadedGcsPath?.trim()) {
       return NextResponse.json({ error: "uploadedGcsPath is required for uploaded source" }, { status: 400 })
@@ -783,5 +790,22 @@ export async function PATCH(req: NextRequest) {
     .maybeSingle()
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
-  return NextResponse.json({ asset: data })
+
+  let namer_sync: Awaited<ReturnType<typeof appendApprovedCreativeToNamer>> | undefined
+  if (body.action === "approve_asset" && data) {
+    try {
+      namer_sync = await appendApprovedCreativeToNamer(admin!, data.id)
+      if (!namer_sync.ok) {
+        console.error("[creative-pipeline] namer append failed:", namer_sync.reason)
+      }
+    } catch (err) {
+      console.error("[creative-pipeline] namer append error:", err)
+      namer_sync = {
+        ok: false,
+        reason: err instanceof Error ? err.message : "Unknown namer sync error",
+      }
+    }
+  }
+
+  return NextResponse.json({ asset: data, ...(namer_sync ? { namer_sync } : {}) })
 }

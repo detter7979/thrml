@@ -12,11 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { AssetLibraryPanel, type AssetLibraryEntry } from "./asset-library-panel"
-import type { VideoConfig, VideoCopyVariant } from "@/lib/agent/types"
-import {
-  DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
-  DEFAULT_POV_VIDEO_OVERLAY,
-} from "@/lib/agent/video-template-copy"
+import { DEFAULT_POV_SAUNA_TEMPLATE_VERSION } from "@/lib/agent/video-template-copy"
 import { DEFAULT_HOST_HEADLINE, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
 import {
   normalizeGcsObjectPath,
@@ -158,18 +154,6 @@ export function BriefIntakePanel({
   const [showManual, setShowManual] = useState(false)
   const [uploadedGcsPath, setUploadedGcsPath] = useState("")
 
-  const [videoDraft, setVideoDraft] = useState({
-    conceptSlug: "",
-    assetSlug: "",
-    source: "uploaded" as VideoConfig["source"],
-    runwayPrompt: "",
-    templateVersion: DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
-    duration: 5 as 5 | 10,
-    ratio: "768:1280" as "768:1280" | "1280:768",
-    copyVariants: [{ slug: "pov-idle-income", copy: DEFAULT_POV_VIDEO_OVERLAY }] as VideoCopyVariant[],
-    hypothesis: "",
-  })
-
   const [staticDraft, setStaticDraft] = useState({
     hook: "",
     headline: "",
@@ -200,8 +184,6 @@ export function BriefIntakePanel({
   }
 
   const needsUploadedBaseVideo =
-    selectedTemplate?.type === "video" && selectedTemplate.id === "T4"
-  const needsRunwayApiKey =
     selectedTemplate?.type === "video" && selectedTemplate.id === "T2"
 
   const { data: storageInfo } = useSWR<CreativeStorageInfo>(
@@ -219,7 +201,7 @@ export function BriefIntakePanel({
       return
     }
     if (needsUploadedBaseVideo && !uploadedGcsPath.trim()) {
-      onMessage("Select or upload a POV sauna base video before creating a T4 brief.")
+      onMessage("Select or upload a POV sauna base video before creating a T2 brief.")
       return
     }
     setBusyAction("create-from-template")
@@ -242,42 +224,6 @@ export function BriefIntakePanel({
       setUploadedGcsPath("")
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Could not create from template.")
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
-  const buildVideoConfig = (): VideoConfig => ({
-    source: videoDraft.source,
-    runwayPrompt: videoDraft.source === "runway" ? videoDraft.runwayPrompt.trim() : undefined,
-    uploadedGcsPath: videoDraft.source === "uploaded" ? uploadedGcsPath.trim() : undefined,
-    copyVariants: videoDraft.copyVariants.filter((v) => v.slug.trim() && v.copy.trim()),
-    templateVersion: videoDraft.templateVersion,
-    conceptSlug: videoDraft.conceptSlug.trim(),
-    assetSlug: videoDraft.assetSlug.trim(),
-    duration: videoDraft.duration,
-    ratio: videoDraft.ratio,
-  })
-
-  const createVideoBrief = async (saveAndApprove: boolean) => {
-    setBusyAction(saveAndApprove ? "create-video-approve" : "create-video-draft")
-    try {
-      const video_config = buildVideoConfig()
-      if (!video_config.conceptSlug || !video_config.assetSlug) throw new Error("Concept and asset slug required.")
-      if (!video_config.copyVariants.length) throw new Error("Add at least one copy variant.")
-      await patchPipeline({
-        action: "create_video_brief",
-        brief: {
-          video_config,
-          hook: video_config.copyVariants[0]?.copy,
-          hypothesis: videoDraft.hypothesis.trim() || null,
-          saveAndApprove,
-        },
-      })
-      onCreated()
-      onMessage(saveAndApprove ? "Video brief created and approved." : "Video brief saved.")
-    } catch (err) {
-      onMessage(err instanceof Error ? err.message : "Could not create video brief.")
     } finally {
       setBusyAction(null)
     }
@@ -363,10 +309,10 @@ export function BriefIntakePanel({
     file: File,
     opts?: { conceptSlug?: string; assetSlug?: string; category?: string; angleSlug?: string },
   ) => {
-    const conceptSlug = opts?.conceptSlug ?? videoDraft.conceptSlug.trim()
-    const assetSlug = opts?.assetSlug ?? videoDraft.assetSlug.trim()
+    const conceptSlug = opts?.conceptSlug ?? T4_BASE_VIDEO_UPLOAD.conceptSlug
+    const assetSlug = opts?.assetSlug ?? T4_BASE_VIDEO_UPLOAD.assetSlug
     if (!conceptSlug || !assetSlug) {
-      throw new Error("Enter concept slug and asset slug before uploading.")
+      throw new Error("Concept slug and asset slug are required before uploading.")
     }
 
     const form = new FormData()
@@ -400,7 +346,7 @@ export function BriefIntakePanel({
     setBusyAction("upload-base-video")
     try {
       await uploadBaseVideoFile(file, T4_BASE_VIDEO_UPLOAD)
-      onMessage("Sauna base video uploaded — you can create the T4 brief now.")
+      onMessage("Sauna base video uploaded — you can create the T2 brief now.")
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Upload failed")
     } finally {
@@ -413,7 +359,7 @@ export function BriefIntakePanel({
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">New Brief</h2>
-          <p className="text-xs text-muted-foreground mt-1">Start from a template or create manually.</p>
+          <p className="text-xs text-muted-foreground mt-1">Start from a template. Video: create in Runway, upload via T2.</p>
         </div>
         <button
           type="button"
@@ -433,13 +379,6 @@ export function BriefIntakePanel({
               setSelectedTemplateId(e.target.value)
               const t = templates.find((x) => x.id === e.target.value)
               if (t) setConceptVerify(t.concept_verify_default)
-              if (e.target.value === "T2" || e.target.value === "T4") {
-                setVideoDraft((p) => ({
-                  ...p,
-                  templateVersion: DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
-                  source: e.target.value === "T4" ? "uploaded" : "runway",
-                }))
-              }
             }}
             className="w-full rounded-md border bg-background px-3 py-2.5 text-sm"
           >
@@ -489,20 +428,12 @@ export function BriefIntakePanel({
         </div>
       ) : null}
 
-      {needsRunwayApiKey ? (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          T2 calls Runway to generate base video and requires <code className="font-mono">RUNWAY_API_KEY</code> on
-          the server (Vercel Production + Preview, then redeploy). To overlay copy on your own POV sauna MP4, use{" "}
-          <strong>T4 · POV Sauna (Upload)</strong> instead.
-        </p>
-      ) : null}
-
       {needsUploadedBaseVideo ? (
         <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
           <p className="text-xs text-muted-foreground">
-            T4 needs a POV sauna base MP4 in the creative GCS bucket. Upload via gsutil (below), pick from the
-            library, paste a path, or try the in-app uploader. After approval, the Railway worker composites the
-            same centered POV overlay as T2 (template v{DEFAULT_POV_SAUNA_TEMPLATE_VERSION}).
+            Create your base POV clip in Runway, export MP4, then upload to the creative GCS bucket via gsutil
+            (below), pick from the library, paste a path, or try the in-app uploader. After approval, the Railway
+            worker composites centered POV overlay copy (template v{DEFAULT_POV_SAUNA_TEMPLATE_VERSION}).
           </p>
 
           <details className="rounded-md border bg-background px-3 py-2 text-xs">
@@ -595,25 +526,11 @@ export function BriefIntakePanel({
           <DialogHeader className="shrink-0 border-b px-5 py-4 text-left">
             <DialogTitle>Manual brief</DialogTitle>
             <DialogDescription>
-              Create a static or video brief without a template. Scroll to see all fields — press Escape or click
-              outside to close.
+              Create a static brief without a template. For video, use template T2 (upload your Runway export).
             </DialogDescription>
           </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4">
-          <div className="flex gap-4 text-sm">
-            <span className="font-medium text-muted-foreground">Manual type:</span>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="manualType"
-                checked={!videoDraft.conceptSlug && staticDraft.hook !== "__video__"}
-                onChange={() => setStaticDraft((p) => ({ ...p, hook: p.hook === "__video__" ? "" : p.hook }))}
-              />
-              Static
-            </label>
-          </div>
-
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase text-muted-foreground">Static brief</p>
             <div className="flex flex-wrap gap-4 text-sm">
@@ -749,178 +666,6 @@ export function BriefIntakePanel({
                 </div>
               </>
             )}
-          </div>
-
-          <div className="space-y-3 border-t pt-3">
-            <p className="text-xs font-semibold uppercase text-muted-foreground">Video brief</p>
-            <div className="grid gap-2 md:grid-cols-2">
-              <input
-                placeholder="Concept slug"
-                value={videoDraft.conceptSlug}
-                onChange={(e) => setVideoDraft((p) => ({ ...p, conceptSlug: e.target.value }))}
-                className="rounded-md border px-3 py-2 text-sm"
-              />
-              <input
-                placeholder="Asset slug"
-                value={videoDraft.assetSlug}
-                onChange={(e) => setVideoDraft((p) => ({ ...p, assetSlug: e.target.value }))}
-                className="rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="flex gap-4 text-sm">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={videoDraft.source === "runway"}
-                  onChange={() => setVideoDraft((p) => ({ ...p, source: "runway" }))}
-                />
-                Runway
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={videoDraft.source === "uploaded"}
-                  onChange={() => setVideoDraft((p) => ({ ...p, source: "uploaded" }))}
-                />
-                Upload / library
-              </label>
-            </div>
-            {videoDraft.source === "runway" ? (
-              <textarea
-                value={videoDraft.runwayPrompt}
-                onChange={(e) => setVideoDraft((p) => ({ ...p, runwayPrompt: e.target.value }))}
-                className="min-h-20 w-full rounded-md border px-3 py-2 text-sm"
-              />
-            ) : (
-              <>
-                <VideoUploadButton
-                  busy={busyAction === "upload-base-video"}
-                  disabled={busyAction !== null && busyAction !== "upload-base-video"}
-                  onFile={(file) => {
-                    setBusyAction("upload-base-video")
-                    void uploadBaseVideoFile(file)
-                      .then(() => onMessage("Base video uploaded."))
-                      .catch((err) => onMessage(err instanceof Error ? err.message : "Upload failed"))
-                      .finally(() => setBusyAction(null))
-                  }}
-                />
-                <AssetLibraryPanel mediaType="video" selectedPath={uploadedGcsPath} onSelect={onLibrarySelect} />
-                {uploadedGcsPath ? <p className="text-xs font-mono text-green-700">{uploadedGcsPath}</p> : null}
-              </>
-            )}
-            <div className="grid gap-2 md:grid-cols-3 text-sm">
-              <label className="space-y-1 text-xs">
-                Template v
-                <input
-                  type="number"
-                  min={1}
-                  value={videoDraft.templateVersion}
-                  onChange={(e) =>
-                    setVideoDraft((p) => ({ ...p, templateVersion: Number(e.target.value) || 1 }))
-                  }
-                  className="w-full rounded border px-2 py-1"
-                />
-              </label>
-              <label className="space-y-1 text-xs">
-                Duration (Runway)
-                <select
-                  value={videoDraft.duration}
-                  onChange={(e) =>
-                    setVideoDraft((p) => ({ ...p, duration: Number(e.target.value) as 5 | 10 }))
-                  }
-                  className="w-full rounded border px-2 py-1"
-                >
-                  <option value={5}>5s</option>
-                  <option value={10}>10s</option>
-                </select>
-              </label>
-              <label className="space-y-1 text-xs">
-                Ratio
-                <select
-                  value={videoDraft.ratio}
-                  onChange={(e) =>
-                    setVideoDraft((p) => ({
-                      ...p,
-                      ratio: e.target.value as "768:1280" | "1280:768",
-                    }))
-                  }
-                  className="w-full rounded border px-2 py-1"
-                >
-                  <option value="768:1280">9:16 vertical</option>
-                  <option value="1280:768">16:9 horizontal</option>
-                </select>
-              </label>
-            </div>
-            {videoDraft.copyVariants.map((variant, index) => (
-              <div key={index} className="grid gap-2 md:grid-cols-[1fr_2fr_auto]">
-                <input
-                  value={variant.slug}
-                  placeholder="slug"
-                  onChange={(e) =>
-                    setVideoDraft((p) => ({
-                      ...p,
-                      copyVariants: p.copyVariants.map((v, i) =>
-                        i === index ? { ...v, slug: e.target.value } : v
-                      ),
-                    }))
-                  }
-                  className="rounded-md border px-2 py-1 text-sm"
-                />
-                <input
-                  value={variant.copy}
-                  placeholder="overlay copy"
-                  onChange={(e) =>
-                    setVideoDraft((p) => ({
-                      ...p,
-                      copyVariants: p.copyVariants.map((v, i) =>
-                        i === index ? { ...v, copy: e.target.value } : v
-                      ),
-                    }))
-                  }
-                  className="rounded-md border px-2 py-1 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setVideoDraft((p) => ({
-                      ...p,
-                      copyVariants: p.copyVariants.filter((_, i) => i !== index),
-                    }))
-                  }
-                  className="text-xs border rounded px-2"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setVideoDraft((p) => ({
-                  ...p,
-                  copyVariants: [...p.copyVariants, { slug: "", copy: "" }],
-                }))
-              }
-              className="text-xs border rounded px-2 py-1"
-            >
-              + variant
-            </button>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void createVideoBrief(false)}
-                className="text-xs border rounded px-3 py-1.5"
-              >
-                Save video draft
-              </button>
-              <button
-                type="button"
-                onClick={() => void createVideoBrief(true)}
-                className="text-xs bg-green-600 text-white rounded px-3 py-1.5"
-              >
-                Save video &amp; approve
-              </button>
-            </div>
           </div>
           </div>
 

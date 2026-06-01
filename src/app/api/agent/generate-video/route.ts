@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       {
         error: "Runway is not configured on this server",
         detail:
-          "This brief uses template T2 (Runway). Set RUNWAY_API_KEY in Vercel, or create a new brief from T4 (Upload MP4) with your POV sauna video instead.",
+          "This brief uses legacy Runway source. Create video in Runway, upload MP4, and use template T2 (Upload) instead.",
         hint: onVercel
           ? "Add RUNWAY_API_KEY under Vercel → Settings → Environment Variables for Production and Preview, then redeploy. The admin Creative tab shows whether Runway is detected."
           : "Add RUNWAY_API_KEY to .env.local for local dev, then restart `next dev`.",

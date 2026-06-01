@@ -21,25 +21,10 @@ type CreativeAssetCardProps = {
   approveBusy: boolean
   rejectBusy: boolean
   canEditPhoto: boolean
-  canEditVideo?: boolean
   editPrompt: string
   onEditPromptChange: (value: string) => void
   onApplyEdit: () => void
   editBusy: boolean
-  editDisabledReason?: string | null
-}
-
-export function canEditVideoAsset(
-  asset: {
-    generation_tool?: string | null
-    variation_label?: string | null
-  },
-  videoConfig?: { source?: string } | null
-) {
-  if (!videoConfig || videoConfig.source !== "runway") return false
-  if (asset.generation_tool === "composite-video") return true
-  if (asset.generation_tool === "runway" && asset.variation_label === "base") return true
-  return false
 }
 
 export function canEditPhotoAsset(asset: {
@@ -104,23 +89,13 @@ export function CreativeAssetCard({
   approveBusy,
   rejectBusy,
   canEditPhoto,
-  canEditVideo = false,
   editPrompt,
   onEditPromptChange,
   onApplyEdit,
   editBusy,
-  editDisabledReason = null,
 }: CreativeAssetCardProps) {
   const status = asset.status ?? "generated"
   const isApproved = status === "approved"
-  const canEditInline = canEditPhoto || canEditVideo
-  const editLabel = canEditVideo ? "Edit video" : "Edit photo"
-  const editPlaceholder = canEditVideo
-    ? "e.g. slower walk, more mist, tighter framing on sauna door"
-    : "e.g. flip horizontal, remove blurred railing"
-  const editHelp = canEditVideo
-    ? "Updates the Runway base clip and re-renders all overlay variants."
-    : null
 
   return (
     <div className="rounded-md border bg-background p-2 space-y-2">
@@ -160,16 +135,13 @@ export function CreativeAssetCard({
         {sourceLabel} · {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`} · {status}
       </p>
 
-      {canEditInline ? (
+      {canEditPhoto ? (
         <div className="space-y-1.5 rounded-md border border-dashed border-[#9A4A33]/30 bg-[#9A4A33]/5 p-2">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-[#9A4A33]">{editLabel}</p>
-          {editHelp ? (
-            <p className="text-[10px] leading-snug text-muted-foreground">{editHelp}</p>
-          ) : null}
+          <p className="text-[10px] font-medium uppercase tracking-wide text-[#9A4A33]">Edit photo</p>
           <input
             value={editPrompt}
             onChange={(e) => onEditPromptChange(e.target.value)}
-            placeholder={editPlaceholder}
+            placeholder="e.g. flip horizontal, remove blurred railing"
             className="w-full rounded border bg-background px-2 py-1.5 text-[11px]"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -178,12 +150,9 @@ export function CreativeAssetCard({
               }
             }}
           />
-          {editDisabledReason ? (
-            <p className="text-[10px] text-amber-800">{editDisabledReason}</p>
-          ) : null}
           <button
             type="button"
-            disabled={editBusy || !editPrompt.trim() || Boolean(editDisabledReason)}
+            disabled={editBusy || !editPrompt.trim()}
             onClick={onApplyEdit}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-[#9A4A33] px-2 py-1.5 text-[11px] font-medium text-white disabled:opacity-50"
           >
@@ -192,7 +161,7 @@ export function CreativeAssetCard({
             ) : (
               <Wand2 className="size-3.5" />
             )}
-            {canEditVideo ? "Regenerate base" : "Apply edit"}
+            Apply edit
           </button>
         </div>
       ) : null}

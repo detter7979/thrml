@@ -8,7 +8,6 @@ import type { VideoConfig } from "@/lib/agent/types"
 import {
   DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
   DEFAULT_POV_VIDEO_OVERLAY,
-  DEFAULT_RUNWAY_POV_PROMPT,
 } from "@/lib/agent/video-template-copy"
 import {
   Dialog,
@@ -73,7 +72,7 @@ export type StructuredBriefEditorState = {
   video_concept_slug: string
   video_asset_slug: string
   video_duration: 5 | 10
-  video_ratio: "768:1280" | "1280:768"
+  video_ratio: "720:1280" | "1280:720" | "768:1280" | "1280:768"
   video_template_version: number
   video_copy_variants: VideoCopyVariantRow[]
 }
@@ -192,13 +191,14 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
     svg_variations,
     reference_image_urls: (brief.reference_image_urls ?? []).join("\n"),
     is_video_brief: isVideoBrief,
-    video_source: vc?.source ?? "runway",
-    runway_prompt: vc?.runwayPrompt?.trim() || DEFAULT_RUNWAY_POV_PROMPT,
+    video_source: vc?.source === "runway" ? "uploaded" : (vc?.source ?? "uploaded"),
+    runway_prompt: "",
     uploaded_gcs_path: vc?.uploadedGcsPath ?? "",
     video_concept_slug: vc?.conceptSlug ?? brief.campaign_short_name ?? "pov-earnings",
     video_asset_slug: vc?.assetSlug ?? "sauna",
     video_duration: vc?.duration === 10 ? 10 : 5,
-    video_ratio: vc?.ratio === "1280:768" ? "1280:768" : "768:1280",
+    video_ratio:
+      vc?.ratio === "1280:720" || vc?.ratio === "1280:768" ? "1280:720" : "720:1280",
     video_template_version: vc?.templateVersion ?? DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
     video_copy_variants: parseVideoCopyVariants(vc?.copyVariants),
   }
@@ -268,15 +268,11 @@ export function structuredEditorToPatch(state: StructuredBriefEditorState) {
 
   if (state.is_video_brief) {
     patch.video_config = {
-      source: state.video_source,
-      runwayPrompt: state.video_source === "runway" ? state.runway_prompt.trim() || DEFAULT_RUNWAY_POV_PROMPT : undefined,
-      uploadedGcsPath:
-        state.video_source === "uploaded" ? state.uploaded_gcs_path.trim() || undefined : undefined,
+      source: "uploaded",
+      uploadedGcsPath: state.uploaded_gcs_path.trim() || undefined,
       conceptSlug: state.video_concept_slug.trim() || state.campaign_short_name.trim() || "pov-earnings",
       assetSlug: state.video_asset_slug.trim() || "sauna",
       templateVersion: state.video_template_version || DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
-      duration: state.video_duration,
-      ratio: state.video_ratio,
       copyVariants: state.video_copy_variants.slice(0, effectiveVariations).map((row, i) => ({
         slug: row.slug.trim() || `variant-${i + 1}`,
         copy: row.copy.trim(),
@@ -383,7 +379,7 @@ export function BriefEditorModal({
             {isSplitHeaderSvg
               ? "Split copy SVG template — edit tagline, subhead, and per-variant headlines."
               : showVideoFields
-                ? "Edit the Runway base-video prompt and overlay copy before generating variants."
+                ? "Edit uploaded base video path and overlay copy before generating variants."
                 : "Structured fields — naming preview updates live."}
           </DialogDescription>
         </DialogHeader>
@@ -474,34 +470,7 @@ export function BriefEditorModal({
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                   />
                 </label>
-                <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                  Source
-                  <select
-                    value={state.video_source}
-                    onChange={(e) => set("video_source", e.target.value as "runway" | "uploaded")}
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="runway">Runway (AI base video)</option>
-                    <option value="uploaded">Uploaded MP4</option>
-                  </select>
-                </label>
-              </div>
-
-              {state.video_source === "runway" ? (
-                <label className="block space-y-1 text-xs font-medium text-muted-foreground border-t pt-3">
-                  Runway prompt (base POV video)
-                  <textarea
-                    value={state.runway_prompt}
-                    onChange={(e) => set("runway_prompt", e.target.value)}
-                    placeholder={DEFAULT_RUNWAY_POV_PROMPT}
-                    className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  />
-                  <span className="text-[11px] font-normal text-muted-foreground">
-                    Describes the motion/scene Runway generates — not the on-screen overlay text.
-                  </span>
-                </label>
-              ) : (
-                <label className="block space-y-1 text-xs font-medium text-muted-foreground border-t pt-3">
+                <label className="block space-y-1 text-xs font-medium text-muted-foreground border-t pt-3 md:col-span-2">
                   Uploaded base video (GCS path)
                   <input
                     value={state.uploaded_gcs_path}
@@ -509,8 +478,11 @@ export function BriefEditorModal({
                     placeholder="2026/05/hosts/pov_earnings/Video/base_sauna_v1.mp4"
                     className="w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
                   />
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    Export MP4 from Runway, upload to GCS, then paste the object path here.
+                  </span>
                 </label>
-              )}
+              </div>
 
               <div className="grid gap-3 md:grid-cols-2 border-t pt-3">
                 <label className="space-y-1 text-xs font-medium text-muted-foreground">
@@ -529,40 +501,12 @@ export function BriefEditorModal({
                     className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
                   />
                 </label>
-                {state.video_source === "runway" ? (
-                  <>
-                    <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                      Duration
-                      <select
-                        value={state.video_duration}
-                        onChange={(e) => set("video_duration", Number(e.target.value) as 5 | 10)}
-                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      >
-                        <option value={5}>5s</option>
-                        <option value={10}>10s</option>
-                      </select>
-                    </label>
-                    <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                      Aspect ratio
-                      <select
-                        value={state.video_ratio}
-                        onChange={(e) =>
-                          set("video_ratio", e.target.value as "768:1280" | "1280:768")
-                        }
-                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="768:1280">9:16 vertical</option>
-                        <option value="1280:768">16:9 horizontal</option>
-                      </select>
-                    </label>
-                  </>
-                ) : null}
               </div>
 
               <div className="space-y-2 border-t pt-3">
                 <p className="text-xs font-semibold uppercase text-muted-foreground">Overlay copy variants</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Composited onto the base video after Runway/upload. Use line breaks for two-line overlays.
+                  Composited onto your uploaded base video. Use line breaks for two-line overlays.
                 </p>
                 {(state.video_copy_variants.length
                   ? state.video_copy_variants

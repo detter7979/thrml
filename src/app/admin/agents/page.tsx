@@ -12,7 +12,6 @@ import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel
 import { CreativePipelinePurgePanel } from "@/components/admin/creative/creative-pipeline-purge-panel"
 import {
   canEditPhotoAsset,
-  canEditVideoAsset,
   CreativeAssetCard,
 } from "@/components/admin/creative/creative-asset-card"
 import {
@@ -608,34 +607,6 @@ export default function AgentsDashboard() {
     }
   }
 
-  const editRunwayVideo = async (
-    assetId: string,
-    prompt?: string,
-    opts?: { closeModal?: boolean },
-  ) => {
-    const editPrompt = (prompt ?? photoEditPrompt).trim()
-    if (!editPrompt) {
-      setPipelineMessage("Add Runway edit instructions first (e.g. slower walk, more golden hour).")
-      return
-    }
-    setBusyAction(`edit-video-${assetId}`)
-    setPipelineMessage(null)
-    try {
-      await patchPipeline({
-        action: "edit_runway_video",
-        asset_id: assetId,
-        edit_prompt: editPrompt,
-      })
-      await mutatePipeline()
-      setPipelineMessage("Runway base regenerated — overlay variants are re-rendering.")
-      if (opts?.closeModal) setViewingAsset(null)
-    } catch (err) {
-      setPipelineMessage(err instanceof Error ? err.message : "Video edit failed.")
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
   const criticalCount = alerts.filter(a => a.severity === "CRITICAL").length
   const latestFinance = finance[0]
   const briefs = useMemo(() => pipeline?.briefs ?? [], [pipeline?.briefs])
@@ -655,7 +626,6 @@ export default function AgentsDashboard() {
   const generatedAssets = useMemo(() => pipeline?.generatedAssets ?? [], [pipeline?.generatedAssets])
   const launchedAssets = useMemo(() => pipeline?.launchedAssets ?? [], [pipeline?.launchedAssets])
   const metaAdsets = useMemo(() => pipeline?.activeMetaAdsets ?? [], [pipeline?.activeMetaAdsets])
-  const runwayConfigured = pipeline?.runwayConfigured ?? false
   const assetsByBrief = useMemo(() => {
     const grouped = new Map<string, CreativeAsset[]>()
     for (const asset of generatedAssets) {
@@ -907,17 +877,6 @@ export default function AgentsDashboard() {
           {pipelineError ? (
             <p className="text-sm text-red-500">{pipelineError instanceof Error ? pipelineError.message : "Could not load creative pipeline."}</p>
           ) : null}
-          {!pipelineLoading && pipeline ? (
-            <p
-              className={`text-xs rounded-lg border px-3 py-2 ${
-                runwayConfigured
-                  ? "border-green-200 bg-green-50 text-green-900"
-                  : "border-amber-200 bg-amber-50 text-amber-900"
-              }`}
-            >
-              Runway API: {runwayConfigured ? "detected on this server" : "not detected — T2 briefs need RUNWAY_API_KEY in Vercel (Production + Preview) with a redeploy, or use T4 (Upload MP4) instead"}
-            </p>
-          ) : null}
 
           <BriefIntakePanel
             onCreated={() => void mutatePipeline()}
@@ -1066,17 +1025,23 @@ export default function AgentsDashboard() {
                             <button
                               type="button"
                               onClick={() => void generateVideoVariants(brief.id)}
-                            disabled={
-                              busyAction === `generate-video-${brief.id}` ||
-                              (config.source === "runway" && !runwayConfigured)
-                            }
-                            className="text-xs px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
-                          >
-                            Generate Video Variants ({variantCount} copies, source: {config.source === "runway" ? "Runway" : "Upload"})
-                          </button>
-                          {config.source === "runway" && !runwayConfigured ? (
+                              disabled={
+                                busyAction === `generate-video-${brief.id}` ||
+                                config.source !== "uploaded" ||
+                                !config.uploadedGcsPath?.trim()
+                              }
+                              className="text-xs px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
+                            >
+                              Generate Video Variants ({variantCount} copies)
+                            </button>
+                          {config.source === "runway" ? (
                             <p className="text-xs text-amber-800">
-                              Runway key not visible to this deployment. Redeploy after setting RUNWAY_API_KEY, or switch to T4.
+                              Legacy Runway brief — edit brief, paste your uploaded MP4 GCS path, and save before
+                              generating.
+                            </p>
+                          ) : !config.uploadedGcsPath?.trim() ? (
+                            <p className="text-xs text-amber-800">
+                              Upload base MP4 to GCS and set the path on the brief before generating.
                             </p>
                           ) : null}
                           </div>
@@ -1205,8 +1170,6 @@ export default function AgentsDashboard() {
                       </div>
                       <div className="grid gap-3 md:grid-cols-3">
                         {group.assets.map((asset) => {
-                          const assetBrief = group.brief ?? briefFor(asset)
-                          const videoEditable = canEditVideoAsset(asset, assetBrief?.video_config)
                           const photoEditable = canEditPhotoAsset(asset) && !isVideoAsset(asset)
                           return (
                           <CreativeAssetCard
@@ -1223,27 +1186,16 @@ export default function AgentsDashboard() {
                             approveBusy={busyAction === `approve_asset-${asset.id}`}
                             rejectBusy={busyAction === `reject_asset-${asset.id}`}
                             canEditPhoto={photoEditable}
-                            canEditVideo={videoEditable}
-                            editDisabledReason={
-                              videoEditable && !runwayConfigured
-                                ? "Runway key not detected on this deployment."
-                                : null
-                            }
                             editPrompt={assetEditPrompts[asset.id] ?? ""}
                             onEditPromptChange={(value) =>
                               setAssetEditPrompts((prev) => ({ ...prev, [asset.id]: value }))
                             }
                             onApplyEdit={() =>
-                              videoEditable
-                                ? void editRunwayVideo(asset.id, assetEditPrompts[asset.id])
-                                : void editStaticPhoto(asset.id, assetEditPrompts[asset.id], {
-                                    replaceInPlace: true,
-                                  })
+                              void editStaticPhoto(asset.id, assetEditPrompts[asset.id], {
+                                replaceInPlace: true,
+                              })
                             }
-                            editBusy={
-                              busyAction === `edit-photo-${asset.id}` ||
-                              busyAction === `edit-video-${asset.id}`
-                            }
+                            editBusy={busyAction === `edit-photo-${asset.id}`}
                             preview={
                               <div className={`aspect-square w-full`}>
                                 {isVideoAsset(asset) ? (
@@ -1442,47 +1394,6 @@ export default function AgentsDashboard() {
                   className="text-xs px-3 py-1.5 rounded-md bg-[#9A4A33] text-white disabled:opacity-50"
                 >
                   {busyAction === `edit-photo-${viewingAsset.id}` ? "Editing…" : "Apply edit & re-composite"}
-                </button>
-              </div>
-            ) : isVideoAsset(viewingAsset) &&
-              canEditVideoAsset(viewingAsset, briefFor(viewingAsset)?.video_config) ? (
-              <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
-                <p className="text-xs font-medium text-foreground">Edit Runway base &amp; re-render</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Appends your notes to the saved Runway prompt, regenerates the base clip, and re-composites all
-                  overlay variants. Examples:{" "}
-                  <span className="font-mono">slower walk</span>,{" "}
-                  <span className="font-mono">more mist, tighter framing on sauna door</span>.
-                </p>
-                <textarea
-                  value={photoEditPrompt}
-                  onChange={(e) => {
-                    setPhotoEditPrompt(e.target.value)
-                    setAssetEditPrompts((prev) => ({ ...prev, [viewingAsset.id]: e.target.value }))
-                  }}
-                  placeholder="slower walk, more golden hour glow"
-                  className="min-h-16 w-full rounded-md border bg-background px-3 py-2 text-sm"
-                />
-                {!runwayConfigured ? (
-                  <p className="text-xs text-amber-800">
-                    Runway key not detected on this deployment — set RUNWAY_API_KEY and redeploy.
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={
-                    busyAction === `edit-video-${viewingAsset.id}` ||
-                    !photoEditPrompt.trim() ||
-                    !runwayConfigured
-                  }
-                  onClick={() =>
-                    void editRunwayVideo(viewingAsset.id, photoEditPrompt, {
-                      closeModal: false,
-                    })
-                  }
-                  className="text-xs px-3 py-1.5 rounded-md bg-[#9A4A33] text-white disabled:opacity-50"
-                >
-                  {busyAction === `edit-video-${viewingAsset.id}` ? "Regenerating…" : "Regenerate base & re-render"}
                 </button>
               </div>
             ) : !isVideoAsset(viewingAsset) ? (

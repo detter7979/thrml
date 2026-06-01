@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   if (template.type === "video" && template.video?.source === "uploaded" && !body?.uploadedGcsPath?.trim()) {
     return NextResponse.json(
-      { error: "uploadedGcsPath is required for uploaded-video templates (T4)" },
+      { error: "uploadedGcsPath is required for uploaded-video templates (T2)" },
       { status: 400 }
     )
   }

@@ -8,6 +8,21 @@ const RUNWAY_API_VERSION = "2024-11-06"
 
 const RUNWAY_ENV_KEYS = ["RUNWAY_API_KEY", "RUNWAYML_API_SECRET", "RUNWAY_API_SECRET"] as const
 
+/** Ratios accepted by Runway Gen-4 Turbo image-to-video (2024-11-06 API). */
+export type RunwayRatio =
+  | "1280:720"
+  | "720:1280"
+  | "1104:832"
+  | "832:1104"
+  | "960:960"
+  | "1584:672"
+
+/** Stored brief values and API values — normalized before each request. */
+export type RunwayRatioInput = RunwayRatio | "768:1280" | "1280:768" | "1024:1024"
+
+/** Default POV sauna still used as gen4_turbo first frame (image-to-video is required). */
+export const DEFAULT_RUNWAY_POV_REFERENCE_IMAGE_URL = "https://usethrml.com/hero-sauna.png"
+
 function normalizeSecret(value: string | undefined): string | null {
   if (!value) return null
   const trimmed = value.trim().replace(/^['"]|['"]$/g, "")
@@ -34,12 +49,47 @@ export function isRunwayConfigured(): boolean {
   return resolveRunwayApiKey() !== null
 }
 
+export function normalizeRunwayRatio(ratio?: RunwayRatioInput): RunwayRatio {
+  switch (ratio) {
+    case "1280:768":
+    case "1280:720":
+      return "1280:720"
+    case "768:1280":
+    case "720:1280":
+      return "720:1280"
+    case "1024:1024":
+    case "960:960":
+      return "960:960"
+    case "1104:832":
+    case "832:1104":
+    case "1584:672":
+      return ratio
+    default:
+      return "720:1280"
+  }
+}
+
+/** HTTPS URL Runway can fetch as the image-to-video first frame. */
+export function resolveRunwayPromptImage(explicit?: string | null): string {
+  const direct = explicit?.trim()
+  if (direct) return direct
+
+  const fromEnv = normalizeSecret(process.env.RUNWAY_POV_REFERENCE_IMAGE_URL)
+  if (fromEnv) return fromEnv
+
+  const appUrl = normalizeSecret(process.env.NEXT_PUBLIC_APP_URL)
+  if (appUrl) return `${appUrl.replace(/\/$/, "")}/hero-sauna.png`
+
+  return DEFAULT_RUNWAY_POV_REFERENCE_IMAGE_URL
+}
+
 export interface RunwayGenerateArgs {
   prompt: string
   duration?: 5 | 10
-  ratio?: "768:1280" | "1280:768" | "1024:1024"
+  ratio?: RunwayRatioInput
   model?: "gen4_turbo" | "gen3a_turbo"
-  promptImage?: string // optional: data URI or HTTPS URL for image-to-video
+  /** HTTPS URL, Runway URI, or data URI — defaults to POV sauna hero still. */
+  promptImage?: string
   seed?: number
 }
 
@@ -77,17 +127,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 /**
- * Kick off a video generation task.
+ * Kick off a video generation task (Gen-4 Turbo image-to-video).
  * Returns immediately with the task ID; use pollTask() to await completion.
  */
 export async function generateVideo(args: RunwayGenerateArgs): Promise<{ taskId: string }> {
   const body: Record<string, unknown> = {
     model: args.model ?? "gen4_turbo",
     promptText: args.prompt,
+    promptImage: resolveRunwayPromptImage(args.promptImage),
     duration: args.duration ?? 5,
-    ratio: args.ratio ?? "768:1280",
+    ratio: normalizeRunwayRatio(args.ratio),
   }
-  if (args.promptImage) body.promptImage = args.promptImage
   if (args.seed != null) body.seed = args.seed
 
   const result = await request<{ id: string }>("/image_to_video", {

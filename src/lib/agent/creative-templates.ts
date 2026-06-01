@@ -36,7 +36,7 @@ export type CreativeTemplateVideoBlock = {
   asset_slug: string
   template_version: number
   duration?: 5 | 10
-  ratio?: "768:1280" | "1280:768"
+  ratio?: "720:1280" | "1280:720" | "768:1280" | "1280:768"
   runway_prompt?: string
   copy_variants: Array<{
     slug: string

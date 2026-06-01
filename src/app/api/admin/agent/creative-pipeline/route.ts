@@ -342,6 +342,10 @@ export async function PATCH(req: NextRequest) {
     brief_id?: string
     asset_id?: string
     brief?: Record<string, unknown>
+    edit_prompt?: string
+    save_as_new_variant?: boolean
+    replace_in_place?: boolean
+    confirm?: string
   } | null
 
   if (!body?.action || !PIPELINE_ACTIONS.has(body.action)) {

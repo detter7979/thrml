@@ -51,7 +51,7 @@ export function targetFormatsForBrief(brief: {
     const normalized = normalizeStaticFormat(value)
     if (normalized) formats.add(normalized)
   }
-  const resolved = formats.size > 0 ? Array.from(formats) : ["1x1"]
+  const resolved: StaticFormat[] = formats.size > 0 ? [...formats] : ["1x1"]
   return mergePhotoStaticTargetFormats(brief, resolved)
 }
 

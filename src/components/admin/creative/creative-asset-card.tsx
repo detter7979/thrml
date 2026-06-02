@@ -177,7 +177,7 @@ export function CreativeAssetCard({
             ) : (
               <Wand2 className="size-3.5" />
             )}
-            Build all remaining ({buildOutFormats.join(", ")})
+            Build All
           </button>
           <p className="text-[10px] leading-snug text-muted-foreground">
             Reuses this preview photo — no new AI generation. Skip if you only need {asset.format ?? "this size"}.

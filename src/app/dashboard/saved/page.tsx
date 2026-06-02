@@ -130,16 +130,6 @@ export default function DashboardSavedPage() {
     }, 200)
   }
 
-  const filterOptions = isSaunasOnlyLaunch()
-    ? []
-    : [
-        { id: "all", label: "All" },
-        ...getLaunchVisibleServiceTypes().map((item) => ({
-          id: item.value,
-          label: item.label,
-        })),
-      ]
-
   return (
     <div className="space-y-5 px-4 py-6 md:px-8 md:py-8">
       <div className="space-y-1">

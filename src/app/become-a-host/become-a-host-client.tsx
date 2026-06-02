@@ -311,7 +311,7 @@ export function BecomeAHostClient() {
                     </p>
                   </div>
 
-                  <div className="max-h-72 space-y-4 overflow-y-auto rounded-xl border border-neutral-100 bg-white p-5 text-sm leading-relaxed text-[#2F241E]">
+                  <div className="space-y-4 rounded-xl border border-neutral-100 bg-white p-5 text-sm leading-relaxed text-[#2F241E]">
                     <div className="space-y-1">
                       <p className="font-semibold">Independent host status</p>
                       <p className="text-xs text-neutral-500">

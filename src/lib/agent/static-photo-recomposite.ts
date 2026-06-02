@@ -54,7 +54,11 @@ type AssetRow = {
   convention_name: string | null
 }
 
-function performanceData(asset: AssetRow): Record<string, unknown> {
+type PerformanceDataSource = {
+  performance_data?: Record<string, unknown> | null
+}
+
+function performanceData(asset: PerformanceDataSource): Record<string, unknown> {
   return asset.performance_data && typeof asset.performance_data === "object"
     ? asset.performance_data
     : {}
@@ -92,7 +96,7 @@ async function downloadFromUrl(url: string) {
 }
 
 export async function resolveBasePhotoBuffer(
-  asset: Pick<AssetRow, "performance_data">,
+  asset: PerformanceDataSource,
 ): Promise<{ buffer: Buffer; source: string }> {
   const perf = performanceData(asset)
   const baseGcsPath = typeof perf.base_gcs_path === "string" ? perf.base_gcs_path.trim() : ""

@@ -1,6 +1,6 @@
-import { uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
+import { downloadCreativeAsset, uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
 import { resolveNamingFromBrief } from "@/lib/agent/creative-templates"
-import { unifiedStaticBasePath, unifiedStaticPath } from "@/lib/agent/gcs-paths"
+import { resolveCreativeBucketName, unifiedStaticBasePath, unifiedStaticPath } from "@/lib/agent/gcs-paths"
 import {
   HOST_PROOF_SUBTEXT,
   finalizeHostStaticImagePrompt,
@@ -54,6 +54,7 @@ type AssetRow = {
   generation_tool: string | null
   gcs_path: string | null
   performance_data: Record<string, unknown> | null
+  created_at?: string | null
 }
 
 const VARIATION_LABELS = ["A", "B", "C"] as const
@@ -107,6 +108,55 @@ function performanceData(asset: AssetRow): Record<string, unknown> {
   return asset.performance_data && typeof asset.performance_data === "object" ? asset.performance_data : {}
 }
 
+export function inferredStaticBaseGcsPath(sourceAsset: AssetRow, brief: BriefRow): string | null {
+  const format = normalizeStaticFormat(sourceAsset.format) ?? "1x1"
+  const variationLabel = (sourceAsset.variation_label ?? "A").toUpperCase().slice(0, 1)
+  const { category, angleSlug } = taxonomyFromBrief(brief)
+  const templateSlug = templateSlugFromBrief(brief) ?? undefined
+  const objectPath = unifiedStaticBasePath({
+    date: sourceAsset.created_at ? new Date(sourceAsset.created_at) : new Date(),
+    category,
+    angleSlug,
+    variant: variationLabel,
+    format,
+    templateSlug,
+  })
+  return `gs://${resolveCreativeBucketName()}/${objectPath}`
+}
+
+async function resolveExpandBasePhotoBuffer(
+  sourceAsset: AssetRow,
+  brief: BriefRow,
+): Promise<{ buffer: Buffer; source: string; baseGcsPath: string }> {
+  const perf = performanceData(sourceAsset)
+  const storedBasePath = typeof perf.base_gcs_path === "string" ? perf.base_gcs_path.trim() : ""
+
+  const candidates = [
+    storedBasePath,
+    inferredStaticBaseGcsPath(sourceAsset, brief),
+  ].filter(Boolean) as string[]
+
+  for (const candidate of candidates) {
+    try {
+      const downloaded = await downloadCreativeAsset(candidate)
+      return { buffer: downloaded.buffer, source: candidate, baseGcsPath: candidate }
+    } catch {
+      // try next candidate
+    }
+  }
+
+  try {
+    const { buffer, source } = await resolveBasePhotoBuffer(sourceAsset)
+    const baseGcsPath = storedBasePath || source
+    return { buffer, source, baseGcsPath }
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    throw new Error(
+      `Could not load the preview base photo (${detail}). Regenerate the preview, then build out remaining sizes.`,
+    )
+  }
+}
+
 function resolveStaticPlan(brief: BriefRow): StoredStaticVariation[] | null {
   return parseStoredStaticVariations(brief.trigger_data)
 }
@@ -140,7 +190,9 @@ async function loadBriefAndAssets(admin: ReturnType<typeof createAdminClient>, b
 
   const { data: assets, error: assetsError } = await admin
     .from("creative_assets")
-    .select("id, brief_id, format, variation_label, variation_index, generation_tool, gcs_path, performance_data")
+    .select(
+      "id, brief_id, format, variation_label, variation_index, generation_tool, gcs_path, performance_data, created_at",
+    )
     .eq("brief_id", briefId)
 
   if (assetsError) throw assetsError
@@ -244,7 +296,10 @@ async function expandPhotoStaticSizesFromAsset(opts: {
     return { generated: 0, assetIds: [] as string[] }
   }
 
-  const { buffer: baseBuffer } = await resolveBasePhotoBuffer(opts.sourceAsset)
+  const { buffer: baseBuffer, baseGcsPath: resolvedBasePath } = await resolveExpandBasePhotoBuffer(
+    opts.sourceAsset,
+    opts.brief,
+  )
   const perf = performanceData(opts.sourceAsset)
   const headline =
     (typeof perf.static_variation_headline === "string" && perf.static_variation_headline.trim()) ||
@@ -254,27 +309,18 @@ async function expandPhotoStaticSizesFromAsset(opts: {
   const generationTool = opts.sourceAsset.generation_tool ?? "replicate_mj"
   const variationIndex = opts.sourceAsset.variation_index ?? 1
 
-  const storedBasePath = typeof perf.base_gcs_path === "string" ? perf.base_gcs_path.trim() : ""
-  let baseGcsPath = storedBasePath
+  let baseGcsPath = typeof perf.base_gcs_path === "string" ? perf.base_gcs_path.trim() : ""
   if (!baseGcsPath) {
-    const { category, angleSlug } = taxonomyFromBrief(opts.brief)
-    const templateSlug = templateSlugFromBrief(opts.brief) ?? undefined
-    const uploaded = await uploadGcsCreativeAsset(baseBuffer, {
-      campaignShortName: opts.brief.campaign_short_name ?? opts.brief.id,
-      briefId: opts.brief.id,
-      kind: "static",
-      filename: `base_${opts.sourceAsset.format ?? "1x1"}_${variationLabel}_expanded.png`,
-      contentType: "image/png",
-      unifiedObjectPath: unifiedStaticBasePath({
-        date: new Date(),
-        category,
-        angleSlug,
-        variant: variationLabel,
-        format: (normalizeStaticFormat(opts.sourceAsset.format) ?? "1x1") as StaticFormat,
-        templateSlug,
-      }),
-    })
-    baseGcsPath = uploaded.gcsPath
+    baseGcsPath = resolvedBasePath
+    await admin
+      .from("creative_assets")
+      .update({
+        performance_data: {
+          ...perf,
+          base_gcs_path: baseGcsPath,
+        },
+      })
+      .eq("id", opts.sourceAsset.id)
   }
 
   const assetIds: string[] = []
@@ -365,7 +411,9 @@ export async function expandStaticSizesFromAsset(opts: { assetId: string; format
   const admin = createAdminClient()
   const { data: asset, error: assetError } = await admin
     .from("creative_assets")
-    .select("id, brief_id, format, variation_label, variation_index, generation_tool, gcs_path, performance_data")
+    .select(
+      "id, brief_id, format, variation_label, variation_index, generation_tool, gcs_path, performance_data, created_at",
+    )
     .eq("id", opts.assetId)
     .maybeSingle()
 

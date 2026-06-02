@@ -13,7 +13,7 @@ templates:
     category: Hosts
     angle: pov_earnings
     static_playbook: host_monetization_v3
-    formats: ["1x1", "9x16"]
+    formats: ["1x1", "9x16", "4x5"]
     default_variations: 1
     concept_verify_default: true
     full_batch_variations: 3

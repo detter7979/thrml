@@ -548,11 +548,15 @@ export default function AgentsDashboard() {
     }
   }
 
-  const expandStaticSizes = async (assetId: string) => {
-    setBusyAction(`expand-${assetId}`)
+  const expandStaticSizes = async (assetId: string, formats?: ("1x1" | "4x5" | "9x16")[]) => {
+    setBusyAction(formats?.length === 1 ? `expand-${assetId}-${formats[0]}` : `expand-${assetId}`)
     setPipelineMessage(null)
     try {
-      const json = (await patchPipeline({ action: "expand_static_sizes", asset_id: assetId })) as {
+      const json = (await patchPipeline({
+        action: "expand_static_sizes",
+        asset_id: assetId,
+        ...(formats?.length ? { formats } : {}),
+      })) as {
         generated?: number
       }
       await mutatePipeline()
@@ -1352,9 +1356,22 @@ export default function AgentsDashboard() {
                             editBusy={busyAction === `edit-photo-${asset.id}`}
                             buildOutFormats={canBuildOut ? buildOutFormats : undefined}
                             onBuildOutSizes={
-                              canBuildOut ? () => void expandStaticSizes(asset.id) : undefined
+                              canBuildOut
+                                ? (format) =>
+                                    void expandStaticSizes(
+                                      asset.id,
+                                      format === "1x1" || format === "4x5" || format === "9x16"
+                                        ? [format]
+                                        : undefined,
+                                    )
+                                : undefined
                             }
-                            buildOutBusy={busyAction === `expand-${asset.id}`}
+                            buildOutBusy={busyAction === `expand-${asset.id}` || busyAction?.startsWith(`expand-${asset.id}-`) === true}
+                            buildOutBusyFormat={
+                              busyAction?.startsWith(`expand-${asset.id}-`)
+                                ? busyAction.slice(`expand-${asset.id}-`.length)
+                                : null
+                            }
                             preview={
                               <div className={`aspect-square w-full`}>
                                 {isVideoAsset(asset) ? (

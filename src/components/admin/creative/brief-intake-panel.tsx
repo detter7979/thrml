@@ -262,7 +262,7 @@ export function BriefIntakePanel({
           copy_headline: staticDraft.headline.trim() || null,
           visual_direction: staticDraft.visual_direction.trim(),
           campaign_short_name: staticDraft.campaign_short_name.trim(),
-          format: "1x1,9x16",
+          format: "1x1,9x16,4x5",
           trigger_data: {
             category: "Hosts",
             angle: "pov_earnings",
@@ -273,7 +273,8 @@ export function BriefIntakePanel({
           success_criteria: {
             variations: conceptVerify ? 1 : 3,
             concept_verify: conceptVerify,
-            formats: ["1x1", "9x16"],
+            formats: ["1x1", "9x16", "4x5"],
+            preview_format: "1x1",
           },
           saveAndApprove,
         },

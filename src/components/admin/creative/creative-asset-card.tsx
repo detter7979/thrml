@@ -27,8 +27,9 @@ type CreativeAssetCardProps = {
   onApplyEdit: () => void
   editBusy: boolean
   buildOutFormats?: string[]
-  onBuildOutSizes?: () => void
+  onBuildOutSizes?: (format?: string) => void
   buildOutBusy?: boolean
+  buildOutBusyFormat?: string | null
 }
 
 export function canEditPhotoAsset(asset: {
@@ -100,6 +101,7 @@ export function CreativeAssetCard({
   buildOutFormats,
   onBuildOutSizes,
   buildOutBusy,
+  buildOutBusyFormat,
 }: CreativeAssetCardProps) {
   const status = asset.status ?? "generated"
   const isApproved = status === "approved"
@@ -144,15 +146,43 @@ export function CreativeAssetCard({
       </p>
 
       {buildOutFormats?.length && onBuildOutSizes ? (
-        <button
-          type="button"
-          disabled={buildOutBusy}
-          onClick={onBuildOutSizes}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-[#9A4A33]/40 bg-[#9A4A33]/10 px-2 py-1.5 text-[11px] font-medium text-[#9A4A33] hover:bg-[#9A4A33]/15 disabled:opacity-50"
-        >
-          {buildOutBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
-          Build out {buildOutFormats.join(", ")}
-        </button>
+        <div className="space-y-1.5 rounded-md border border-[#9A4A33]/20 bg-[#9A4A33]/5 p-2">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-[#9A4A33]">
+            Remaining sizes
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {buildOutFormats.map((format) => (
+              <button
+                key={format}
+                type="button"
+                disabled={buildOutBusy}
+                onClick={() => onBuildOutSizes(format)}
+                className="rounded border border-[#9A4A33]/30 bg-background px-2 py-1 text-[10px] font-medium text-[#9A4A33] hover:bg-[#9A4A33]/10 disabled:opacity-50"
+              >
+                {buildOutBusyFormat === format ? (
+                  <Loader2 className="inline size-3 animate-spin" />
+                ) : null}
+                {format}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={buildOutBusy}
+            onClick={() => onBuildOutSizes()}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-[#9A4A33]/40 bg-[#9A4A33]/10 px-2 py-1.5 text-[11px] font-medium text-[#9A4A33] hover:bg-[#9A4A33]/15 disabled:opacity-50"
+          >
+            {buildOutBusy && !buildOutBusyFormat ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Wand2 className="size-3.5" />
+            )}
+            Build all remaining ({buildOutFormats.join(", ")})
+          </button>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Reuses this preview photo — no new AI generation. Skip if you only need {asset.format ?? "this size"}.
+          </p>
+        </div>
       ) : null}
 
       {canEditPhoto ? (

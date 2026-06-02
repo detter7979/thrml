@@ -196,13 +196,9 @@ export async function refreshCreativeAssetUrl(gcsPath: string) {
 }
 
 export async function downloadCreativeAsset(gcsPath: string): Promise<DownloadedCreativeAsset> {
-  const { bucketName, objectPath } = parseGcsPath(gcsPath)
-  const configuredBucket = requireEnv("GCS_BUCKET_NAME")
-  if (bucketName !== configuredBucket) {
-    throw new Error(`GCS path bucket ${bucketName} does not match configured bucket ${configuredBucket}`)
-  }
-
-  const file = getBucket().file(objectPath)
+  const normalized = normalizeCreativeAssetGcsPath(gcsPath)
+  const { bucketName, objectPath } = parseGcsPath(normalized)
+  const file = fileForStoredGcsPath(bucketName, objectPath)
   const signedUrl = await signedReadUrl(file)
   const res = await fetch(signedUrl)
   if (!res.ok) throw new Error(`GCS download failed: ${res.status} ${await res.text()}`)

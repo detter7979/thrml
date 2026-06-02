@@ -17,7 +17,9 @@ import { DEFAULT_HOST_HEADLINE, isSplitHeaderSvgTemplate } from "@/lib/agent/svg
 import {
   normalizeGcsObjectPath,
   suggestedT4BaseVideoObjectPath,
+  suggestedT5BlockSplitVideoObjectPath,
   T4_BASE_VIDEO_UPLOAD,
+  T5_BLOCK_SPLIT_VIDEO_UPLOAD,
 } from "@/lib/agent/t4-base-video-upload"
 
 export type CreativeTemplateSummary = {
@@ -25,7 +27,7 @@ export type CreativeTemplateSummary = {
   label: string
   short_label: string
   description: string | null
-  group: "static_photo" | "static_svg" | "video_pov" | null
+  group: "static_photo" | "static_svg" | "video_pov" | "video_block" | null
   recommended: boolean
   type: "static" | "video"
   formats: string[]
@@ -35,12 +37,13 @@ export type CreativeTemplateSummary = {
   svg_template_id?: string | null
 }
 
-const TEMPLATE_GROUP_ORDER = ["static_photo", "static_svg", "video_pov"] as const
+const TEMPLATE_GROUP_ORDER = ["static_photo", "static_svg", "video_pov", "video_block"] as const
 
 const TEMPLATE_GROUP_LABELS: Record<(typeof TEMPLATE_GROUP_ORDER)[number], string> = {
   static_photo: "Static · Photo + overlay",
   static_svg: "Static · SVG layouts",
   video_pov: "Video · POV overlay",
+  video_block: "Video · Block split upload",
 }
 
 function templatesByGroup(templates: CreativeTemplateSummary[]) {
@@ -184,7 +187,15 @@ export function BriefIntakePanel({
   }
 
   const needsUploadedBaseVideo =
-    selectedTemplate?.type === "video" && selectedTemplate.id === "T2"
+    selectedTemplate?.type === "video" &&
+    (selectedTemplate.id === "T2" || selectedTemplate.id === "T5")
+
+  const uploadPreset =
+    selectedTemplate?.id === "T5" ? T5_BLOCK_SPLIT_VIDEO_UPLOAD : T4_BASE_VIDEO_UPLOAD
+  const suggestedUploadPath =
+    selectedTemplate?.id === "T5"
+      ? suggestedT5BlockSplitVideoObjectPath()
+      : suggestedT4BaseVideoObjectPath()
 
   const { data: storageInfo } = useSWR<CreativeStorageInfo>(
     needsUploadedBaseVideo ? "/api/admin/agent/creative-storage-info" : null,
@@ -201,7 +212,11 @@ export function BriefIntakePanel({
       return
     }
     if (needsUploadedBaseVideo && !uploadedGcsPath.trim()) {
-      onMessage("Select or upload a POV sauna base video before creating a T2 brief.")
+      onMessage(
+        selectedTemplate?.id === "T5"
+          ? "Upload a 9×16 MP4 for the block split bottom panel before creating the brief."
+          : "Select or upload a POV sauna base video before creating a T2 brief.",
+      )
       return
     }
     setBusyAction("create-from-template")
@@ -219,7 +234,13 @@ export function BriefIntakePanel({
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error((json as { error?: string }).error ?? "Template brief failed")
       onCreated()
-      onMessage(saveAndApprove ? "Brief created from template and approved." : "Brief created from template.")
+      onMessage(
+        saveAndApprove
+          ? "Brief created from template and approved."
+          : conceptVerify
+            ? "Brief created — preview generating in Variations Ready."
+            : "Brief created from template.",
+      )
       setSelectedTemplateId("")
       setUploadedGcsPath("")
     } catch (err) {
@@ -345,8 +366,12 @@ export function BriefIntakePanel({
   const uploadT4BaseVideo = async (file: File) => {
     setBusyAction("upload-base-video")
     try {
-      await uploadBaseVideoFile(file, T4_BASE_VIDEO_UPLOAD)
-      onMessage("Sauna base video uploaded — you can create the T2 brief now.")
+      await uploadBaseVideoFile(file, uploadPreset)
+      onMessage(
+        selectedTemplate?.id === "T5"
+          ? "Block split base video uploaded — you can create the T5 brief now."
+          : "Sauna base video uploaded — you can create the T2 brief now.",
+      )
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Upload failed")
     } finally {
@@ -431,9 +456,18 @@ export function BriefIntakePanel({
       {needsUploadedBaseVideo ? (
         <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
           <p className="text-xs text-muted-foreground">
-            Create your base POV clip in Runway, export MP4, then upload to the creative GCS bucket via gsutil
-            (below), pick from the library, paste a path, or try the in-app uploader. After approval, the Railway
-            worker composites centered POV overlay copy (template v{DEFAULT_POV_SAUNA_TEMPLATE_VERSION}).
+            {selectedTemplate?.id === "T5" ? (
+              <>
+                Upload a 9×16 MP4 for the bottom panel (sauna b-roll, lifestyle clip, etc.). The worker composites the
+                orange block split header from template v3 — same copy layout as static T4.
+              </>
+            ) : (
+              <>
+                Create your base POV clip in Runway, export MP4, then upload to the creative GCS bucket via gsutil
+                (below), pick from the library, paste a path, or try the in-app uploader. After approval, the Railway
+                worker composites centered POV overlay copy (template v{DEFAULT_POV_SAUNA_TEMPLATE_VERSION}).
+              </>
+            )}
           </p>
 
           <details className="rounded-md border bg-background px-3 py-2 text-xs">
@@ -449,10 +483,12 @@ export function BriefIntakePanel({
                 <code className="font-mono">{t4LegacyExample}</code> — paste any existing object path below.
               </p>
               <p>
-                <strong>New canonical folder</strong> (use for all new POV sauna bases):
+                <strong>New canonical folder</strong> (use for all new{" "}
+                {selectedTemplate?.id === "T5" ? "block split" : "POV sauna"} bases):
               </p>
               <pre className="overflow-x-auto rounded bg-muted p-2 font-mono text-[11px] text-foreground">
-                {t4GsutilCommand || `gsutil cp your-sauna.mp4 gs://${t4CreativeBucket}/${t4ObjectPath}`}
+                {t4GsutilCommand ||
+                  `gsutil cp your-${selectedTemplate?.id === "T5" ? "block-split" : "sauna"}.mp4 gs://${t4CreativeBucket}/${suggestedUploadPath}`}
               </pre>
               <p>
                 List everything:{" "}
@@ -466,14 +502,14 @@ export function BriefIntakePanel({
             <input
               value={uploadedGcsPath}
               onChange={(e) => setUploadedGcsPath(normalizeGcsObjectPath(e.target.value))}
-              placeholder={t4ObjectPath}
+              placeholder={suggestedUploadPath}
               className="w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
             />
           </label>
           <button
             type="button"
             className="text-xs underline text-muted-foreground hover:text-foreground"
-            onClick={() => setUploadedGcsPath(t4ObjectPath)}
+            onClick={() => setUploadedGcsPath(suggestedUploadPath)}
           >
             Use suggested path for this month
           </button>

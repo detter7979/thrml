@@ -5,6 +5,7 @@ import { Check, Eye, Loader2, Wand2, X } from "lucide-react"
 type CreativeAssetCardProps = {
   asset: {
     id: string
+    format?: string | null
     generation_tool?: string | null
     variation_label?: string | null
     variation_index?: number | null
@@ -25,6 +26,9 @@ type CreativeAssetCardProps = {
   onEditPromptChange: (value: string) => void
   onApplyEdit: () => void
   editBusy: boolean
+  buildOutFormats?: string[]
+  onBuildOutSizes?: () => void
+  buildOutBusy?: boolean
 }
 
 export function canEditPhotoAsset(asset: {
@@ -93,6 +97,9 @@ export function CreativeAssetCard({
   onEditPromptChange,
   onApplyEdit,
   editBusy,
+  buildOutFormats,
+  onBuildOutSizes,
+  buildOutBusy,
 }: CreativeAssetCardProps) {
   const status = asset.status ?? "generated"
   const isApproved = status === "approved"
@@ -132,8 +139,21 @@ export function CreativeAssetCard({
       </div>
 
       <p className="text-[11px] leading-snug text-muted-foreground">
-        {sourceLabel} · {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`} · {status}
+        {sourceLabel} · {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`}
+        {asset.format ? ` · ${asset.format}` : ""} · {status}
       </p>
+
+      {buildOutFormats?.length && onBuildOutSizes ? (
+        <button
+          type="button"
+          disabled={buildOutBusy}
+          onClick={onBuildOutSizes}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-[#9A4A33]/40 bg-[#9A4A33]/10 px-2 py-1.5 text-[11px] font-medium text-[#9A4A33] hover:bg-[#9A4A33]/15 disabled:opacity-50"
+        >
+          {buildOutBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
+          Build out {buildOutFormats.join(", ")}
+        </button>
+      ) : null}
 
       {canEditPhoto ? (
         <div className="space-y-1.5 rounded-md border border-dashed border-[#9A4A33]/30 bg-[#9A4A33]/5 p-2">

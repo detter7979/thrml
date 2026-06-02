@@ -1,4 +1,4 @@
-# thrml creative concept presets (T1–T4)
+# thrml creative concept presets (T1–T5)
 # Used by admin Creative Pipeline "New from template" intake.
 
 version: 1
@@ -155,6 +155,46 @@ templates:
       - variation_label: C
         tokens:
           HEADLINE: "Earn while you recover."
+
+  - id: T5
+    label: "Block Split — Upload MP4"
+    short_label: "Block Split (Video)"
+    description: "Same orange block + copy as T4 static; upload MP4 for the bottom half instead of a photo."
+    group: video_block
+    type: video
+    category: Hosts
+    angle: pov_earnings
+    formats: ["9x16"]
+    default_variations: 2
+    concept_verify_default: true
+    full_batch_variations: 3
+    naming:
+      test_id: T05
+      format: Video_15s
+      cta: list_now
+      template_slug: block_split_video
+    defaults:
+      trigger_type: manual
+      hypothesis: "Block split layout with uploaded b-roll in the bottom panel — pair with T4 static for A/B format tests."
+      hook: "Turn your idle sauna into income."
+      copy_headline: "Turn your idle sauna into income."
+      campaign_short_name: pov-earnings
+    svg_tokens:
+      TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
+      SUBHEAD: "Backyard and cabin saunas in Seattle + LA."
+    video:
+      source: uploaded
+      layout: block_split
+      concept_slug: pov-earnings
+      asset_slug: block-split
+      template_version: 3
+      copy_variants:
+        - slug: block-idle-income
+          variant: A
+          headline: "Turn your idle sauna into income."
+        - slug: block-sauna-bill
+          variant: B
+          headline: "Let your sauna pay its own electric bill."
 
 svg_templates:
   - id: thrml_split_header_static

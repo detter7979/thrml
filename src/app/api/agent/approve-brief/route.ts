@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { processStaticBrief } from "@/lib/agent/static-generator"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
 import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-generator"
+import { isConceptVerifyBrief, previewFormatForBrief } from "@/lib/agent/static-brief-plan"
+import { expandStaticSizesFromAsset } from "@/lib/agent/static-preview-expand"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 type StaticFormat = "1x1" | "4x5" | "9x16"
@@ -75,6 +77,59 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const { data: existingAssets } = await admin!
+      .from("creative_assets")
+      .select("id, format, variation_label, created_at")
+      .eq("brief_id", data.id)
+      .order("created_at", { ascending: true })
+
+    const conceptVerify = isConceptVerifyBrief(data)
+    const previewFormat = previewFormatForBrief(data)
+
+    if (conceptVerify && existingAssets?.length) {
+      const anchor =
+        existingAssets.find(
+          (asset) =>
+            (asset.variation_label ?? "A").toUpperCase().slice(0, 1) === "A" &&
+            (asset.format === previewFormat || !asset.format),
+        ) ?? existingAssets[0]
+
+      const expanded = await expandStaticSizesFromAsset({ assetId: anchor.id })
+
+      const queueUpdate = await admin!
+        .from("creative_queue")
+        .update({ approved_at: now, approved_by: "dom", status: "brief_ready" })
+        .eq("brief_id", briefId)
+      if (queueUpdate.error && queueUpdate.error.code !== "42703") {
+        console.warn("[agent/approve-brief] creative_queue update failed", queueUpdate.error)
+      }
+
+      return NextResponse.json({
+        ok: true,
+        briefId: data.id,
+        generated: expanded.generated,
+        expanded: true,
+      })
+    }
+
+    if (conceptVerify) {
+      const generated = await processStaticBrief({
+        briefId: data.id,
+        variations: 1,
+        formats: [previewFormat],
+      })
+
+      const queueUpdate = await admin!
+        .from("creative_queue")
+        .update({ approved_at: now, approved_by: "dom", status: "brief_ready" })
+        .eq("brief_id", briefId)
+      if (queueUpdate.error && queueUpdate.error.code !== "42703") {
+        console.warn("[agent/approve-brief] creative_queue update failed", queueUpdate.error)
+      }
+
+      return NextResponse.json({ ok: true, briefId: data.id, generated, preview: true })
+    }
+
     const generated = await processStaticBrief({
       briefId: data.id,
       formats: formatsForBrief(data.format),

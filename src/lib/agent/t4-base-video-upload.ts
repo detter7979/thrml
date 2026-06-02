@@ -38,3 +38,39 @@ export function gsutilUploadCommand(
 ) {
   return `gsutil cp ${localFile} ${suggestedT4BaseVideoGsUri(creativeBucket, date)}`
 }
+
+/** Matches T5 block-split video template in `config/creative-templates.yaml`. */
+export const T5_BLOCK_SPLIT_VIDEO_UPLOAD = {
+  conceptSlug: "pov-earnings",
+  assetSlug: "block-split",
+  category: "Hosts",
+  angleSlug: "pov_earnings",
+  version: 1,
+} as const
+
+export function suggestedT5BlockSplitVideoObjectPath(date = new Date()) {
+  return baseVideoPath({
+    date,
+    conceptSlug: T5_BLOCK_SPLIT_VIDEO_UPLOAD.conceptSlug,
+    assetSlug: T5_BLOCK_SPLIT_VIDEO_UPLOAD.assetSlug,
+    source: "uploaded",
+    version: T5_BLOCK_SPLIT_VIDEO_UPLOAD.version,
+    category: T5_BLOCK_SPLIT_VIDEO_UPLOAD.category,
+    angleSlug: T5_BLOCK_SPLIT_VIDEO_UPLOAD.angleSlug,
+  })
+}
+
+export function suggestedT5BlockSplitVideoGsUri(
+  creativeBucket = resolveCreativeBucketName(),
+  date = new Date(),
+) {
+  return `gs://${creativeBucket}/${suggestedT5BlockSplitVideoObjectPath(date)}`
+}
+
+export function gsutilBlockSplitUploadCommand(
+  localFile = "your-block-split.mp4",
+  creativeBucket = resolveCreativeBucketName(),
+  date = new Date(),
+) {
+  return `gsutil cp ${localFile} ${suggestedT5BlockSplitVideoGsUri(creativeBucket, date)}`
+}

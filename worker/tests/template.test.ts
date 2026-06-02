@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { templateV1, templateV2, getTemplate, DEFAULT_POV_SAUNA_TEMPLATE_VERSION } from "../src/template.js"
+import { templateV1, templateV2, templateV3, getTemplate, DEFAULT_POV_SAUNA_TEMPLATE_VERSION } from "../src/template.js"
 import { buildFilterComplex } from "../src/renderer.js"
 
 describe("template", () => {
@@ -25,9 +25,10 @@ describe("template", () => {
     expect(templateV2.fontPath).toBe("assets/DMSerifDisplay-Regular.ttf")
   })
 
-  it("getTemplate returns v1 and v2", () => {
+  it("getTemplate returns v1, v2, and v3", () => {
     expect(getTemplate(1)).toBe(templateV1)
     expect(getTemplate(2)).toBe(templateV2)
+    expect(getTemplate(3)).toBe(templateV3)
   })
 
   it("default POV sauna template is v2", () => {

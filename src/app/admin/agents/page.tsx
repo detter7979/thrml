@@ -7,6 +7,7 @@ import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
 import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
+import { buildOutFormatsForAsset, nextVariationLabelsForBrief } from "@/lib/agent/static-brief-plan"
 import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
 import { CreativePipelinePurgePanel } from "@/components/admin/creative/creative-pipeline-purge-panel"
@@ -482,12 +483,53 @@ export default function AgentsDashboard() {
     setBusyAction(`preview-${briefId}`)
     setPipelineMessage(null)
     try {
-      await patchPipeline({ action: "generate_preview", brief_id: briefId })
+      const json = (await patchPipeline({ action: "generate_preview", brief_id: briefId })) as {
+        preview_format?: string
+      }
       await mutatePipeline()
-      setPipelineMessage("Preview generated (1× 1x1). Approve brief for full batch.")
+      const fmt = json.preview_format ?? "1x1"
+      setPipelineMessage(`Preview generated (1× ${fmt}). Edit via prompt if needed, then Build out sizes.`)
       setEditBrief(null)
     } catch (err) {
       setPipelineMessage(err instanceof Error ? err.message : "Preview generation failed.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const expandStaticSizes = async (assetId: string) => {
+    setBusyAction(`expand-${assetId}`)
+    setPipelineMessage(null)
+    try {
+      const json = (await patchPipeline({ action: "expand_static_sizes", asset_id: assetId })) as {
+        generated?: number
+      }
+      await mutatePipeline()
+      setPipelineMessage(
+        json.generated
+          ? `Built out ${json.generated} additional size${json.generated === 1 ? "" : "s"} from preview.`
+          : "All target sizes already exist for this variation.",
+      )
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not build out sizes.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const generateVariationPreview = async (briefId: string, variationLabel: "A" | "B" | "C") => {
+    setBusyAction(`variation-${briefId}-${variationLabel}`)
+    setPipelineMessage(null)
+    try {
+      await patchPipeline({
+        action: "generate_variation_preview",
+        brief_id: briefId,
+        variation_label: variationLabel,
+      })
+      await mutatePipeline()
+      setPipelineMessage(`Variation ${variationLabel} preview generated. Review, edit, then build out sizes.`)
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not generate variation preview.")
     } finally {
       setBusyAction(null)
     }
@@ -1180,6 +1222,12 @@ export default function AgentsDashboard() {
                     {assetsByBrief.map((group) => {
                   const selected = selectedForBrief(group.briefId)
                   const selectedApproved = selected.filter((asset) => asset.status === "approved")
+                  const planLabels = group.brief
+                    ? parseStoredStaticVariations(group.brief.trigger_data)?.map((row) => row.variation_label)
+                    : undefined
+                  const pendingVariationLabels = group.brief
+                    ? nextVariationLabelsForBrief(group.brief, group.assets, planLabels)
+                    : []
                   return (
                     <div key={group.briefId} className="rounded-lg border p-3 space-y-3">
                       <div>
@@ -1194,6 +1242,10 @@ export default function AgentsDashboard() {
                       <div className="grid gap-3 md:grid-cols-3">
                         {group.assets.map((asset) => {
                           const photoEditable = canEditPhotoAsset(asset) && !isVideoAsset(asset)
+                          const buildOutFormats = group.brief
+                            ? buildOutFormatsForAsset(group.brief, asset, group.assets)
+                            : []
+                          const canBuildOut = buildOutFormats.length > 0 && !isVideoAsset(asset)
                           return (
                           <CreativeAssetCard
                             key={asset.id}
@@ -1219,6 +1271,11 @@ export default function AgentsDashboard() {
                               })
                             }
                             editBusy={busyAction === `edit-photo-${asset.id}`}
+                            buildOutFormats={canBuildOut ? buildOutFormats : undefined}
+                            onBuildOutSizes={
+                              canBuildOut ? () => void expandStaticSizes(asset.id) : undefined
+                            }
+                            buildOutBusy={busyAction === `expand-${asset.id}`}
                             preview={
                               <div className={`aspect-square w-full`}>
                                 {isVideoAsset(asset) ? (
@@ -1249,6 +1306,19 @@ export default function AgentsDashboard() {
                         })}
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        {pendingVariationLabels
+                          .filter((label) => label !== "A")
+                          .map((label) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => void generateVariationPreview(group.briefId, label)}
+                              disabled={busyAction === `variation-${group.briefId}-${label}`}
+                              className="text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
+                            >
+                              New variation {label} preview
+                            </button>
+                          ))}
                         <button
                           onClick={() => approveAll(group.assets)}
                           disabled={busyAction === `approve-all-${group.briefId}`}

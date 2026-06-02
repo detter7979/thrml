@@ -237,9 +237,11 @@ export async function POST(req: NextRequest) {
         base_video_gcs_path: baseGcsPath,
         variant_slug: variant.slug,
         copy_text:
-          templateVersion >= 2
-            ? formatPovVideoOverlay(variant.copy)
-            : variant.copy,
+          templateVersion >= 3
+            ? variant.copy
+            : templateVersion >= 2
+              ? formatPovVideoOverlay(variant.copy)
+              : variant.copy,
         concept_slug: config.conceptSlug,
         template_version: templateVersion,
         ad_name: adName,

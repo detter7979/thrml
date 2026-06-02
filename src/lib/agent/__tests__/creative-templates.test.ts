@@ -7,10 +7,10 @@ import {
 } from "../creative-templates"
 
 describe("creative-templates", () => {
-  it("loads four active templates (T1–T4)", () => {
+  it("loads five active templates (T1–T5)", () => {
     const templates = loadCreativeTemplates()
-    expect(templates.length).toBe(4)
-    expect(templates.map((t) => t.id)).toEqual(["T1", "T2", "T3", "T4"])
+    expect(templates.length).toBe(5)
+    expect(templates.map((t) => t.id)).toEqual(["T1", "T2", "T3", "T4", "T5"])
   })
 
   it("builds static brief with concept verify", () => {
@@ -27,6 +27,18 @@ describe("creative-templates", () => {
     })
   })
 
+  it("builds block split upload video brief with JSON overlay copy", () => {
+    const t5 = getCreativeTemplate("T5")
+    expect(t5).toBeDefined()
+    const brief = buildBriefFromTemplate(t5!, { conceptVerify: true })
+    expect(brief.video_config?.templateVersion).toBe(3)
+    expect(brief.video_config?.copyVariants[0]?.copy).toContain('"headline"')
+    expect(brief.trigger_data).toMatchObject({
+      video_layout: "block_split",
+      template_id: "T5",
+    })
+  })
+
   it("builds upload video brief with naming", () => {
     const t2 = getCreativeTemplate("T2")
     const brief = buildBriefFromTemplate(t2!, { conceptVerify: false })
@@ -36,7 +48,6 @@ describe("creative-templates", () => {
   })
 
   it("does not include removed templates", () => {
-    expect(getCreativeTemplate("T5")).toBeUndefined()
     expect(getCreativeTemplate("T6")).toBeUndefined()
     expect(getCreativeTemplate("T7")).toBeUndefined()
   })

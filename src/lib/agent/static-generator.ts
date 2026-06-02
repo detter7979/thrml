@@ -20,6 +20,11 @@ import {
   generateSvgVariantsForBrief,
   type SvgStaticFormat,
 } from "@/lib/agent/svg-template-generator"
+import {
+  isConceptVerifyBrief,
+  previewFormatForBrief,
+  targetFormatsForBrief,
+} from "@/lib/agent/static-brief-plan"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
@@ -49,6 +54,7 @@ type CreativeBriefRow = {
   hook: string | null
   format: string | null
   campaign_short_name: string | null
+  success_criteria: Record<string, unknown> | null
 }
 
 function templateSlugFromBrief(brief: CreativeBriefRow) {
@@ -250,8 +256,16 @@ function aspectForFormat(format: StaticFormat): AspectRatio {
   return "1:1"
 }
 
-function parseFormatsFromBrief(format: unknown, override?: StaticFormat[]): StaticFormat[] {
+function parseFormatsFromBrief(
+  format: unknown,
+  override?: StaticFormat[],
+  successCriteria?: Record<string, unknown> | null,
+): StaticFormat[] {
   if (override?.length) return Array.from(new Set(override)).slice(0, 3)
+  if (successCriteria) {
+    const fromSc = targetFormatsForBrief({ format: typeof format === "string" ? format : null, success_criteria: successCriteria })
+    if (fromSc.length) return fromSc
+  }
   if (typeof format !== "string") return ["1x1"]
   const formats = new Set<StaticFormat>()
   for (const value of format.split(/[,/+\s]+/)) {
@@ -259,6 +273,19 @@ function parseFormatsFromBrief(format: unknown, override?: StaticFormat[]): Stat
     if (normalized) formats.add(normalized)
   }
   return formats.size > 0 ? Array.from(formats) : ["1x1"]
+}
+
+function resolveRequestedVariations(
+  brief: CreativeBriefRow,
+  staticPlan: StoredStaticVariation[] | null,
+  override?: StaticVariationCount,
+): StaticVariationCount {
+  if (override) return override
+  const fromBrief = briefRequestedVariationCount(brief)
+  if (fromBrief) return fromBrief
+  if (isConceptVerifyBrief(brief)) return 1
+  if (staticPlan?.length) return Math.min(staticPlan.length, 3) as StaticVariationCount
+  return defaultVariationCount()
 }
 
 function countBaseImages(generatorCount: number, formatCount: number, requestedVariations: number) {
@@ -413,7 +440,7 @@ async function getBrief(admin: ReturnType<typeof createAdminClient>, briefId: st
   const { data, error } = await admin
     .from("creative_briefs")
     .select(
-      "id, trigger_type, trigger_data, status, approved_at, visual_direction, copy_primary, copy_headline, copy_subtext, cta, hook, format, campaign_short_name",
+      "id, trigger_type, trigger_data, status, approved_at, visual_direction, copy_primary, copy_headline, copy_subtext, cta, hook, format, campaign_short_name, success_criteria",
     )
     .eq("id", briefId)
     .maybeSingle()
@@ -431,8 +458,8 @@ async function processStaticBriefInner(
 
   if (briefUsesSvgTemplate(brief.trigger_data)) {
     await admin.from("creative_briefs").update({ status: "generating" }).eq("id", brief.id)
-    const formats = parseFormatsFromBrief(brief.format, options.formats) as SvgStaticFormat[]
-    const requestedVariations = options.variations ?? briefRequestedVariationCount(brief) ?? defaultVariationCount()
+    const formats = parseFormatsFromBrief(brief.format, options.formats, brief.success_criteria) as SvgStaticFormat[]
+    const requestedVariations = resolveRequestedVariations(brief, null, options.variations)
     const results = await generateSvgVariantsForBrief(brief.id, {
       formats,
       variations: requestedVariations,
@@ -453,10 +480,8 @@ async function processStaticBriefInner(
 
   const generator = briefGenerator(brief, options.generator)
   const generators = generatorsFor(generator)
-  const formats = parseFormatsFromBrief(brief.format, options.formats)
-  const requestedVariations = staticPlan?.length
-    ? (Math.min(staticPlan.length, 3) as StaticVariationCount)
-    : (options.variations ?? briefRequestedVariationCount(brief) ?? defaultVariationCount())
+  const formats = parseFormatsFromBrief(brief.format, options.formats, brief.success_criteria)
+  const requestedVariations = resolveRequestedVariations(brief, staticPlan, options.variations)
   const baseCount = countBaseImages(generators.length, formats.length, requestedVariations)
   const subtextLocked = lockedSubtextForBrief(brief)
   let generated = 0

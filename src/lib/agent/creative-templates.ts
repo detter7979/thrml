@@ -5,6 +5,10 @@ import yaml from "js-yaml"
 
 import { HOST_MONETIZATION_CANONICAL_VARIATIONS } from "@/lib/agent/host-monetization-static"
 import type { VideoConfig, VideoCopyVariant } from "@/lib/agent/types"
+import {
+  DEFAULT_BLOCK_SPLIT_VIDEO_OVERLAY,
+  formatBlockSplitVideoOverlay,
+} from "@/lib/agent/video-template-copy"
 
 export type CreativeTemplateType = "static" | "video"
 
@@ -16,7 +20,7 @@ export type CreativeTemplateNaming = {
   template_slug?: string
 }
 
-export type CreativeTemplateGroup = "static_photo" | "static_svg" | "video_pov"
+export type CreativeTemplateGroup = "static_photo" | "static_svg" | "video_pov" | "video_block"
 
 export type CreativeTemplateStaticVariation = {
   variation_label: string
@@ -35,12 +39,15 @@ export type CreativeTemplateVideoBlock = {
   concept_slug: string
   asset_slug: string
   template_version: number
+  layout?: "pov_overlay" | "block_split"
   duration?: 5 | 10
   ratio?: "720:1280" | "1280:720" | "768:1280" | "1280:768"
   runway_prompt?: string
+  block_tokens?: Record<string, string>
   copy_variants: Array<{
     slug: string
-    copy: string
+    copy?: string
+    headline?: string
     variant?: "A" | "B" | "C" | "D"
   }>
 }
@@ -158,16 +165,54 @@ export function buildBriefFromTemplate(
   }
 
   const format = template.formats.join(",")
-  const successCriteria = { variations, formats: template.formats, concept_verify: conceptVerify }
+  const successCriteria = {
+    variations,
+    formats: template.formats,
+    concept_verify: conceptVerify,
+    preview_format: template.formats[0] ?? "1x1",
+  }
 
   if (template.type === "video" && template.video) {
     const v = template.video
-    const copyVariants: VideoCopyVariant[] = v.copy_variants.slice(0, variations).map((cv) => ({
-      slug: cv.slug,
-      copy: cv.copy,
-      variant: cv.variant,
-      angle: template.angle,
-    }))
+    const taglineEyebrow =
+      v.block_tokens?.TAGLINE_EYEBROW ??
+      template.svg_tokens?.TAGLINE_EYEBROW ??
+      DEFAULT_BLOCK_SPLIT_VIDEO_OVERLAY.taglineEyebrow
+    const subhead =
+      v.block_tokens?.SUBHEAD ??
+      template.svg_tokens?.SUBHEAD ??
+      DEFAULT_BLOCK_SPLIT_VIDEO_OVERLAY.subhead
+
+    if (v.layout === "block_split") {
+      triggerData.video_layout = "block_split"
+      triggerData.svg_tokens = {
+        TAGLINE_EYEBROW: taglineEyebrow,
+        SUBHEAD: subhead,
+      }
+    }
+
+    const copyVariants: VideoCopyVariant[] = v.copy_variants.slice(0, variations).map((cv) => {
+      if (v.layout === "block_split") {
+        const headline =
+          cv.headline?.trim() ||
+          cv.copy?.trim() ||
+          template.defaults.copy_headline ||
+          DEFAULT_BLOCK_SPLIT_VIDEO_OVERLAY.headline
+        return {
+          slug: cv.slug,
+          copy: formatBlockSplitVideoOverlay({ taglineEyebrow, headline, subhead }),
+          variant: cv.variant,
+          angle: template.angle,
+        }
+      }
+
+      return {
+        slug: cv.slug,
+        copy: cv.copy ?? "",
+        variant: cv.variant,
+        angle: template.angle,
+      }
+    })
 
     const video_config: VideoConfig = {
       source: v.source,

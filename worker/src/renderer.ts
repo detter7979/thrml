@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { VideoTemplate } from "./template.js"
+import { renderBlockSplit } from "./block-split-renderer.js"
 
 export interface RenderArgs {
   baseVideoPath: string
@@ -138,6 +139,10 @@ export function buildFilterComplex(args: {
 }
 
 export async function render(args: RenderArgs): Promise<void> {
+  if (args.template.version === 3) {
+    return renderBlockSplit(args)
+  }
+
   const { baseVideoPath, outputPath, copyText, template: t } = args
 
   await mkdir(dirname(outputPath), { recursive: true })

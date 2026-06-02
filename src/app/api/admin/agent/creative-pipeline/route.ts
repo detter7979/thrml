@@ -6,6 +6,11 @@ import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/g
 import { isRunwayConfigured } from "@/lib/agent/runway"
 import { processStaticBrief } from "@/lib/agent/static-generator"
 import { editStaticPhotoAsset } from "@/lib/agent/static-photo-recomposite"
+import { previewFormatForBrief } from "@/lib/agent/static-brief-plan"
+import {
+  expandStaticSizesFromAsset,
+  generateStaticVariationPreview,
+} from "@/lib/agent/static-preview-expand"
 import { editRunwayVideoFromAsset } from "@/lib/agent/video-runway-edit"
 import {
   generateFromSvgTemplate,
@@ -28,6 +33,8 @@ const PIPELINE_ACTIONS = new Set([
   "create_static_brief",
   "create_svg_static_brief",
   "generate_preview",
+  "expand_static_sizes",
+  "generate_variation_preview",
   "generate_svg_static",
   "acknowledge_claim_warning",
   "edit_static_photo",
@@ -349,6 +356,9 @@ export async function PATCH(req: NextRequest) {
     save_as_new_variant?: boolean
     replace_in_place?: boolean
     confirm?: string
+    formats?: string[]
+    variation_label?: string
+    visual_direction?: string
   } | null
 
   if (!body?.action || !PIPELINE_ACTIONS.has(body.action)) {
@@ -670,7 +680,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: brief, error: briefError } = await admin!
       .from("creative_briefs")
-      .select("id, trigger_data, format")
+      .select("id, trigger_data, format, success_criteria")
       .eq("id", body.brief_id)
       .maybeSingle()
 
@@ -678,14 +688,54 @@ export async function PATCH(req: NextRequest) {
     if (!brief) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
 
     try {
+      const previewFormat = previewFormatForBrief(brief)
       const generated = await processStaticBrief({
         briefId: body.brief_id,
         variations: 1,
-        formats: ["1x1"],
+        formats: [previewFormat],
       })
-      return NextResponse.json({ ok: true, generated })
+      return NextResponse.json({ ok: true, generated, preview_format: previewFormat })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Preview generation failed"
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+  }
+
+  if (body.action === "expand_static_sizes") {
+    if (!body.asset_id) return NextResponse.json({ error: "asset_id is required" }, { status: 400 })
+
+    try {
+      const result = await expandStaticSizesFromAsset({
+        assetId: body.asset_id,
+        formats: Array.isArray(body.formats)
+          ? body.formats.filter((value): value is "1x1" | "4x5" | "9x16" =>
+              value === "1x1" || value === "4x5" || value === "9x16",
+            )
+          : undefined,
+      })
+      return NextResponse.json({ ok: true, ...result })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Size expansion failed"
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+  }
+
+  if (body.action === "generate_variation_preview") {
+    if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
+    const variationLabel = typeof body.variation_label === "string" ? body.variation_label.trim().toUpperCase() : ""
+    if (variationLabel !== "A" && variationLabel !== "B" && variationLabel !== "C") {
+      return NextResponse.json({ error: "variation_label must be A, B, or C" }, { status: 400 })
+    }
+
+    try {
+      const result = await generateStaticVariationPreview({
+        briefId: body.brief_id,
+        variationLabel,
+        promptOverride: typeof body.visual_direction === "string" ? body.visual_direction : null,
+      })
+      return NextResponse.json({ ok: true, ...result })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Variation preview failed"
       return NextResponse.json({ error: message }, { status: 500 })
     }
   }

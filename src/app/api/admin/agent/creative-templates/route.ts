@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { getCreativeTemplate, buildBriefFromTemplate, loadCreativeTemplates } from "@/lib/agent/creative-templates"
+import { previewFormatForBrief } from "@/lib/agent/static-brief-plan"
 import { loadSvgTemplateRegistry } from "@/lib/agent/svg-template-generator"
 import { processStaticBrief } from "@/lib/agent/static-generator"
 import { requireAdminApi } from "@/lib/admin-guard"
@@ -86,6 +87,31 @@ export async function POST(req: NextRequest) {
 
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: "Failed to create brief" }, { status: 500 })
+
+  const conceptVerify = Boolean(body?.conceptVerify ?? template.concept_verify_default)
+  const shouldPreviewOnly = conceptVerify && !saveAndApprove && !data.video_config
+
+  if (shouldPreviewOnly) {
+    try {
+      const generated = await processStaticBrief({
+        briefId: data.id,
+        variations: 1,
+        formats: [previewFormatForBrief(data)],
+      })
+      const { data: updated, error: reloadError } = await admin!
+        .from("creative_briefs")
+        .select("*")
+        .eq("id", data.id)
+        .maybeSingle()
+
+      if (reloadError) return NextResponse.json({ error: reloadError.message }, { status: 500 })
+      return NextResponse.json({ brief: updated ?? data, generated, preview: true })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Preview generation failed"
+      console.error("[creative-templates] preview generation failed", err)
+      return NextResponse.json({ error: message, brief: data }, { status: 500 })
+    }
+  }
 
   if (saveAndApprove && !data.video_config) {
     try {

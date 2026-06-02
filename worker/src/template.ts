@@ -6,6 +6,8 @@
  * v1 once renders have been produced against it.
  */
 
+import { BRAND_RUST_HEX } from "./brand-colors.js"
+
 export interface BlockSplitLayout {
   width: number
   height: number
@@ -130,7 +132,7 @@ export const templateV3: VideoTemplate = {
     height: 1920,
     topBlockHeight: 640,
     videoHeight: 1280,
-    brandColor: "C75B3A",
+    brandColor: BRAND_RUST_HEX,
     paddingX: 80,
     brandFontSize: 64,
     brandY: 96,

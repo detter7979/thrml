@@ -8,6 +8,7 @@ import {
   wrapOverlayLine,
   type BlockSplitVideoOverlay,
 } from "./block-split-overlay.js"
+import { BRAND_RUST_FFMPEG } from "./brand-colors.js"
 import type { VideoTemplate } from "./template.js"
 
 export interface BlockSplitRenderArgs {
@@ -61,8 +62,10 @@ export function buildBlockSplitFilterComplex(args: {
   if (!layout) throw new Error("Template is missing blockSplit layout")
 
   const fontPath = resolveWorkerPath(args.template.fontPath)
+  const rust = BRAND_RUST_FFMPEG
   const parts: string[] = [
-    `[0:v]scale=${layout.width}:${layout.videoHeight}:force_original_aspect_ratio=increase,crop=${layout.width}:${layout.videoHeight},setsar=1,pad=${layout.width}:${layout.height}:0:${layout.topBlockHeight}:color=0x${layout.brandColor}[base]`,
+    `[0:v]scale=${layout.width}:${layout.videoHeight}:force_original_aspect_ratio=increase,crop=${layout.width}:${layout.videoHeight},setsar=1,format=rgb24[vid]`,
+    `[vid]pad=${layout.width}:${layout.height}:0:${layout.topBlockHeight}:color=${rust},format=rgb24[base]`,
   ]
 
   const drawSteps: Array<{
@@ -109,7 +112,7 @@ export function buildBlockSplitFilterComplex(args: {
 
   let current = "[base]"
   drawSteps.forEach((step, index) => {
-    const outputLabel = index === drawSteps.length - 1 ? "[out]" : `[txt${index}]`
+    const outputLabel = index === drawSteps.length - 1 ? "[out_rgb]" : `[txt${index}]`
     parts.push(
       drawtextFileStep({
         inputLabel: current,
@@ -124,6 +127,8 @@ export function buildBlockSplitFilterComplex(args: {
     )
     current = outputLabel
   })
+
+  parts.push("[out_rgb]colorspace=all=bt709:iall=bt709:fast=0:format=yuv420p[out]")
 
   return { filter: parts.join(";"), outputLabel: "out" }
 }
@@ -172,6 +177,14 @@ export async function renderBlockSplit(args: BlockSplitRenderArgs): Promise<void
         "2",
         "-pix_fmt",
         "yuv420p",
+        "-colorspace",
+        "bt709",
+        "-color_primaries",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-color_range",
+        "tv",
         "-movflags",
         "+faststart",
         "-an",

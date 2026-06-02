@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 
+import { BRAND_RUST_HEX } from "../src/brand-colors.js"
 import { parseBlockSplitVideoOverlay, wrapOverlayLine } from "../src/block-split-overlay.js"
 import { buildBlockSplitFilterComplex } from "../src/block-split-renderer.js"
 import { templateV3 } from "../src/template.js"
@@ -40,8 +41,12 @@ describe("buildBlockSplitFilterComplex", () => {
     })
 
     expect(filter).toContain("scale=1080:1280")
-    expect(filter).toContain("pad=1080:1920:0:640:color=0xC75B3A")
+    expect(filter).toContain("format=rgb24")
+    expect(filter).toContain(`pad=1080:1920:0:640:color=0x${BRAND_RUST_HEX}`)
+    expect(filter).toContain("colorspace=all=bt709")
     expect(filter).not.toContain("color=c=0xC75B3A:s=")
+    expect(filter).not.toContain("drawbox")
+    expect(filter).not.toContain("grad")
     expect(filter).toContain("textfile='/tmp/block-headline-0.txt'")
     expect(filter).toContain("[out]")
   })

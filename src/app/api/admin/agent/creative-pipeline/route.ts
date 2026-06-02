@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { appendApprovedCreativeToNamer } from "@/lib/agent/namer-creative-append"
-import { purgeCreativePipeline } from "@/lib/agent/creative-pipeline-purge"
+import { deleteCreativeBrief, purgeCreativePipeline } from "@/lib/agent/creative-pipeline-purge"
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
 import { isRunwayConfigured } from "@/lib/agent/runway"
 import { processStaticBrief } from "@/lib/agent/static-generator"
@@ -26,6 +26,7 @@ export const maxDuration = 300
 
 const PIPELINE_ACTIONS = new Set([
   "reject_brief",
+  "delete_brief",
   "update_brief",
   "approve_asset",
   "reject_asset",
@@ -806,6 +807,19 @@ export async function PATCH(req: NextRequest) {
 
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
     return NextResponse.json({ brief: data })
+  }
+
+  if (body.action === "delete_brief") {
+    if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
+
+    try {
+      const summary = await deleteCreativeBrief(body.brief_id)
+      return NextResponse.json({ ok: true, summary })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Brief delete failed"
+      const status = message === "Brief not found" ? 404 : 500
+      return NextResponse.json({ error: message }, { status })
+    }
   }
 
   if (body.action === "update_brief") {

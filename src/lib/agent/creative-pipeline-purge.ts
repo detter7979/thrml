@@ -13,9 +13,20 @@ export type CreativePurgeSummary = {
   gcsPathsPreserved: string[]
 }
 
+export type DeleteCreativeBriefSummary = {
+  briefId: string
+  assetsDeleted: number
+  renderJobsDeleted: number
+  gcsDeleted: number
+  gcsFailed: number
+}
+
 type AssetRow = {
+  id?: string
   gcs_path: string | null
   performance_data: Record<string, unknown> | null
+  launched_at?: string | null
+  meta_ad_id?: string | null
 }
 
 type RenderJobRow = {
@@ -94,11 +105,114 @@ async function collectGeneratedGcsPaths(admin: ReturnType<typeof createAdminClie
   return paths
 }
 
+async function unlinkCreativeQueueBrief(admin: ReturnType<typeof createAdminClient>, briefId: string) {
+  const { error } = await admin.from("creative_queue").update({ brief_id: null }).eq("brief_id", briefId)
+  if (error && !/creative_queue|does not exist|relation/i.test(error.message)) {
+    throw new Error(error.message)
+  }
+}
+
 async function unlinkCreativeQueueBriefs(admin: ReturnType<typeof createAdminClient>) {
   const { error } = await admin.from("creative_queue").update({ brief_id: null }).not("brief_id", "is", null)
   if (error && !/creative_queue|does not exist|relation/i.test(error.message)) {
     throw new Error(error.message)
   }
+}
+
+function collectBriefGcsPaths(
+  assets: AssetRow[],
+  jobs: RenderJobRow[],
+): { generated: string[]; preserved: string[] } {
+  const paths = new Set<string>()
+  for (const asset of assets) collectGcsPathsFromAsset(asset, paths)
+  for (const job of jobs) {
+    if (!job.rendered_gcs_path) continue
+    const objectPath = objectPathFromGcsRef(job.rendered_gcs_path)
+    if (objectPath) paths.add(objectPath)
+  }
+
+  const generated: string[] = []
+  const preserved: string[] = []
+  for (const objectPath of paths) {
+    if (isPreservedCreativeObjectPath(objectPath)) preserved.push(objectPath)
+    else if (isGeneratedCreativeObjectPath(objectPath)) generated.push(objectPath)
+  }
+
+  return { generated, preserved }
+}
+
+export async function deleteCreativeBrief(briefId: string): Promise<DeleteCreativeBriefSummary> {
+  const admin = createAdminClient()
+
+  const { data: brief, error: briefErr } = await admin
+    .from("creative_briefs")
+    .select("id")
+    .eq("id", briefId)
+    .maybeSingle()
+  if (briefErr) throw new Error(briefErr.message)
+  if (!brief) throw new Error("Brief not found")
+
+  const [{ data: assets, error: assetsErr }, { data: jobs, error: jobsErr }] = await Promise.all([
+    admin
+      .from("creative_assets")
+      .select("id, gcs_path, performance_data, launched_at, meta_ad_id")
+      .eq("brief_id", briefId),
+    admin.from("render_jobs").select("id, rendered_gcs_path").eq("brief_id", briefId),
+  ])
+  if (assetsErr) throw new Error(assetsErr.message)
+  if (jobsErr) throw new Error(jobsErr.message)
+
+  const assetRows = (assets ?? []) as AssetRow[]
+  const jobRows = (jobs ?? []) as RenderJobRow[]
+
+  const launched = assetRows.some((asset) => asset.launched_at || asset.meta_ad_id)
+  if (launched) {
+    throw new Error("Cannot delete brief with launched Meta ads. Pause or archive ads first.")
+  }
+
+  const { generated: gcsToDelete } = collectBriefGcsPaths(assetRows, jobRows)
+
+  await unlinkCreativeQueueBrief(admin, briefId)
+
+  const { error: parentError } = await admin
+    .from("creative_briefs")
+    .update({ parent_brief_id: null })
+    .eq("parent_brief_id", briefId)
+  if (parentError) throw new Error(parentError.message)
+
+  const assetIds = assetRows.map((asset) => asset.id).filter(Boolean) as string[]
+  if (assetIds.length > 0) {
+    const { error: sourceError } = await admin
+      .from("creative_assets")
+      .update({ source_asset_id: null })
+      .in("source_asset_id", assetIds)
+    if (sourceError) throw new Error(sourceError.message)
+  }
+
+  const summary: DeleteCreativeBriefSummary = {
+    briefId,
+    assetsDeleted: assetRows.length,
+    renderJobsDeleted: jobRows.length,
+    gcsDeleted: 0,
+    gcsFailed: 0,
+  }
+
+  for (const objectPath of gcsToDelete) {
+    const deleted = await deleteCreativeObject(objectPath)
+    if (deleted) summary.gcsDeleted += 1
+    else summary.gcsFailed += 1
+  }
+
+  const { error: renderDeleteError } = await admin.from("render_jobs").delete().eq("brief_id", briefId)
+  if (renderDeleteError) throw new Error(renderDeleteError.message)
+
+  const { error: assetDeleteError } = await admin.from("creative_assets").delete().eq("brief_id", briefId)
+  if (assetDeleteError) throw new Error(assetDeleteError.message)
+
+  const { error: briefDeleteError } = await admin.from("creative_briefs").delete().eq("id", briefId)
+  if (briefDeleteError) throw new Error(briefDeleteError.message)
+
+  return summary
 }
 
 const DELETE_ALL_FILTER_ID = "00000000-0000-0000-0000-000000000000"

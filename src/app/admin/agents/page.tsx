@@ -444,6 +444,57 @@ export default function AgentsDashboard() {
     }
   }
 
+  const deleteBrief = async (brief: CreativeBrief, label?: string) => {
+    const name =
+      label ??
+      (brief.video_config?.conceptSlug ?? brief.campaign_short_name ?? brief.hook ?? "this brief")
+    if (
+      !window.confirm(
+        `Delete "${name}"?\n\nThis removes the brief, render jobs, and generated assets. Uploaded base MP4s in GCS are kept.`,
+      )
+    ) {
+      return
+    }
+
+    setBusyAction(`delete-brief-${brief.id}`)
+    setPipelineMessage(null)
+    try {
+      await patchPipeline({ action: "delete_brief", brief_id: brief.id })
+      await mutatePipeline()
+      setPipelineMessage(`Deleted brief "${name}".`)
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not delete brief.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const deleteAllApprovedVideoBriefs = async () => {
+    const videoBriefs = pipeline?.approvedVideoBriefs ?? []
+    if (videoBriefs.length === 0) return
+    if (
+      !window.confirm(
+        `Delete all ${videoBriefs.length} approved video briefs?\n\nThis removes each brief and its generated assets. Uploaded base MP4s in GCS are kept.`,
+      )
+    ) {
+      return
+    }
+
+    setBusyAction("delete-all-video-briefs")
+    setPipelineMessage(null)
+    try {
+      for (const brief of videoBriefs) {
+        await patchPipeline({ action: "delete_brief", brief_id: brief.id })
+      }
+      await mutatePipeline()
+      setPipelineMessage(`Deleted ${videoBriefs.length} approved video briefs.`)
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not delete video briefs.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
   const reviewAsset = async (id: string, action: "approve_asset" | "reject_asset") => {
     setBusyAction(`${action}-${id}`)
     setPipelineMessage(null)
@@ -1049,9 +1100,21 @@ export default function AgentsDashboard() {
             </section>
 
             <section className="rounded-xl border bg-card p-4">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                Variations Ready ({variationReadyCount})
-              </h2>
+              <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Variations Ready ({variationReadyCount})
+                </h2>
+                {approvedVideoBriefs.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => void deleteAllApprovedVideoBriefs()}
+                    disabled={busyAction === "delete-all-video-briefs"}
+                    className="text-[11px] px-2 py-1 border border-red-200 text-red-700 rounded hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Clear all video briefs ({approvedVideoBriefs.length})
+                  </button>
+                ) : null}
+              </div>
               <div className="space-y-3">
                 {pipelineLoading ? (
                   <p className="text-sm text-muted-foreground">Loading variations...</p>
@@ -1098,6 +1161,14 @@ export default function AgentsDashboard() {
                               className="text-xs px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
                             >
                               Generate Video Variants ({variantCount} copies)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteBrief(brief, config.conceptSlug)}
+                              disabled={busyAction === `delete-brief-${brief.id}`}
+                              className="text-xs px-3 py-1.5 border border-red-200 text-red-700 rounded hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Delete
                             </button>
                           {config.source === "runway" ? (
                             <p className="text-xs text-amber-800">
@@ -1170,6 +1241,14 @@ export default function AgentsDashboard() {
                               </div>
                             ))}
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => void deleteBrief(brief, config?.conceptSlug ?? brief.hook ?? undefined)}
+                            disabled={busyAction === `delete-brief-${brief.id}`}
+                            className="text-xs px-3 py-1.5 border border-red-200 text-red-700 rounded hover:bg-red-50 disabled:opacity-50"
+                          >
+                            Delete brief
+                          </button>
                         </div>
                       )
                     })}

@@ -8,6 +8,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import {
+  batchWriteCells,
   columnToLetter,
   createGoogleSheetsClient,
   listSpreadsheetTabs,
@@ -28,16 +29,24 @@ const CREATIVE_BUILDER_TAB_CANDIDATES = [
 /** thrml_namer_v4 — canonical Creative Builder destination. */
 export const THRML_NAMER_V4_SHEET_ID = "1bSSZNmE8YENlkUOgHaS689Z1UpU8VAD6j5B0MnQK-HQ"
 
-/** Trailing metadata columns — not part of → Ad Name / convention_name. */
-export const NAMER_EXTENDED_HEADERS = [
-  "Asset GCS Link",
+/** Trailing metadata columns (Ad Builder already has GCS Path). */
+export const NAMER_EXTENDED_HEADERS_AD_BUILDER = [
   "Pipeline Template",
-  "Asset UUID",
   "Brief Input",
   "Creative Gen",
   "Campaign Gen",
   "Ad Set Gen",
+  "Asset UUID",
 ] as const
+
+/** Extended columns when the tab has no native GCS Path column. */
+export const NAMER_EXTENDED_HEADERS_WITH_LINK = [
+  "Asset GCS Link",
+  ...NAMER_EXTENDED_HEADERS_AD_BUILDER,
+] as const
+
+/** @deprecated use layout-specific lists */
+export const NAMER_EXTENDED_HEADERS = NAMER_EXTENDED_HEADERS_WITH_LINK
 
 const FORMAT_SPLIT: Record<string, [formatType: string, length: string, aspectRatio: string]> = {
   Static_9x16: ["Static", "NA", "9:16"],
@@ -53,6 +62,8 @@ const FORMAT_SPLIT: Record<string, [formatType: string, length: string, aspectRa
 
 export type ProvenanceLabel = "Human" | "Bot" | "Pending"
 
+export type NamerSheetLayout = "ad_builder" | "creative_builder" | "legacy"
+
 export type NamerCreativeRow = {
   adId: string
   adSetId: string
@@ -60,8 +71,14 @@ export type NamerCreativeRow = {
   testId: string
   variant: string
   angle: string
+  /** Combined naming token e.g. Static_9x16 (convention_name only). */
+  formatToken: string
   formatType: string
+  /** Aspect size e.g. 9x16, 1x1, 4x5, or NA. */
+  sizeToken: string
   length: string
+  /** Video duration e.g. 15s, or NA for static. */
+  videoLength: string
   aspectRatio: string
   cta: string
   adName: string
@@ -70,6 +87,7 @@ export type NamerCreativeRow = {
   platform: string
   phase: string
   optEvent: string
+  assetGcsPath: string
   assetGcsLink: string
   pipelineTemplate: string
   assetUuid: string
@@ -94,6 +112,7 @@ type BriefRow = {
   trigger_data: Record<string, unknown> | null
   created_by: string | null
   hook: string | null
+  copy_headline: string | null
 }
 
 type AssetRow = {
@@ -162,6 +181,99 @@ export function hookPreview(hook: string | null | undefined): string {
   return hook.trim().split(/\s+/).slice(0, 3).join(" ")
 }
 
+/** Ad Builder hook style — full line, ellipsis when long (matches seed rows). */
+export function formatHookCopy(hook: string | null | undefined, layout: NamerSheetLayout): string {
+  if (!hook?.trim()) return ""
+  const text = hook.trim().replace(/\s+/g, " ")
+  if (layout === "creative_builder") return hookPreview(text)
+  if (text.length <= 42) return text
+  return `${text.slice(0, 39).trimEnd()}…`
+}
+
+export function normalizeNamerGcsPath(gcsPath: string | null | undefined): string {
+  if (!gcsPath?.trim()) return ""
+  const trimmed = gcsPath.trim()
+
+  if (trimmed.startsWith("https://storage.googleapis.com/")) {
+    try {
+      const url = new URL(trimmed.split("?")[0] ?? trimmed)
+      const parts = url.pathname.split("/").filter(Boolean)
+      if (parts.length >= 2) {
+        const [bucket, ...objectParts] = parts
+        return `gs://${bucket}/${objectParts.map((p) => decodeURIComponent(p)).join("/")}`
+      }
+    } catch {
+      return trimmed.split("?")[0] ?? trimmed
+    }
+  }
+
+  if (trimmed.startsWith("gs://")) return trimmed.split("?")[0] ?? trimmed
+  return trimmed
+}
+
+export function normalizeTestId(testId: string): string {
+  const match = /^T(\d+)$/i.exec(testId.trim())
+  if (!match) return testId.trim()
+  return `T${match[1].padStart(2, "0")}`
+}
+
+function extendedHeadersForLayout(layout: NamerSheetLayout, headers: string[]): readonly string[] {
+  const hasGcsPath = colIndex(headers, [/^gcs path$/i]) >= 0
+  if (layout === "ad_builder" || hasGcsPath) return NAMER_EXTENDED_HEADERS_AD_BUILDER
+  return NAMER_EXTENDED_HEADERS_WITH_LINK
+}
+
+export function sizeFromFormatToken(formatToken: string, aspectRatio: string): string {
+  const staticMatch = /^Static_(\d+x\d+)$/i.exec(formatToken)
+  if (staticMatch) return staticMatch[1]
+  if (aspectRatio && aspectRatio !== "NA") return aspectRatio.replace(":", "x")
+  return "NA"
+}
+
+export function videoLengthDisplay(formatType: string, length: string): string {
+  if (formatType === "Video") return length === "NA" ? "" : length
+  return "NA"
+}
+
+function headlineFromBrief(brief: BriefRow): string {
+  if (brief.copy_headline?.trim()) return brief.copy_headline.trim()
+
+  const td = brief.trigger_data ?? {}
+  const svgTokens = td.svg_tokens
+  if (svgTokens && typeof svgTokens === "object") {
+    const headline = (svgTokens as Record<string, unknown>).HEADLINE
+    if (typeof headline === "string" && headline.trim()) return headline.trim()
+  }
+
+  const svgVars = td.svg_variations
+  if (Array.isArray(svgVars) && svgVars.length) {
+    const first = svgVars[0]
+    if (first && typeof first === "object") {
+      const tokens = (first as Record<string, unknown>).tokens
+      if (tokens && typeof tokens === "object") {
+        const headline = (tokens as Record<string, unknown>).HEADLINE
+        if (typeof headline === "string" && headline.trim()) return headline.trim()
+      }
+    }
+  }
+
+  const staticVars = td.static_variations
+  if (Array.isArray(staticVars) && staticVars.length) {
+    const first = staticVars[0]
+    if (first && typeof first === "object") {
+      const headline = (first as Record<string, unknown>).headline
+      if (typeof headline === "string" && headline.trim()) return headline.trim()
+    }
+  }
+
+  return brief.hook?.trim() ?? ""
+}
+
+/** Hook Copy column — prefers brief headline, same ellipsis styling as before. */
+export function hookCopyFromBrief(brief: BriefRow, layout: NamerSheetLayout): string {
+  return formatHookCopy(headlineFromBrief(brief), layout)
+}
+
 export function briefInputProvenance(brief: BriefRow): ProvenanceLabel {
   const createdBy = brief.created_by?.trim().toLowerCase() ?? ""
   const triggerType = brief.trigger_type?.trim().toLowerCase() ?? ""
@@ -193,7 +305,8 @@ export function buildNamerCreativeRow(
   asset: AssetRow,
   brief: BriefRow,
   provenance: { campaignGen: ProvenanceLabel; adSetGen: ProvenanceLabel },
-  assetGcsLink: string
+  links: { gcsPath: string; signedUrl: string },
+  layout: NamerSheetLayout = "creative_builder"
 ): NamerCreativeRow | null {
   const conventionName = asset.convention_name?.trim()
   if (!conventionName) return null
@@ -202,25 +315,33 @@ export function buildNamerCreativeRow(
   if (!tokens) return null
 
   const [formatType, length, aspectRatio] = splitFormatToken(tokens.format)
+  const sizeToken = sizeFromFormatToken(tokens.format, aspectRatio)
+  const videoLength = videoLengthDisplay(formatType, length)
+  const status = layout === "ad_builder" ? "TEST" : "Draft"
+  const gcsPath = normalizeNamerGcsPath(links.gcsPath)
 
   return {
     adId: "",
     adSetId: "",
     campaignId: "",
-    testId: tokens.testId,
-    variant: tokens.variant,
+    testId: normalizeTestId(tokens.testId),
+    variant: tokens.variant.toUpperCase().slice(0, 1),
     angle: tokens.angle,
+    formatToken: tokens.format,
     formatType,
+    sizeToken,
     length,
+    videoLength,
     aspectRatio,
     cta: tokens.cta,
     adName: conventionName,
-    hookPreview: hookPreview(brief.hook),
-    status: "Draft",
+    hookPreview: hookCopyFromBrief(brief, layout),
+    status,
     platform: "",
     phase: "",
     optEvent: "",
-    assetGcsLink,
+    assetGcsPath: gcsPath,
+    assetGcsLink: links.signedUrl,
     pipelineTemplate: pipelineTemplateFromBrief(brief),
     assetUuid: asset.id,
     briefInput: briefInputProvenance(brief),
@@ -258,26 +379,36 @@ export function namerRowToSheetValues(row: NamerCreativeRow): string[] {
   ]
 }
 
-function findCreativeBuilderHeader(
+export function findCreativeBuilderHeader(
   rows: string[][]
-): { headerRow: number; headers: string[]; layout: "v4" | "legacy" } | null {
-  for (let r = 0; r < Math.min(rows.length, 20); r++) {
+): { headerRow: number; headers: string[]; layout: NamerSheetLayout } | null {
+  for (let r = 0; r < Math.min(rows.length, 25); r++) {
     const line = rows[r] ?? []
     const normalized = line.map((c) => String(c).trim())
     const joined = normalized.join(" ").toLowerCase()
+
+    // thrml_namer_v4 — Ad Builder tab (TEST / VAR / FORMAT / GCS Path)
+    if (
+      normalized.some((h) => /^test$/i.test(h)) &&
+      normalized.some((h) => /^var$/i.test(h)) &&
+      normalized.some((h) => /^format$/i.test(h)) &&
+      normalized.some((h) => /ad name/i.test(h))
+    ) {
+      return { headerRow: r, headers: normalized, layout: "ad_builder" }
+    }
 
     if (
       normalized.some((h) => /^test id$/i.test(h)) &&
       normalized.some((h) => /ad name/i.test(h) || h.startsWith("→"))
     ) {
-      return { headerRow: r, headers: normalized, layout: "v4" }
+      return { headerRow: r, headers: normalized, layout: "creative_builder" }
     }
 
     if (
       normalized.some((h) => /^format type$/i.test(h)) &&
       normalized.some((h) => /ad name/i.test(h) || h.startsWith("→"))
     ) {
-      return { headerRow: r, headers: normalized, layout: "v4" }
+      return { headerRow: r, headers: normalized, layout: "creative_builder" }
     }
 
     if (
@@ -288,7 +419,7 @@ function findCreativeBuilderHeader(
     }
 
     if (joined.includes("test id") && joined.includes("cta") && joined.includes("ad name")) {
-      return { headerRow: r, headers: normalized, layout: "v4" }
+      return { headerRow: r, headers: normalized, layout: "creative_builder" }
     }
 
     if (joined.includes("concept") && joined.includes("cta") && joined.includes("ad name")) {
@@ -315,6 +446,12 @@ function rowHasAssetUuid(row: string[], headers: string[], assetId: string): boo
   const uuidCol = colIndex(headers, headerPatternsForExtended("Asset UUID"))
   if (uuidCol < 0) return false
   return (row[uuidCol] ?? "").trim() === assetId
+}
+
+function rowHasConventionName(row: string[], headers: string[], conventionName: string): boolean {
+  const adNameCol = colIndex(headers, [/→?\s*ad name/i, /^ad name/i])
+  if (adNameCol < 0) return false
+  return (row[adNameCol] ?? "").trim() === conventionName
 }
 
 async function resolveRegistryProvenance(
@@ -420,11 +557,11 @@ async function ensureExtendedHeaders(
   spreadsheetId: string,
   tabTitle: string,
   headerRow1Based: number,
-  headers: string[]
+  headers: string[],
+  layout: NamerSheetLayout
 ): Promise<string[]> {
-  const missing = NAMER_EXTENDED_HEADERS.filter(
-    (label) => colIndex(headers, headerPatternsForExtended(label)) < 0
-  )
+  const desired = extendedHeadersForLayout(layout, headers)
+  const missing = desired.filter((label) => colIndex(headers, headerPatternsForExtended(label)) < 0)
   if (!missing.length) return headers
 
   const nextHeaders = [...headers]
@@ -444,16 +581,121 @@ async function ensureExtendedHeaders(
   return nextHeaders
 }
 
-function normalizeAspectRatio(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed || trimmed.toUpperCase() === "NA") return trimmed
-  return trimmed.includes(":") ? trimmed : trimmed.replace(/x/i, ":")
+async function ensureAdBuilderFormatColumns(
+  sheets: ReturnType<typeof createGoogleSheetsClient>,
+  spreadsheetId: string,
+  tabTitle: string,
+  headerRow0Based: number,
+  headers: string[]
+): Promise<string[]> {
+  const hasSize = colIndex(headers, [/^size$/i]) >= 0
+  const hasVideoLength = colIndex(headers, [/^video length$/i]) >= 0
+  if (hasSize && hasVideoLength) return headers
+
+  const formatCol = colIndex(headers, [/^format$/i])
+  if (formatCol < 0) return headers
+
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" })
+  const sheetId = meta.data.sheets?.find((s) => s.properties?.title === tabTitle)?.properties?.sheetId
+  if (sheetId == null) return headers
+
+  const labelsToInsert: string[] = []
+  if (!hasSize) labelsToInsert.push("Size")
+  if (!hasVideoLength) labelsToInsert.push("Video Length")
+  if (!labelsToInsert.length) return headers
+
+  const insertAt = formatCol + 1
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [
+        {
+          insertDimension: {
+            range: {
+              sheetId,
+              dimension: "COLUMNS",
+              startIndex: insertAt,
+              endIndex: insertAt + labelsToInsert.length,
+            },
+            inheritFromBefore: false,
+          },
+        },
+      ],
+    },
+  })
+
+  const escaped = tabTitle.replace(/'/g, "''")
+  const headerRow1 = headerRow0Based + 1
+  await batchWriteCells(
+    sheets,
+    spreadsheetId,
+    labelsToInsert.map((label, i) => ({
+      range: `'${escaped}'!${columnToLetter(insertAt + i)}${headerRow1}`,
+      values: [[label]],
+    }))
+  )
+
+  const next = [...headers]
+  next.splice(insertAt, 0, ...labelsToInsert)
+  return next
+}
+
+async function prepareSheetHeaders(
+  sheets: ReturnType<typeof createGoogleSheetsClient>,
+  spreadsheetId: string,
+  tabTitle: string,
+  headerInfo: { headerRow: number; headers: string[]; layout: NamerSheetLayout }
+): Promise<string[]> {
+  let headers = headerInfo.headers
+  if (headerInfo.layout === "ad_builder") {
+    headers = await ensureAdBuilderFormatColumns(
+      sheets,
+      spreadsheetId,
+      tabTitle,
+      headerInfo.headerRow,
+      headers
+    )
+  }
+  return ensureExtendedHeaders(
+    sheets,
+    spreadsheetId,
+    tabTitle,
+    headerInfo.headerRow + 1,
+    headers,
+    headerInfo.layout
+  )
+}
+
+async function loadPreparedSheetTab(
+  sheets: ReturnType<typeof createGoogleSheetsClient>,
+  spreadsheetId: string,
+  tabTitle: string
+): Promise<{
+  rows: string[][]
+  headerInfo: { headerRow: number; headers: string[]; layout: NamerSheetLayout }
+  headers: string[]
+} | null> {
+  const initialRows = await readSheetValues(sheets, spreadsheetId, tabTitle)
+  const headerInfo = findCreativeBuilderHeader(initialRows)
+  if (!headerInfo) return null
+
+  await prepareSheetHeaders(sheets, spreadsheetId, tabTitle, headerInfo)
+
+  const rows = await readSheetValues(sheets, spreadsheetId, tabTitle)
+  const refreshedHeader = findCreativeBuilderHeader(rows)
+  if (!refreshedHeader) return null
+
+  return {
+    rows,
+    headerInfo: refreshedHeader,
+    headers: refreshedHeader.headers,
+  }
 }
 
 function mapRowToHeaderColumns(
   headers: string[],
   row: NamerCreativeRow,
-  layout: "v4" | "legacy"
+  layout: NamerSheetLayout
 ): string[] {
   const values = new Array(headers.length).fill("")
   const set = (patterns: RegExp[], value: string) => {
@@ -462,10 +704,19 @@ function mapRowToHeaderColumns(
   }
 
   set([/^ad id$/i], row.adId)
-  set([/^ad set id$/i], row.adSetId)
-  set([/^campaign id$/i], row.campaignId)
+  set([/^ad set id$/i, /^adset id$/i], row.adSetId)
+  set([/^campaign id$/i, /^campaign name \(ref\)$/i], row.campaignId)
 
-  if (layout === "v4") {
+  if (layout === "ad_builder") {
+    set([/^test$/i, /^test id$/i], row.testId)
+    set([/^var$/i, /^variant$/i], row.variant)
+    set([/^angle$/i], row.angle)
+    set([/^format$/i], row.formatType)
+    set([/^size$/i], row.sizeToken)
+    set([/^video length$/i], row.videoLength)
+    set([/^gcs path$/i], row.assetGcsPath)
+    set([/^platform ad id$/i], "")
+  } else if (layout === "creative_builder") {
     set([/^test id$/i], row.testId)
     set([/^variant$/i], row.variant)
     set([/^angle$/i], row.angle)
@@ -481,14 +732,21 @@ function mapRowToHeaderColumns(
   }
 
   set([/^cta$/i], row.cta)
-  set([/→?\s*ad name/i], row.adName)
+  set([/→?\s*ad name/i, /^ad name/i], row.adName)
   set([/^hook copy/i, /^hook$/i], row.hookPreview)
   set([/^status$/i], row.status)
   set([/^platform$/i], row.platform)
   set([/^phase$/i], row.phase)
   set([/^opt\.?\s*event$/i, /^conv\.?\s*event$/i], row.optEvent)
 
-  set(headerPatternsForExtended("Asset GCS Link"), row.assetGcsLink)
+  const hasGcsPath = colIndex(headers, [/^gcs path$/i]) >= 0
+  if (!hasGcsPath) {
+    set(headerPatternsForExtended("Asset GCS Link"), row.assetGcsPath || row.assetGcsLink)
+  } else {
+    const linkCol = colIndex(headers, headerPatternsForExtended("Asset GCS Link"))
+    if (linkCol >= 0) values[linkCol] = ""
+  }
+
   set(headerPatternsForExtended("Pipeline Template"), row.pipelineTemplate)
   set(headerPatternsForExtended("Asset UUID"), row.assetUuid)
   set(headerPatternsForExtended("Brief Input"), row.briefInput)
@@ -546,34 +804,21 @@ export async function appendApprovedCreativeToNamer(
 
   const { data: brief, error: briefError } = await admin
     .from("creative_briefs")
-    .select("id, trigger_type, trigger_data, created_by, hook")
+    .select("id, trigger_type, trigger_data, created_by, hook, copy_headline")
     .eq("id", asset.brief_id)
     .maybeSingle()
 
   if (briefError) return { ok: false, reason: briefError.message }
   if (!brief) return { ok: false, reason: "Brief not found for asset" }
 
-  const assetGcsLink = await resolveAssetGcsLink(asset as AssetRow)
-  const provenance = await resolveRegistryProvenance(
-    admin,
-    asset as AssetRow,
-    asset.convention_name.trim()
-  )
-
-  const row = buildNamerCreativeRow(
-    asset as AssetRow,
-    brief as BriefRow,
-    provenance,
-    assetGcsLink
-  )
-  if (!row) {
-    return { ok: true, skipped: true, reason: "Could not parse convention_name for namer row" }
-  }
+  const conventionName = asset.convention_name.trim()
+  const assetGcsPath = normalizeNamerGcsPath((asset as AssetRow).gcs_path)
+  const signedUrl = await resolveAssetGcsLink(asset as AssetRow)
+  const provenance = await resolveRegistryProvenance(admin, asset as AssetRow, conventionName)
 
   const sheets = createGoogleSheetsClient()
   let tabTitle: string
-  let headerInfo: { headerRow: number; headers: string[]; layout: "v4" | "legacy" }
-  let existingRows: string[][]
+  let sheetState: NonNullable<Awaited<ReturnType<typeof loadPreparedSheetTab>>>
 
   try {
     const tabTitles = await listSpreadsheetTabs(sheets, sheetId)
@@ -583,33 +828,45 @@ export async function appendApprovedCreativeToNamer(
     }
     tabTitle = resolvedTab
 
-    existingRows = await readSheetValues(sheets, sheetId, tabTitle)
-    const foundHeader = findCreativeBuilderHeader(existingRows)
-    if (!foundHeader) {
+    const prepared = await loadPreparedSheetTab(sheets, sheetId, tabTitle)
+    if (!prepared) {
       return { ok: false, reason: "Creative Builder header row not found" }
     }
-    headerInfo = foundHeader
+    sheetState = prepared
   } catch (err) {
     return { ok: false, reason: sheetsErrorMessage(err) }
   }
 
+  const { rows: existingRows, headerInfo, headers } = sheetState
+
+  const row = buildNamerCreativeRow(
+    asset as AssetRow,
+    brief as BriefRow,
+    provenance,
+    { gcsPath: assetGcsPath, signedUrl },
+    headerInfo.layout
+  )
+  if (!row) {
+    return { ok: true, skipped: true, reason: "Could not parse convention_name for namer row" }
+  }
+
   for (let r = headerInfo.headerRow + 1; r < existingRows.length; r++) {
-    if (rowHasAssetUuid(existingRows[r] ?? [], headerInfo.headers, assetId)) {
+    const line = existingRows[r] ?? []
+    if (rowHasAssetUuid(line, headers, assetId)) {
       await admin
         .from("creative_assets")
         .update({ namer_synced_at: new Date().toISOString() })
         .eq("id", assetId)
       return { ok: true, skipped: true, reason: "Row already present in sheet (Asset UUID)" }
     }
+    if (rowHasConventionName(line, headers, conventionName)) {
+      await admin
+        .from("creative_assets")
+        .update({ namer_synced_at: new Date().toISOString() })
+        .eq("id", assetId)
+      return { ok: true, skipped: true, reason: "Row already present in sheet (Ad Name)" }
+    }
   }
-
-  const headers = await ensureExtendedHeaders(
-    sheets,
-    sheetId,
-    tabTitle,
-    headerInfo.headerRow + 1,
-    headerInfo.headers
-  )
 
   const sheetValues = mapRowToHeaderColumns(headers, row, headerInfo.layout)
   const endCol = columnToLetter(Math.max(headers.length - 1, 0))
@@ -656,6 +913,124 @@ export async function appendApprovedCreativeToNamer(
     ok: true,
     tabTitle,
     gcsExportPath,
-    assetGcsLink: assetGcsLink || undefined,
+    assetGcsLink: row.assetGcsPath || signedUrl || undefined,
   }
+}
+
+async function loadAssetAndBrief(admin: SupabaseClient, assetId: string) {
+  const { data: asset, error: assetError } = await admin
+    .from("creative_assets")
+    .select(
+      "id, brief_id, convention_name, gcs_path, gcs_url, format, meta_ad_id, meta_adset_id, namer_synced_at"
+    )
+    .eq("id", assetId)
+    .maybeSingle()
+
+  if (assetError || !asset?.convention_name?.trim()) return null
+
+  const { data: brief, error: briefError } = await admin
+    .from("creative_briefs")
+    .select("id, trigger_type, trigger_data, created_by, hook, copy_headline")
+    .eq("id", asset.brief_id)
+    .maybeSingle()
+
+  if (briefError || !brief) return null
+  return { asset: asset as AssetRow, brief: brief as BriefRow }
+}
+
+function findSheetRowForAsset(
+  rows: string[][],
+  headerInfo: { headerRow: number; headers: string[] },
+  assetId: string,
+  conventionName: string
+): number {
+  for (let r = headerInfo.headerRow + 1; r < rows.length; r++) {
+    const line = rows[r] ?? []
+    if (rowHasAssetUuid(line, headerInfo.headers, assetId)) return r
+    if (rowHasConventionName(line, headerInfo.headers, conventionName)) return r
+  }
+  return -1
+}
+
+/** Rewrite pipeline rows already in the namer sheet (formatting fixes). */
+export async function repairSyncedNamerRows(
+  admin: SupabaseClient
+): Promise<{ repaired: number; errors: string[] }> {
+  const sheetId = await resolveNamerSheetId(admin)
+  if (!sheetId) return { repaired: 0, errors: ["NAMER_SHEET_ID not configured"] }
+
+  const { data: assets, error } = await admin
+    .from("creative_assets")
+    .select("id")
+    .not("namer_synced_at", "is", null)
+    .not("convention_name", "is", null)
+
+  if (error) return { repaired: 0, errors: [error.message] }
+  if (!assets?.length) return { repaired: 0, errors: [] }
+
+  const sheets = createGoogleSheetsClient()
+  const tabTitles = await listSpreadsheetTabs(sheets, sheetId)
+  const tabTitleResolved = resolveTabTitle(tabTitles, ...CREATIVE_BUILDER_TAB_CANDIDATES)
+  if (!tabTitleResolved) return { repaired: 0, errors: ["Ad Builder tab not found"] }
+
+  let sheetState: NonNullable<Awaited<ReturnType<typeof loadPreparedSheetTab>>>
+  try {
+    const prepared = await loadPreparedSheetTab(sheets, sheetId, tabTitleResolved)
+    if (!prepared) return { repaired: 0, errors: ["Header row not found"] }
+    sheetState = prepared
+  } catch (err) {
+    return { repaired: 0, errors: [sheetsErrorMessage(err)] }
+  }
+
+  const { rows: existingRows, headerInfo, headers } = sheetState
+  const tabTitle = tabTitleResolved
+
+  const errors: string[] = []
+  let repaired = 0
+  const updates: { range: string; values: string[][] }[] = []
+
+  for (const { id: assetId } of assets) {
+    const loaded = await loadAssetAndBrief(admin, assetId)
+    if (!loaded) {
+      errors.push(`${assetId}: asset/brief not found`)
+      continue
+    }
+
+    const conventionName = loaded.asset.convention_name!.trim()
+    const sheetRow = findSheetRowForAsset(existingRows, { headerRow: headerInfo.headerRow, headers }, assetId, conventionName)
+    if (sheetRow < 0) {
+      errors.push(`${assetId}: row not found in sheet`)
+      continue
+    }
+
+    const signedUrl = await resolveAssetGcsLink(loaded.asset)
+    const provenance = await resolveRegistryProvenance(admin, loaded.asset, conventionName)
+    const row = buildNamerCreativeRow(
+      loaded.asset,
+      loaded.brief,
+      provenance,
+      { gcsPath: loaded.asset.gcs_path ?? "", signedUrl },
+      headerInfo.layout
+    )
+    if (!row) {
+      errors.push(`${assetId}: could not build row`)
+      continue
+    }
+
+    const values = mapRowToHeaderColumns(headers, row, headerInfo.layout)
+    const endCol = columnToLetter(headers.length - 1)
+    const escapedTab = tabTitle.replace(/'/g, "''")
+    const row1Based = sheetRow + 1
+    updates.push({
+      range: `'${escapedTab}'!A${row1Based}:${endCol}${row1Based}`,
+      values: [values],
+    })
+    repaired++
+  }
+
+  if (updates.length) {
+    await batchWriteCells(sheets, sheetId, updates)
+  }
+
+  return { repaired, errors }
 }

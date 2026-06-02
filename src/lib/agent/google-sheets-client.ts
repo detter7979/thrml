@@ -8,7 +8,7 @@ const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
 export type SheetsClient = sheets_v4.Sheets
 
 export function resolveNamerSheetIdFromEnv(): string | null {
-  return requireEnv("NAMER_SHEET_ID") ?? requireEnv("GDRIVE_NAMER_SHEET_ID")
+  return process.env.NAMER_SHEET_ID?.trim() || process.env.GDRIVE_NAMER_SHEET_ID?.trim() || null
 }
 
 export function getNamerSheetId(): string {

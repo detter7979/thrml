@@ -16,8 +16,12 @@ export default async function DashboardAccountPage() {
   const normalizeName = (value: unknown) => (typeof value === "string" && value.trim().length > 0 ? value.trim() : null)
   const profileColumns =
     "full_name, first_name, last_name, avatar_url, phone, phone_verified, bio, house_rules, ui_intent, stripe_account_id, stripe_onboarding_complete, stripe_payouts_enabled, stripe_charges_enabled, newsletter_opted_in, offers_opted_in, product_updates_opted_in, notification_preferences, id_verified, id_verified_at, id_verification_status, insurance_attested, insurance_attested_at"
-  const [{ count: listingCount }, { data: profileById }] = await Promise.all([
-    supabase.from("listings").select("*", { count: "exact", head: true }).eq("host_id", user.id),
+  const [{ count: activeListingCount }, { data: profileById }] = await Promise.all([
+    supabase
+      .from("listings")
+      .select("*", { count: "exact", head: true })
+      .eq("host_id", user.id)
+      .eq("is_active", true),
     supabase.from("profiles").select(profileColumns).eq("id", user.id).maybeSingle(),
   ])
   const { data: profileByUserId, error: profileByUserIdError } = await supabase
@@ -43,10 +47,12 @@ export default async function DashboardAccountPage() {
   const houseRules = Array.isArray(profile?.house_rules)
     ? profile.house_rules.filter((rule): rule is string => typeof rule === "string")
     : []
-  const hostingEnabled =
-    Boolean((listingCount ?? 0) > 0) ||
-    profile?.ui_intent === "host" ||
-    profile?.ui_intent === "both"
+  const uiIntent =
+    profile?.ui_intent === "host" || profile?.ui_intent === "both" || profile?.ui_intent === "guest"
+      ? profile.ui_intent
+      : "guest"
+  // Host-only account sections: active listings, or explicit host intent (not guest / both-without-listings).
+  const hostingEnabled = Boolean((activeListingCount ?? 0) > 0) || uiIntent === "host"
   const notificationPreferences = normalizeNotificationPreferences(profile?.notification_preferences)
 
   return (

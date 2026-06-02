@@ -2,6 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
 
+import { VerifiedHostBadge } from "@/components/host/verified-host-badge"
 import { ListingCard, type ListingCardData } from "@/components/listings/ListingCard"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { isLikelyValidAvatarUrl } from "@/lib/avatar-url"
@@ -253,6 +254,7 @@ export async function HostProfileContent({
     canViewAsOwner && typeof user?.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null
   const hostName =
     (typeof profileSafe.full_name === "string" && profileSafe.full_name.trim()) || ownerNameFromAuth || "Thrml Host"
+  const hostIdVerified = profileSafe.id_verified === true
   const hostFirstName = firstName(hostName)
   const hostInitials = initials(hostName || "Host")
   const hostSinceSource =
@@ -385,7 +387,10 @@ export async function HostProfileContent({
               <AvatarFallback>{hostInitials || "TH"}</AvatarFallback>
             </Avatar>
             <div className="space-y-1">
-              <h1 className="font-serif text-3xl text-[#1A1410]">{hostName}</h1>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h1 className="font-serif text-3xl text-[#1A1410]">{hostName}</h1>
+                <VerifiedHostBadge verified={hostIdVerified} size="sm" />
+              </div>
               {typeof profileSafe.tagline === "string" && profileSafe.tagline.trim().length > 0 ? (
                 <p className="text-[#6D5E51]">{String(profileSafe.tagline)}</p>
               ) : null}

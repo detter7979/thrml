@@ -630,13 +630,13 @@ export function AccountClient({
   }, [searchParams, router])
 
   useEffect(() => {
-    if (searchParams.get("identity") !== "complete") return
+    if (!hostingEnabled || searchParams.get("identity") !== "complete") return
     void (async () => {
       await fetch("/api/account/identity/status", { credentials: "include" })
       router.replace("/dashboard/account", { scroll: false })
       router.refresh()
     })()
-  }, [searchParams, router])
+  }, [hostingEnabled, searchParams, router])
 
   useEffect(() => {
     if (!toastMessage) return
@@ -767,11 +767,13 @@ export function AccountClient({
     <div className="space-y-6 px-4 py-6 md:px-8 md:py-8">
       <h1 className="font-serif text-3xl text-[#1A1410]">Account</h1>
 
-      <IdentityVerificationCTA
-        status={(idVerificationStatus ?? null) as IdentityUiStatus}
-        verified={idVerified}
-        verifiedAt={idVerifiedAt}
-      />
+      {hostingEnabled ? (
+        <IdentityVerificationCTA
+          status={(idVerificationStatus ?? null) as IdentityUiStatus}
+          verified={idVerified}
+          verifiedAt={idVerifiedAt}
+        />
+      ) : null}
 
       <section id="notifications" className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">PROFILE</h2>
@@ -847,7 +849,7 @@ export function AccountClient({
           <Label>Bio</Label>
           <Textarea
             maxLength={200}
-            placeholder={savedBio || "Short bio for your host profile"}
+            placeholder={savedBio || (hostingEnabled ? "Short bio for your host profile" : "A few words about you (optional)")}
             value={bioValue}
             onChange={(event) => setBioValue(event.target.value)}
           />
@@ -900,7 +902,7 @@ export function AccountClient({
       </section>
 
       {hostingEnabled ? (
-        <section id="house-rules" className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
+        <section id="payout-settings" className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">PAYOUT SETTINGS</h2>
           {!hasStripeAccount ? (
             <StripeConnectBanner />
@@ -1055,38 +1057,40 @@ export function AccountClient({
                   : ""}
           </p>
         </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-[#1A1410]">New booking</p>
-          <Switch
-            checked={notificationPrefs.new_booking}
-            onCheckedChange={(checked) => updateNotificationPreference("new_booking", checked)}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-[#1A1410]">Booking cancelled</p>
-          <Switch
-            checked={notificationPrefs.booking_cancelled}
-            onCheckedChange={(checked) => updateNotificationPreference("booking_cancelled", checked)}
-          />
-        </div>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-[#1A1410]">New review</p>
-          <Switch
-            checked={notificationPrefs.new_review}
-            onCheckedChange={(checked) => updateNotificationPreference("new_review", checked)}
-          />
-        </div>
         {hostingEnabled ? (
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-[#1A1410]">Payout sent</p>
-            <Switch
-              checked={notificationPrefs.payout_sent}
-              onCheckedChange={(checked) => updateNotificationPreference("payout_sent", checked)}
-            />
-          </div>
+          <>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[#1A1410]">New booking</p>
+              <Switch
+                checked={notificationPrefs.new_booking}
+                onCheckedChange={(checked) => updateNotificationPreference("new_booking", checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[#1A1410]">Booking cancelled</p>
+              <Switch
+                checked={notificationPrefs.booking_cancelled}
+                onCheckedChange={(checked) => updateNotificationPreference("booking_cancelled", checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[#1A1410]">New review</p>
+              <Switch
+                checked={notificationPrefs.new_review}
+                onCheckedChange={(checked) => updateNotificationPreference("new_review", checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[#1A1410]">Payout sent</p>
+              <Switch
+                checked={notificationPrefs.payout_sent}
+                onCheckedChange={(checked) => updateNotificationPreference("payout_sent", checked)}
+              />
+            </div>
+          </>
         ) : null}
 
-        <div className="border-t border-[#EDE8E2] pt-4">
+        <div className={hostingEnabled ? "border-t border-[#EDE8E2] pt-4" : undefined}>
           <h3 className="text-xs font-semibold tracking-wide text-[#7A6A5D]">EMAIL PREFERENCES</h3>
           <div className="mt-3 space-y-3">
             <div className="flex items-center justify-between">

@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { ListingCard, type ListingCardData } from "@/components/listings/ListingCard"
 import { getServiceType } from "@/lib/constants/service-types"
-import { getLaunchVisibleServiceTypes, isSaunasOnlyLaunch } from "@/lib/launch-config"
 
 type SavedRow = {
   listing_id: string
@@ -33,7 +32,6 @@ function serviceMeta(serviceType: string | null | undefined) {
 export default function DashboardSavedPage() {
   const [rows, setRows] = useState<SavedRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [serviceFilter, setServiceFilter] = useState<string>("all")
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set())
   const removeTimersRef = useRef<Record<string, number>>({})
 
@@ -100,10 +98,9 @@ export default function DashboardSavedPage() {
         }
       })
 
-    const filtered = serviceFilter === "all" ? mapped : mapped.filter((item) => item.serviceType === serviceFilter)
-    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    return filtered
-  }, [rows, serviceFilter])
+    mapped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return mapped
+  }, [rows])
 
   const savedCount = rows.length
 
@@ -165,27 +162,6 @@ export default function DashboardSavedPage() {
 
       {!loading && savedCount > 0 ? (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {filterOptions.length > 0 ? (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {filterOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setServiceFilter(option.id)}
-                    className={`shrink-0 rounded-full border px-4 py-2 text-sm ${
-                      serviceFilter === option.id
-                        ? "border-brand-500 bg-brand-100 text-brand-900"
-                        : "bg-white text-warm-600"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {listingCards.map((item) => {
               const isRemoving = removingIds.has(item.listingId)

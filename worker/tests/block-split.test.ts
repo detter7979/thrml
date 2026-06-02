@@ -40,8 +40,8 @@ describe("buildBlockSplitFilterComplex", () => {
     })
 
     expect(filter).toContain("scale=1080:1280")
-    expect(filter).toContain("overlay=0:640")
-    expect(filter).toContain("color=c=0xC75B3A")
+    expect(filter).toContain("pad=1080:1920:0:640:color=0xC75B3A")
+    expect(filter).not.toContain("color=c=0xC75B3A:s=")
     expect(filter).toContain("textfile='/tmp/block-headline-0.txt'")
     expect(filter).toContain("[out]")
   })

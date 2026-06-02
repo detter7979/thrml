@@ -62,9 +62,7 @@ export function buildBlockSplitFilterComplex(args: {
 
   const fontPath = resolveWorkerPath(args.template.fontPath)
   const parts: string[] = [
-    `[0:v]scale=${layout.width}:${layout.videoHeight}:force_original_aspect_ratio=increase,crop=${layout.width}:${layout.videoHeight},setsar=1[vid]`,
-    `color=c=0x${layout.brandColor}:s=${layout.width}x${layout.height}:r=30[bg]`,
-    `[bg][vid]overlay=0:${layout.topBlockHeight}:shortest=1[base]`,
+    `[0:v]scale=${layout.width}:${layout.videoHeight}:force_original_aspect_ratio=increase,crop=${layout.width}:${layout.videoHeight},setsar=1,pad=${layout.width}:${layout.height}:0:${layout.topBlockHeight}:color=0x${layout.brandColor}[base]`,
   ]
 
   const drawSteps: Array<{
@@ -167,7 +165,11 @@ export async function renderBlockSplit(args: BlockSplitRenderArgs): Promise<void
         "-crf",
         "18",
         "-preset",
-        "medium",
+        "veryfast",
+        "-threads",
+        "2",
+        "-filter_complex_threads",
+        "2",
         "-pix_fmt",
         "yuv420p",
         "-movflags",

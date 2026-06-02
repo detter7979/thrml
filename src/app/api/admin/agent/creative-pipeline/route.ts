@@ -302,13 +302,14 @@ export async function GET() {
         job.status === "failed" ||
         job.status === "cancelled"
     )
-    if (allTerminal) {
-      await admin!
-        .from("creative_briefs")
-        .update({ status: "variations_ready" })
-        .eq("id", brief.id)
-      brief.status = "variations_ready"
+    if (!allTerminal) continue
+
+    const hasCompleted = jobs.some((job) => job.status === "completed")
+    const nextStatus = hasCompleted ? "variations_ready" : "approved"
+    if (brief.status !== nextStatus) {
+      await admin!.from("creative_briefs").update({ status: nextStatus }).eq("id", brief.id)
     }
+    brief.status = nextStatus
   }
 
   const approvedVideoBriefs = (approvedBriefs.data ?? []).filter(

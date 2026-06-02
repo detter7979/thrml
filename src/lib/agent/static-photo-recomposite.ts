@@ -91,7 +91,9 @@ async function downloadFromUrl(url: string) {
   return Buffer.from(await res.arrayBuffer())
 }
 
-export async function resolveBasePhotoBuffer(asset: AssetRow): Promise<{ buffer: Buffer; source: string }> {
+export async function resolveBasePhotoBuffer(
+  asset: Pick<AssetRow, "performance_data">,
+): Promise<{ buffer: Buffer; source: string }> {
   const perf = performanceData(asset)
   const baseGcsPath = typeof perf.base_gcs_path === "string" ? perf.base_gcs_path.trim() : ""
   if (baseGcsPath) {

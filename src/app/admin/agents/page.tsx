@@ -365,6 +365,24 @@ export default function AgentsDashboard() {
     return json
   }
 
+  const formatNamerSyncMessage = (namerSync: {
+    ok: boolean
+    skipped?: boolean
+    reason?: string
+    tabTitle?: string
+  }) => {
+    if (namerSync.ok && !namerSync.skipped) {
+      return `Added to namer${namerSync.tabTitle ? ` (${namerSync.tabTitle})` : ""}.`
+    }
+    if (namerSync.skipped && namerSync.reason) {
+      return `Namer skipped: ${namerSync.reason}`
+    }
+    if (!namerSync.ok && namerSync.reason) {
+      return `Namer sync failed: ${namerSync.reason}`
+    }
+    return ""
+  }
+
 
   const generateVideoVariants = async (briefId: string) => {
     setBusyAction(`generate-video-${briefId}`)
@@ -429,8 +447,13 @@ export default function AgentsDashboard() {
     setBusyAction(`${action}-${id}`)
     setPipelineMessage(null)
     try {
-      await patchPipeline({ action, asset_id: id })
+      const json = await patchPipeline({ action, asset_id: id })
       await mutatePipeline()
+      if (action === "approve_asset") {
+        const namerSync = (json as { namer_sync?: Parameters<typeof formatNamerSyncMessage>[0] }).namer_sync
+        const namerMsg = namerSync ? formatNamerSyncMessage(namerSync) : ""
+        setPipelineMessage(namerMsg ? `Asset approved. ${namerMsg}` : "Asset approved.")
+      }
     } catch (err) {
       setPipelineMessage(err instanceof Error ? err.message : "Could not update asset.")
     } finally {

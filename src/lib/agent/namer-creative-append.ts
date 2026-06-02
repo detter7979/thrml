@@ -25,6 +25,9 @@ const CREATIVE_BUILDER_TAB_CANDIDATES = [
   "2 Ad Builder",
 ]
 
+/** thrml_namer_v4 — canonical Creative Builder destination. */
+export const THRML_NAMER_V4_SHEET_ID = "1bSSZNmE8YENlkUOgHaS689Z1UpU8VAD6j5B0MnQK-HQ"
+
 /** Trailing metadata columns — not part of → Ad Name / convention_name. */
 export const NAMER_EXTENDED_HEADERS = [
   "Asset GCS Link",
@@ -114,22 +117,24 @@ export async function resolveNamerSheetId(admin?: SupabaseClient): Promise<strin
   const fromEnv = requireEnv("NAMER_SHEET_ID") ?? requireEnv("GDRIVE_NAMER_SHEET_ID")
   if (fromEnv) return fromEnv
 
-  if (!admin) return null
+  if (admin) {
+    const { data, error } = await admin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "gdrive_namer_sheet_id")
+      .maybeSingle()
 
-  const { data, error } = await admin
-    .from("platform_settings")
-    .select("value")
-    .eq("key", "gdrive_namer_sheet_id")
-    .maybeSingle()
-
-  if (error || !data) return null
-  const value = (data as { value?: unknown }).value
-  if (typeof value === "string" && value.trim()) return value.trim()
-  if (value && typeof value === "object" && "sheetId" in value) {
-    const sheetId = (value as { sheetId?: string }).sheetId
-    if (sheetId?.trim()) return sheetId.trim()
+    if (!error && data) {
+      const value = (data as { value?: unknown }).value
+      if (typeof value === "string" && value.trim()) return value.trim()
+      if (value && typeof value === "object" && "sheetId" in value) {
+        const sheetId = (value as { sheetId?: string }).sheetId
+        if (sheetId?.trim()) return sheetId.trim()
+      }
+    }
   }
-  return null
+
+  return THRML_NAMER_V4_SHEET_ID
 }
 
 export function isNamerCreativeAppendConfigured(): boolean {
@@ -253,19 +258,41 @@ export function namerRowToSheetValues(row: NamerCreativeRow): string[] {
   ]
 }
 
-function findCreativeBuilderHeader(rows: string[][]): { headerRow: number; headers: string[] } | null {
+function findCreativeBuilderHeader(
+  rows: string[][]
+): { headerRow: number; headers: string[]; layout: "v4" | "legacy" } | null {
   for (let r = 0; r < Math.min(rows.length, 20); r++) {
     const line = rows[r] ?? []
     const normalized = line.map((c) => String(c).trim())
     const joined = normalized.join(" ").toLowerCase()
+
     if (
       normalized.some((h) => /^test id$/i.test(h)) &&
       normalized.some((h) => /ad name/i.test(h) || h.startsWith("→"))
     ) {
-      return { headerRow: r, headers: normalized }
+      return { headerRow: r, headers: normalized, layout: "v4" }
     }
-    if (joined.includes("test id") && joined.includes("format") && joined.includes("cta")) {
-      return { headerRow: r, headers: normalized }
+
+    if (
+      normalized.some((h) => /^format type$/i.test(h)) &&
+      normalized.some((h) => /ad name/i.test(h) || h.startsWith("→"))
+    ) {
+      return { headerRow: r, headers: normalized, layout: "v4" }
+    }
+
+    if (
+      normalized.some((h) => /^concept$/i.test(h)) &&
+      normalized.some((h) => /ad name/i.test(h) || h.startsWith("→"))
+    ) {
+      return { headerRow: r, headers: normalized, layout: "legacy" }
+    }
+
+    if (joined.includes("test id") && joined.includes("cta") && joined.includes("ad name")) {
+      return { headerRow: r, headers: normalized, layout: "v4" }
+    }
+
+    if (joined.includes("concept") && joined.includes("cta") && joined.includes("ad name")) {
+      return { headerRow: r, headers: normalized, layout: "legacy" }
     }
   }
   return null
@@ -417,7 +444,17 @@ async function ensureExtendedHeaders(
   return nextHeaders
 }
 
-function mapRowToHeaderColumns(headers: string[], row: NamerCreativeRow): string[] {
+function normalizeAspectRatio(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.toUpperCase() === "NA") return trimmed
+  return trimmed.includes(":") ? trimmed : trimmed.replace(/x/i, ":")
+}
+
+function mapRowToHeaderColumns(
+  headers: string[],
+  row: NamerCreativeRow,
+  layout: "v4" | "legacy"
+): string[] {
   const values = new Array(headers.length).fill("")
   const set = (patterns: RegExp[], value: string) => {
     const idx = colIndex(headers, patterns)
@@ -427,19 +464,29 @@ function mapRowToHeaderColumns(headers: string[], row: NamerCreativeRow): string
   set([/^ad id$/i], row.adId)
   set([/^ad set id$/i], row.adSetId)
   set([/^campaign id$/i], row.campaignId)
-  set([/^test id$/i], row.testId)
-  set([/^variant$/i], row.variant)
-  set([/^angle$/i], row.angle)
-  set([/^format type$/i, /^format$/i], row.formatType)
-  set([/^length$/i], row.length)
-  set([/^aspect ratio$/i, /^size$/i], row.aspectRatio)
+
+  if (layout === "v4") {
+    set([/^test id$/i], row.testId)
+    set([/^variant$/i], row.variant)
+    set([/^angle$/i], row.angle)
+    set([/^format type$/i], row.formatType)
+    set([/^length$/i], row.length)
+    set([/^aspect ratio$/i], row.aspectRatio)
+  } else {
+    set([/^concept$/i], row.angle)
+    set([/^format$/i], row.formatType.toLowerCase())
+    set([/^length$/i], row.length)
+    set([/^size$/i], row.aspectRatio.replace(":", "x"))
+    set([/^variant$/i], row.variant)
+  }
+
   set([/^cta$/i], row.cta)
   set([/→?\s*ad name/i], row.adName)
   set([/^hook copy/i, /^hook$/i], row.hookPreview)
   set([/^status$/i], row.status)
   set([/^platform$/i], row.platform)
   set([/^phase$/i], row.phase)
-  set([/^opt\.?\s*event$/i], row.optEvent)
+  set([/^opt\.?\s*event$/i, /^conv\.?\s*event$/i], row.optEvent)
 
   set(headerPatternsForExtended("Asset GCS Link"), row.assetGcsLink)
   set(headerPatternsForExtended("Pipeline Template"), row.pipelineTemplate)
@@ -450,6 +497,17 @@ function mapRowToHeaderColumns(headers: string[], row: NamerCreativeRow): string
   set(headerPatternsForExtended("Ad Set Gen"), row.adSetGen)
 
   return values
+}
+
+function sheetsErrorMessage(err: unknown): string {
+  if (err && typeof err === "object" && "code" in err && (err as { code?: number }).code === 403) {
+    return (
+      "Google Sheets permission denied — share thrml_namer_v4 with " +
+      "thrml-agent@watchful-muse-350902.iam.gserviceaccount.com as Editor"
+    )
+  }
+  if (err instanceof Error) return err.message
+  return String(err)
 }
 
 async function saveNamerExportToGcs(assetId: string, payload: Record<string, unknown>) {
@@ -513,17 +571,26 @@ export async function appendApprovedCreativeToNamer(
   }
 
   const sheets = createGoogleSheetsClient()
-  const tabTitles = await listSpreadsheetTabs(sheets, sheetId)
-  const tabTitle = resolveTabTitle(tabTitles, ...CREATIVE_BUILDER_TAB_CANDIDATES)
+  let tabTitle: string
+  let headerInfo: { headerRow: number; headers: string[]; layout: "v4" | "legacy" }
+  let existingRows: string[][]
 
-  if (!tabTitle) {
-    return { ok: false, reason: "Creative Builder tab not found in namer sheet" }
-  }
+  try {
+    const tabTitles = await listSpreadsheetTabs(sheets, sheetId)
+    const resolvedTab = resolveTabTitle(tabTitles, ...CREATIVE_BUILDER_TAB_CANDIDATES)
+    if (!resolvedTab) {
+      return { ok: false, reason: "Creative Builder tab not found in namer sheet" }
+    }
+    tabTitle = resolvedTab
 
-  const existingRows = await readSheetValues(sheets, sheetId, tabTitle)
-  const headerInfo = findCreativeBuilderHeader(existingRows)
-  if (!headerInfo) {
-    return { ok: false, reason: "Creative Builder header row not found" }
+    existingRows = await readSheetValues(sheets, sheetId, tabTitle)
+    const foundHeader = findCreativeBuilderHeader(existingRows)
+    if (!foundHeader) {
+      return { ok: false, reason: "Creative Builder header row not found" }
+    }
+    headerInfo = foundHeader
+  } catch (err) {
+    return { ok: false, reason: sheetsErrorMessage(err) }
   }
 
   for (let r = headerInfo.headerRow + 1; r < existingRows.length; r++) {
@@ -544,17 +611,21 @@ export async function appendApprovedCreativeToNamer(
     headerInfo.headers
   )
 
-  const sheetValues = mapRowToHeaderColumns(headers, row)
+  const sheetValues = mapRowToHeaderColumns(headers, row, headerInfo.layout)
   const endCol = columnToLetter(Math.max(headers.length - 1, 0))
   const escapedTab = tabTitle.replace(/'/g, "''")
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: sheetId,
-    range: `'${escapedTab}'!A:${endCol}`,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [sheetValues] },
-  })
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: `'${escapedTab}'!A:${endCol}`,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: [sheetValues] },
+    })
+  } catch (err) {
+    return { ok: false, reason: sheetsErrorMessage(err) }
+  }
 
   const exportPayload = {
     version: 1,

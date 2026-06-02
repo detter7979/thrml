@@ -20,6 +20,19 @@ export type ExecuteResolutionOptions = {
   bypassAutoGate?: boolean
 }
 
+async function markResolutionEmailSent(supportRequestId: string) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from("support_requests")
+    .update({ resolution_email_sent_at: new Date().toISOString() })
+    .eq("id", supportRequestId)
+    .is("resolution_email_sent_at", null)
+
+  if (error) {
+    console.error("[dispute-executor] resolution_email_sent_at update failed", error.message)
+  }
+}
+
 export async function executeResolution(
   supportRequestId: string,
   ticketNumber: string,
@@ -30,6 +43,13 @@ export async function executeResolution(
   options?: ExecuteResolutionOptions
 ): Promise<ExecutionResult> {
   const supabase = createAdminClient()
+  const { data: ticketMeta } = await supabase
+    .from("support_requests")
+    .select("resolution_email_sent_at")
+    .eq("id", supportRequestId)
+    .maybeSingle()
+  const resolutionEmailAlreadySent = Boolean(ticketMeta?.resolution_email_sent_at)
+
   let stripeRefundId: string | null = null
   let executionError: string | null = null
   let actionTaken: string = classification.recommended_action
@@ -194,21 +214,34 @@ export async function executeResolution(
     }
 
     if (!isSafetyInjuryCategory(classification)) {
-      const toAddress =
-        process.env.NODE_ENV === "production" ? userEmail : (process.env.RESEND_TEST_TO_EMAIL ?? userEmail)
+      if (resolutionEmailAlreadySent) {
+        console.info("[dispute-executor] skipping duplicate resolution email", {
+          supportRequestId,
+          ticketNumber,
+        })
+      } else {
+        const toAddress =
+          process.env.NODE_ENV === "production" ? userEmail : (process.env.RESEND_TEST_TO_EMAIL ?? userEmail)
 
-      const resolutionLayout = buildResolutionLayout(userName, ticketNumber, classification)
-      const html = await renderThrmlEmail(resolutionLayout)
-      const text = buildPlainText(resolutionLayout)
+        const resolutionLayout = buildResolutionLayout(userName, ticketNumber, classification)
+        const html = await renderThrmlEmail(resolutionLayout)
+        const text = buildPlainText(resolutionLayout)
 
-      await sendEmail({
-        to: toAddress,
-        subject: `Your request has been resolved — ${ticketNumber}`,
-        html,
-        text,
-      }).catch((err) => {
-        console.error("[dispute-executor] resolution email failed", err)
-      })
+        const emailResult = await sendEmail({
+          to: toAddress,
+          subject: `Your request has been resolved — ${ticketNumber}`,
+          html,
+          text,
+        }).catch((err): { sent: false; error: string } => {
+          const message = err instanceof Error ? err.message : "Resolution email failed"
+          console.error("[dispute-executor] resolution email failed", message)
+          return { sent: false, error: message }
+        })
+
+        if (emailResult.sent) {
+          await markResolutionEmailSent(supportRequestId)
+        }
+      }
     }
   } catch (err) {
     executionError = err instanceof Error ? err.message : "Unknown execution error"
@@ -254,6 +287,6 @@ function buildResolutionLayout(name: string, ticket: string, c: ClassificationRe
           ? `<p style="margin:0 0 16px;padding:12px 16px;background:#FFF5F0;border:1px solid #FFE8DC;color:#1A1410;font-weight:600;">Refund of $${c.refund_amount.toFixed(2)} has been issued. Please allow 5–10 business days to appear on your statement.</p>`
           : ""
       }`,
-    cta: { label: "Visit support centre", href: `${APP_URL}/support` },
+    cta: { label: "Visit support center", href: `${APP_URL}/support` },
   }
 }

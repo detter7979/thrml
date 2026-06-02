@@ -22,13 +22,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       .eq("is_active", true),
     supabase
       .from("profiles")
-      .select("full_name, avatar_url, ui_intent")
+      .select("full_name, avatar_url, ui_intent, id_verified")
       .eq("id", user.id)
       .maybeSingle(),
   ])
   const { data: profileByUserId, error: profileByUserIdError } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, ui_intent")
+    .select("full_name, avatar_url, ui_intent, id_verified")
     .eq("user_id", user.id)
     .maybeSingle()
   const hasUserIdColumn =
@@ -44,11 +44,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     : legacyProfile
 
   const name = normalizeName(profile?.full_name) ?? normalizeName(user.user_metadata.full_name) ?? user.email ?? "Member"
+  const idVerified = profile?.id_verified === true
 
   return (
     <DashboardShell
       fullName={name}
       avatarUrl={normalizeAvatarUrl(profile?.avatar_url)}
+      idVerified={idVerified}
       uiIntent={
         profile?.ui_intent === "host" || profile?.ui_intent === "both" || profile?.ui_intent === "guest"
           ? profile.ui_intent

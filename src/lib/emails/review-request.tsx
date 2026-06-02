@@ -60,8 +60,23 @@ export function ReviewRequestEmail({
           color: "#1A1410",
         }}
       >
-        <div style={{ backgroundColor: "#1A1410", padding: "24px" }}>
-          <p style={{ margin: 0, color: "#FFFFFF", fontSize: "22px", fontWeight: 700 }}>Thrml</p>
+        <div style={{ backgroundColor: "#C75B3A", padding: "24px 28px" }}>
+          <p
+            style={{
+              margin: "0 0 6px",
+              color: "#F5EFE8",
+              fontFamily: 'Georgia, "Times New Roman", "DM Serif Display", serif',
+              fontSize: "30px",
+              fontWeight: 400,
+              letterSpacing: "-0.025em",
+              textTransform: "lowercase",
+            }}
+          >
+            thrml
+          </p>
+          <p style={{ margin: 0, color: "rgba(255, 255, 255, 0.88)", fontSize: "13px", fontWeight: 500 }}>
+            Private wellness, by the hour
+          </p>
         </div>
 
         <div style={{ padding: "24px" }}>

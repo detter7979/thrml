@@ -59,10 +59,21 @@ export async function GET(req: NextRequest) {
     try {
       results.evaluated++
 
-      await supabase
+      const { data: claimed, error: claimErr } = await supabase
         .from("support_requests")
         .update({ status: "pending_agent", agent_run_at: new Date().toISOString() })
         .eq("id", ticket.id)
+        .eq("status", "open")
+        .is("agent_run_at", null)
+        .select("id")
+        .maybeSingle()
+
+      if (claimErr) {
+        throw claimErr
+      }
+      if (!claimed?.id) {
+        continue
+      }
 
       let bookingContext: BookingContext = {
         booking_id: ticket.booking_id ?? null,
@@ -282,12 +293,25 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       results.errors++
       console.error("[agent-disputes] ticket error", ticket.id, err)
-      const { error: resetErr } = await supabase
+      const { data: current } = await supabase
         .from("support_requests")
-        .update({ status: "open", agent_run_at: null })
+        .select("status, resolution_email_sent_at")
         .eq("id", ticket.id)
-      if (resetErr) {
-        console.error("[agent-disputes] reset ticket failed", ticket.id, resetErr.message)
+        .maybeSingle()
+
+      const leaveResolved =
+        current?.status === "agent_resolved" ||
+        current?.status === "closed" ||
+        Boolean(current?.resolution_email_sent_at)
+
+      if (!leaveResolved) {
+        const { error: resetErr } = await supabase
+          .from("support_requests")
+          .update({ status: "open", agent_run_at: null })
+          .eq("id", ticket.id)
+        if (resetErr) {
+          console.error("[agent-disputes] reset ticket failed", ticket.id, resetErr.message)
+        }
       }
     }
   }

@@ -37,6 +37,11 @@ const FAQS = [
     question: "How do I contact support?",
     answer: "Visit the Support page and submit a request. We respond within 24 hours.",
   },
+  {
+    question: "What does the Verified Host badge mean?",
+    answer:
+      "A Verified Host has completed government-issued ID verification through our payments partner, Stripe. This confirms the host's identity but does not verify the safety, quality, or condition of their space. Hosts are also required to attest to carrying appropriate liability insurance. See our Disclaimers for details.",
+  },
 ]
 
 const faqSchema = {

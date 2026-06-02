@@ -62,6 +62,23 @@ export async function POST(
     return NextResponse.json({ error: "Ticket not found" }, { status: 404 })
   }
 
+  const ticketStatus = typeof ticket.status === "string" ? ticket.status : ""
+  const resolutionEmailSentAt =
+    typeof ticket.resolution_email_sent_at === "string" ? ticket.resolution_email_sent_at : null
+
+  if (
+    action === "approve" &&
+    (ticketStatus === "agent_resolved" || ticketStatus === "closed") &&
+    resolutionEmailSentAt
+  ) {
+    return NextResponse.json({
+      ok: true,
+      action,
+      skipped: "already_resolved",
+      message: "Guest resolution email was already sent for this ticket.",
+    })
+  }
+
   const { data: decisions, error: decErr } = await admin
     .from("dispute_decisions")
     .select("*")

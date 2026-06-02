@@ -5,6 +5,7 @@ import {
   loadActiveNewsletterEmails,
   weeklyDigestCooldownMs,
 } from "@/lib/emails/newsletter-digest"
+import { processHostIdentityFollowUps } from "@/lib/emails/host-identity"
 import { processGuestRetargeting, processHostRetargeting } from "@/lib/emails/retargeting"
 import { sendEmail } from "@/lib/emails/send"
 import {
@@ -123,10 +124,11 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   const newsletterEmails = await loadActiveNewsletterEmails(admin)
 
-  const [hostResult, guestResult, newsletterResult] = await Promise.allSettled([
+  const [hostResult, guestResult, newsletterResult, identityFollowUpResult] = await Promise.allSettled([
     processHostRetargeting({ skipEmails: newsletterEmails }),
     processGuestRetargeting({ skipEmails: newsletterEmails }),
     sendNewsletterDigest(),
+    processHostIdentityFollowUps(),
   ])
 
   return NextResponse.json({
@@ -134,5 +136,9 @@ export async function GET(req: NextRequest) {
     host_retarget: hostResult.status === "fulfilled" ? hostResult.value : { error: String(hostResult.reason) },
     guest_retarget: guestResult.status === "fulfilled" ? guestResult.value : { error: String(guestResult.reason) },
     newsletter: newsletterResult.status === "fulfilled" ? newsletterResult.value : { error: String(newsletterResult.reason) },
+    host_identity_followup:
+      identityFollowUpResult.status === "fulfilled"
+        ? identityFollowUpResult.value
+        : { error: String(identityFollowUpResult.reason) },
   })
 }

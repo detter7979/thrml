@@ -18,7 +18,7 @@ For each test below, confirm:
 
 - [ ] **From** is your transactional address (default `Thrml <notifications@usethrml.com>` unless overridden).
 - [ ] **Reply-To** is `hello@usethrml.com` (or your override), except where noted.
-- [ ] **Layout**: orange header band, cream body, square corners, cream wordmark (`/brand/logo-wordmark-cream.svg`).
+- [ ] **Layout**: orange header band, cream body, square corners, serif lowercase **thrml** wordmark (matches site nav).
 - [ ] Links resolve to the expected host (`NEXT_PUBLIC_APP_URL` / production URL).
 - [ ] Message appears in Resend **Logs** if delivery fails.
 

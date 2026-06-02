@@ -98,6 +98,7 @@ export function IdentityVerificationCTA({ status, verified, verifiedAt, compact 
   if (effective === "verified") {
     return (
       <section
+        id="identity"
         className={`rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-5 shadow-sm ${compact ? "mb-4" : ""}`}
       >
         <div className="flex items-start gap-3">
@@ -115,7 +116,10 @@ export function IdentityVerificationCTA({ status, verified, verifiedAt, compact 
 
   if (effective === "pending") {
     return (
-      <section className={`rounded-2xl border border-[#E6DDD3] bg-white p-5 shadow-sm ${compact ? "mb-4" : ""}`}>
+      <section
+        id="identity"
+        className={`rounded-2xl border border-[#E6DDD3] bg-white p-5 shadow-sm ${compact ? "mb-4" : ""}`}
+      >
         <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">IDENTITY</h2>
         <p className="mt-2 text-sm text-[#1A1410]">
           We&apos;re processing your verification. This usually takes a minute.
@@ -165,7 +169,10 @@ export function IdentityVerificationCTA({ status, verified, verifiedAt, compact 
 
   if (effective === "canceled") {
     return (
-      <section className={`rounded-2xl border border-[#E6DDD3] bg-[#FCFAF7] p-5 shadow-sm ${compact ? "mb-4" : ""}`}>
+      <section
+        id="identity"
+        className={`rounded-2xl border border-[#E6DDD3] bg-[#FCFAF7] p-5 shadow-sm ${compact ? "mb-4" : ""}`}
+      >
         <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">IDENTITY</h2>
         <p className="mt-2 text-sm text-[#5D4D41]">You started a verification but didn&apos;t finish.</p>
         <Button type="button" className="btn-primary mt-3" disabled={starting} onClick={() => void startVerification()}>
@@ -185,7 +192,10 @@ export function IdentityVerificationCTA({ status, verified, verifiedAt, compact 
 
   /* not_started */
   return (
-    <section className={`rounded-2xl border border-[#E6DDD3] bg-white p-5 shadow-sm ${compact ? "mb-4" : ""}`}>
+    <section
+      id="identity"
+      className={`rounded-2xl border border-[#E6DDD3] bg-white p-5 shadow-sm ${compact ? "mb-4" : ""}`}
+    >
       <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">IDENTITY</h2>
       <p className="mt-2 text-lg font-semibold text-[#1A1410]">
         {compact ? "Optional: verify your identity" : "Verify your identity"}

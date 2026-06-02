@@ -163,7 +163,7 @@ const wordmark = {
 
 const editorialWordmark = {
   ...wordmark,
-  color: "#F5F0EB",
+  color: "#F5EFE8",
 }
 
 const tagline = {

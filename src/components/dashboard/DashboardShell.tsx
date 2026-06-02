@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 
+import { HostSidebarVerification } from "@/components/host/host-sidebar-verification"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { trackMetaEvent } from "@/components/meta-pixel"
@@ -32,6 +33,7 @@ const PROFILE_NAME_OVERRIDE_KEY = "thrml.profileNameOverride"
 export function DashboardShell({
   fullName,
   avatarUrl,
+  idVerified = false,
   uiIntent,
   hasListings,
   activeListingsCount,
@@ -39,6 +41,7 @@ export function DashboardShell({
 }: {
   fullName: string
   avatarUrl: string | null
+  idVerified?: boolean
   uiIntent: UiIntent
   hasListings: boolean
   activeListingsCount: number
@@ -383,7 +386,10 @@ export function DashboardShell({
               <AvatarImage src={avatarUrlValue ?? undefined} alt={fullNameValue} />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
-            <p className="text-sm font-medium text-[#1A1410]">{fullNameValue}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[#1A1410]">{fullNameValue}</p>
+              {isHost ? <HostSidebarVerification idVerified={idVerified} /> : null}
+            </div>
           </div>
         </div>
 

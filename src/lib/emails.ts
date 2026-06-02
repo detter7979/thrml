@@ -162,18 +162,18 @@ export async function sendGuestCancellationConfirmation(
   const refundLine =
     refundAmount > 0
       ? `A refund of ${formatUsd(refundAmount)} will appear on your statement within 5-10 business days.`
-      : "This booking was cancelled within 48 hours of the session and is not eligible for a refund per our cancellation policy."
+      : "This booking was canceled within 48 hours of the session and is not eligible for a refund per our cancellation policy."
   const when = formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)
 
   return sendThrmlLayoutEmail({
     to: booking.guest_email,
-    subject: `Booking cancelled — ${title}`,
+    subject: `Booking canceled — ${title}`,
     userId: booking.guest_id ?? null,
     preferenceKey: "booking_cancelled",
     layout: {
-      preview: `Booking cancelled — ${title}`,
-      kicker: "Booking cancelled",
-      title: "Your booking has been cancelled.",
+      preview: `Booking canceled — ${title}`,
+      kicker: "Booking canceled",
+      title: "Your booking has been canceled.",
       summary: [
         { label: "Listing", value: title },
         { label: "Date & time", value: when },
@@ -188,22 +188,22 @@ export async function sendHostCancellationNotice(
   booking: BookingEmailPayload,
   _refundAmount: number,
   _penalty?: HostPenaltyEmailPayload,
-  _cancelledBy: "guest" | "host" = "guest"
+  _canceledBy: "guest" | "host" = "guest"
 ) {
-  void _cancelledBy
+  void _canceledBy
   if (!booking.host_email) return { sent: false, error: "Missing host email" }
   const title = booking.listing_title ?? "Thrml session"
   const when = formatBookingWindow(booking.session_date, booking.start_time, booking.end_time)
 
   return sendThrmlLayoutEmail({
     to: booking.host_email,
-    subject: `Booking cancelled by guest — ${formatLongDate(booking.session_date)}`,
+    subject: `Booking canceled by guest — ${formatLongDate(booking.session_date)}`,
     userId: booking.host_id ?? null,
     preferenceKey: "booking_cancelled",
     layout: {
-      preview: `Guest cancelled — ${title}`,
-      kicker: "Booking cancelled",
-      title: "A guest has cancelled their booking.",
+      preview: `Guest canceled — ${title}`,
+      kicker: "Booking canceled",
+      title: "A guest has canceled their booking.",
       summary: [
         { label: "Guest", value: booking.guest_name ?? "Guest" },
         { label: "Listing", value: title },
@@ -225,13 +225,13 @@ export async function sendGuestHostCancelledNotice(
 
   return sendThrmlLayoutEmail({
     to: booking.guest_email,
-    subject: "Your booking has been cancelled by the host",
+    subject: "Your booking has been canceled by the host",
     userId: booking.guest_id ?? null,
     preferenceKey: "booking_cancelled",
     layout: {
-      preview: "Your host cancelled this booking",
-      kicker: "Booking cancelled",
-      title: "We're sorry — your host has cancelled this booking.",
+      preview: "Your host canceled this booking",
+      kicker: "Booking canceled",
+      title: "We're sorry — your host has canceled this booking.",
       summary: [
         { label: "Listing", value: title },
         { label: "Date & time", value: when },
@@ -702,7 +702,7 @@ export async function sendHostBookingRequestEmail(booking: BookingRequestEmailPa
         { label: "You'd receive", value: formatMoney(Number(booking.host_payout ?? 0)) },
       ],
       paragraphs: [
-        `You have 24 hours to respond. Requests not confirmed by ${deadlineLabel} will be automatically cancelled.`,
+        `You have 24 hours to respond. Requests not confirmed by ${deadlineLabel} will be automatically canceled.`,
       ],
       cta: { label: "Confirm booking", href: bookingUrl },
     },

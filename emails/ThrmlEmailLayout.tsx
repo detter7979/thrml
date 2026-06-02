@@ -5,7 +5,6 @@ import {
   Head,
   Hr,
   Html,
-  Img,
   Link,
   Preview,
   Section,
@@ -83,7 +82,6 @@ export function ThrmlEmailLayout({
   appUrl,
 }: ThrmlEmailLayoutProps) {
   const base = resolveAppUrl(appUrl)
-  const wordmarkUrl = `${base}/brand/logo-wordmark-cream.svg`
   const notificationsUrl = `${base}/dashboard/account#notifications`
 
   return (
@@ -95,13 +93,9 @@ export function ThrmlEmailLayout({
           <Section style={styles.card}>
             {/* Orange header band */}
             <Section style={styles.headerBand}>
-              <Img
-                src={wordmarkUrl}
-                width={120}
-                height={32}
-                alt="thrml"
-                style={styles.wordmark}
-              />
+              <Link href={base} style={styles.wordmarkLink}>
+                <Text style={styles.wordmarkText}>thrml</Text>
+              </Link>
               <Text style={styles.tagline}>Private wellness, by the hour</Text>
             </Section>
 
@@ -213,9 +207,20 @@ const styles = {
     backgroundColor: THRML_EMAIL_COLORS.orange,
     padding: "28px 28px 24px",
   },
-  wordmark: {
+  wordmarkLink: {
     display: "block",
     margin: "0 0 8px",
+    textDecoration: "none",
+  },
+  wordmarkText: {
+    margin: 0,
+    fontFamily: 'Georgia, "Times New Roman", "DM Serif Display", serif',
+    fontSize: "30px",
+    lineHeight: "1.15",
+    fontWeight: 400,
+    color: "#F5EFE8",
+    letterSpacing: "-0.025em",
+    textTransform: "lowercase" as const,
   },
   tagline: {
     margin: 0,

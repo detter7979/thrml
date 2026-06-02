@@ -29,6 +29,7 @@ export async function POST() {
       .update({
         stripe_identity_verification_id: sessionId,
         id_verification_status: "pending",
+        id_verification_started_at: new Date().toISOString(),
       })
       .eq("id", user.id)
 

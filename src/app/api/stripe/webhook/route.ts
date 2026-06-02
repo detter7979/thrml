@@ -778,7 +778,10 @@ export async function POST(req: NextRequest) {
           raw_event: { stripe_event_id: event.id, type: event.type },
         })
 
-        const { data: authUser } = await supabase.auth.admin.getUserById(profileId)
+        const [{ data: authUser }, { data: profileRow }] = await Promise.all([
+          supabase.auth.admin.getUserById(profileId),
+          supabase.from("profiles").select("full_name").eq("id", profileId).maybeSingle(),
+        ])
         const email = authUser.user?.email ?? undefined
         void fireServerEvent(
           "host_verified",
@@ -786,6 +789,14 @@ export async function POST(req: NextRequest) {
           { profile_id: profileId },
           { eventId: `host_verified_${event.id}` }
         )
+
+        const { sendHostIdentityVerifiedEmail } = await import("@/lib/emails/host-identity")
+        void sendHostIdentityVerifiedEmail({
+          profileId,
+          fullName: typeof profileRow?.full_name === "string" ? profileRow.full_name : null,
+        }).catch((err) => {
+          console.error("[stripe/webhook] host identity verified email failed", err)
+        })
       }
     } else {
       console.warn("[stripe/webhook] identity.verification_session.verified missing profile_id metadata", {
@@ -818,6 +829,21 @@ export async function POST(req: NextRequest) {
         failure_reason: failureReason,
         raw_event: { stripe_event_id: event.id, type: event.type, last_error: lastErr ?? null },
       })
+
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("full_name, id_verified")
+        .eq("id", profileId)
+        .maybeSingle()
+      if (!profileRow?.id_verified) {
+        const { sendHostIdentityRequiresInputEmail } = await import("@/lib/emails/host-identity")
+        void sendHostIdentityRequiresInputEmail({
+          profileId,
+          fullName: typeof profileRow?.full_name === "string" ? profileRow.full_name : null,
+        }).catch((err) => {
+          console.error("[stripe/webhook] host identity requires_input email failed", err)
+        })
+      }
     }
   }
 

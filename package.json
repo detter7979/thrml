@@ -24,7 +24,8 @@
     "finance:sync-sheet": "tsx scripts/sync-marketplace-finance-sheet.ts",
     "finance:rebuild-sheet": "tsx scripts/rebuild-finance-tracker-sheet.ts",
     "test:email": "tsx scripts/test-email.ts",
-    "email:mock": "tsx scripts/preview-email-mock.ts"
+    "email:mock": "tsx scripts/preview-email-mock.ts",
+    "brand:email-profile": "tsx scripts/render-email-profile-asset.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

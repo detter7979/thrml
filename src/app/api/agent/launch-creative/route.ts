@@ -330,6 +330,12 @@ export async function POST(req: NextRequest) {
 
     const token = getMetaMarketingApiToken()
     const adAccountId = getMetaAdAccountId()
+    if (!adAccountId.startsWith("act_")) {
+      throw new Error(
+        `META_AD_ACCOUNT_ID must resolve to act_<id>; got "${adAccountId}". Fix env or redeploy latest launch-creative.`
+      )
+    }
+    console.log("[launch-creative] using ad account", adAccountId)
     const pageId = requiredEnv("META_PAGE_ID")
 
     const { data: asset, error: assetError } = await admin!

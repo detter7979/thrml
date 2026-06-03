@@ -69,10 +69,18 @@ export function normalizeListingInsertPayload(
 ): Record<string, unknown> {
   const payload = { ...raw }
 
-  payload.exterior_devices = coerceExteriorDevicesField(payload.exterior_devices)
-  payload.safety_amenities = coerceStringArrayField(payload.safety_amenities)
-  payload.controls_in_reach = coerceBooleanField(payload.controls_in_reach)
-  payload.has_ventilation = coerceBooleanField(payload.has_ventilation)
+  if ("exterior_devices" in payload) {
+    payload.exterior_devices = coerceExteriorDevicesField(payload.exterior_devices)
+  }
+  if ("safety_amenities" in payload) {
+    payload.safety_amenities = coerceStringArrayField(payload.safety_amenities)
+  }
+  if ("controls_in_reach" in payload) {
+    payload.controls_in_reach = coerceBooleanField(payload.controls_in_reach)
+  }
+  if ("has_ventilation" in payload) {
+    payload.has_ventilation = coerceBooleanField(payload.has_ventilation)
+  }
 
   if ("private_space_no_devices_attested" in payload) {
     payload.private_space_no_devices_attested = coerceBooleanField(payload.private_space_no_devices_attested)
@@ -89,13 +97,6 @@ export function normalizeListingInsertPayload(
   }
   if ("amenities" in payload) {
     payload.amenities = coerceStringArrayField(payload.amenities)
-  }
-
-  if (!Array.isArray(payload.exterior_devices)) {
-    console.warn("[normalizeListingInsertPayload] exterior_devices coerced to []", {
-      receivedType: typeof raw.exterior_devices,
-    })
-    payload.exterior_devices = []
   }
 
   return payload

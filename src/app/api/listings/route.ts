@@ -8,8 +8,10 @@ import {
   normalizeListingInsertPayload,
   sanitizeHouseRulesForListing,
 } from "@/lib/listings/normalize-listing-insert-payload"
+import { pickListingInsertPayload } from "@/lib/listings/pick-listing-insert-payload"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 function errorFromUnknown(err: unknown): { message: string; code: string | null } {
@@ -68,23 +70,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: attestationCheck.error }, { status: 400 })
     }
 
-    const listingPayload = normalizeListingInsertPayload({
-      ...body,
-      host_id: user.id,
-      title,
-      description,
-      house_rules: sanitizeHouseRulesForListing(body.house_rules),
-      is_active: true,
-      is_draft: false,
-    })
+    const listingPayload = pickListingInsertPayload(
+      normalizeListingInsertPayload({
+        ...body,
+        host_id: user.id,
+        title,
+        description,
+        house_rules: sanitizeHouseRulesForListing(body.house_rules),
+        is_active: true,
+        is_draft: false,
+      })
+    )
 
-    delete listingPayload.id
-    delete listingPayload.created_at
-    delete listingPayload.updated_at
-    delete listingPayload.is_featured
-
-    const { data, error, code } = await insertListingWithColumnFallback(supabase, listingPayload)
+    const admin = createAdminClient()
+    const { data, error, code } = await insertListingWithColumnFallback(admin, listingPayload)
     if (!data) {
+      console.error("[POST /api/listings] insert failed", {
+        userId: user.id,
+        error,
+        code,
+        payloadKeys: Object.keys(listingPayload),
+      })
       return NextResponse.json(
         { error: error ?? "Failed to create listing.", code: code ?? null },
         { status: 500 }

@@ -903,7 +903,6 @@ export function HostNewListingClient({
       service_duration_max: hasServiceDuration ? serviceDurationMaxTotal : null,
       service_duration_unit: "minutes",
       max_temp: values.maxTemperature,
-      max_temperature: values.maxTemperature,
       description: sanitizedDescription,
       door_operation: values.doorOperation,
       access_method: values.accessMethod,
@@ -936,7 +935,6 @@ export function HostNewListingClient({
           : null,
       service_attributes: values.serviceAttributes ?? {},
       instant_book: values.instantBook,
-      is_instant_book: values.instantBook,
       cancellation_policy: values.cancellationPolicy,
       house_rules: sanitizedHouseRules,
     }
@@ -957,7 +955,6 @@ export function HostNewListingClient({
           setStep(5)
           return
         }
-        setPhotoError(createError)
         setSubmitError(createError)
         if (createResponse.status === 400 && message.includes("can't publish")) {
           setStep(2)
@@ -967,16 +964,13 @@ export function HostNewListingClient({
 
       const createPayload = await parseJsonResponse<{ listingId?: string; error?: string }>(createResponse)
       if (!createPayload?.listingId) {
-        const createError = createPayload?.error ?? "Failed to create listing."
-        setPhotoError(createError)
-        setSubmitError(createError)
+        setSubmitError(createPayload?.error ?? "Failed to create listing.")
         return
       }
       listingId = createPayload.listingId
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Network error while creating listing. Please try again."
-      setPhotoError(message)
       setSubmitError(message)
       return
     }
@@ -1885,8 +1879,8 @@ export function HostNewListingClient({
               ) : null}
             </div>
 
-            {photoError ? <p className="text-sm text-destructive">{photoError}</p> : null}
             {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
+            {photoError ? <p className="text-sm text-destructive">{photoError}</p> : null}
             {step === TOTAL_STEPS && !insuranceAttested && !insuranceAttestationChecked ? (
               <p className="text-sm text-[#6D5E51]">
                 Confirm the insurance attestation on this step to publish. Identity verification and payouts can be

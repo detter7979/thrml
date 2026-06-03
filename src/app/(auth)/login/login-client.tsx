@@ -3,15 +3,76 @@
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, type FormEvent, useState } from "react"
-import { Chrome, Mail } from "lucide-react"
 
+import { AuthField } from "@/components/auth/AuthField"
+import {
+  authPrimaryButtonClassName,
+  authSocialButtonClassName,
+} from "@/components/auth/auth-field-styles"
 import { AuthShell } from "@/components/auth/AuthShell"
+import { GoogleIcon } from "@/components/auth/GoogleIcon"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { trackGaEvent } from "@/lib/analytics/ga"
+import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
+
+type LoginView = "password" | "magic-link" | "check-email"
+
+function AuthDivider() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-px flex-1 bg-[#E7DED3]" />
+      <span className="text-xs font-medium uppercase tracking-wide text-[#A89888]">or</span>
+      <div className="h-px flex-1 bg-[#E7DED3]" />
+    </div>
+  )
+}
+
+function MethodToggle({
+  view,
+  onChange,
+  disabled,
+}: {
+  view: "password" | "magic-link"
+  onChange: (view: "password" | "magic-link") => void
+  disabled: boolean
+}) {
+  return (
+    <div
+      className="grid grid-cols-2 gap-1 rounded-full border border-[#E7DED3] bg-[#F7F3EE] p-1"
+      role="tablist"
+      aria-label="Sign-in method"
+    >
+      {(
+        [
+          { id: "password" as const, label: "Password" },
+          { id: "magic-link" as const, label: "Email link" },
+        ] as const
+      ).map((option) => {
+        const active = view === option.id
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            disabled={disabled}
+            onClick={() => onChange(option.id)}
+            className={cn(
+              "h-10 rounded-full text-sm font-medium transition-colors",
+              active
+                ? "bg-white text-[#1A1410] shadow-sm"
+                : "text-[#746558] hover:text-[#1A1410]"
+            )}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function LoginForm() {
   const supabase = createClient()
@@ -24,7 +85,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [view, setView] = useState<"password" | "magic-link" | "check-email">("password")
+  const [view, setView] = useState<LoginView>("password")
   const [error, setError] = useState<string | null>(null)
   const [isPasswordLoading, setIsPasswordLoading] = useState(false)
   const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false)
@@ -188,7 +249,7 @@ function LoginForm() {
   const isBusy = isPasswordLoading || isMagicLinkLoading || isGoogleLoading
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {loginError === "invalid_reset_link" ? (
         <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
           That reset link is invalid or has expired. Please request a new one.
@@ -209,104 +270,116 @@ function LoginForm() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          type="button"
-          variant={view === "password" ? "default" : "outline"}
-          className={view === "password" ? "btn-primary h-10" : "h-10"}
-          onClick={() => setView("password")}
-          disabled={isBusy}
-        >
-          Password
-        </Button>
-        <Button
-          type="button"
-          variant={view === "magic-link" ? "default" : "outline"}
-          className={view === "magic-link" ? "btn-primary h-10" : "h-10"}
-          onClick={() => setView("magic-link")}
-          disabled={isBusy}
-        >
-          Email link
-        </Button>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        className={authSocialButtonClassName}
+        onClick={handleGoogleLogin}
+        disabled={isBusy}
+      >
+        <GoogleIcon className="size-5 shrink-0" />
+        {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
+      </Button>
+
+      <AuthDivider />
 
       {view === "check-email" ? (
         <div className="space-y-4 rounded-2xl border border-[#E7DED3] bg-[#FCFAF7] p-5">
-          <h2 className="text-base font-medium text-[#1A1410]">Check your inbox</h2>
-          <p className="text-sm text-[#746558]">
-            We sent a login link to <strong>{email}</strong>. Click it to sign in without a password.
+          <h2 className="font-serif text-xl text-[#1A1410]">Check your inbox</h2>
+          <p className="text-sm leading-relaxed text-[#746558]">
+            We sent a login link to <strong className="text-[#1A1410]">{email}</strong>. Open it on
+            this device to sign in.
           </p>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setView("magic-link")}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 flex-1 rounded-full border-[#E7DED3]"
+              onClick={() => setView("magic-link")}
+            >
               Send another link
             </Button>
-            <Button type="button" className="btn-primary flex-1" onClick={() => setView("password")}>
+            <Button
+              type="button"
+              className={cn(authPrimaryButtonClassName, "flex-1")}
+              onClick={() => setView("password")}
+            >
               Use password
             </Button>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="space-y-5">
+          <MethodToggle
+            view={view === "magic-link" ? "magic-link" : "password"}
+            onChange={(next) => setView(next)}
+            disabled={isBusy}
+          />
 
-      {view === "password" ? (
-        <form onSubmit={handlePasswordLogin} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Password</Label>
-            <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-          </div>
-          <div className="-mt-1 text-right">
-            <Link href={`/forgot-password${nextQuery}`} className="text-xs text-brand-600 hover:underline">
-              Forgot password?
-            </Link>
-          </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button className="btn-primary h-11 w-full" disabled={isBusy}>
-            <Mail className="mr-2 size-4" />
-            {isPasswordLoading ? "Signing in..." : "Continue"}
-          </Button>
-        </form>
-      ) : null}
+          {view === "password" ? (
+            <form onSubmit={handlePasswordLogin} className="space-y-5">
+              <AuthField
+                label="Email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+              <div className="space-y-2">
+                <AuthField
+                  label="Password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+                <div className="flex justify-end">
+                  <Link
+                    href={`/forgot-password${nextQuery}`}
+                    className="text-sm text-[#C75B3A] hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+              </div>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              <Button className={authPrimaryButtonClassName} disabled={isBusy}>
+                {isPasswordLoading ? "Signing in..." : "Log in"}
+              </Button>
+            </form>
+          ) : null}
 
-      {view === "magic-link" ? (
-        <form onSubmit={handleMagicLinkLogin} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button className="btn-primary h-11 w-full" disabled={isBusy}>
-            <Mail className="mr-2 size-4" />
-            {isMagicLinkLoading ? "Sending..." : "Send magic link"}
-          </Button>
-        </form>
-      ) : null}
+          {view === "magic-link" ? (
+            <form onSubmit={handleMagicLinkLogin} className="space-y-5">
+              <AuthField
+                label="Email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+              <p className="text-sm leading-relaxed text-[#746558]">
+                We&apos;ll email you a secure link — no password needed.
+              </p>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              <Button className={authPrimaryButtonClassName} disabled={isBusy}>
+                {isMagicLinkLoading ? "Sending link..." : "Email me a login link"}
+              </Button>
+            </form>
+          ) : null}
+        </div>
+      )}
 
-      <div className="flex items-center gap-3 py-1">
-        <div className="h-px flex-1 bg-border" />
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">or</p>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-      <Button type="button" variant="outline" className="h-11 w-full" onClick={handleGoogleLogin} disabled={isBusy}>
-        <Chrome className="mr-2 size-4" />
-        {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
-      </Button>
-      <p className="type-label text-center md:text-left">
-        New to thrml? <Link href={`/signup${nextQuery}`} className="text-brand-600">Create an account</Link>
+      <p className="text-center text-sm text-[#746558] md:text-left">
+        New to thrml?{" "}
+        <Link href={`/signup${nextQuery}`} className="font-medium text-[#C75B3A] hover:underline">
+          Create an account
+        </Link>
       </p>
     </div>
   )
@@ -314,8 +387,8 @@ function LoginForm() {
 
 export default function LoginClientPage() {
   return (
-    <AuthShell title="Welcome back" subtitle="One account for booking and listing wellness spaces.">
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Loading login...</div>}>
+    <AuthShell title="Welcome back" subtitle="Sign in to book or manage your wellness space.">
+      <Suspense fallback={<div className="text-sm text-[#746558]">Loading login...</div>}>
         <LoginForm />
       </Suspense>
     </AuthShell>

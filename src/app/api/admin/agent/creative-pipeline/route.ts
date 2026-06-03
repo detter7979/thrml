@@ -18,6 +18,11 @@ import {
   type SvgAspectRatio,
 } from "@/lib/agent/svg-template-generator"
 import type { RenderJob, VideoConfig } from "@/lib/agent/types"
+import {
+  fetchLaunchableAdsets,
+  fetchLaunchableCampaigns,
+  getMetaAdAccountId,
+} from "@/lib/agent/meta-ads-api"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
@@ -128,9 +133,17 @@ async function withSignedUrls<T extends CreativeAssetRow>(assets: T[]) {
   )
 }
 
+type LaunchableMetaCampaign = {
+  platform_id: string
+  campaign_name: string
+  status: string | null
+}
+
 type LaunchableMetaAdset = {
   id: string
   platform_id: string
+  platform_campaign_id: string
+  campaign_name: string
   adset_name: string
   status: string | null
   market: string | null
@@ -138,35 +151,117 @@ type LaunchableMetaAdset = {
   goal_type: string | null
 }
 
-async function fetchMetaAdsets(admin: AdminClient) {
+type LaunchTargetsResult = {
+  campaigns: LaunchableMetaCampaign[]
+  adsets: LaunchableMetaAdset[]
+  source: "meta" | "database"
+}
+
+async function fetchMetaAdsetsFromDb(admin: AdminClient): Promise<LaunchTargetsResult> {
   const { data, error } = await admin
     .from("ad_sets")
-    .select("id, name, status, platform_adset_id, audience_src, conv_event, campaigns(geo, platform)")
+    .select(
+      "id, name, status, platform_adset_id, audience_src, conv_event, campaign_id, campaigns(id, name, geo, platform, platform_campaign_id)"
+    )
     .in("status", ["TEST", "SCALE"])
     .not("platform_adset_id", "is", null)
     .order("created_at", { ascending: false })
 
-  if (error) return { data: null, error }
+  if (error) throw new Error(error.message)
 
-  const mapped: LaunchableMetaAdset[] = (data ?? [])
-    .filter((row) => {
-      const camp = Array.isArray(row.campaigns) ? row.campaigns[0] : row.campaigns
-      return camp?.platform === "META"
-    })
-    .map((row) => {
-      const camp = Array.isArray(row.campaigns) ? row.campaigns[0] : row.campaigns
-      return {
-        id: row.id,
-        platform_id: row.platform_adset_id ?? row.id,
-        adset_name: row.name,
-        status: row.status,
-        market: camp?.geo ?? null,
-        aud_type: row.audience_src ?? null,
-        goal_type: row.conv_event ?? null,
-      }
-    })
+  const campaignByPlatformId = new Map<string, LaunchableMetaCampaign>()
+  const adsets: LaunchableMetaAdset[] = []
 
-  return { data: mapped, error: null }
+  for (const row of data ?? []) {
+    const camp = Array.isArray(row.campaigns) ? row.campaigns[0] : row.campaigns
+    if (camp?.platform !== "META" || !camp.platform_campaign_id) continue
+
+    const platformCampaignId = camp.platform_campaign_id as string
+    if (!campaignByPlatformId.has(platformCampaignId)) {
+      campaignByPlatformId.set(platformCampaignId, {
+        platform_id: platformCampaignId,
+        campaign_name: (camp.name as string) ?? platformCampaignId,
+        status: null,
+      })
+    }
+
+    adsets.push({
+      id: row.id,
+      platform_id: row.platform_adset_id ?? row.id,
+      platform_campaign_id: platformCampaignId,
+      campaign_name: (camp.name as string) ?? platformCampaignId,
+      adset_name: row.name,
+      status: row.status,
+      market: camp.geo ?? null,
+      aud_type: row.audience_src ?? null,
+      goal_type: row.conv_event ?? null,
+    })
+  }
+
+  const campaigns = [...campaignByPlatformId.values()].sort((a, b) =>
+    a.campaign_name.localeCompare(b.campaign_name)
+  )
+
+  return {
+    campaigns,
+    adsets: adsets.sort((a, b) => a.adset_name.localeCompare(b.adset_name)),
+    source: "database",
+  }
+}
+
+async function fetchMetaLaunchTargets(admin: AdminClient): Promise<LaunchTargetsResult> {
+  try {
+    const accountId = getMetaAdAccountId()
+    const [campaigns, adsets] = await Promise.all([
+      fetchLaunchableCampaigns(accountId),
+      fetchLaunchableAdsets(accountId),
+    ])
+
+    if (campaigns.length === 0 && adsets.length === 0) {
+      return fetchMetaAdsetsFromDb(admin)
+    }
+
+    const campaignNameById = new Map(campaigns.map((c) => [c.id, c.name]))
+    const launchCampaigns: LaunchableMetaCampaign[] = campaigns.map((c) => ({
+      platform_id: c.id,
+      campaign_name: c.name,
+      status: c.effective_status ?? c.status ?? null,
+    }))
+    const campaignIds = new Set(launchCampaigns.map((c) => c.platform_id))
+
+    const launchAdsets: LaunchableMetaAdset[] = adsets.map((a) => ({
+      id: a.id,
+      platform_id: a.id,
+      platform_campaign_id: a.campaign_id,
+      campaign_name: campaignNameById.get(a.campaign_id) ?? a.campaign_id,
+      adset_name: a.name,
+      status: a.effective_status ?? a.status ?? null,
+      market: null,
+      aud_type: null,
+      goal_type: null,
+    }))
+
+    for (const adset of launchAdsets) {
+      if (campaignIds.has(adset.platform_campaign_id)) continue
+      campaignIds.add(adset.platform_campaign_id)
+      launchCampaigns.push({
+        platform_id: adset.platform_campaign_id,
+        campaign_name: adset.campaign_name,
+        status: null,
+      })
+    }
+
+    launchCampaigns.sort((a, b) => a.campaign_name.localeCompare(b.campaign_name))
+
+    return {
+      campaigns: launchCampaigns,
+      adsets: launchAdsets,
+      source: "meta",
+    }
+  } catch (err) {
+    console.error("[creative-pipeline] live Meta launch targets failed, using DB fallback:", err)
+    return fetchMetaAdsetsFromDb(admin)
+  }
 }
 
 function numberMetric(value: unknown) {
@@ -215,7 +310,7 @@ export async function GET() {
   const { error, admin } = await requireAdminApi()
   if (error) return error
 
-  const [briefs, generatedAssets, launchedAssets, adsets] = await Promise.all([
+  const [briefs, generatedAssets, launchedAssets, launchTargets] = await Promise.all([
     admin!
       .from("creative_briefs")
       .select("*")
@@ -234,11 +329,10 @@ export async function GET() {
       .eq("status", "launched")
       .order("launched_at", { ascending: false })
       .limit(100),
-    fetchMetaAdsets(admin!),
+    fetchMetaLaunchTargets(admin!),
   ])
 
-  const firstError =
-    briefs.error ?? generatedAssets.error ?? launchedAssets.error ?? adsets.error
+  const firstError = briefs.error ?? generatedAssets.error ?? launchedAssets.error
   if (firstError) return NextResponse.json({ error: firstError.message }, { status: 500 })
 
   const approvedBriefs = await admin!
@@ -265,7 +359,8 @@ export async function GET() {
     }
   }
 
-  const activeMetaAdsets = adsets.data ?? []
+  const activeMetaCampaigns = launchTargets.campaigns
+  const activeMetaAdsets = launchTargets.adsets
 
   const allBriefIds = [
     ...(briefs.data ?? []).map((b) => b.id),
@@ -340,7 +435,9 @@ export async function GET() {
     renderJobsByBrief,
     generatedAssets: signedGeneratedAssets,
     launchedAssets: launchedWithInsights,
+    activeMetaCampaigns,
     activeMetaAdsets,
+    metaLaunchSource: launchTargets.source,
     runwayConfigured: isRunwayConfigured(),
   })
 }

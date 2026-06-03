@@ -377,28 +377,30 @@ export function Navbar() {
             </DropdownMenu>
           ) : (
             <>
-              <Button
-                asChild
-                variant="ghost"
-                className={`rounded-full border border-current/25 px-5 hover:bg-white/10 ${desktopLinkColor}`}
-              >
-                <Link
-                  href="/become-a-host"
-                  onClick={() => {
-                    trackBecomeHostClick("/become-a-host")
-                    trackMetaEvent(
-                      "become_host_click",
-                      {
-                        content_name: "become_a_host",
-                        source: "nav",
-                      },
-                      { custom: true }
-                    )
-                  }}
+              {!isHome ? (
+                <Button
+                  asChild
+                  variant="ghost"
+                  className={`rounded-full border border-current/25 px-5 hover:bg-white/10 ${desktopLinkColor}`}
                 >
-                  Become a host
-                </Link>
-              </Button>
+                  <Link
+                    href="/become-a-host"
+                    onClick={() => {
+                      trackBecomeHostClick("/become-a-host")
+                      trackMetaEvent(
+                        "become_host_click",
+                        {
+                          content_name: "become_a_host",
+                          source: "nav",
+                        },
+                        { custom: true }
+                      )
+                    }}
+                  >
+                    Become a host
+                  </Link>
+                </Button>
+              ) : null}
               <Link href={loginHref} className={`text-sm ${desktopLinkColor}`}>
                 Log in
               </Link>
@@ -558,29 +560,33 @@ export function Navbar() {
                         </Link>
                       </Button>
                     </motion.div>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <div className="my-1 border-t border-[#3A3029]" />
-                    </motion.div>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <Link
-                        href="/become-a-host"
-                        className="text-[#FFAB90] font-medium"
-                        onClick={() => {
-                          trackBecomeHostClick("/become-a-host")
-                          trackMetaEvent(
-                            "become_host_click",
-                            {
-                              content_name: "become_a_host",
-                              source: "nav",
-                            },
-                            { custom: true }
-                          )
-                          closeMobileNav()
-                        }}
-                      >
-                        Become a host
-                      </Link>
-                    </motion.div>
+                    {!isHome ? (
+                      <>
+                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
+                          <div className="my-1 border-t border-[#3A3029]" />
+                        </motion.div>
+                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
+                          <Link
+                            href="/become-a-host"
+                            className="text-[#FFAB90] font-medium"
+                            onClick={() => {
+                              trackBecomeHostClick("/become-a-host")
+                              trackMetaEvent(
+                                "become_host_click",
+                                {
+                                  content_name: "become_a_host",
+                                  source: "nav",
+                                },
+                                { custom: true }
+                              )
+                              closeMobileNav()
+                            }}
+                          >
+                            Become a host
+                          </Link>
+                        </motion.div>
+                      </>
+                    ) : null}
                   </>
                 )}
               </motion.div>

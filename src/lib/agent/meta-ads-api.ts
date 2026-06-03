@@ -13,6 +13,14 @@ export type MetaCampaign = {
   status?: string
 }
 
+export type MetaAdset = {
+  id: string
+  name: string
+  campaign_id: string
+  effective_status?: string
+  status?: string
+}
+
 /** One normalized insight slice per calendar day (UTC) from Meta, before DB conv_event split. */
 export type MetaInsightRow = {
   date: string
@@ -325,32 +333,74 @@ export async function fetchInsights(
   return { insights: results, skippedEntityIds }
 }
 
-export async function fetchActiveCampaigns(adAccountId: string): Promise<MetaCampaign[]> {
+const LAUNCHABLE_EFFECTIVE_STATUSES = ["ACTIVE", "PAUSED"] as const
+
+async function fetchPaginatedAccountResource<T>(
+  adAccountId: string,
+  resource: "campaigns" | "adsets",
+  fields: string,
+  effectiveStatuses: readonly string[],
+  logLabel: string
+): Promise<T[]> {
   const acct = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`
   const token = encodeURIComponent(getMetaAccessToken())
-  const fields = encodeURIComponent("id,name,status,effective_status")
+  const encodedFields = encodeURIComponent(fields)
   const filtering = encodeURIComponent(
-    JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }])
+    JSON.stringify([{ field: "effective_status", operator: "IN", value: [...effectiveStatuses] }])
   )
   const initial =
-    `${graphBase()}/${acct}/campaigns?fields=${fields}&filtering=${filtering}&limit=500&access_token=${token}`
+    `${graphBase()}/${acct}/${resource}?fields=${encodedFields}&filtering=${filtering}&limit=500&access_token=${token}`
 
-  const rows: MetaCampaign[] = []
+  const rows: T[] = []
   let url: string | null = initial
   while (url) {
     const res = await fetchWithRetry(url)
     if (!res.ok) {
-      console.error("[meta-ads-api] fetchActiveCampaigns", await res.text())
+      console.error(`[meta-ads-api] ${logLabel}`, await res.text())
       break
     }
     const json = (await res.json()) as {
-      data?: MetaCampaign[]
+      data?: T[]
       paging?: { next?: string }
     }
     rows.push(...(json.data ?? []))
     url = json.paging?.next ?? null
   }
   return rows
+}
+
+export async function fetchActiveCampaigns(adAccountId: string): Promise<MetaCampaign[]> {
+  return fetchPaginatedAccountResource<MetaCampaign>(
+    adAccountId,
+    "campaigns",
+    "id,name,status,effective_status",
+    ["ACTIVE"],
+    "fetchActiveCampaigns"
+  )
+}
+
+/** Campaigns available for creative launch (live Meta, not DB registry). */
+export async function fetchLaunchableCampaigns(adAccountId: string): Promise<MetaCampaign[]> {
+  const rows = await fetchPaginatedAccountResource<MetaCampaign>(
+    adAccountId,
+    "campaigns",
+    "id,name,status,effective_status",
+    LAUNCHABLE_EFFECTIVE_STATUSES,
+    "fetchLaunchableCampaigns"
+  )
+  return rows.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Ad sets available for creative launch (live Meta, not DB registry). */
+export async function fetchLaunchableAdsets(adAccountId: string): Promise<MetaAdset[]> {
+  const rows = await fetchPaginatedAccountResource<MetaAdset>(
+    adAccountId,
+    "adsets",
+    "id,name,campaign_id,status,effective_status",
+    LAUNCHABLE_EFFECTIVE_STATUSES,
+    "fetchLaunchableAdsets"
+  )
+  return rows.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**

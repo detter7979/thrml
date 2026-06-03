@@ -64,8 +64,12 @@ type CreativeAsset = {
   variation_label?: string | null; format?: string | null; signed_url?: string | null
   created_at: string; creative_briefs?: CreativeBrief | CreativeBrief[] | null
 }
+type MetaCampaign = {
+  platform_id: string; campaign_name: string; status: string | null
+}
 type MetaAdset = {
-  id: string; platform_id: string; adset_name: string; status: string | null
+  id: string; platform_id: string; platform_campaign_id: string; campaign_name: string
+  adset_name: string; status: string | null
   market: string | null; aud_type: string | null; goal_type: string | null
 }
 type CreativePipelineData = {
@@ -76,7 +80,9 @@ type CreativePipelineData = {
   renderJobsByBrief?: Record<string, RenderJob[]>
   generatedAssets: CreativeAsset[]
   launchedAssets: CreativeAsset[]
+  activeMetaCampaigns?: MetaCampaign[]
   activeMetaAdsets: MetaAdset[]
+  metaLaunchSource?: "meta" | "database"
   runwayConfigured?: boolean
 }
 
@@ -261,6 +267,7 @@ export default function AgentsDashboard() {
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [drafts, setDrafts] = useState<InboxDraft[]>([])
   const [launchAssetIds, setLaunchAssetIds] = useState<string[]>([])
+  const [selectedCampaignId, setSelectedCampaignId] = useState("")
   const [selectedAdsetId, setSelectedAdsetId] = useState("")
   const [pipelineMessage, setPipelineMessage] = useState<string | null>(null)
   const [editBrief, setEditBrief] = useState<StructuredBriefEditorState | null>(null)
@@ -609,7 +616,15 @@ export default function AgentsDashboard() {
 
   const openLaunchModal = (assetIds: string[]) => {
     setLaunchAssetIds(assetIds)
-    setSelectedAdsetId(metaAdsets[0]?.platform_id ?? metaAdsets[0]?.id ?? "")
+    const defaultCampaignId =
+      metaCampaigns[0]?.platform_id ?? metaAdsets[0]?.platform_campaign_id ?? ""
+    const adsetsForCampaign = metaAdsets.filter(
+      (adset) => adset.platform_campaign_id === defaultCampaignId
+    )
+    setSelectedCampaignId(defaultCampaignId)
+    setSelectedAdsetId(
+      adsetsForCampaign[0]?.platform_id ?? metaAdsets[0]?.platform_id ?? metaAdsets[0]?.id ?? ""
+    )
     setLaunchProgress(null)
   }
 
@@ -651,6 +666,7 @@ export default function AgentsDashboard() {
         setLaunchProgress(isVideo ? "Done" : "Launch complete")
       }
       setLaunchAssetIds([])
+      setSelectedCampaignId("")
       setSelectedAdsetId("")
       setSelectedAssetIds({})
       setPipelineMessage("Creative launched to the selected Meta ad set.")
@@ -745,7 +761,15 @@ export default function AgentsDashboard() {
   )
   const generatedAssets = useMemo(() => pipeline?.generatedAssets ?? [], [pipeline?.generatedAssets])
   const launchedAssets = useMemo(() => pipeline?.launchedAssets ?? [], [pipeline?.launchedAssets])
+  const metaCampaigns = useMemo(
+    () => pipeline?.activeMetaCampaigns ?? [],
+    [pipeline?.activeMetaCampaigns]
+  )
   const metaAdsets = useMemo(() => pipeline?.activeMetaAdsets ?? [], [pipeline?.activeMetaAdsets])
+  const filteredMetaAdsets = useMemo(() => {
+    if (!selectedCampaignId) return metaAdsets
+    return metaAdsets.filter((adset) => adset.platform_campaign_id === selectedCampaignId)
+  }, [metaAdsets, selectedCampaignId])
   const assetsByBrief = useMemo(() => {
     const grouped = new Map<string, CreativeAsset[]>()
     for (const asset of generatedAssets) {
@@ -1640,26 +1664,72 @@ export default function AgentsDashboard() {
                 </div>
               </div>
             ) : null}
-            <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground" htmlFor="meta-adset">
-                Target ad set
-              </label>
-              <select
-                id="meta-adset"
-                value={selectedAdsetId}
-                onChange={(event) => setSelectedAdsetId(event.target.value)}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              >
-                {metaAdsets.length === 0 ? (
-                  <option value="">No active Meta ad sets</option>
-                ) : metaAdsets.map((adset) => (
-                  <option key={adset.id} value={adset.platform_id ?? adset.id}>
-                    {adset.adset_name} {adset.market ? `· ${adset.market}` : ""}
-                  </option>
-                ))}
-              </select>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  htmlFor="meta-campaign"
+                >
+                  Target campaign
+                </label>
+                <select
+                  id="meta-campaign"
+                  value={selectedCampaignId}
+                  onChange={(event) => {
+                    const campaignId = event.target.value
+                    setSelectedCampaignId(campaignId)
+                    const firstAdset = metaAdsets.find((adset) => adset.platform_campaign_id === campaignId)
+                    setSelectedAdsetId(firstAdset?.platform_id ?? "")
+                  }}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                >
+                  {metaCampaigns.length === 0 ? (
+                    <option value="">No Meta campaigns available</option>
+                  ) : (
+                    metaCampaigns.map((campaign) => (
+                      <option key={campaign.platform_id} value={campaign.platform_id}>
+                        {campaign.campaign_name}
+                        {campaign.status ? ` · ${campaign.status}` : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  htmlFor="meta-adset"
+                >
+                  Target ad set
+                </label>
+                <select
+                  id="meta-adset"
+                  value={selectedAdsetId}
+                  onChange={(event) => setSelectedAdsetId(event.target.value)}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  disabled={!selectedCampaignId || filteredMetaAdsets.length === 0}
+                >
+                  {!selectedCampaignId || filteredMetaAdsets.length === 0 ? (
+                    <option value="">
+                      {!selectedCampaignId
+                        ? "Select a campaign first"
+                        : "No ad sets in this campaign"}
+                    </option>
+                  ) : (
+                    filteredMetaAdsets.map((adset) => (
+                      <option key={adset.id} value={adset.platform_id ?? adset.id}>
+                        {adset.adset_name}
+                        {adset.status ? ` · ${adset.status}` : ""}
+                        {adset.market ? ` · ${adset.market}` : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Creates a PAUSED ad. Activate in Meta Ads Manager when ready.
+                Lists live Meta campaigns and ad sets
+                {pipeline?.metaLaunchSource === "database" ? " (database fallback — check API token)" : ""}.
+                Creates a PAUSED ad; activate in Meta Ads Manager when ready.
               </p>
             </div>
             <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
@@ -1680,6 +1750,7 @@ export default function AgentsDashboard() {
               <button
                 onClick={() => {
                   setLaunchAssetIds([])
+                  setSelectedCampaignId("")
                   setSelectedAdsetId("")
                   setLaunchProgress(null)
                 }}

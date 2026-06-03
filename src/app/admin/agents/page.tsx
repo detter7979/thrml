@@ -663,6 +663,13 @@ export default function AgentsDashboard() {
           const detail = (json as { error?: string; detail?: string }).error
           throw new Error(detail ?? "Launch failed")
         }
+        const warnings = (json as { preflightWarnings?: { field: string; message: string }[] })
+          .preflightWarnings
+        if (warnings?.length) {
+          setPipelineMessage(
+            `Launched. Note: ${warnings.map((w) => w.message).join(" ")}`
+          )
+        }
         setLaunchProgress(isVideo ? "Done" : "Launch complete")
       }
       setLaunchAssetIds([])
@@ -1658,7 +1665,10 @@ export default function AgentsDashboard() {
                     <div className="mt-2 space-y-1 border-t pt-2">
                       <p><span className="text-muted-foreground">Headline:</span> {launchBrief.copy_headline ?? launchBrief.hook ?? "—"}</p>
                       <p><span className="text-muted-foreground">Primary:</span> {shortText(launchBrief.copy_primary, 80)}</p>
-                      <p><span className="text-muted-foreground">CTA:</span> {launchBrief.cta ?? "—"}</p>
+                      <p><span className="text-muted-foreground">CTA (brief):</span> {launchBrief.cta ?? "—"}</p>
+                      <p className="text-muted-foreground">
+                        Meta shows a standard button (e.g. Sign Up / Learn More), not this exact label.
+                      </p>
                     </div>
                   ) : null}
                 </div>

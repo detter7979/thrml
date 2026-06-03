@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { downloadCreativeAsset, getSignedGcsReadUrl } from "@/lib/agent/gcs"
-import { ctaToMetaEnum as ctaToMetaEnumLenient } from "@/lib/agent/meta-cta"
+import { ctaToMetaEnumFromBrief } from "@/lib/agent/meta-cta"
+import {
+  collectLaunchPreflightWarnings,
+  resolveLaunchLandingUrl,
+} from "@/lib/agent/launch-creative-preflight"
 import {
   getMetaAdAccountId,
   getMetaMarketingApiToken,
@@ -13,7 +17,6 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
-const LANDING_URL = "https://usethrml.com"
 const META_GRAPH_BASE = "https://graph.facebook.com/v21.0"
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 type LaunchStatus = "PAUSED" | "ACTIVE"
@@ -21,14 +24,6 @@ const LAUNCH_STATUSES = new Set<LaunchStatus>(["PAUSED", "ACTIVE"])
 
 const VIDEO_LAUNCH_TOOLS = new Set(["composite-video"])
 const BASE_VIDEO_TOOLS = new Set(["runway", "manual"])
-
-const CTA_TO_META_ENUM: Record<string, string> = {
-  "Book Now": "BOOK_TRAVEL",
-  "Find Your Space": "LEARN_MORE",
-  "Reserve Your Hour": "BOOK_TRAVEL",
-  "Explore Spaces": "LEARN_MORE",
-  "See What's Near You": "LEARN_MORE",
-}
 
 type LaunchCreativeBody = {
   assetId?: unknown
@@ -115,13 +110,6 @@ function firstBrief(asset: CreativeAssetRow) {
   return Array.isArray(asset.creative_briefs) ? asset.creative_briefs[0] ?? null : asset.creative_briefs
 }
 
-function ctaToMetaEnum(cta: string | null) {
-  const value = cta?.trim() || "Book Now"
-  const metaEnum = CTA_TO_META_ENUM[value]
-  if (!metaEnum) throw new Error(`Unsupported creative brief CTA: ${value}`)
-  return metaEnum
-}
-
 function extractImageHash(json: MetaAdImageUploadResponse) {
   if (json.hash) return json.hash
   const firstImage = Object.values(json.images ?? {})[0]
@@ -177,24 +165,26 @@ async function createMetaStaticCreative(params: {
   pageId: string
   imageHash: string
   name: string
+  landingUrl: string
   primaryCopy: string
   headline: string
   subtext: string | null
-  cta: string | null
+  brief: CreativeBrief
 }) {
+  const ctaType = ctaToMetaEnumFromBrief(params.brief)
   const body = {
     name: params.name,
     object_story_spec: {
       page_id: params.pageId,
       link_data: {
         image_hash: params.imageHash,
-        link: LANDING_URL,
+        link: params.landingUrl,
         message: params.primaryCopy,
         name: params.headline,
         description: params.subtext ?? "",
         call_to_action: {
-          type: ctaToMetaEnum(params.cta),
-          value: { link: LANDING_URL },
+          type: ctaType,
+          value: { link: params.landingUrl },
         },
       },
     },
@@ -219,17 +209,18 @@ async function createMetaVideoCreative(params: {
   name: string
   videoId: string
   thumbnailImageHash: string
+  landingUrl: string
   primaryCopy: string
   headline: string | null
-  cta: string | null
+  brief: CreativeBrief
 }) {
   const videoData: Record<string, unknown> = {
     video_id: params.videoId,
     image_hash: params.thumbnailImageHash,
     message: params.primaryCopy,
     call_to_action: {
-      type: ctaToMetaEnumLenient(params.cta),
-      value: { link: LANDING_URL },
+      type: ctaToMetaEnumFromBrief(params.brief),
+      value: { link: params.landingUrl },
     },
   }
   if (params.headline?.trim()) {
@@ -371,6 +362,14 @@ export async function POST(req: NextRequest) {
     const isVideo = VIDEO_LAUNCH_TOOLS.has(tool)
     const adName = resolveAdName(creativeAsset, brief)
     const launchStatus: LaunchStatus = isVideo ? "PAUSED" : body?.status === "ACTIVE" ? "ACTIVE" : "PAUSED"
+    const landingUrl = resolveLaunchLandingUrl(brief)
+    const preflightWarnings = collectLaunchPreflightWarnings(brief, { isVideo })
+    if (preflightWarnings.length > 0) {
+      console.warn("[launch-creative] preflight warnings", {
+        assetId,
+        warnings: preflightWarnings,
+      })
+    }
 
     let metaCreativeId: string
     let imageHash: string | undefined
@@ -399,9 +398,10 @@ export async function POST(req: NextRequest) {
         name: adName,
         videoId,
         thumbnailImageHash,
+        landingUrl,
         primaryCopy,
         headline: brief.copy_headline,
-        cta: brief.cta,
+        brief,
       })
     } else {
       if (creativeAsset.asset_type !== "image") {
@@ -433,10 +433,11 @@ export async function POST(req: NextRequest) {
         pageId,
         imageHash,
         name: adName,
+        landingUrl,
         primaryCopy: brief.copy_primary,
         headline: brief.copy_headline,
         subtext: brief.copy_subtext,
-        cta: brief.cta,
+        brief,
       })
     }
 
@@ -478,6 +479,9 @@ export async function POST(req: NextRequest) {
       metaAdId,
       metaCreativeId,
       adName,
+      landingUrl,
+      metaCtaType: ctaToMetaEnumFromBrief(brief),
+      preflightWarnings,
       ...videoMetaFields,
       adsManagerUrl: adsManagerUrl(adAccountId, metaAdId),
     })

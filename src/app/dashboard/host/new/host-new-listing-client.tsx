@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useDropzone } from "react-dropzone"
-import { useForm, type Path } from "react-hook-form"
+import { useForm, type FieldErrors, type Path } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Check, ImagePlus, Loader2, MapPin } from "lucide-react"
@@ -293,6 +293,21 @@ type GeocodeSuggestion = {
   center: [number, number]
 }
 
+function stepHasFormErrors(errors: FieldErrors<ListingFormInput>, stepNumber: number) {
+  const fields = STEP_FIELDS[stepNumber] ?? []
+  return fields.some((field) => {
+    const root = field.split(".")[0] as keyof ListingFormInput
+    return Boolean(errors[root])
+  })
+}
+
+function resolveStepFromFormErrors(errors: FieldErrors<ListingFormInput>): number {
+  for (let stepNumber = FIRST_STEP; stepNumber <= TOTAL_STEPS; stepNumber += 1) {
+    if (stepHasFormErrors(errors, stepNumber)) return stepNumber
+  }
+  return FIRST_STEP
+}
+
 const STEP_FIELDS: Record<number, Path<ListingFormInput>[]> = {
   1: ["serviceType"],
   2: [
@@ -391,6 +406,7 @@ export function HostNewListingClient({
   const [insuranceAttested, setInsuranceAttested] = useState(initialInsuranceAttested)
   const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(false)
   const [insuranceAttestationError, setInsuranceAttestationError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const allowNavigationRef = useRef(false)
   const hostOnboardingPhase2TrackedRef = useRef(false)
 
@@ -453,6 +469,9 @@ export function HostNewListingClient({
       serviceDurationMaxMinutes: 0,
       maxTemperature: 180,
       description: "",
+      doorOperation: "push_pull_no_lock",
+      accessMethod: "host_greets_in_person",
+      hostAvailability: "on_site_whole_time",
       emergencyContact: "",
       controlsInReach: false,
       hasVentilation: false,
@@ -687,8 +706,16 @@ export function HostNewListingClient({
     }))
   }, [bookingModel, enableGroupTiers, price2, price3, price4plus, priceSession, priceSolo])
 
+  function handleInvalidSubmit(errors: FieldErrors<ListingFormInput>) {
+    const targetStep = resolveStepFromFormErrors(errors)
+    setStep(targetStep)
+    setSubmitError("Some required fields are missing or invalid. We jumped you to the step that needs attention.")
+    setPhotoError(null)
+  }
+
   async function handleNextStep() {
     setPhotoError(null)
+    setSubmitError(null)
     if (step === 4 && photos.length < 3) {
       setPhotoError("Please upload at least 3 photos.")
       return
@@ -784,10 +811,13 @@ export function HostNewListingClient({
 
   async function onSubmit(values: ListingFormValues) {
     setPhotoError(null)
+    setSubmitError(null)
     setInsuranceAttestationError(null)
 
     if (!insuranceAttested && !insuranceAttestationChecked) {
-      setInsuranceAttestationError(INSURANCE_ATTESTATION_BLOCK_MESSAGE)
+      setInsuranceAttestationError(
+        "Please confirm the insurance attestation below before publishing your listing."
+      )
       setStep(5)
       return
     }
@@ -1014,7 +1044,7 @@ export function HostNewListingClient({
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit, handleInvalidSubmit)} className="space-y-6">
             <div className="transition-all duration-200">
               {!SKIP_SERVICE_TYPE_STEP && step === 1 ? (
                 <div className="space-y-5">
@@ -1245,7 +1275,7 @@ export function HostNewListingClient({
                     <div className="space-y-2">
                       <Label>How does the sauna door open from the inside?</Label>
                       <Select
-                        value={watch("doorOperation")}
+                        value={watch("doorOperation") ?? ""}
                         onValueChange={(value) =>
                           setValue("doorOperation", value as DoorOperation, {
                             shouldValidate: true,
@@ -1274,7 +1304,7 @@ export function HostNewListingClient({
                     <div className="space-y-2">
                       <Label>How do guests access the space?</Label>
                       <Select
-                        value={watch("accessMethod")}
+                        value={watch("accessMethod") ?? ""}
                         onValueChange={(value) =>
                           setValue("accessMethod", value as AccessMethod, {
                             shouldValidate: true,
@@ -1303,7 +1333,7 @@ export function HostNewListingClient({
                     <div className="space-y-2">
                       <Label>Are you available during the session?</Label>
                       <Select
-                        value={watch("hostAvailability")}
+                        value={watch("hostAvailability") ?? ""}
                         onValueChange={(value) =>
                           setValue("hostAvailability", value as HostAvailability, {
                             shouldValidate: true,
@@ -1836,6 +1866,13 @@ export function HostNewListingClient({
             </div>
 
             {photoError ? <p className="text-sm text-destructive">{photoError}</p> : null}
+            {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
+            {step === TOTAL_STEPS && !insuranceAttested && !insuranceAttestationChecked ? (
+              <p className="text-sm text-[#6D5E51]">
+                Confirm the insurance attestation on this step to publish. Identity verification and payouts can be
+                completed afterward from My Spaces.
+              </p>
+            ) : null}
 
             <div className="flex items-center justify-between">
               <Button type="button" variant="outline" onClick={handlePreviousStep} disabled={step === FIRST_STEP}>
@@ -1847,11 +1884,7 @@ export function HostNewListingClient({
                   Next
                 </Button>
               ) : (
-                <Button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={isSubmitting || (!insuranceAttested && !insuranceAttestationChecked)}
-                >
+                <Button type="submit" className="btn-primary" disabled={isSubmitting}>
                   {isSubmitting ? "Creating listing..." : "Publish listing"}
                 </Button>
               )}

@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { usePlatformFeePercents } from "@/contexts/platform-fees-context"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { formatHostKeepPercent } from "@/lib/fees"
+import { HOST_NEW_LISTING_PATH, isHostUser } from "@/lib/host/is-host-user"
 import { trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { createClient } from "@/lib/supabase/client"
@@ -132,6 +133,42 @@ export function BecomeAHostClient() {
     })
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function redirectExistingHost() {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+
+      const [{ count: listingCount }, { data: profile }] = await Promise.all([
+        supabase
+          .from("listings")
+          .select("*", { count: "exact", head: true })
+          .eq("host_id", user.id)
+          .eq("is_active", true),
+        supabase.from("profiles").select("ui_intent").eq("id", user.id).maybeSingle(),
+      ])
+
+      if (
+        !cancelled &&
+        isHostUser({
+          activeListingCount: listingCount ?? 0,
+          uiIntent: profile?.ui_intent,
+        })
+      ) {
+        router.replace(HOST_NEW_LISTING_PATH)
+      }
+    }
+
+    void redirectExistingHost()
+    return () => {
+      cancelled = true
+    }
+  }, [router])
+
   function handleStep1Continue() {
     setStep(2)
     trackGaEvent("host_onboarding_step", { step: 2 })
@@ -179,7 +216,7 @@ export function BecomeAHostClient() {
       })
       trackHostOnboardingComplete()
 
-      router.push("/dashboard/host/new")
+      router.push(HOST_NEW_LISTING_PATH)
     } catch {
       setError("Something went wrong. Please try again.")
       setSaving(false)

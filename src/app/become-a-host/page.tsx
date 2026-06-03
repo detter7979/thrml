@@ -1,9 +1,12 @@
 import { Suspense } from "react"
 import type { Metadata } from "next"
+import { redirect } from "next/navigation"
 
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { formatHostKeepPercent } from "@/lib/fees"
 import { getPlatformFeePercentsCached } from "@/lib/fees-server"
+import { HOST_NEW_LISTING_PATH, isHostUser } from "@/lib/host/is-host-user"
+import { createClient } from "@/lib/supabase/server"
 
 import { BecomeAHostClient } from "./become-a-host-client"
 
@@ -27,6 +30,31 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function BecomeAHostPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    const [{ count: listingCount }, { data: profile }] = await Promise.all([
+      supabase
+        .from("listings")
+        .select("*", { count: "exact", head: true })
+        .eq("host_id", user.id)
+        .eq("is_active", true),
+      supabase.from("profiles").select("ui_intent").eq("id", user.id).maybeSingle(),
+    ])
+
+    if (
+      isHostUser({
+        activeListingCount: listingCount ?? 0,
+        uiIntent: profile?.ui_intent,
+      })
+    ) {
+      redirect(HOST_NEW_LISTING_PATH)
+    }
+  }
+
   const feePercents = await getPlatformFeePercentsCached()
 
   return (

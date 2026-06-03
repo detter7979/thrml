@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { StripeConnectBanner } from "@/components/host/StripeConnectBanner"
+import { HostListingNextSteps } from "@/components/host/host-listing-next-steps"
 import { Button } from "@/components/ui/button"
 import { guestCompletedTabBooking } from "@/lib/booking-session"
 import { normalizeCancellationPolicy } from "@/lib/cancellations"
@@ -21,7 +21,12 @@ function isMissingColumnError(message: string) {
   )
 }
 
-export default async function DashboardListingsPage() {
+export default async function DashboardListingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ created?: string }>
+}) {
+  const { created } = await searchParams
   const supabase = await createClient()
   const {
     data: { user },
@@ -30,7 +35,9 @@ export default async function DashboardListingsPage() {
   const [{ data: profile }, { data: listings }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("ui_intent, stripe_account_id, stripe_payouts_enabled, stripe_onboarding_complete")
+      .select(
+        "ui_intent, stripe_account_id, stripe_payouts_enabled, stripe_onboarding_complete, id_verification_status, id_verified, id_verified_at"
+      )
       .eq("id", user?.id ?? "")
       .maybeSingle(),
     supabase
@@ -404,8 +411,18 @@ export default async function DashboardListingsPage() {
         </Button>
       </div>
 
-      {hostingEnabled && !payoutsConnected ? (
-        <StripeConnectBanner compact payoutsActive={Boolean(profile?.stripe_onboarding_complete)} />
+      {hostingEnabled ? (
+        <HostListingNextSteps
+          listingJustCreated={created === "1"}
+          hasListings={currentListings.length > 0}
+          idVerificationStatus={
+            typeof profile?.id_verification_status === "string" ? profile.id_verification_status : null
+          }
+          idVerified={Boolean(profile?.id_verified)}
+          idVerifiedAt={typeof profile?.id_verified_at === "string" ? profile.id_verified_at : null}
+          payoutsConnected={payoutsConnected}
+          stripeOnboardingComplete={Boolean(profile?.stripe_onboarding_complete)}
+        />
       ) : null}
 
       {currentListings.length === 0 ? (

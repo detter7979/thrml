@@ -6,13 +6,7 @@ import { useDropzone } from "react-dropzone"
 import { useForm, type Path } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import {
-  AlertCircle,
-  Check,
-  ImagePlus,
-  Loader2,
-  MapPin,
-} from "lucide-react"
+import { Check, ImagePlus, Loader2, MapPin } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -57,7 +51,6 @@ import { getPricePerPerson } from "@/lib/pricing"
 import type { ServiceTypeId } from "@/lib/service-types"
 import { getFacebookPixelCookies, trackMetaEvent } from "@/components/meta-pixel"
 import { HostInsuranceAttestation } from "@/components/host/HostInsuranceAttestation"
-import { IdentityVerificationCTA, type IdentityUiStatus } from "@/components/profile/IdentityVerificationCTA"
 import { INSURANCE_ATTESTATION_BLOCK_MESSAGE } from "@/lib/host/insurance-attestation"
 
 const saunaTypes = ["Finnish", "Infrared", "Steam", "Barrel", "Wood-Fired"] as const
@@ -377,22 +370,12 @@ function ProgressBar({ step, totalSteps }: { step: number; totalSteps: number })
 
 export function HostNewListingClient({
   userId,
-  stripeConnected: initialStripeConnected,
-  hasStripeAccount: initialHasStripeAccount,
   defaultHouseRules,
-  idVerificationStatus,
-  idVerified,
-  idVerifiedAt,
   insuranceAttested: initialInsuranceAttested,
   insuranceAttestedAt,
 }: {
   userId: string
-  stripeConnected: boolean
-  hasStripeAccount: boolean
   defaultHouseRules: string[]
-  idVerificationStatus: string | null
-  idVerified: boolean
-  idVerifiedAt: string | null
   insuranceAttested: boolean
   insuranceAttestedAt: string | null
 }) {
@@ -404,10 +387,6 @@ export function HostNewListingClient({
   const [mapSuggestions, setMapSuggestions] = useState<GeocodeSuggestion[]>([])
   const [mapLoading, setMapLoading] = useState(false)
   const [mapError, setMapError] = useState<string | null>(null)
-  const [isConnectingStripe, setIsConnectingStripe] = useState(false)
-  const [onboardingError, setOnboardingError] = useState<string | null>(null)
-  const [stripeConnected, setStripeConnected] = useState(initialStripeConnected)
-  const [hasStripeAccount, setHasStripeAccount] = useState(initialHasStripeAccount)
   const [showMoreAmenities, setShowMoreAmenities] = useState(false)
   const [insuranceAttested, setInsuranceAttested] = useState(initialInsuranceAttested)
   const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(false)
@@ -616,31 +595,6 @@ export function HostNewListingClient({
       controller.abort()
     }
   }, [address])
-
-  useEffect(() => {
-    let cancelled = false
-    const refreshConnectStatus = async () => {
-      try {
-        const response = await fetch("/api/stripe/connect", { method: "GET" })
-        const data = (await response.json()) as {
-          connected?: boolean
-          stripeAccountId?: string | null
-          error?: string
-        }
-
-        if (!response.ok || cancelled) return
-        setStripeConnected(Boolean(data.connected))
-        setHasStripeAccount(Boolean(data.stripeAccountId))
-      } catch {
-        // Keep current state when refresh fails.
-      }
-    }
-
-    void refreshConnectStatus()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     if (!hasPendingDraft) return
@@ -1048,25 +1002,7 @@ export function HostNewListingClient({
     }
 
     allowNavigationRef.current = true
-    router.push(`/listings/${listing.id}`)
-  }
-
-  async function handleSetupPayouts() {
-    setOnboardingError(null)
-    setIsConnectingStripe(true)
-
-    try {
-      const response = await fetch("/api/stripe/connect", { method: "POST" })
-      const data = (await response.json()) as { onboardingUrl?: string; error?: string }
-      if (!response.ok || !data.onboardingUrl) {
-        throw new Error(data.error ?? "Unable to start Stripe onboarding.")
-      }
-      allowNavigationRef.current = true
-      window.location.href = data.onboardingUrl
-    } catch (error) {
-      setOnboardingError(error instanceof Error ? error.message : "Unable to start Stripe onboarding.")
-      setIsConnectingStripe(false)
-    }
+    router.push("/dashboard/listings?created=1")
   }
 
   return (
@@ -1078,47 +1014,6 @@ export function HostNewListingClient({
         </CardHeader>
 
         <CardContent>
-          {!stripeConnected ? (
-            <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="mt-0.5 size-4 text-amber-700" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-amber-900">Set up payouts when you are ready to earn</p>
-                    <p className="text-xs text-amber-800">
-                      {hasStripeAccount
-                        ? "Finish Stripe onboarding so payouts can start after your first booking."
-                        : "Connect Stripe now or do it later from Account settings."}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  className="btn-primary"
-                  onClick={handleSetupPayouts}
-                  disabled={isConnectingStripe}
-                >
-                  {isConnectingStripe ? (
-                    <>
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                      Redirecting...
-                    </>
-                  ) : (
-                    "Set up payouts"
-                  )}
-                </Button>
-              </div>
-              {onboardingError ? <p className="mt-2 text-sm text-destructive">{onboardingError}</p> : null}
-            </div>
-          ) : null}
-
-          <IdentityVerificationCTA
-            status={(idVerificationStatus ?? null) as IdentityUiStatus}
-            verified={idVerified}
-            verifiedAt={idVerifiedAt}
-            compact
-          />
-
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="transition-all duration-200">
               {!SKIP_SERVICE_TYPE_STEP && step === 1 ? (
@@ -1157,6 +1052,12 @@ export function HostNewListingClient({
               {step === 2 ? (
                 <div className="space-y-5">
                   <h2 className="type-h2">Step {getWizardDisplayStep(2)} — Service details</h2>
+                  {SKIP_SERVICE_TYPE_STEP ? (
+                    <p className="text-sm text-muted-foreground">
+                      You&apos;re listing a private sauna on thrml. Payouts and identity verification are available
+                      after you save your listing.
+                    </p>
+                  ) : null}
                   <div className="space-y-2">
                     <Label htmlFor="title">Listing title</Label>
                     <Input id="title" {...register("title")} />

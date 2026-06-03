@@ -1,9 +1,12 @@
 import { SERVICE_TYPES, type ServiceType } from "@/lib/constants/service-types"
 import type { ServiceTypeMeta } from "@/lib/service-types"
 
-/** When true, only saunas are shown in discovery filters and host create flows. */
+/**
+ * When true, only saunas are shown in discovery filters and host create flows.
+ * Defaults to on; set NEXT_PUBLIC_SAUNAS_ONLY_LAUNCH=false to show all service types.
+ */
 export const SAUNAS_ONLY_LAUNCH =
-  process.env.NEXT_PUBLIC_SAUNAS_ONLY_LAUNCH === "true"
+  process.env.NEXT_PUBLIC_SAUNAS_ONLY_LAUNCH !== "false"
 
 export const LAUNCH_VISIBLE_SERVICE_TYPE_IDS: readonly ServiceType[] = SAUNAS_ONLY_LAUNCH
   ? (["sauna"] as const)

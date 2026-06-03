@@ -7,7 +7,7 @@
 function syncAgentData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet()
   const SECRET = PropertiesService.getScriptProperties().getProperty("THRML_CRON_SECRET")
-  const BASE = "https://usethrml.com/api/admin/agent/export"
+  const BASE = "https://usethrml.com/api/cron/agent/export"
 
   function fetchGoal(goalType) {
     const res = UrlFetchApp.fetch(`${BASE}?goal_type=${goalType}`, {

@@ -32,8 +32,10 @@ export function BookingConfirmationTracker({
     if (!isAnalyticsConsented()) return
 
     const purchaseEventId = `purchase_${bookingId}`
-    const googleAdsIdRaw = (process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18014799415").trim()
-    const googleAdsId = googleAdsIdRaw && /^AW-\d+$/.test(googleAdsIdRaw) ? googleAdsIdRaw : null
+    const googleAdsIdRaw = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim()
+    if (!googleAdsIdRaw) return
+    const googleAdsId = /^AW-\d+$/.test(googleAdsIdRaw) ? googleAdsIdRaw : null
+    if (!googleAdsId) return
 
     // GA4 purchase (client-side — deduplicates against server-side MP event).
     trackGaEvent("purchase", {

@@ -20,8 +20,8 @@ export { COOKIE_CONSENT_ACCEPTED_EVENT } from "@/lib/cookie-consent"
  */
 export function GoogleTagLoader() {
   const [enabled, setEnabled] = useState(false)
-  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18014799415"
-  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-L20J7S2M51"
+  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
 
   useEffect(() => {
     function syncConsent() {
@@ -57,7 +57,7 @@ export function GoogleTagLoader() {
     }
   }, [])
 
-  if (!enabled) return null
+  if (!enabled || !googleAdsId || !gaMeasurementId) return null
 
   return (
     <>

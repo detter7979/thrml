@@ -43,10 +43,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "event_id is required" }, { status: 400 })
   }
 
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "922697217019242"
-  const accessToken = process.env.META_CONVERSIONS_API_TOKEN
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  if (!pixelId) {
+    throw new Error("NEXT_PUBLIC_META_PIXEL_ID env var is required")
+  }
 
-  if (pixelId && accessToken) {
+  const accessToken =
+    process.env.META_CAPI_ACCESS_TOKEN ?? process.env.META_CONVERSIONS_API_TOKEN
+  if (!accessToken) {
+    throw new Error(
+      "META_CONVERSIONS_API_TOKEN env var is required (or META_CAPI_ACCESS_TOKEN)"
+    )
+  }
+
+  {
     const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     const headerUa = req.headers.get("user-agent") ?? undefined
     const ip = forwardedFor || body.client_ip
@@ -92,8 +102,6 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error("[Meta CAPI host_onboarding_started] Send failed", error)
     }
-  } else {
-    console.warn("[Meta CAPI host_onboarding_started] Missing pixel id or META_CONVERSIONS_API_TOKEN — skipping analytics only")
   }
 
   // ── Host welcome email (idempotent) ──────────────────────────────────────

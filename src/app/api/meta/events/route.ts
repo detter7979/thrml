@@ -40,11 +40,17 @@ export async function POST(req: NextRequest) {
   })
   if (limited) return limited
 
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "922697217019242"
-  const accessToken = process.env.META_CONVERSIONS_API_TOKEN
-  if (!pixelId || !accessToken) {
-    console.warn("[Meta CAPI] Missing META_CONVERSIONS_API_TOKEN")
-    return NextResponse.json({ ok: false, skipped: true }, { status: 202 })
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  if (!pixelId) {
+    throw new Error("NEXT_PUBLIC_META_PIXEL_ID env var is required")
+  }
+
+  const accessToken =
+    process.env.META_CAPI_ACCESS_TOKEN ?? process.env.META_CONVERSIONS_API_TOKEN
+  if (!accessToken) {
+    throw new Error(
+      "META_CONVERSIONS_API_TOKEN env var is required (or META_CAPI_ACCESS_TOKEN)"
+    )
   }
 
   let payload: MetaEventsPayload

@@ -12,7 +12,7 @@ export function trackHostOnboardingComplete() {
   const label = process.env.NEXT_PUBLIC_GOOGLE_ADS_HOST_CONVERSION_LABEL
   if (!label) return
 
-  const conversionId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? "AW-18014799415"
+  const conversionId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
   if (!conversionId) return
 
   if (!isAnalyticsConsented()) return

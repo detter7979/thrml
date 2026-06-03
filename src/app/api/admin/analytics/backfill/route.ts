@@ -1,19 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
+import { requireAdminApi } from "@/lib/admin-guard"
 
 // POST { days: 30 } — documents manual backfill; crons always use "yesterday".
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const admin = createAdminClient()
-  const { data: profile } = await admin.from("profiles").select("is_admin").eq("id", user.id).maybeSingle()
-  if (!profile?.is_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const { error } = await requireAdminApi()
+  if (error) return error
 
   const { days = 30 } = (await req.json().catch(() => ({}))) as { days?: number }
 

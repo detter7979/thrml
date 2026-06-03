@@ -18,10 +18,8 @@ function generateAccessCode() {
   return randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()
 }
 
-function readSecret(req: NextRequest) {
+function readCronSecret(req: NextRequest) {
   return (
-    req.headers.get("x-backfill-secret") ??
-    req.headers.get("backfill_secret") ??
     req.headers.get("x-cron-secret") ??
     req.headers.get("cron_secret") ??
     req.headers.get("authorization")?.replace("Bearer ", "") ??
@@ -35,10 +33,7 @@ function parseDryRunFlag(value: unknown) {
 }
 
 export async function POST(req: NextRequest) {
-  const expectedSecret = process.env.BACKFILL_SECRET ?? process.env.CRON_SECRET
-  const suppliedSecret = readSecret(req)
-
-  if (!expectedSecret || suppliedSecret !== expectedSecret) {
+  if (!process.env.CRON_SECRET || readCronSecret(req) !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

@@ -17,7 +17,10 @@ export async function generateImagen(
     count: 1 | 2 | 3 | 4
   }
 ): Promise<{ base64: string; mimeType: string }[]> {
-  const projectId = process.env.VERTEX_AI_PROJECT_ID || 'watchful-muse-350902'
+  const projectId = process.env.VERTEX_AI_PROJECT_ID
+  if (!projectId) {
+    throw new Error('VERTEX_AI_PROJECT_ID env var is required')
+  }
   const location = process.env.VERTEX_AI_LOCATION || 'us-west1'
   const model = 'imagen-3.0-generate-002'  // current GA model name
 

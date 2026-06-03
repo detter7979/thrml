@@ -2,21 +2,23 @@ import { hashIfPresent } from "@/lib/analytics/hash-for-meta"
 
 const GRAPH_VERSION = "v21.0"
 
-function pixelId(): string | null {
-  return (
-    process.env.META_PIXEL_ID ??
-    process.env.NEXT_PUBLIC_META_PIXEL_ID ??
-    null
-  )
+function pixelId(): string {
+  const pid = process.env.META_PIXEL_ID ?? process.env.NEXT_PUBLIC_META_PIXEL_ID
+  if (!pid) {
+    throw new Error("NEXT_PUBLIC_META_PIXEL_ID env var is required (or META_PIXEL_ID)")
+  }
+  return pid
 }
 
-function capiAccessToken(): string | null {
-  return (
-    process.env.META_CAPI_ACCESS_TOKEN ??
-    process.env.META_CONVERSIONS_API_TOKEN ??
-    process.env.META_MARKETING_API_TOKEN ??
-    null
-  )
+function capiAccessToken(): string {
+  const token =
+    process.env.META_CAPI_ACCESS_TOKEN ?? process.env.META_CONVERSIONS_API_TOKEN
+  if (!token) {
+    throw new Error(
+      "META_CONVERSIONS_API_TOKEN env var is required (or META_CAPI_ACCESS_TOKEN)"
+    )
+  }
+  return token
 }
 
 export type MetaCapiUserData = {
@@ -36,10 +38,6 @@ export async function fireServerEvent(
 ): Promise<void> {
   const pid = pixelId()
   const token = capiAccessToken()
-  if (!pid || !token) {
-    console.warn("[meta-capi] Missing META_PIXEL_ID / NEXT_PUBLIC_META_PIXEL_ID or CAPI token; skip", eventName)
-    return
-  }
 
   const em = hashIfPresent(userData.email)
   const ph = hashIfPresent(userData.phone?.replace(/\D/g, ""))

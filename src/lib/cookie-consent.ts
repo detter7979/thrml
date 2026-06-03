@@ -4,9 +4,6 @@ export const COOKIE_CONSENT_DECLINED = "declined"
 export const COOKIE_CONSENT_ACCEPTED_EVENT = "thrml-cookie-consent-accepted"
 export const COOKIE_CONSENT_CHANGED_EVENT = "thrml-cookie-consent-changed"
 
-const DEFAULT_GA_MEASUREMENT_ID = "G-L20J7S2M51"
-const DEFAULT_GOOGLE_ADS_ID = "AW-18014799415"
-
 export function getCookieConsent(): string | null {
   if (typeof window === "undefined") return null
   try {
@@ -20,11 +17,11 @@ export function isAnalyticsConsented(): boolean {
   return getCookieConsent() === COOKIE_CONSENT_ACCEPTED
 }
 
-function getAnalyticsIds() {
-  return {
-    gaMeasurementId: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? DEFAULT_GA_MEASUREMENT_ID,
-    googleAdsId: process.env.NEXT_PUBLIC_GOOGLE_ADS_ID ?? DEFAULT_GOOGLE_ADS_ID,
-  }
+function getAnalyticsIds(): { gaMeasurementId: string; googleAdsId: string } | null {
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
+  if (!gaMeasurementId || !googleAdsId) return null
+  return { gaMeasurementId, googleAdsId }
 }
 
 function getGtagFn(): (...args: unknown[]) => void {
@@ -34,7 +31,9 @@ function getGtagFn(): (...args: unknown[]) => void {
 
 /** Google's documented kill-switch for a loaded gtag.js instance. */
 function setGtagDisableFlags(disable: boolean) {
-  const { gaMeasurementId, googleAdsId } = getAnalyticsIds()
+  const ids = getAnalyticsIds()
+  if (!ids) return
+  const { gaMeasurementId, googleAdsId } = ids
   const win = window as Window & Record<string, boolean | undefined>
   win[`ga-disable-${gaMeasurementId}`] = disable ? true : undefined
   win[`ga-disable-${googleAdsId}`] = disable ? true : undefined

@@ -47,6 +47,10 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/api/listings/update") ||
     request.nextUrl.pathname.startsWith("/api/listings/delete")
 
+  if (request.nextUrl.pathname.startsWith("/api/admin/") && !session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   if (isProtectedRoute && !session) {
     const loginUrl = new URL("/login", request.url)
     loginUrl.searchParams.set("next", request.nextUrl.pathname)
@@ -72,5 +76,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/api/:path*"],
+  matcher: ["/dashboard/:path*", "/api/:path*", "/api/admin/:path*"],
 }

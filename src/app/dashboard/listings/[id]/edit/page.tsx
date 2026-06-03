@@ -68,6 +68,7 @@ export default async function EditListingPage({
 
   return (
     <EditListingClient
+      userId={user.id}
       listing={{
         id: String(listing.id),
         title: typeof listing.title === "string" ? listing.title : "",

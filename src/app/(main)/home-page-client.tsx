@@ -116,8 +116,8 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
 
   const heroImage = {
     url: "/hero-main-bg.png",
-    objectPosition: "center center",
-    alt: "Outdoor wooden sauna glowing at dusk with autumn foliage",
+    objectPosition: "center 42%",
+    alt: "Outdoor cedar sauna on a forest deck overlooking misty water",
   }
 
   async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {

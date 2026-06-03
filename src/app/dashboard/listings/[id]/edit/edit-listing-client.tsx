@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Handshake, KeyRound, Lock, MoreHorizontal, Trash2, User } from "lucide-react"
 
+import { trackHostListingPublishedMeta } from "@/lib/analytics/host-listing-publish-meta"
 import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -111,12 +112,14 @@ function DisplayRow({ label, value }: { label: string; value: string }) {
 }
 
 export function EditListingClient({
+  userId,
   listing,
   activeBookingCount,
   fromClone,
   originalTitleHint,
   parentTitle,
 }: {
+  userId: string
   listing: ListingEditModel
   activeBookingCount: number
   fromClone: boolean
@@ -451,6 +454,7 @@ export function EditListingClient({
       setError(payload.error ?? "Unable to publish listing.")
       return
     }
+    trackHostListingPublishedMeta({ listingId: listing.id, userId })
     router.push("/dashboard/listings?published=1")
     router.refresh()
   }

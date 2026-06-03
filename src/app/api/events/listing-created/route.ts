@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { META_EVENT_LISTING_CREATED } from "@/lib/analytics/host-listing-publish-meta"
 import { hashIfPresent } from "@/lib/analytics/hash-for-meta"
 import { sendGA4Event } from "@/lib/analytics/measurement-protocol"
 import { rateLimit } from "@/lib/rate-limit"
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     const capiBody = {
       data: [
         {
-          event_name: "listing_created",
+          event_name: META_EVENT_LISTING_CREATED,
           event_time: Math.floor(Date.now() / 1000),
           event_id: eventId,
           action_source: "website",
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
     clientId,
     events: [
       {
-        name: "listing_created",
+        name: META_EVENT_LISTING_CREATED,
         params: {
           listing_id: listingId,
           engagement_time_msec: 100,

@@ -44,12 +44,12 @@ import {
   HOST_CLAIM_GUIDANCE,
 } from "@/lib/listings/host-claim-policy"
 import { trackGaEvent } from "@/lib/analytics/ga"
-import { getGa4ClientIdForMp } from "@/lib/analytics/ga-client-id"
 import { sanitizeText } from "@/lib/sanitize"
 import { createClient } from "@/lib/supabase/client"
 import { getPricePerPerson } from "@/lib/pricing"
 import type { ServiceTypeId } from "@/lib/service-types"
-import { getFacebookPixelCookies, trackMetaEvent } from "@/components/meta-pixel"
+import { trackMetaEvent } from "@/components/meta-pixel"
+import { trackHostListingPublishedMeta } from "@/lib/analytics/host-listing-publish-meta"
 import { formatApiErrorMessage, parseJsonResponse, readApiErrorResponse } from "@/lib/api/read-error-response"
 import { HostInsuranceAttestation } from "@/components/host/HostInsuranceAttestation"
 import { INSURANCE_ATTESTATION_BLOCK_MESSAGE } from "@/lib/host/insurance-attestation"
@@ -1006,38 +1006,7 @@ export function HostNewListingClient({
       return
     }
 
-    const listingCreatedEventId = crypto.randomUUID()
-    const listingGaClientId = getGa4ClientIdForMp(userId)
-    const listingPixelCookies = getFacebookPixelCookies()
-
-    trackMetaEvent(
-      "listing_created",
-      {
-        content_name: "New Listing",
-        content_type: "product",
-        content_id: listing.id,
-        event_id: listingCreatedEventId,
-      },
-      { eventId: listingCreatedEventId, sendServer: false, custom: true }
-    )
-
-    void fetch("/api/events/listing-created", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      keepalive: true,
-      body: JSON.stringify({
-        event_id: listingCreatedEventId,
-        listing_id: listing.id,
-        client_id: listingGaClientId,
-        ...listingPixelCookies,
-      }),
-    }).catch(() => undefined)
-
-    trackGaEvent("listing_created", {
-      event_category: "host_funnel",
-      event_label: "listing_published",
-      listing_id: listing.id,
-    })
+    trackHostListingPublishedMeta({ listingId: listing.id, userId })
 
     const win = window as { gtag?: (...args: unknown[]) => void }
     if (win.gtag) {

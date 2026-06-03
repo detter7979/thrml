@@ -50,6 +50,7 @@ import { createClient } from "@/lib/supabase/client"
 import { getPricePerPerson } from "@/lib/pricing"
 import type { ServiceTypeId } from "@/lib/service-types"
 import { getFacebookPixelCookies, trackMetaEvent } from "@/components/meta-pixel"
+import { formatApiErrorMessage, parseJsonResponse, readApiErrorResponse } from "@/lib/api/read-error-response"
 import { HostInsuranceAttestation } from "@/components/host/HostInsuranceAttestation"
 import { INSURANCE_ATTESTATION_BLOCK_MESSAGE } from "@/lib/host/insurance-attestation"
 
@@ -940,28 +941,47 @@ export function HostNewListingClient({
       house_rules: sanitizedHouseRules,
     }
 
-    const createResponse = await fetch("/api/listings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(listingPayload),
-    })
-    const createPayload = (await createResponse.json()) as { listingId?: string; error?: string }
+    let listingId: string | null = null
+    try {
+      const createResponse = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(listingPayload),
+      })
 
-    if (!createResponse.ok || !createPayload.listingId) {
-      const createError = createPayload.error ?? "Failed to create listing."
-      if (createError === INSURANCE_ATTESTATION_BLOCK_MESSAGE) {
-        setInsuranceAttestationError(createError)
-        setStep(5)
+      if (!createResponse.ok) {
+        const { message, code } = await readApiErrorResponse(createResponse, "Failed to create listing.")
+        const createError = formatApiErrorMessage(message, code)
+        if (message === INSURANCE_ATTESTATION_BLOCK_MESSAGE) {
+          setInsuranceAttestationError(createError)
+          setStep(5)
+          return
+        }
+        setPhotoError(createError)
+        setSubmitError(createError)
+        if (createResponse.status === 400 && message.includes("can't publish")) {
+          setStep(2)
+        }
         return
       }
-      setPhotoError(createError)
-      if (createResponse.status === 400 && createPayload.error?.includes("can't publish")) {
-        setStep(2)
+
+      const createPayload = await parseJsonResponse<{ listingId?: string; error?: string }>(createResponse)
+      if (!createPayload?.listingId) {
+        const createError = createPayload?.error ?? "Failed to create listing."
+        setPhotoError(createError)
+        setSubmitError(createError)
+        return
       }
+      listingId = createPayload.listingId
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Network error while creating listing. Please try again."
+      setPhotoError(message)
+      setSubmitError(message)
       return
     }
 
-    const listing = { id: createPayload.listingId }
+    const listing = { id: listingId }
 
     const photoRows: { listing_id: string; url: string; order_index: number }[] = []
 

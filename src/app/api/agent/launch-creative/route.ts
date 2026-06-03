@@ -5,6 +5,7 @@ import { ctaToMetaEnumFromBrief } from "@/lib/agent/meta-cta"
 import {
   collectLaunchPreflightWarnings,
   resolveLaunchLandingUrl,
+  truncateForMetaLinkDescription,
 } from "@/lib/agent/launch-creative-preflight"
 import {
   getMetaAdAccountId,
@@ -101,9 +102,24 @@ async function readMetaError(res: Response) {
   }
 }
 
+function formatMetaActionError(action: string, payload: unknown): string {
+  const base = `${action} failed: ${JSON.stringify(payload)}`
+  const err =
+    payload && typeof payload === "object" && "error" in payload
+      ? (payload as { error?: { code?: number; error_subcode?: number; message?: string } }).error
+      : null
+  if (err?.code === 100 && err.error_subcode === 33) {
+    return (
+      `${base} — Check META_AD_ACCOUNT_ID (use act_<id> or digits only), ` +
+      "META_MARKETING_API_TOKEN ads_management access for that account, and that the token is not a Page token."
+    )
+  }
+  return base
+}
+
 async function assertMetaOk(res: Response, action: string) {
   if (res.ok) return
-  throw new Error(`${action} failed: ${JSON.stringify(await readMetaError(res))}`)
+  throw new Error(formatMetaActionError(action, await readMetaError(res)))
 }
 
 function firstBrief(asset: CreativeAssetRow) {
@@ -427,6 +443,16 @@ export async function POST(req: NextRequest) {
         .eq("id", assetId)
       if (imageUpdateError) throw imageUpdateError
 
+      const rawSubtext = brief.copy_subtext?.trim() ?? ""
+      const metaSubtext = truncateForMetaLinkDescription(brief.copy_subtext)
+      if (rawSubtext.length > metaSubtext.length) {
+        console.log("[launch-creative] truncated link description for Meta", {
+          assetId,
+          fromChars: rawSubtext.length,
+          toChars: metaSubtext.length,
+        })
+      }
+
       metaCreativeId = await createMetaStaticCreative({
         token,
         adAccountId,
@@ -436,7 +462,7 @@ export async function POST(req: NextRequest) {
         landingUrl,
         primaryCopy: brief.copy_primary,
         headline: brief.copy_headline,
-        subtext: brief.copy_subtext,
+        subtext: metaSubtext,
         brief,
       })
     }

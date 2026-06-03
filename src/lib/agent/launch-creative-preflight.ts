@@ -11,6 +11,18 @@ export function resolveLaunchLandingUrl(brief: {
   return DEFAULT_LANDING
 }
 
+/** Meta `link_data.description` — longer copy is truncated at launch. */
+export const META_LINK_DESCRIPTION_MAX = 30
+
+export function truncateForMetaLinkDescription(text: string | null | undefined): string {
+  const trimmed = (text ?? "").trim()
+  if (trimmed.length <= META_LINK_DESCRIPTION_MAX) return trimmed
+  const slice = trimmed.slice(0, META_LINK_DESCRIPTION_MAX)
+  const lastSpace = slice.lastIndexOf(" ")
+  if (lastSpace >= 18) return slice.slice(0, lastSpace).trimEnd()
+  return slice.trimEnd()
+}
+
 export type LaunchPreflightWarning = {
   field: string
   message: string
@@ -50,13 +62,6 @@ export function collectLaunchPreflightWarnings(
       message: `Headline is ${headline.length} chars; may truncate in feed placements.`,
     })
   }
-  if (subtext.length > 30) {
-    warnings.push({
-      field: "copy_subtext",
-      message: `Description is ${subtext.length} chars; link description limit is often ~30.`,
-    })
-  }
-
   const claimWarning = brief.trigger_data?.claim_warning
   if (
     claimWarning &&

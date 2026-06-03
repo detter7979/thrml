@@ -8,10 +8,11 @@ export function getMetaMarketingApiToken() {
   return t
 }
 
+/** Meta Graph ad account id — always `act_<digits>` (required for /adimages, /ads, etc.). */
 export function getMetaAdAccountId() {
-  const id = process.env.META_AD_ACCOUNT_ID
+  const id = process.env.META_AD_ACCOUNT_ID?.trim()
   if (!id) throw new Error("META_AD_ACCOUNT_ID is not set")
-  return id
+  return id.startsWith("act_") ? id : `act_${id.replace(/^act_/, "")}`
 }
 
 function token() {

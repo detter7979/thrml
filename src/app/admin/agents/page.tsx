@@ -7,6 +7,10 @@ import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
 import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
+import {
+  canLaunchAsPlacementBundle,
+  validatePlacementBundle,
+} from "@/lib/agent/launch-creative-bundle"
 import { buildOutFormatsForAsset, nextVariationLabelsForBrief } from "@/lib/agent/static-brief-plan"
 import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
@@ -637,46 +641,73 @@ export default function AgentsDashboard() {
       progressTimers.length = 0
     }
     try {
-      for (const assetId of launchAssetIds) {
-        const asset = generatedAssets.find((a) => a.id === assetId)
-        const isVideo = asset ? isLaunchableVideo(asset) : false
-        if (isVideo) {
-          setLaunchProgress("Uploading video to Meta…")
-          progressTimers.push(
-            window.setTimeout(
-              () => setLaunchProgress("Meta is processing the video (this can take 1–2 minutes)…"),
-              4_000
-            ),
-            window.setTimeout(() => setLaunchProgress("Creating ad in Meta…"), 50_000)
-          )
-        } else {
-          setLaunchProgress("Uploading image to Meta…")
-        }
+      if (launchAsPlacementBundle) {
+        setLaunchProgress(
+          `Uploading ${launchAssetIds.length} images and creating one Meta ad with placement rules…`
+        )
         const res = await fetch("/api/agent/launch-creative", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assetId, adsetId: selectedAdsetId, status: "PAUSED" }),
+          body: JSON.stringify({
+            assetIds: launchAssetIds,
+            adsetId: selectedAdsetId,
+            status: "PAUSED",
+          }),
         })
-        clearProgressTimers()
         const json = await res.json().catch(() => ({}))
         if (!res.ok) {
-          const detail = (json as { error?: string; detail?: string }).error
+          const detail = (json as { error?: string }).error
           throw new Error(detail ?? "Launch failed")
         }
-        const warnings = (json as { preflightWarnings?: { field: string; message: string }[] })
-          .preflightWarnings
-        if (warnings?.length) {
-          setPipelineMessage(
-            `Launched. Note: ${warnings.map((w) => w.message).join(" ")}`
-          )
+        const formats = (json as { formats?: string[] }).formats
+        setLaunchProgress("Done")
+        setPipelineMessage(
+          formats?.length
+            ? `Created 1 paused Meta ad with placements: ${formats.join(", ")}. Turn it on in Ads Manager.`
+            : "Created 1 paused Meta ad with all selected sizes."
+        )
+      } else {
+        for (const assetId of launchAssetIds) {
+          const asset = generatedAssets.find((a) => a.id === assetId)
+          const isVideo = asset ? isLaunchableVideo(asset) : false
+          if (isVideo) {
+            setLaunchProgress("Uploading video to Meta…")
+            progressTimers.push(
+              window.setTimeout(
+                () => setLaunchProgress("Meta is processing the video (this can take 1–2 minutes)…"),
+                4_000
+              ),
+              window.setTimeout(() => setLaunchProgress("Creating ad in Meta…"), 50_000)
+            )
+          } else {
+            setLaunchProgress("Uploading image to Meta…")
+          }
+          const res = await fetch("/api/agent/launch-creative", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assetId, adsetId: selectedAdsetId, status: "PAUSED" }),
+          })
+          clearProgressTimers()
+          const json = await res.json().catch(() => ({}))
+          if (!res.ok) {
+            const detail = (json as { error?: string }).error
+            throw new Error(detail ?? "Launch failed")
+          }
+          const warnings = (json as { preflightWarnings?: { field: string; message: string }[] })
+            .preflightWarnings
+          if (warnings?.length) {
+            setPipelineMessage(
+              `Launched. Note: ${warnings.map((w) => w.message).join(" ")}`
+            )
+          }
+          setLaunchProgress(isVideo ? "Done" : "Launch complete")
         }
-        setLaunchProgress(isVideo ? "Done" : "Launch complete")
+        setPipelineMessage("Creative launched to the selected Meta ad set.")
       }
       setLaunchAssetIds([])
       setSelectedCampaignId("")
       setSelectedAdsetId("")
       setSelectedAssetIds({})
-      setPipelineMessage("Creative launched to the selected Meta ad set.")
       await mutatePipeline()
     } catch (err) {
       clearProgressTimers()
@@ -813,6 +844,31 @@ export default function AgentsDashboard() {
     if (!asset) return null
     return briefFor(asset)
   }, [activeLaunchAssets])
+
+  const launchBundleRows = useMemo(
+    () =>
+      activeLaunchAssets.map((asset) => ({
+        id: asset.id,
+        brief_id: asset.brief_id,
+        asset_type: asset.asset_type,
+        generation_tool: asset.generation_tool,
+        variation_label: asset.variation_label,
+        format: asset.format,
+        status: asset.status,
+        meta_ad_id: asset.meta_ad_id,
+      })),
+    [activeLaunchAssets]
+  )
+
+  const launchAsPlacementBundle = useMemo(
+    () => canLaunchAsPlacementBundle(launchBundleRows),
+    [launchBundleRows]
+  )
+
+  const placementBundleBlockReason = useMemo(() => {
+    if (launchAsPlacementBundle || activeLaunchAssets.length < 2) return null
+    return validatePlacementBundle(launchBundleRows)
+  }, [launchAsPlacementBundle, activeLaunchAssets.length, launchBundleRows])
 
   const TABS = [
     { key: "overview", label: `Overview${criticalCount > 0 ? ` 🚨${criticalCount}` : ""}` },
@@ -1632,8 +1688,13 @@ export default function AgentsDashboard() {
             <div>
               <h2 className="text-lg font-semibold">Launch Creative to Meta</h2>
               <p className="text-sm text-muted-foreground">
-                Select an active Meta ad set for {activeLaunchAssets.length} approved variation{activeLaunchAssets.length === 1 ? "" : "s"}.
+                {launchAsPlacementBundle
+                  ? `Create one paused Meta ad with ${activeLaunchAssets.length} placement images (1×1, 4×5, 9×16) in the selected ad set.`
+                  : `Select an active Meta ad set for ${activeLaunchAssets.length} approved asset${activeLaunchAssets.length === 1 ? "" : "s"}.`}
               </p>
+              {placementBundleBlockReason ? (
+                <p className="text-sm text-amber-800">{placementBundleBlockReason}</p>
+              ) : null}
             </div>
             {activeLaunchAssets[0] ? (
               <div className="flex gap-3 items-start">
@@ -1739,14 +1800,16 @@ export default function AgentsDashboard() {
               <p className="text-xs text-muted-foreground">
                 Lists live Meta campaigns and ad sets
                 {pipeline?.metaLaunchSource === "database" ? " (database fallback — check API token)" : ""}.
-                Creates a PAUSED ad; activate in Meta Ads Manager when ready.
+                {launchAsPlacementBundle
+                  ? " One ad is created with placement-specific images; turn it on in Ads Manager when ready."
+                  : " Creates a PAUSED ad per asset; activate in Ads Manager when ready."}
               </p>
             </div>
             <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
               {activeLaunchAssets.map((asset) => (
                 <p key={asset.id}>
                   {asset.variation_label ?? `Variation ${asset.variation_index ?? "—"}`} ·{" "}
-                  {isLaunchableVideo(asset) ? "video" : asset.asset_type ?? "asset"}
+                  {asset.format ?? (isLaunchableVideo(asset) ? "video" : asset.asset_type ?? "asset")}
                 </p>
               ))}
             </div>
@@ -1773,7 +1836,9 @@ export default function AgentsDashboard() {
                 disabled={!selectedAdsetId || busyAction === "launch-creative"}
                 className="text-sm px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
               >
-                Confirm Launch
+                {launchAsPlacementBundle
+                  ? `Create 1 ad (${activeLaunchAssets.length} placements)`
+                  : "Confirm Launch"}
               </button>
             </div>
           </div>

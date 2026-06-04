@@ -3,10 +3,21 @@ import { NextRequest, NextResponse } from "next/server"
 import { downloadCreativeAsset, getSignedGcsReadUrl } from "@/lib/agent/gcs"
 import { ctaToMetaEnumFromBrief } from "@/lib/agent/meta-cta"
 import {
+  canLaunchAsPlacementBundle,
+  validatePlacementBundle,
+  type LaunchableAssetRow,
+} from "@/lib/agent/launch-creative-bundle"
+import {
   collectLaunchPreflightWarnings,
   resolveLaunchLandingUrl,
   truncateForMetaLinkDescription,
 } from "@/lib/agent/launch-creative-preflight"
+import {
+  buildPlacementAssetFeedSpec,
+  resolvePlacementBundleAdName,
+  type PlacementImageInput,
+} from "@/lib/agent/meta-placement-creative"
+import { normalizeStaticFormat } from "@/lib/agent/static-brief-plan"
 import {
   getMetaAdAccountId,
   getMetaMarketingApiToken,
@@ -28,6 +39,7 @@ const BASE_VIDEO_TOOLS = new Set(["runway", "manual"])
 
 type LaunchCreativeBody = {
   assetId?: unknown
+  assetIds?: unknown
   adsetId?: unknown
   status?: unknown
 }
@@ -43,17 +55,11 @@ type CreativeBrief = {
   trigger_data?: Record<string, unknown> | null
 }
 
-type CreativeAssetRow = {
-  id: string
-  brief_id: string | null
-  asset_type: string | null
-  generation_tool: string | null
+type CreativeAssetRow = LaunchableAssetRow & {
   variation_index: number | null
-  variation_label: string | null
   gcs_path: string | null
   convention_name: string | null
-  status: string | null
-  meta_ad_id: string | null
+  performance_data?: Record<string, unknown> | null
   creative_briefs: CreativeBrief | CreativeBrief[] | null
 }
 
@@ -182,6 +188,33 @@ async function uploadImageToMeta(params: {
   return imageHash
 }
 
+async function createMetaPlacementCreative(params: {
+  token: string
+  adAccountId: string
+  pageId: string
+  name: string
+  assetFeedSpec: ReturnType<typeof buildPlacementAssetFeedSpec>
+}) {
+  const body = {
+    name: params.name,
+    object_story_spec: {
+      page_id: params.pageId,
+    },
+    asset_feed_spec: params.assetFeedSpec,
+  }
+
+  const res = await fetch(metaUrl(`${params.adAccountId}/adcreatives`, params.token), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  await assertMetaOk(res, "Meta placement ad creative creation")
+
+  const json = (await res.json()) as MetaIdResponse
+  if (!json.id) throw new Error("Meta placement ad creative response did not include an id")
+  return json.id
+}
+
 async function createMetaStaticCreative(params: {
   token: string
   adAccountId: string
@@ -297,6 +330,164 @@ async function createMetaAd(params: {
   return json.id
 }
 
+function parseAssetIds(body: LaunchCreativeBody | null): string[] {
+  if (Array.isArray(body?.assetIds)) {
+    return body.assetIds
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter((value) => UUID_RE.test(value))
+  }
+  const single = typeof body?.assetId === "string" ? body.assetId.trim() : ""
+  return UUID_RE.test(single) ? [single] : []
+}
+
+async function launchPlacementBundle(params: {
+  admin: NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>
+  token: string
+  adAccountId: string
+  pageId: string
+  adsetId: string
+  assetIds: string[]
+  launchStatus: LaunchStatus
+}) {
+  const { data: rows, error } = await params.admin
+    .from("creative_assets")
+    .select(
+      "id, brief_id, asset_type, generation_tool, variation_index, variation_label, format, gcs_path, convention_name, status, meta_ad_id, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name, trigger_data)"
+    )
+    .in("id", params.assetIds)
+
+  if (error) throw error
+  const assets = (rows ?? []) as CreativeAssetRow[]
+  if (assets.length !== params.assetIds.length) {
+    return jsonError("One or more creative assets were not found", 404)
+  }
+
+  const bundleError = validatePlacementBundle(assets)
+  if (bundleError) return jsonError(bundleError, 400)
+
+  const brief = firstBrief(assets[0]!)
+  if (!brief) return jsonError("Creative brief not found for bundle", 404)
+  if (!assets[0]!.brief_id) return jsonError("Creative asset is missing brief_id", 400)
+
+  const claimWarning = brief.trigger_data?.claim_warning
+  if (
+    claimWarning &&
+    typeof claimWarning === "object" &&
+    !Array.isArray(claimWarning) &&
+    !(claimWarning as Record<string, unknown>).acknowledged_at
+  ) {
+    return jsonError(
+      "Ad copy flagged for health claims — acknowledge the claim warning on the brief before launch",
+      403,
+      { claimWarning }
+    )
+  }
+
+  if (!brief.copy_primary || !brief.copy_headline) {
+    return jsonError("Creative brief is missing copy_primary or copy_headline", 400)
+  }
+
+  const landingUrl = resolveLaunchLandingUrl(brief)
+  const metaSubtext = truncateForMetaLinkDescription(brief.copy_subtext)
+  const placementImages: PlacementImageInput[] = []
+
+  for (const asset of assets) {
+    if (!asset.gcs_path) return jsonError(`Asset ${asset.id} is missing gcs_path`, 400)
+    const format = normalizeStaticFormat(asset.format)
+    if (!format) return jsonError(`Asset ${asset.id} has unsupported format`, 400)
+
+    const downloaded = await downloadCreativeAsset(asset.gcs_path)
+    const imageHash = await uploadImageToMeta({
+      token: params.token,
+      adAccountId: params.adAccountId,
+      assetId: asset.id,
+      filename: downloaded.filename,
+      contentType: downloaded.contentType,
+      buffer: downloaded.buffer,
+    })
+
+    const { error: imageUpdateError } = await params.admin
+      .from("creative_assets")
+      .update({ meta_image_hash: imageHash })
+      .eq("id", asset.id)
+    if (imageUpdateError) throw imageUpdateError
+
+    placementImages.push({ format, imageHash })
+  }
+
+  const adName = resolvePlacementBundleAdName(
+    assets.map((asset) => asset.convention_name),
+    legacyAdName(assets[0]!, brief)
+  )
+
+  const assetFeedSpec = buildPlacementAssetFeedSpec({
+    images: placementImages,
+    landingUrl,
+    primaryCopy: brief.copy_primary,
+    headline: brief.copy_headline,
+    description: metaSubtext,
+    brief,
+  })
+
+  const metaCreativeId = await createMetaPlacementCreative({
+    token: params.token,
+    adAccountId: params.adAccountId,
+    pageId: params.pageId,
+    name: adName,
+    assetFeedSpec,
+  })
+
+  const metaAdId = await createMetaAd({
+    token: params.token,
+    adAccountId: params.adAccountId,
+    adsetId: params.adsetId,
+    creativeId: metaCreativeId,
+    name: adName,
+    status: params.launchStatus,
+  })
+
+  const launchedAt = new Date().toISOString()
+  const formats = placementImages.map((row) => row.format)
+
+  for (const asset of assets) {
+    const imageHash = placementImages.find((row) => row.format === normalizeStaticFormat(asset.format))
+      ?.imageHash
+    const { error: updateError } = await params.admin
+      .from("creative_assets")
+      .update({
+        status: "launched",
+        meta_creative_id: metaCreativeId,
+        meta_ad_id: metaAdId,
+        meta_adset_id: params.adsetId,
+        launched_at: launchedAt,
+        ...(imageHash ? { meta_image_hash: imageHash } : {}),
+        performance_data: {
+          launch_mode: "placement_bundle",
+          placement_formats: formats,
+        },
+      })
+      .eq("id", asset.id)
+    if (updateError) throw updateError
+  }
+
+  await maybeMarkBriefLaunched(params.admin, assets[0]!.brief_id!)
+
+  return NextResponse.json({
+    ok: true,
+    success: true,
+    launchMode: "placement_bundle",
+    metaAdId,
+    metaCreativeId,
+    adName,
+    landingUrl,
+    formats,
+    assetIds: assets.map((asset) => asset.id),
+    metaCtaType: ctaToMetaEnumFromBrief(brief),
+    adsManagerUrl: adsManagerUrl(params.adAccountId, metaAdId),
+  })
+}
+
 async function maybeMarkBriefLaunched(
   admin: NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>,
   briefId: string
@@ -324,9 +515,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json().catch(() => null)) as LaunchCreativeBody | null
-    const assetId = typeof body?.assetId === "string" ? body.assetId.trim() : ""
+    const assetIds = parseAssetIds(body)
     const adsetId = typeof body?.adsetId === "string" ? body.adsetId.trim() : ""
-    if (!UUID_RE.test(assetId)) return jsonError("assetId must be a valid UUID", 400)
+    if (assetIds.length === 0) {
+      return jsonError("assetId or assetIds (UUID array) is required", 400)
+    }
     if (!adsetId) return jsonError("adsetId is required", 400)
     if (
       body?.status !== undefined &&
@@ -345,10 +538,38 @@ export async function POST(req: NextRequest) {
     console.log("[launch-creative] using ad account", adAccountId)
     const pageId = requiredEnv("META_PAGE_ID")
 
+    const launchStatus: LaunchStatus =
+      body?.status === "ACTIVE" ? "ACTIVE" : "PAUSED"
+
+    if (assetIds.length > 1 || (assetIds.length === 1 && body?.assetIds)) {
+      const { data: probeRows } = await admin!
+        .from("creative_assets")
+        .select("id, brief_id, asset_type, generation_tool, variation_label, format, status, meta_ad_id")
+        .in("id", assetIds)
+      const probeAssets = (probeRows ?? []) as LaunchableAssetRow[]
+      if (canLaunchAsPlacementBundle(probeAssets)) {
+        return launchPlacementBundle({
+          admin: admin!,
+          token,
+          adAccountId,
+          pageId,
+          adsetId,
+          assetIds,
+          launchStatus,
+        })
+      }
+      if (assetIds.length > 1) {
+        const bundleError = validatePlacementBundle(probeAssets)
+        return jsonError(bundleError ?? "Cannot launch selected assets as one placement bundle", 400)
+      }
+    }
+
+    const assetId = assetIds[0]!
+
     const { data: asset, error: assetError } = await admin!
       .from("creative_assets")
       .select(
-        "id, brief_id, asset_type, generation_tool, variation_index, variation_label, gcs_path, convention_name, status, meta_ad_id, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name, trigger_data)"
+        "id, brief_id, asset_type, generation_tool, variation_index, variation_label, gcs_path, convention_name, status, meta_ad_id, performance_data, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name, trigger_data)"
       )
       .eq("id", assetId)
       .maybeSingle()
@@ -390,7 +611,7 @@ export async function POST(req: NextRequest) {
 
     const isVideo = VIDEO_LAUNCH_TOOLS.has(tool)
     const adName = resolveAdName(creativeAsset, brief)
-    const launchStatus: LaunchStatus = isVideo ? "PAUSED" : body?.status === "ACTIVE" ? "ACTIVE" : "PAUSED"
+    const singleLaunchStatus: LaunchStatus = isVideo ? "PAUSED" : launchStatus
     const landingUrl = resolveLaunchLandingUrl(brief)
     const preflightWarnings = collectLaunchPreflightWarnings(brief, { isVideo })
     if (preflightWarnings.length > 0) {
@@ -492,7 +713,7 @@ export async function POST(req: NextRequest) {
       adsetId,
       creativeId: metaCreativeId,
       name: adName,
-      status: launchStatus,
+      status: singleLaunchStatus,
     })
 
     const launchedAt = new Date().toISOString()
@@ -506,6 +727,13 @@ export async function POST(req: NextRequest) {
         launched_at: launchedAt,
         ...(imageHash ? { meta_image_hash: imageHash } : {}),
         ...videoMetaFields,
+        performance_data: {
+          ...(creativeAsset.performance_data &&
+          typeof creativeAsset.performance_data === "object"
+            ? creativeAsset.performance_data
+            : {}),
+          launch_mode: "single",
+        },
       })
       .eq("id", assetId)
 
@@ -515,6 +743,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       success: true,
+      launchMode: "single",
       metaAdId,
       metaCreativeId,
       adName,

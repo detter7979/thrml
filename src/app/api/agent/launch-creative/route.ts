@@ -114,6 +114,13 @@ function formatMetaActionError(action: string, payload: unknown): string {
       "META_MARKETING_API_TOKEN ads_management access for that account, and that the token is not a Page token."
     )
   }
+  if (err?.code === 100 && err.error_subcode === 1885183) {
+    return (
+      `${base} — Your Meta app is in Development mode. In developers.facebook.com open the app ` +
+      "used for META_MARKETING_API_TOKEN, switch App mode to Live, complete required permissions " +
+      "(ads_management), then regenerate the system user token in Business Settings if needed."
+    )
+  }
   return base
 }
 

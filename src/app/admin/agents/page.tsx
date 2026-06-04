@@ -708,11 +708,22 @@ export default function AgentsDashboard() {
           throw new Error(detail ?? "Launch failed")
         }
         const formats = (json as { formats?: string[] }).formats
+        const namerSync = (
+          json as {
+            namerPlatformSync?: { updated?: number; errors?: { reason: string }[] }
+          }
+        ).namerPlatformSync
+        const namerNote =
+          namerSync && (namerSync.updated ?? 0) > 0
+            ? ` Namer sheet updated (${namerSync.updated} row${namerSync.updated === 1 ? "" : "s"}).`
+            : namerSync?.errors?.length
+              ? " Namer sheet ID sync had issues — check Ad Builder tab."
+              : ""
         setLaunchProgress("Done")
         setPipelineMessage(
-          formats?.length
+          (formats?.length
             ? `Created 1 paused Meta ad with placements: ${formats.join(", ")}. Turn it on in Ads Manager.`
-            : "Created 1 paused Meta ad with all selected sizes."
+            : "Created 1 paused Meta ad with all selected sizes.") + namerNote
         )
       } else {
         for (const assetId of launchAssetIds) {
@@ -748,9 +759,21 @@ export default function AgentsDashboard() {
               `Launched. Note: ${warnings.map((w) => w.message).join(" ")}`
             )
           }
+          const namerSync = (
+            json as {
+              namerPlatformSync?: { updated?: number; errors?: { reason: string }[] }
+            }
+          ).namerPlatformSync
+          if (namerSync && (namerSync.updated ?? 0) > 0) {
+            setPipelineMessage(
+              `Launched. Namer sheet updated with Meta campaign / ad set / ad IDs.`
+            )
+          }
           setLaunchProgress(isVideo ? "Done" : "Launch complete")
         }
-        setPipelineMessage("Creative launched to the selected Meta ad set.")
+        setPipelineMessage((prev) =>
+          prev?.startsWith("Launched. Namer") ? prev : "Creative launched to the selected Meta ad set."
+        )
       }
       setLaunchAssetIds([])
       setSelectedCampaignId("")

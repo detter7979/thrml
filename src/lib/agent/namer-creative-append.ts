@@ -15,6 +15,7 @@ import {
   readSheetValues,
   resolveTabTitle,
 } from "@/lib/agent/google-sheets-client"
+import { fetchMetaAd, fetchMetaAdSet } from "@/lib/agent/namer-meta-client"
 import { uploadBufferToCreativeObject, refreshCreativeAssetUrl } from "@/lib/agent/gcs"
 import { parseAdName } from "@/lib/agent/naming-builder"
 
@@ -105,6 +106,20 @@ export type NamerCreativeAppendResult = {
   tabTitle?: string
   gcsExportPath?: string
   assetGcsLink?: string
+}
+
+/** Meta platform object IDs written to Ad Builder after launch (not convention tokens). */
+export type MetaPlatformIds = {
+  adId: string
+  adSetId: string
+  campaignId: string
+}
+
+export type NamerPlatformSyncResult = {
+  ok: boolean
+  updated: number
+  skipped: number
+  errors: { assetId: string; reason: string }[]
 }
 
 type BriefRow = {
@@ -302,12 +317,73 @@ export function pipelineTemplateFromBrief(brief: BriefRow): string {
   return templateId || "—"
 }
 
+/** Resolve Meta campaign / ad set / ad IDs for namer sheet columns (registry, then Graph API). */
+export async function resolveMetaPlatformIds(
+  admin: SupabaseClient,
+  asset: Pick<AssetRow, "meta_ad_id" | "meta_adset_id">
+): Promise<MetaPlatformIds> {
+  let adId = asset.meta_ad_id?.trim() ?? ""
+  let adSetId = asset.meta_adset_id?.trim() ?? ""
+  let campaignId = ""
+
+  if (adSetId) {
+    try {
+      const { data: adset } = await admin
+        .from("adset_registry")
+        .select("campaign_registry_id, platform_campaign_id")
+        .eq("platform_id", adSetId)
+        .maybeSingle()
+
+      const fromAdset =
+        typeof adset?.platform_campaign_id === "string" ? adset.platform_campaign_id.trim() : ""
+      if (fromAdset) campaignId = fromAdset
+
+      const campaignRegistryId =
+        typeof adset?.campaign_registry_id === "string" ? adset.campaign_registry_id : null
+      if (!campaignId && campaignRegistryId) {
+        const { data: campaign } = await admin
+          .from("campaign_registry")
+          .select("platform_campaign_id")
+          .eq("id", campaignRegistryId)
+          .maybeSingle()
+        const fromRegistry =
+          typeof campaign?.platform_campaign_id === "string"
+            ? campaign.platform_campaign_id.trim()
+            : ""
+        if (fromRegistry) campaignId = fromRegistry
+      }
+    } catch {
+      // Registry tables may be absent in some environments.
+    }
+
+    if (!campaignId) {
+      const metaRes = await fetchMetaAdSet(adSetId)
+      if (metaRes.ok && metaRes.data?.campaign_id) {
+        campaignId = metaRes.data.campaign_id.trim()
+      }
+    }
+  }
+
+  if (adId && (!adSetId || !campaignId)) {
+    const metaRes = await fetchMetaAd(adId)
+    if (metaRes.ok && metaRes.data) {
+      if (!adSetId && metaRes.data.adset_id) adSetId = metaRes.data.adset_id.trim()
+      if (!campaignId && metaRes.data.campaign_id) {
+        campaignId = metaRes.data.campaign_id.trim()
+      }
+    }
+  }
+
+  return { adId, adSetId, campaignId }
+}
+
 export function buildNamerCreativeRow(
   asset: AssetRow,
   brief: BriefRow,
   provenance: { campaignGen: ProvenanceLabel; adSetGen: ProvenanceLabel },
   links: { gcsPath: string; signedUrl: string },
-  layout: NamerSheetLayout = "creative_builder"
+  layout: NamerSheetLayout = "creative_builder",
+  platformIds?: MetaPlatformIds
 ): NamerCreativeRow | null {
   const conventionName = asset.convention_name?.trim()
   if (!conventionName) return null
@@ -322,9 +398,9 @@ export function buildNamerCreativeRow(
   const gcsPath = normalizeNamerGcsPath(links.gcsPath)
 
   return {
-    adId: "",
-    adSetId: "",
-    campaignId: "",
+    adId: platformIds?.adId?.trim() ?? "",
+    adSetId: platformIds?.adSetId?.trim() ?? "",
+    campaignId: platformIds?.campaignId?.trim() ?? "",
     testId: normalizeTestId(tokens.testId),
     variant: tokens.variant.toUpperCase().slice(0, 1),
     angle: tokens.angle,
@@ -716,7 +792,7 @@ function mapRowToHeaderColumns(
     set([/^size$/i], row.sizeToken)
     set([/^video length$/i], row.videoLength)
     set([/^gcs path$/i], row.assetGcsPath)
-    set([/^platform ad id$/i], "")
+    set([/^platform ad id$/i], row.adId)
   } else if (layout === "creative_builder") {
     set([/^test id$/i], row.testId)
     set([/^variant$/i], row.variant)
@@ -776,6 +852,202 @@ async function saveNamerExportToGcs(assetId: string, payload: Record<string, unk
   return uploaded.gcsPath
 }
 
+/** Cell-level writes for platform ID columns on an existing Ad Builder row. */
+export function buildPlatformIdSheetUpdates(
+  headers: string[],
+  sheetRow0Based: number,
+  tabTitle: string,
+  ids: MetaPlatformIds,
+  layout: NamerSheetLayout
+): { range: string; values: string[][] }[] {
+  const hasAny = Boolean(ids.adId || ids.adSetId || ids.campaignId)
+  if (!hasAny) return []
+
+  const escapedTab = tabTitle.replace(/'/g, "''")
+  const row1 = sheetRow0Based + 1
+  const updates: { range: string; values: string[][] }[] = []
+  const add = (patterns: RegExp[], value: string) => {
+    const v = value.trim()
+    if (!v) return
+    const idx = colIndex(headers, patterns)
+    if (idx < 0) return
+    updates.push({
+      range: `'${escapedTab}'!${columnToLetter(idx)}${row1}`,
+      values: [[v]],
+    })
+  }
+
+  add([/^ad id$/i], ids.adId)
+  add([/^ad set id$/i, /^adset id$/i], ids.adSetId)
+  add([/^campaign id$/i, /^campaign name \(ref\)$/i], ids.campaignId)
+  if (layout === "ad_builder") {
+    add([/^platform ad id$/i], ids.adId)
+  }
+
+  return updates
+}
+
+/**
+ * After Meta launch, patch Ad Builder rows with platform campaign / ad set / ad IDs.
+ * Best-effort: does not throw; callers should not fail launch on sheet errors.
+ */
+export async function syncNamerPlatformIdsForAssets(
+  admin: SupabaseClient,
+  assetIds: string[]
+): Promise<NamerPlatformSyncResult> {
+  const uniqueIds = [...new Set(assetIds.map((id) => id.trim()).filter(Boolean))]
+  if (!uniqueIds.length) {
+    return { ok: true, updated: 0, skipped: 0, errors: [] }
+  }
+
+  const sheetId = await resolveNamerSheetId(admin)
+  if (!sheetId) {
+    return { ok: true, updated: 0, skipped: uniqueIds.length, errors: [] }
+  }
+
+  const sheets = createGoogleSheetsClient()
+  let tabTitle: string
+  let sheetState: NonNullable<Awaited<ReturnType<typeof loadPreparedSheetTab>>>
+
+  try {
+    const tabTitles = await listSpreadsheetTabs(sheets, sheetId)
+    const resolvedTab = resolveTabTitle(tabTitles, ...CREATIVE_BUILDER_TAB_CANDIDATES)
+    if (!resolvedTab) {
+      return {
+        ok: false,
+        updated: 0,
+        skipped: 0,
+        errors: [{ assetId: uniqueIds[0]!, reason: "Ad Builder tab not found" }],
+      }
+    }
+    tabTitle = resolvedTab
+    const prepared = await loadPreparedSheetTab(sheets, sheetId, tabTitle)
+    if (!prepared) {
+      return {
+        ok: false,
+        updated: 0,
+        skipped: 0,
+        errors: [{ assetId: uniqueIds[0]!, reason: "Ad Builder header row not found" }],
+      }
+    }
+    sheetState = prepared
+  } catch (err) {
+    return {
+      ok: false,
+      updated: 0,
+      skipped: 0,
+      errors: [
+        {
+          assetId: uniqueIds[0]!,
+          reason: sheetsErrorMessage(err),
+        },
+      ],
+    }
+  }
+
+  const { rows: existingRows, headerInfo, headers } = sheetState
+  const errors: { assetId: string; reason: string }[] = []
+  let updated = 0
+  let skipped = 0
+  const cellUpdates: { range: string; values: string[][] }[] = []
+
+  for (const assetId of uniqueIds) {
+    const { data: asset, error: assetError } = await admin
+      .from("creative_assets")
+      .select(
+        "id, brief_id, convention_name, gcs_path, gcs_url, format, meta_ad_id, meta_adset_id, namer_synced_at"
+      )
+      .eq("id", assetId)
+      .maybeSingle()
+
+    if (assetError || !asset) {
+      errors.push({ assetId, reason: assetError?.message ?? "Asset not found" })
+      continue
+    }
+
+    const platformIds = await resolveMetaPlatformIds(admin, asset as AssetRow)
+    if (!platformIds.adId && !platformIds.adSetId) {
+      skipped++
+      errors.push({ assetId, reason: "No meta_ad_id or meta_adset_id on asset" })
+      continue
+    }
+
+    let conventionName = asset.convention_name?.trim() ?? ""
+    if (!asset.namer_synced_at) {
+      const appendResult = await appendApprovedCreativeToNamer(admin, assetId)
+      if (!appendResult.ok) {
+        errors.push({
+          assetId,
+          reason: appendResult.reason ?? "Could not append row before platform ID sync",
+        })
+        continue
+      }
+      const { data: refreshed } = await admin
+        .from("creative_assets")
+        .select("convention_name, namer_synced_at")
+        .eq("id", assetId)
+        .maybeSingle()
+      conventionName = refreshed?.convention_name?.trim() ?? conventionName
+    }
+
+    if (!conventionName) {
+      skipped++
+      errors.push({ assetId, reason: "Missing convention_name" })
+      continue
+    }
+
+    const sheetRow = findSheetRowForAsset(
+      existingRows,
+      { headerRow: headerInfo.headerRow, headers },
+      assetId,
+      conventionName
+    )
+    if (sheetRow < 0) {
+      errors.push({ assetId, reason: "Row not found in Ad Builder sheet" })
+      continue
+    }
+
+    const rowUpdates = buildPlatformIdSheetUpdates(
+      headers,
+      sheetRow,
+      tabTitle,
+      platformIds,
+      headerInfo.layout
+    )
+    if (!rowUpdates.length) {
+      skipped++
+      errors.push({ assetId, reason: "Sheet has no platform ID columns" })
+      continue
+    }
+
+    cellUpdates.push(...rowUpdates)
+    updated++
+  }
+
+  if (cellUpdates.length) {
+    try {
+      await batchWriteCells(sheets, sheetId, cellUpdates)
+    } catch (err) {
+      return {
+        ok: false,
+        updated: 0,
+        skipped,
+        errors: [
+          ...errors,
+          { assetId: uniqueIds[0]!, reason: sheetsErrorMessage(err) },
+        ],
+      }
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    updated,
+    skipped,
+    errors,
+  }
+}
+
 export async function appendApprovedCreativeToNamer(
   admin: SupabaseClient,
   assetId: string
@@ -816,6 +1088,7 @@ export async function appendApprovedCreativeToNamer(
   const assetGcsPath = normalizeNamerGcsPath((asset as AssetRow).gcs_path)
   const signedUrl = await resolveAssetGcsLink(asset as AssetRow)
   const provenance = await resolveRegistryProvenance(admin, asset as AssetRow, conventionName)
+  const platformIds = await resolveMetaPlatformIds(admin, asset as AssetRow)
 
   const sheets = createGoogleSheetsClient()
   let tabTitle: string
@@ -845,7 +1118,8 @@ export async function appendApprovedCreativeToNamer(
     brief as BriefRow,
     provenance,
     { gcsPath: assetGcsPath, signedUrl },
-    headerInfo.layout
+    headerInfo.layout,
+    platformIds
   )
   if (!row) {
     return { ok: true, skipped: true, reason: "Could not parse convention_name for namer row" }
@@ -854,18 +1128,60 @@ export async function appendApprovedCreativeToNamer(
   for (let r = headerInfo.headerRow + 1; r < existingRows.length; r++) {
     const line = existingRows[r] ?? []
     if (rowHasAssetUuid(line, headers, assetId)) {
+      const sheetRow = r
+      const idUpdates = buildPlatformIdSheetUpdates(
+        headers,
+        sheetRow,
+        tabTitle,
+        platformIds,
+        headerInfo.layout
+      )
+      if (idUpdates.length) {
+        try {
+          await batchWriteCells(sheets, sheetId, idUpdates)
+        } catch (err) {
+          return { ok: false, reason: sheetsErrorMessage(err) }
+        }
+      }
       await admin
         .from("creative_assets")
         .update({ namer_synced_at: new Date().toISOString() })
         .eq("id", assetId)
-      return { ok: true, skipped: true, reason: "Row already present in sheet (Asset UUID)" }
+      return {
+        ok: true,
+        skipped: true,
+        reason: idUpdates.length
+          ? "Row already present; platform IDs refreshed"
+          : "Row already present in sheet (Asset UUID)",
+      }
     }
     if (rowHasConventionName(line, headers, conventionName)) {
+      const sheetRow = r
+      const idUpdates = buildPlatformIdSheetUpdates(
+        headers,
+        sheetRow,
+        tabTitle,
+        platformIds,
+        headerInfo.layout
+      )
+      if (idUpdates.length) {
+        try {
+          await batchWriteCells(sheets, sheetId, idUpdates)
+        } catch (err) {
+          return { ok: false, reason: sheetsErrorMessage(err) }
+        }
+      }
       await admin
         .from("creative_assets")
         .update({ namer_synced_at: new Date().toISOString() })
         .eq("id", assetId)
-      return { ok: true, skipped: true, reason: "Row already present in sheet (Ad Name)" }
+      return {
+        ok: true,
+        skipped: true,
+        reason: idUpdates.length
+          ? "Row already present; platform IDs refreshed"
+          : "Row already present in sheet (Ad Name)",
+      }
     }
   }
 
@@ -1006,12 +1322,14 @@ export async function repairSyncedNamerRows(
 
     const signedUrl = await resolveAssetGcsLink(loaded.asset)
     const provenance = await resolveRegistryProvenance(admin, loaded.asset, conventionName)
+    const platformIds = await resolveMetaPlatformIds(admin, loaded.asset)
     const row = buildNamerCreativeRow(
       loaded.asset,
       loaded.brief,
       provenance,
       { gcsPath: loaded.asset.gcs_path ?? "", signedUrl },
-      headerInfo.layout
+      headerInfo.layout,
+      platformIds
     )
     if (!row) {
       errors.push(`${assetId}: could not build row`)

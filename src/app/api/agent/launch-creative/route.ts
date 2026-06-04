@@ -30,6 +30,7 @@ import {
 } from "@/lib/agent/meta-instagram-account"
 import { uploadVideo } from "@/lib/agent/meta-video-upload"
 import { requireAdminApi } from "@/lib/admin-guard"
+import { syncNamerPlatformIdsForAssets } from "@/lib/agent/namer-creative-append"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -589,6 +590,19 @@ async function launchPlacementBundle(params: {
 
   await maybeMarkBriefLaunched(params.admin, assets[0]!.brief_id!)
 
+  let namerPlatformSync: Awaited<ReturnType<typeof syncNamerPlatformIdsForAssets>> | undefined
+  try {
+    namerPlatformSync = await syncNamerPlatformIdsForAssets(
+      params.admin,
+      assets.map((asset) => asset.id)
+    )
+    if (namerPlatformSync.errors.length) {
+      console.warn("[launch-creative] namer platform ID sync partial", namerPlatformSync)
+    }
+  } catch (err) {
+    console.warn("[launch-creative] namer platform ID sync failed", err)
+  }
+
   return NextResponse.json({
     ok: true,
     success: true,
@@ -605,6 +619,7 @@ async function launchPlacementBundle(params: {
     instagramActorId: instagramActorId ?? null,
     instagramDiagnostics: instagram.diagnostics,
     adsManagerUrl: adsManagerUrl(params.adAccountId, metaAdId),
+    namerPlatformSync,
   })
 }
 
@@ -864,6 +879,16 @@ export async function POST(req: NextRequest) {
     if (updateError) throw updateError
     await maybeMarkBriefLaunched(admin!, creativeAsset.brief_id)
 
+    let namerPlatformSync: Awaited<ReturnType<typeof syncNamerPlatformIdsForAssets>> | undefined
+    try {
+      namerPlatformSync = await syncNamerPlatformIdsForAssets(admin!, [assetId])
+      if (namerPlatformSync.errors.length) {
+        console.warn("[launch-creative] namer platform ID sync partial", namerPlatformSync)
+      }
+    } catch (err) {
+      console.warn("[launch-creative] namer platform ID sync failed", err)
+    }
+
     return NextResponse.json({
       ok: true,
       success: true,
@@ -876,6 +901,7 @@ export async function POST(req: NextRequest) {
       preflightWarnings,
       ...videoMetaFields,
       adsManagerUrl: adsManagerUrl(adAccountId, metaAdId),
+      namerPlatformSync,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown launch error"

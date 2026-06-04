@@ -151,6 +151,16 @@ function briefForMetaLaunch(brief: CreativeBrief): CreativeBrief {
   }
 }
 
+function resolvedLaunchCopyStrings(brief: CreativeBrief) {
+  const copy = resolveBriefCopyForMeta(brief)
+  return {
+    primaryCopy: copy.copy_primary,
+    headline: copy.copy_headline,
+    subtext: copy.copy_subtext,
+    cta: copy.cta,
+  }
+}
+
 async function persistResolvedBriefCopyIfEmpty(
   admin: NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>,
   briefId: string,
@@ -451,11 +461,12 @@ async function launchPlacementBundle(params: {
     legacyAdName(assets[0]!, brief)
   )
 
+  const launchCopy = resolvedLaunchCopyStrings(brief)
   const assetFeedSpec = buildPlacementAssetFeedSpec({
     images: placementImages,
     landingUrl,
-    primaryCopy: brief.copy_primary,
-    headline: brief.copy_headline,
+    primaryCopy: launchCopy.primaryCopy,
+    headline: launchCopy.headline,
     description: metaSubtext,
     brief,
   })
@@ -673,6 +684,7 @@ export async function POST(req: NextRequest) {
         meta_thumbnail_image_hash: thumbnailImageHash,
       }
 
+      const videoHeadline = resolvedLaunchCopyStrings(brief).headline
       metaCreativeId = await createMetaVideoCreative({
         token,
         adAccountId,
@@ -682,7 +694,7 @@ export async function POST(req: NextRequest) {
         thumbnailImageHash,
         landingUrl,
         primaryCopy,
-        headline: brief.copy_headline,
+        headline: videoHeadline,
         brief,
       })
     } else {
@@ -719,6 +731,7 @@ export async function POST(req: NextRequest) {
         })
       }
 
+      const staticCopy = resolvedLaunchCopyStrings(brief)
       metaCreativeId = await createMetaStaticCreative({
         token,
         adAccountId,
@@ -726,8 +739,8 @@ export async function POST(req: NextRequest) {
         imageHash,
         name: adName,
         landingUrl,
-        primaryCopy: brief.copy_primary,
-        headline: brief.copy_headline,
+        primaryCopy: staticCopy.primaryCopy,
+        headline: staticCopy.headline,
         subtext: metaSubtext,
         brief,
       })

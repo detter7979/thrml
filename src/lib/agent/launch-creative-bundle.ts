@@ -11,6 +11,29 @@ export type LaunchableAssetRow = {
   meta_ad_id: string | null
 }
 
+/** Normalize pipeline/UI asset rows for bundle validation. */
+export function toLaunchableAssetRow(asset: {
+  id: string
+  brief_id?: string | null
+  asset_type?: string | null
+  generation_tool?: string | null
+  variation_label?: string | null
+  format?: string | null
+  status?: string | null
+  meta_ad_id?: string | null
+}): LaunchableAssetRow {
+  return {
+    id: asset.id,
+    brief_id: asset.brief_id ?? null,
+    asset_type: asset.asset_type ?? null,
+    generation_tool: asset.generation_tool ?? null,
+    variation_label: asset.variation_label ?? null,
+    format: asset.format ?? null,
+    status: asset.status ?? null,
+    meta_ad_id: asset.meta_ad_id ?? null,
+  }
+}
+
 const VIDEO_LAUNCH_TOOLS = new Set(["composite-video"])
 const BASE_VIDEO_TOOLS = new Set(["runway", "manual"])
 

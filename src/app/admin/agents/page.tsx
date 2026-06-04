@@ -9,6 +9,7 @@ import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
 import {
   canLaunchAsPlacementBundle,
+  toLaunchableAssetRow,
   validatePlacementBundle,
 } from "@/lib/agent/launch-creative-bundle"
 import { buildOutFormatsForAsset, nextVariationLabelsForBrief } from "@/lib/agent/static-brief-plan"
@@ -846,17 +847,7 @@ export default function AgentsDashboard() {
   }, [activeLaunchAssets])
 
   const launchBundleRows = useMemo(
-    () =>
-      activeLaunchAssets.map((asset) => ({
-        id: asset.id,
-        brief_id: asset.brief_id,
-        asset_type: asset.asset_type,
-        generation_tool: asset.generation_tool,
-        variation_label: asset.variation_label,
-        format: asset.format,
-        status: asset.status,
-        meta_ad_id: asset.meta_ad_id,
-      })),
+    () => activeLaunchAssets.map(toLaunchableAssetRow),
     [activeLaunchAssets]
   )
 

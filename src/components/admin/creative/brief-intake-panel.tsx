@@ -11,6 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  structuredEditorFromBrief,
+  type CreativeBriefLike,
+} from "@/components/admin/creative/brief-editor-modal"
 import { AssetLibraryPanel, type AssetLibraryEntry } from "./asset-library-panel"
 import { DEFAULT_POV_SAUNA_TEMPLATE_VERSION } from "@/lib/agent/video-template-copy"
 import { DEFAULT_HOST_HEADLINE, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
@@ -132,6 +136,7 @@ async function fetcher<T>(url: string): Promise<T> {
 
 type Props = {
   onCreated: () => void
+  onBriefCreated?: (brief: CreativeBriefLike) => void
   onMessage: (msg: string) => void
   busyAction: string | null
   setBusyAction: (v: string | null) => void
@@ -140,6 +145,7 @@ type Props = {
 
 export function BriefIntakePanel({
   onCreated,
+  onBriefCreated,
   onMessage,
   busyAction,
   setBusyAction,
@@ -233,13 +239,17 @@ export function BriefIntakePanel({
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error((json as { error?: string }).error ?? "Template brief failed")
+      const createdBrief = (json as { brief?: CreativeBriefLike }).brief
       onCreated()
+      if (!saveAndApprove && createdBrief && onBriefCreated) {
+        onBriefCreated(createdBrief)
+      }
       onMessage(
         saveAndApprove
           ? "Brief created from template and approved."
           : conceptVerify
-            ? "Brief created — preview generating in Variations Ready."
-            : "Brief created from template.",
+            ? "Draft created — edit copy in the editor or Pending Briefs, then approve when ready."
+            : "Brief created — edit in Pending Briefs before approving.",
       )
       setSelectedTemplateId("")
       setUploadedGcsPath("")
@@ -538,6 +548,12 @@ export function BriefIntakePanel({
           )}
         </div>
       ) : null}
+
+      <p className="text-xs text-muted-foreground">
+        Use <strong>Create draft</strong> to open the brief editor and edit copy before approving. Concept-verify
+        templates still generate a preview asset, but the brief stays in Pending until you approve. Use{" "}
+        <strong>Create &amp; approve</strong> for a full batch without the draft step.
+      </p>
 
       <div className="flex flex-wrap gap-2">
         <button

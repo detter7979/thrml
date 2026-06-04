@@ -7,6 +7,7 @@ import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
 import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
+import { resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
 import {
   canLaunchAsPlacementBundle,
   toLaunchableAssetRow,
@@ -831,6 +832,13 @@ export default function AgentsDashboard() {
     }
     return map
   }, [generatedAssets])
+  const previewAssetCountByBrief = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const asset of generatedAssets) {
+      if (asset.brief_id) map.set(asset.brief_id, (map.get(asset.brief_id) ?? 0) + 1)
+    }
+    return map
+  }, [generatedAssets])
   const variationReadyCount =
     generatingBriefs.length +
     videoGeneratingBriefs.length +
@@ -845,6 +853,11 @@ export default function AgentsDashboard() {
     if (!asset) return null
     return briefFor(asset)
   }, [activeLaunchAssets])
+
+  const launchCopy = useMemo(
+    () => (launchBrief ? resolveBriefCopyForMeta(launchBrief) : null),
+    [launchBrief]
+  )
 
   const launchBundleRows = useMemo(
     () => activeLaunchAssets.map(toLaunchableAssetRow),
@@ -1078,6 +1091,7 @@ export default function AgentsDashboard() {
 
           <BriefIntakePanel
             onCreated={() => void mutatePipeline()}
+            onBriefCreated={(brief) => setEditBrief(structuredEditorFromBrief(brief))}
             onMessage={setPipelineMessage}
             busyAction={busyAction}
             setBusyAction={setBusyAction}
@@ -1151,12 +1165,18 @@ export default function AgentsDashboard() {
                               Add a visual direction before approval so the static generator has an image prompt.
                             </p>
                           ) : null}
+                          {(previewAssetCountByBrief.get(brief.id) ?? 0) > 0 ? (
+                            <p className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                              Concept-verify preview is in Variations Ready. Edit copy here, then Approve to run the
+                              full variation batch.
+                            </p>
+                          ) : null}
                           <div className="flex gap-2">
                             <button
                               onClick={() => setEditBrief(structuredEditorFromBrief(brief))}
                               className="flex-1 text-xs px-3 py-1.5 border rounded hover:bg-muted"
                             >
-                              Edit
+                              Edit brief &amp; copy
                             </button>
                             <button
                               onClick={() => approveBrief(brief.id)}
@@ -1367,16 +1387,25 @@ export default function AgentsDashboard() {
                             </div>
                           ))}
                         </div>
-                        {!isActivelyGenerating ? (
+                        <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
-                            onClick={() => approveBrief(brief.id)}
-                            disabled={busyAction === `approve-brief-${brief.id}`}
-                            className="w-full text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                            onClick={() => setEditBrief(structuredEditorFromBrief(brief))}
+                            className="text-xs px-3 py-1.5 border rounded hover:bg-muted"
                           >
-                            Generate variations
+                            Edit brief &amp; copy
                           </button>
-                        ) : null}
+                          {!isActivelyGenerating ? (
+                            <button
+                              type="button"
+                              onClick={() => approveBrief(brief.id)}
+                              disabled={busyAction === `approve-brief-${brief.id}`}
+                              className="text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                            >
+                              Generate variations
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       )
                     })}
@@ -1397,8 +1426,24 @@ export default function AgentsDashboard() {
                           <span className="text-[11px] text-muted-foreground">{group.assets.length} generated</span>
                           <span className="text-[11px] text-muted-foreground">{timeAgo(group.assets[0].created_at)}</span>
                         </div>
-                        <p className="mt-2 text-sm font-medium">{shortText(group.brief?.copy_headline ?? group.brief?.hook, 140)}</p>
+                        <p className="mt-2 text-sm font-medium">
+                          {shortText(
+                            group.brief
+                              ? resolveBriefCopyForMeta(group.brief).copy_headline
+                              : null,
+                            140
+                          )}
+                        </p>
                         <p className="text-xs text-muted-foreground">{shortText(group.brief?.hypothesis, 140)}</p>
+                        {group.brief ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditBrief(structuredEditorFromBrief(group.brief!))}
+                            className="mt-2 text-xs px-3 py-1.5 border rounded hover:bg-muted"
+                          >
+                            Edit brief &amp; copy
+                          </button>
+                        ) : null}
                       </div>
                       <div className="grid gap-3 md:grid-cols-3">
                         {group.assets.map((asset) => {
@@ -1480,6 +1525,28 @@ export default function AgentsDashboard() {
                         })}
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        {group.brief && selectedApproved.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const label = selectedApproved[0]?.variation_label ?? "A"
+                              const ids = group.assets
+                                .filter(
+                                  (asset) =>
+                                    asset.status === "approved" &&
+                                    (asset.variation_label ?? "A") === label
+                                )
+                                .map((asset) => asset.id)
+                              setSelectedAssetIds((prev) => ({
+                                ...prev,
+                                ...Object.fromEntries(ids.map((id) => [id, true])),
+                              }))
+                            }}
+                            className="text-xs px-3 py-1.5 border rounded hover:bg-muted"
+                          >
+                            Select all sizes (same variation)
+                          </button>
+                        ) : null}
                         {pendingVariationLabels
                           .filter((label) => label !== "A")
                           .map((label) => (
@@ -1713,14 +1780,21 @@ export default function AgentsDashboard() {
                   {!activeLaunchAssets[0].convention_name ? (
                     <p className="text-amber-700">No convention_name. Launch will use a legacy name.</p>
                   ) : null}
-                  {launchBrief ? (
+                  {launchBrief && launchCopy ? (
                     <div className="mt-2 space-y-1 border-t pt-2">
-                      <p><span className="text-muted-foreground">Headline:</span> {launchBrief.copy_headline ?? launchBrief.hook ?? "—"}</p>
-                      <p><span className="text-muted-foreground">Primary:</span> {shortText(launchBrief.copy_primary, 80)}</p>
-                      <p><span className="text-muted-foreground">CTA (brief):</span> {launchBrief.cta ?? "—"}</p>
+                      <p><span className="text-muted-foreground">Headline:</span> {launchCopy.copy_headline}</p>
+                      <p><span className="text-muted-foreground">Primary:</span> {shortText(launchCopy.copy_primary, 80)}</p>
+                      <p><span className="text-muted-foreground">CTA (brief):</span> {launchCopy.cta}</p>
                       <p className="text-muted-foreground">
                         Meta shows a standard button (e.g. Sign Up / Learn More), not this exact label.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => setEditBrief(structuredEditorFromBrief(launchBrief))}
+                        className="text-xs px-2 py-1 border rounded hover:bg-muted"
+                      >
+                        Edit brief copy
+                      </button>
                     </div>
                   ) : null}
                 </div>

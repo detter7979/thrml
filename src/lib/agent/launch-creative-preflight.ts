@@ -28,6 +28,8 @@ export type LaunchPreflightWarning = {
   message: string
 }
 
+import { resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
+
 /** Soft checks before Meta API — does not block launch. */
 export function collectLaunchPreflightWarnings(
   brief: {
@@ -35,14 +37,16 @@ export function collectLaunchPreflightWarnings(
     copy_headline?: string | null
     copy_subtext?: string | null
     cta?: string | null
+    hook?: string | null
     trigger_data?: Record<string, unknown> | null
   },
   opts?: { isVideo?: boolean }
 ): LaunchPreflightWarning[] {
   const warnings: LaunchPreflightWarning[] = []
-  const primary = brief.copy_primary?.trim() ?? ""
-  const headline = brief.copy_headline?.trim() ?? ""
-  const subtext = brief.copy_subtext?.trim() ?? ""
+  const resolved = resolveBriefCopyForMeta(brief)
+  const primary = brief.copy_primary?.trim() || resolved.copy_primary
+  const headline = brief.copy_headline?.trim() || resolved.copy_headline
+  const subtext = brief.copy_subtext?.trim() || resolved.copy_subtext
 
   if (!primary && !opts?.isVideo) {
     warnings.push({ field: "copy_primary", message: "Primary text is empty." })

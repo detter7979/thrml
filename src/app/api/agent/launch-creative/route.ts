@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { downloadCreativeAsset, getSignedGcsReadUrl } from "@/lib/agent/gcs"
+import { hasResolvableLaunchCopy, resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
 import { ctaToMetaEnumFromBrief } from "@/lib/agent/meta-cta"
 import {
   canLaunchAsPlacementBundle,
@@ -137,6 +138,33 @@ async function assertMetaOk(res: Response, action: string) {
 
 function firstBrief(asset: CreativeAssetRow) {
   return Array.isArray(asset.creative_briefs) ? asset.creative_briefs[0] ?? null : asset.creative_briefs
+}
+
+function briefForMetaLaunch(brief: CreativeBrief): CreativeBrief {
+  const resolved = resolveBriefCopyForMeta(brief)
+  return {
+    ...brief,
+    copy_primary: resolved.copy_primary,
+    copy_headline: resolved.copy_headline,
+    copy_subtext: resolved.copy_subtext,
+    cta: resolved.cta,
+  }
+}
+
+async function persistResolvedBriefCopyIfEmpty(
+  admin: NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>,
+  briefId: string,
+  brief: CreativeBrief
+) {
+  const resolved = resolveBriefCopyForMeta(brief)
+  const updates: Record<string, string> = {}
+  if (!brief.copy_primary?.trim()) updates.copy_primary = resolved.copy_primary
+  if (!brief.copy_headline?.trim()) updates.copy_headline = resolved.copy_headline
+  if (!brief.copy_subtext?.trim()) updates.copy_subtext = resolved.copy_subtext
+  if (!brief.cta?.trim()) updates.cta = resolved.cta
+  if (Object.keys(updates).length === 0) return
+  const { error } = await admin.from("creative_briefs").update(updates).eq("id", briefId)
+  if (error) throw error
 }
 
 function extractImageHash(json: MetaAdImageUploadResponse) {
@@ -366,9 +394,11 @@ async function launchPlacementBundle(params: {
   const bundleError = validatePlacementBundle(assets)
   if (bundleError) return jsonError(bundleError, 400)
 
-  const brief = firstBrief(assets[0]!)
-  if (!brief) return jsonError("Creative brief not found for bundle", 404)
+  const rawBrief = firstBrief(assets[0]!)
+  if (!rawBrief) return jsonError("Creative brief not found for bundle", 404)
   if (!assets[0]!.brief_id) return jsonError("Creative asset is missing brief_id", 400)
+  const brief = briefForMetaLaunch(rawBrief)
+  await persistResolvedBriefCopyIfEmpty(params.admin, assets[0]!.brief_id!, rawBrief)
 
   const claimWarning = brief.trigger_data?.claim_warning
   if (
@@ -384,7 +414,7 @@ async function launchPlacementBundle(params: {
     )
   }
 
-  if (!brief.copy_primary || !brief.copy_headline) {
+  if (!hasResolvableLaunchCopy(brief)) {
     return jsonError("Creative brief is missing copy_primary or copy_headline", 400)
   }
 
@@ -578,9 +608,11 @@ export async function POST(req: NextRequest) {
     if (!asset) return jsonError("Creative asset not found", 404)
 
     const creativeAsset = asset as CreativeAssetRow
-    const brief = firstBrief(creativeAsset)
+    const rawBrief = firstBrief(creativeAsset)
     if (!creativeAsset.brief_id) return jsonError("Creative asset is missing brief_id", 400)
-    if (!brief) return jsonError("Creative brief not found for asset", 404)
+    if (!rawBrief) return jsonError("Creative brief not found for asset", 404)
+    const brief = briefForMetaLaunch(rawBrief)
+    await persistResolvedBriefCopyIfEmpty(admin!, creativeAsset.brief_id, rawBrief)
     if (!creativeAsset.gcs_path) return jsonError("Creative asset is missing gcs_path", 400)
 
     const claimWarning = brief.trigger_data?.claim_warning
@@ -657,7 +689,7 @@ export async function POST(req: NextRequest) {
       if (creativeAsset.asset_type !== "image") {
         return jsonError("Creative asset must be an image or rendered video", 400)
       }
-      if (!brief.copy_primary || !brief.copy_headline) {
+      if (!hasResolvableLaunchCopy(brief)) {
         return jsonError("Creative brief is missing copy_primary or copy_headline", 400)
       }
 

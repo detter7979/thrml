@@ -103,6 +103,10 @@ templates:
       trigger_type: manual
       hypothesis: "Split-header SVG template for host POV earnings."
       hook: "Host earnings split header"
+      copy_primary: "List your private sauna on thrml and earn when you're not using it."
+      copy_headline: "Turn your idle sauna into income."
+      copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
+      cta: "List Your Space"
       campaign_short_name: pov-earnings
     svg_tokens:
       TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
@@ -141,6 +145,10 @@ templates:
       trigger_type: manual
       hypothesis: "Vrbo-style 50/50 block split — brand color top, photo bottom."
       hook: "Host earnings block split"
+      copy_primary: "List your private sauna on thrml and earn when you're not using it."
+      copy_headline: "Turn your idle sauna into income."
+      copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
+      cta: "List Your Space"
       campaign_short_name: pov-earnings
     svg_tokens:
       TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."

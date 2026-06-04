@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
 import { getCreativeTemplate, buildBriefFromTemplate, loadCreativeTemplates } from "@/lib/agent/creative-templates"
 import { previewFormatForBrief } from "@/lib/agent/static-brief-plan"
 import { loadSvgTemplateRegistry } from "@/lib/agent/svg-template-generator"
@@ -88,42 +89,60 @@ export async function POST(req: NextRequest) {
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: "Failed to create brief" }, { status: 500 })
 
+  const resolvedCopy = resolveBriefCopyForMeta(data)
+  const copyUpdates: Record<string, string> = {}
+  if (!data.copy_primary?.trim()) copyUpdates.copy_primary = resolvedCopy.copy_primary
+  if (!data.copy_headline?.trim()) copyUpdates.copy_headline = resolvedCopy.copy_headline
+  if (!data.copy_subtext?.trim()) copyUpdates.copy_subtext = resolvedCopy.copy_subtext
+  if (!data.cta?.trim()) copyUpdates.cta = resolvedCopy.cta
+  let briefRow = data
+  if (Object.keys(copyUpdates).length > 0) {
+    const { data: patched, error: copyError } = await admin!
+      .from("creative_briefs")
+      .update(copyUpdates)
+      .eq("id", data.id)
+      .select("*")
+      .maybeSingle()
+    if (copyError) return NextResponse.json({ error: copyError.message }, { status: 500 })
+    if (patched) briefRow = patched
+  }
+
   const conceptVerify = Boolean(body?.conceptVerify ?? template.concept_verify_default)
   const shouldPreviewOnly = conceptVerify && !saveAndApprove && !data.video_config
 
   if (shouldPreviewOnly) {
     try {
       const generated = await processStaticBrief({
-        briefId: data.id,
+        briefId: briefRow.id,
         variations: 1,
-        formats: [previewFormatForBrief(data)],
+        formats: [previewFormatForBrief(briefRow)],
       })
       const { data: updated, error: reloadError } = await admin!
         .from("creative_briefs")
         .select("*")
-        .eq("id", data.id)
+        .eq("id", briefRow.id)
         .maybeSingle()
 
       if (reloadError) return NextResponse.json({ error: reloadError.message }, { status: 500 })
-      return NextResponse.json({ brief: updated ?? data, generated, preview: true })
+      return NextResponse.json({ brief: updated ?? briefRow, generated, preview: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Preview generation failed"
       console.error("[creative-templates] preview generation failed", err)
-      return NextResponse.json({ error: message, brief: data }, { status: 500 })
+      return NextResponse.json({ error: message, brief: briefRow }, { status: 500 })
     }
   }
 
-  if (saveAndApprove && !data.video_config) {
+  if (saveAndApprove && !briefRow.video_config) {
     try {
-      const generated = await processStaticBrief({ briefId: data.id })
+      const generated = await processStaticBrief({ briefId: briefRow.id })
       const { data: updated, error: reloadError } = await admin!
         .from("creative_briefs")
         .select("*")
-        .eq("id", data.id)
+        .eq("id", briefRow.id)
         .maybeSingle()
 
       if (reloadError) return NextResponse.json({ error: reloadError.message }, { status: 500 })
-      return NextResponse.json({ brief: updated ?? data, generated })
+      return NextResponse.json({ brief: updated ?? briefRow, generated })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Static generation failed"
       console.error("[creative-templates] saveAndApprove generation failed", err)
@@ -131,11 +150,11 @@ export async function POST(req: NextRequest) {
       await admin!
         .from("creative_briefs")
         .update({ status: "briefed", approved_at: null })
-        .eq("id", data.id)
+        .eq("id", briefRow.id)
 
-      return NextResponse.json({ error: message, brief: data }, { status: 500 })
+      return NextResponse.json({ error: message, brief: briefRow }, { status: 500 })
     }
   }
 
-  return NextResponse.json({ brief: data })
+  return NextResponse.json({ brief: briefRow })
 }

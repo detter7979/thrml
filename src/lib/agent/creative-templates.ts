@@ -3,6 +3,7 @@ import path from "node:path"
 
 import yaml from "js-yaml"
 
+import { defaultHostBriefCopyFromSvgTokens } from "@/lib/agent/brief-copy-for-meta"
 import { HOST_MONETIZATION_CANONICAL_VARIATIONS } from "@/lib/agent/host-monetization-static"
 import type { VideoConfig, VideoCopyVariant } from "@/lib/agent/types"
 import {
@@ -250,6 +251,23 @@ export function buildBriefFromTemplate(
     }
   }
 
+  const mergedSvgTokens: Record<string, string> = {}
+  if (template.svg_tokens) {
+    for (const [key, value] of Object.entries(template.svg_tokens)) {
+      if (typeof value === "string") mergedSvgTokens[key] = value
+    }
+  }
+  const firstSvgVar = template.svg_variations?.[0]?.tokens
+  if (firstSvgVar) {
+    for (const [key, value] of Object.entries(firstSvgVar)) {
+      if (typeof value === "string" && !mergedSvgTokens[key]) mergedSvgTokens[key] = value
+    }
+  }
+  const svgCopy =
+    template.svg_template_id && Object.keys(mergedSvgTokens).length
+      ? defaultHostBriefCopyFromSvgTokens(mergedSvgTokens, { hook: template.defaults.hook })
+      : null
+
   return {
     trigger_type: template.defaults.trigger_type ?? "manual",
     trigger_data: triggerData,
@@ -259,10 +277,10 @@ export function buildBriefFromTemplate(
     hook: template.defaults.hook ?? null,
     format,
     visual_direction: template.defaults.visual_direction ?? null,
-    copy_primary: template.defaults.copy_primary ?? null,
-    copy_headline: template.defaults.copy_headline ?? null,
-    copy_subtext: template.defaults.copy_subtext ?? null,
-    cta: template.defaults.cta ?? null,
+    copy_primary: template.defaults.copy_primary ?? svgCopy?.copy_primary ?? null,
+    copy_headline: template.defaults.copy_headline ?? svgCopy?.copy_headline ?? null,
+    copy_subtext: template.defaults.copy_subtext ?? svgCopy?.copy_subtext ?? null,
+    cta: template.defaults.cta ?? svgCopy?.cta ?? null,
     campaign_short_name: template.defaults.campaign_short_name ?? template.angle,
     success_criteria: successCriteria,
     video_config: null,

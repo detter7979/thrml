@@ -1,4 +1,5 @@
 import { uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
+import { statusAfterStaticGeneration } from "@/lib/agent/creative-brief-status"
 import { resolveNamingFromBrief } from "@/lib/agent/creative-templates"
 import { buildAdName } from "@/lib/agent/naming-builder"
 import { unifiedStaticBasePath, unifiedStaticPath } from "@/lib/agent/gcs-paths"
@@ -466,7 +467,7 @@ async function processStaticBriefInner(
     })
     const { error: updateError } = await admin
       .from("creative_briefs")
-      .update({ status: "variations_ready" })
+      .update({ status: statusAfterStaticGeneration(brief.approved_at) })
       .eq("id", brief.id)
     if (updateError) throw updateError
     await sendReadyEmail(results.length, brief)
@@ -626,7 +627,7 @@ async function processStaticBriefInner(
 
   const { error: updateError } = await admin
     .from("creative_briefs")
-    .update({ status: "variations_ready" })
+    .update({ status: statusAfterStaticGeneration(brief.approved_at) })
     .eq("id", brief.id)
   if (updateError) throw updateError
 

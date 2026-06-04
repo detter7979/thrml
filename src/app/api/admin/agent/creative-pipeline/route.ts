@@ -6,6 +6,7 @@ import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/g
 import { isRunwayConfigured } from "@/lib/agent/runway"
 import { processStaticBrief } from "@/lib/agent/static-generator"
 import { editStaticPhotoAsset } from "@/lib/agent/static-photo-recomposite"
+import { statusAfterStaticGeneration } from "@/lib/agent/creative-brief-status"
 import { previewFormatForBrief } from "@/lib/agent/static-brief-plan"
 import {
   expandStaticSizesFromAsset,
@@ -314,8 +315,8 @@ export async function GET() {
     admin!
       .from("creative_briefs")
       .select("*")
-      .in("status", ["pending", "briefed"])
       .is("approved_at", null)
+      .in("status", ["pending", "briefed", "generating", "variations_ready"])
       .order("created_at", { ascending: false }),
     admin!
       .from("creative_assets")
@@ -671,8 +672,9 @@ export async function PATCH(req: NextRequest) {
         tokens,
         photoGcsPath,
       )
-      await admin!.from("creative_briefs").update({ status: "variations_ready" }).eq("id", brief.id)
-      return NextResponse.json({ brief: { ...brief, status: "variations_ready" }, asset })
+      const nextStatus = statusAfterStaticGeneration(brief.approved_at)
+      await admin!.from("creative_briefs").update({ status: nextStatus }).eq("id", brief.id)
+      return NextResponse.json({ brief: { ...brief, status: nextStatus }, asset })
     } catch (err) {
       const message = err instanceof Error ? err.message : "SVG generation failed"
       return NextResponse.json({ error: message, brief }, { status: 500 })
@@ -695,7 +697,7 @@ export async function PATCH(req: NextRequest) {
 
     const { data: brief, error: briefError } = await admin!
       .from("creative_briefs")
-      .select("id, trigger_data")
+      .select("id, trigger_data, approved_at")
       .eq("id", body.brief_id)
       .maybeSingle()
 
@@ -725,7 +727,8 @@ export async function PATCH(req: NextRequest) {
         resolvedTokens,
         resolvedPhoto,
       )
-      await admin!.from("creative_briefs").update({ status: "variations_ready" }).eq("id", brief.id)
+      const nextStatus = statusAfterStaticGeneration(brief.approved_at)
+      await admin!.from("creative_briefs").update({ status: nextStatus }).eq("id", brief.id)
       return NextResponse.json({ ok: true, asset })
     } catch (err) {
       const message = err instanceof Error ? err.message : "SVG generation failed"

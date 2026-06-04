@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 
+import { resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
 import { buildAdName } from "@/lib/agent/naming-builder"
 import { DEFAULT_HOST_HEADLINE, SPLIT_HEADER_DEFAULTS, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
 import type { VideoConfig } from "@/lib/agent/types"
@@ -77,7 +78,7 @@ export type StructuredBriefEditorState = {
   video_copy_variants: VideoCopyVariantRow[]
 }
 
-type CreativeBriefLike = {
+export type CreativeBriefLike = {
   id: string
   trigger_type: string | null
   trigger_data: Record<string, unknown> | null
@@ -157,6 +158,7 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
   const svg_variations = parseSvgVariations(td.svg_variations)
   const formatsFromSc = Array.isArray(sc.formats) ? sc.formats.map(String) : []
   const formatsFromBrief = (brief.format ?? "1x1,9x16").split(/[,/+\s]+/).filter(Boolean)
+  const resolvedCopy = resolveBriefCopyForMeta(brief)
 
   return {
     id: brief.id,
@@ -167,10 +169,10 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
     hook: brief.hook ?? "",
     format: brief.format ?? "1x1,9x16",
     visual_direction: brief.visual_direction ?? "",
-    copy_primary: brief.copy_primary ?? "",
-    copy_headline: brief.copy_headline ?? "",
-    copy_subtext: brief.copy_subtext ?? "",
-    cta: brief.cta ?? "",
+    copy_primary: brief.copy_primary ?? resolvedCopy.copy_primary,
+    copy_headline: brief.copy_headline ?? resolvedCopy.copy_headline,
+    copy_subtext: brief.copy_subtext ?? resolvedCopy.copy_subtext,
+    cta: brief.cta ?? resolvedCopy.cta,
     campaign_short_name: brief.campaign_short_name ?? "",
     rationale: brief.rationale ?? "",
     variations: clampVariations(Number(sc.variations ?? td.variations ?? 1)),

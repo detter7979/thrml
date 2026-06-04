@@ -22,4 +22,28 @@ describe("buildPlacementAssetFeedSpec", () => {
     expect(spec.optimization_type).toBe("PLACEMENT")
     expect(spec.call_to_action_types[0]).toBe("SIGN_UP")
   })
+
+  it("uses facebook-only rules when Instagram is not configured", () => {
+    const spec = buildPlacementAssetFeedSpec({
+      images: [
+        { format: "1x1", imageHash: "h1" },
+        { format: "9x16", imageHash: "h2" },
+      ],
+      landingUrl: "https://usethrml.com/become-a-host",
+      primaryCopy: "Primary",
+      headline: "Headline",
+      description: "Desc",
+      brief: { cta: "List Your Space" },
+      includeInstagram: false,
+    })
+    const storyRule = spec.asset_customization_rules.find(
+      (rule) =>
+        typeof rule === "object" &&
+        rule &&
+        (rule as { image_label?: { name?: string } }).image_label?.name === "thrml_story"
+    ) as { customization_spec?: { publisher_platforms?: string[]; facebook_positions?: string[] } }
+    expect(storyRule?.customization_spec?.publisher_platforms).toEqual(["facebook"])
+    expect(storyRule?.customization_spec?.facebook_positions).toContain("story")
+    expect(storyRule?.customization_spec?.facebook_positions).not.toContain("facebook_reels")
+  })
 })

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest"
 
-import { canLaunchAsPlacementBundle } from "@/lib/agent/launch-creative-bundle"
+import {
+  canLaunchAsPlacementBundle,
+  selectPlacementBundleAssets,
+} from "@/lib/agent/launch-creative-bundle"
 
 describe("canLaunchAsPlacementBundle", () => {
   const base = {
@@ -29,5 +32,15 @@ describe("canLaunchAsPlacementBundle", () => {
         { ...base, id: "2", format: "9x16", variation_label: "B" },
       ])
     ).toBe(false)
+  })
+
+  it("selects the largest same-variation format set", () => {
+    const picked = selectPlacementBundleAssets([
+      { ...base, id: "1", format: "1x1" },
+      { ...base, id: "2", format: "9x16" },
+      { ...base, id: "3", format: "4x5" },
+      { ...base, id: "4", format: "1x1", variation_label: "B" },
+    ])
+    expect(picked.map((row) => row.format).sort()).toEqual(["1x1", "4x5", "9x16"])
   })
 })

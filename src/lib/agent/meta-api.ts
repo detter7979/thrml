@@ -15,6 +15,21 @@ export function getMetaAdAccountId() {
   return id.startsWith("act_") ? id : `act_${id.replace(/^act_/, "")}`
 }
 
+export function getMetaPageId() {
+  const id = process.env.META_PAGE_ID?.trim()
+  if (!id) throw new Error("META_PAGE_ID is not set")
+  return id
+}
+
+/** Instagram business/creator account id for placement creatives (optional). */
+export function getMetaInstagramUserId(): string | null {
+  return (
+    process.env.META_INSTAGRAM_ACCOUNT_ID?.trim() ||
+    process.env.META_INSTAGRAM_USER_ID?.trim() ||
+    null
+  )
+}
+
 function token() {
   return getMetaMarketingApiToken()
 }

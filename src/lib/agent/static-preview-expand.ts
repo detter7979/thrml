@@ -15,6 +15,7 @@ import {
   generateFromSvgTemplate,
   type SvgStaticFormat,
 } from "@/lib/agent/svg-template-generator"
+import { statusAfterStaticGeneration } from "@/lib/agent/creative-brief-status"
 import {
   missingFormatsForVariation,
   normalizeStaticFormat,
@@ -339,7 +340,15 @@ async function expandPhotoStaticSizesFromAsset(opts: {
     assetIds.push(assetId)
   }
 
-  await admin.from("creative_briefs").update({ status: "variations_ready" }).eq("id", opts.brief.id)
+  const { data: briefRow } = await admin
+    .from("creative_briefs")
+    .select("approved_at")
+    .eq("id", opts.brief.id)
+    .maybeSingle()
+  await admin
+    .from("creative_briefs")
+    .update({ status: statusAfterStaticGeneration(briefRow?.approved_at) })
+    .eq("id", opts.brief.id)
 
   return { generated: assetIds.length, assetIds }
 }
@@ -402,7 +411,15 @@ async function expandSvgStaticSizesFromAsset(opts: {
     assetIds.push(result.assetId)
   }
 
-  await admin.from("creative_briefs").update({ status: "variations_ready" }).eq("id", opts.brief.id)
+  const { data: briefRow } = await admin
+    .from("creative_briefs")
+    .select("approved_at")
+    .eq("id", opts.brief.id)
+    .maybeSingle()
+  await admin
+    .from("creative_briefs")
+    .update({ status: statusAfterStaticGeneration(briefRow?.approved_at) })
+    .eq("id", opts.brief.id)
 
   return { generated: assetIds.length, assetIds }
 }

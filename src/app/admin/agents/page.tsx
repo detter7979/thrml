@@ -10,10 +10,16 @@ import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-stati
 import { resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
 import {
   canLaunchAsPlacementBundle,
+  selectPlacementBundleAssets,
   toLaunchableAssetRow,
   validatePlacementBundle,
 } from "@/lib/agent/launch-creative-bundle"
-import { buildOutFormatsForAsset, nextVariationLabelsForBrief } from "@/lib/agent/static-brief-plan"
+import {
+  buildOutFormatsForAsset,
+  missingFormatsForVariation,
+  nextVariationLabelsForBrief,
+  targetFormatsForBrief,
+} from "@/lib/agent/static-brief-plan"
 import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
 import { CreativePipelinePurgePanel } from "@/components/admin/creative/creative-pipeline-purge-panel"
@@ -603,6 +609,46 @@ export default function AgentsDashboard() {
     }
   }
 
+  const buildAllMissingSizes = async (
+    brief: CreativeBrief,
+    assets: CreativeAsset[],
+    variationLabel = "A"
+  ) => {
+    const anchor =
+      assets.find(
+        (asset) =>
+          (asset.variation_label ?? "A").toUpperCase().slice(0, 1) ===
+          variationLabel.toUpperCase().slice(0, 1)
+      ) ?? assets[0]
+    if (!anchor) {
+      setPipelineMessage("Generate a preview asset first.")
+      return
+    }
+    const missing = missingFormatsForVariation(
+      targetFormatsForBrief(brief),
+      assets,
+      variationLabel
+    )
+    if (!missing.length) {
+      setPipelineMessage("All target sizes already exist for this variation.")
+      return
+    }
+    await expandStaticSizes(anchor.id, missing)
+  }
+
+  const openPlacementBundleLaunch = (assets: CreativeAsset[]) => {
+    const rows = selectPlacementBundleAssets(assets.map(toLaunchableAssetRow))
+    if (rows.length < 2) {
+      const err = validatePlacementBundle(assets.map(toLaunchableAssetRow))
+      setPipelineMessage(
+        err ??
+          "Approve at least two different formats (1×1, 4×5, 9×16) for the same variation, then launch."
+      )
+      return
+    }
+    openLaunchModal(rows.map((row) => row.id))
+  }
+
   const approveAll = async (assets: CreativeAsset[]) => {
     setBusyAction(`approve-all-${assets[0]?.brief_id ?? "unlinked"}`)
     setPipelineMessage(null)
@@ -873,6 +919,18 @@ export default function AgentsDashboard() {
     if (launchAsPlacementBundle || activeLaunchAssets.length < 2) return null
     return validatePlacementBundle(launchBundleRows)
   }, [launchAsPlacementBundle, activeLaunchAssets.length, launchBundleRows])
+
+  const launchBundleDisabledReason = useMemo(() => {
+    if (!selectedAdsetId) return "Select a target ad set."
+    if (launchAsPlacementBundle) return placementBundleBlockReason
+    if (activeLaunchAssets.length > 1) return placementBundleBlockReason
+    return null
+  }, [
+    selectedAdsetId,
+    launchAsPlacementBundle,
+    placementBundleBlockReason,
+    activeLaunchAssets.length,
+  ])
 
   const TABS = [
     { key: "overview", label: `Overview${criticalCount > 0 ? ` 🚨${criticalCount}` : ""}` },
@@ -1412,6 +1470,16 @@ export default function AgentsDashboard() {
                     {assetsByBrief.map((group) => {
                   const selected = selectedForBrief(group.briefId)
                   const selectedApproved = selected.filter((asset) => asset.status === "approved")
+                  const bundleAssets = selectPlacementBundleAssets(
+                    group.assets.map(toLaunchableAssetRow)
+                  )
+                  const missingSizes =
+                    group.brief &&
+                    missingFormatsForVariation(
+                      targetFormatsForBrief(group.brief),
+                      group.assets,
+                      group.assets[0]?.variation_label ?? "A"
+                    )
                   const planLabels = group.brief
                     ? parseStoredStaticVariations(group.brief.trigger_data)?.map((row) => row.variation_label)
                     : undefined
@@ -1435,6 +1503,23 @@ export default function AgentsDashboard() {
                           )}
                         </p>
                         <p className="text-xs text-muted-foreground">{shortText(group.brief?.hypothesis, 140)}</p>
+                        {missingSizes && missingSizes.length > 0 ? (
+                          <p className="mt-1 text-xs text-amber-800">
+                            Missing sizes for variation A: {missingSizes.join(", ")}. Build them before a
+                            multi-placement launch.
+                          </p>
+                        ) : null}
+                        {bundleAssets.length >= 2 ? (
+                          <p className="mt-1 text-xs text-green-800">
+                            Ready for one Meta ad with {bundleAssets.length} placement
+                            {bundleAssets.length === 1 ? "" : "s"} (
+                            {bundleAssets
+                              .map((row) => row.format)
+                              .filter(Boolean)
+                              .join(", ")}
+                            ).
+                          </p>
+                        ) : null}
                         {group.brief ? (
                           <button
                             type="button"
@@ -1560,6 +1645,21 @@ export default function AgentsDashboard() {
                               New variation {label} preview
                             </button>
                           ))}
+                        {group.brief && missingSizes && missingSizes.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void buildAllMissingSizes(group.brief!, group.assets, "A")
+                            }
+                            disabled={
+                              busyAction === `expand-${group.assets[0]?.id}` ||
+                              busyAction?.startsWith(`expand-${group.assets[0]?.id}-`) === true
+                            }
+                            className="text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
+                          >
+                            Build all missing sizes
+                          </button>
+                        ) : null}
                         <button
                           onClick={() => approveAll(group.assets)}
                           disabled={busyAction === `approve-all-${group.briefId}`}
@@ -1567,6 +1667,15 @@ export default function AgentsDashboard() {
                         >
                           Approve all
                         </button>
+                        {bundleAssets.length >= 2 ? (
+                          <button
+                            type="button"
+                            onClick={() => openPlacementBundleLaunch(group.assets)}
+                            className="text-xs px-3 py-1.5 bg-[#9A4A33] text-white rounded hover:opacity-90"
+                          >
+                            Launch 1 ad ({bundleAssets.length} sizes)
+                          </button>
+                        ) : null}
                         <button
                           onClick={() => openLaunchModal(selectedApproved.map((asset) => asset.id))}
                           disabled={selectedApproved.length === 0}
@@ -1898,7 +2007,10 @@ export default function AgentsDashboard() {
               </button>
               <button
                 onClick={launchCreative}
-                disabled={!selectedAdsetId || busyAction === "launch-creative"}
+                disabled={
+                  Boolean(launchBundleDisabledReason) || busyAction === "launch-creative"
+                }
+                title={launchBundleDisabledReason ?? undefined}
                 className="text-sm px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
               >
                 {launchAsPlacementBundle

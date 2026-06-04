@@ -49,6 +49,38 @@ export function placementBundleFormats(assets: LaunchableAssetRow[]): StaticForm
     .filter((value): value is StaticFormat => Boolean(value))
 }
 
+/** Best set of approved, unlaunched static assets for one placement-bundle ad (same brief + variation). */
+export function selectPlacementBundleAssets(
+  assets: LaunchableAssetRow[]
+): LaunchableAssetRow[] {
+  const eligible = assets.filter(
+    (asset) =>
+      isLaunchableStaticImage(asset) &&
+      asset.status === "approved" &&
+      !asset.meta_ad_id &&
+      asset.brief_id
+  )
+  if (eligible.length < 2) return []
+
+  const byBriefVariation = new Map<string, LaunchableAssetRow[]>()
+  for (const asset of eligible) {
+    const label = (asset.variation_label ?? "A").toUpperCase().slice(0, 1)
+    const key = `${asset.brief_id}:${label}`
+    const list = byBriefVariation.get(key) ?? []
+    list.push(asset)
+    byBriefVariation.set(key, list)
+  }
+
+  let best: LaunchableAssetRow[] = []
+  for (const group of byBriefVariation.values()) {
+    const formats = placementBundleFormats(group)
+    if (formats.length !== group.length) continue
+    if (new Set(formats).size !== formats.length) continue
+    if (group.length > best.length) best = group
+  }
+  return best
+}
+
 export function canLaunchAsPlacementBundle(assets: LaunchableAssetRow[]): boolean {
   if (assets.length < 2) return false
   if (!assets.every(isLaunchableStaticImage)) return false

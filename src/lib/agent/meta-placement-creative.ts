@@ -12,30 +12,41 @@ const FORMAT_LABEL: Record<StaticFormat, string> = {
   "9x16": "thrml_story",
 }
 
-/** Placement targeting per aspect ratio (Placement Asset Customization). */
+/** Placement targeting per aspect ratio — positions must match Meta Marketing API enums. */
 const FORMAT_RULE_SPEC: Record<
   StaticFormat,
   {
-    publisher_platforms: string[]
     facebook_positions: string[]
     instagram_positions: string[]
   }
 > = {
   "1x1": {
-    publisher_platforms: ["facebook", "instagram"],
     facebook_positions: ["feed", "right_hand_column", "marketplace"],
-    instagram_positions: ["stream", "explore"],
+    instagram_positions: ["stream", "explore", "profile_feed"],
   },
   "4x5": {
-    publisher_platforms: ["facebook", "instagram"],
     facebook_positions: ["feed", "marketplace"],
     instagram_positions: ["stream", "explore", "profile_feed"],
   },
   "9x16": {
-    publisher_platforms: ["facebook", "instagram"],
-    facebook_positions: ["story", "facebook_reels_overlay", "facebook_reels"],
-    instagram_positions: ["story", "reels", "profile_reels", "ig_search"],
+    facebook_positions: ["story", "video_feeds"],
+    instagram_positions: ["story", "explore", "ig_search"],
   },
+}
+
+function customizationSpecFor(format: StaticFormat, includeInstagram: boolean) {
+  const rule = FORMAT_RULE_SPEC[format]
+  if (includeInstagram) {
+    return {
+      publisher_platforms: ["facebook", "instagram"],
+      facebook_positions: rule.facebook_positions,
+      instagram_positions: rule.instagram_positions,
+    }
+  }
+  return {
+    publisher_platforms: ["facebook"],
+    facebook_positions: rule.facebook_positions,
+  }
 }
 
 const FORMAT_PRIORITY: StaticFormat[] = ["1x1", "4x5", "9x16"]
@@ -60,7 +71,10 @@ export function buildPlacementAssetFeedSpec(params: {
     cta?: string | null
     trigger_data?: Record<string, unknown> | null
   }
+  /** When false, rules target Facebook only (no META_INSTAGRAM_ACCOUNT_ID). */
+  includeInstagram?: boolean
 }) {
+  const includeInstagram = params.includeInstagram !== false
   const sorted = sortPlacementFormats(params.images.map((row) => row.format))
   const imageByFormat = new Map(params.images.map((row) => [row.format, row.imageHash]))
   const defaultFormat = sorted.includes("1x1") ? "1x1" : sorted[0]
@@ -82,7 +96,7 @@ export function buildPlacementAssetFeedSpec(params: {
   for (const format of sorted) {
     if (format === defaultFormat) continue
     assetCustomizationRules.push({
-      customization_spec: FORMAT_RULE_SPEC[format],
+      customization_spec: customizationSpecFor(format, includeInstagram),
       image_label: { name: labelForPlacementFormat(format) },
     })
   }
@@ -90,7 +104,7 @@ export function buildPlacementAssetFeedSpec(params: {
   if (assetCustomizationRules.length < 2) {
     const only = sorted[0]
     assetCustomizationRules.push({
-      customization_spec: FORMAT_RULE_SPEC[only],
+      customization_spec: customizationSpecFor(only, includeInstagram),
       image_label: { name: labelForPlacementFormat(only) },
     })
   }

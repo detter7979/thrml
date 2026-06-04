@@ -21,7 +21,9 @@ import {
 import { normalizeStaticFormat } from "@/lib/agent/static-brief-plan"
 import {
   getMetaAdAccountId,
+  getMetaInstagramUserId,
   getMetaMarketingApiToken,
+  getMetaPageId,
 } from "@/lib/agent/meta-api"
 import { uploadVideo } from "@/lib/agent/meta-video-upload"
 import { requireAdminApi } from "@/lib/admin-guard"
@@ -230,14 +232,18 @@ async function createMetaPlacementCreative(params: {
   token: string
   adAccountId: string
   pageId: string
+  instagramUserId?: string | null
   name: string
   assetFeedSpec: ReturnType<typeof buildPlacementAssetFeedSpec>
 }) {
+  const objectStorySpec: Record<string, string> = { page_id: params.pageId }
+  if (params.instagramUserId) {
+    objectStorySpec.instagram_user_id = params.instagramUserId
+  }
+
   const body = {
     name: params.name,
-    object_story_spec: {
-      page_id: params.pageId,
-    },
+    object_story_spec: objectStorySpec,
     asset_feed_spec: params.assetFeedSpec,
   }
 
@@ -462,6 +468,7 @@ async function launchPlacementBundle(params: {
   )
 
   const launchCopy = resolvedLaunchCopyStrings(brief)
+  const instagramUserId = getMetaInstagramUserId()
   const assetFeedSpec = buildPlacementAssetFeedSpec({
     images: placementImages,
     landingUrl,
@@ -469,12 +476,14 @@ async function launchPlacementBundle(params: {
     headline: launchCopy.headline,
     description: metaSubtext,
     brief,
+    includeInstagram: Boolean(instagramUserId),
   })
 
   const metaCreativeId = await createMetaPlacementCreative({
     token: params.token,
     adAccountId: params.adAccountId,
     pageId: params.pageId,
+    instagramUserId,
     name: adName,
     assetFeedSpec,
   })
@@ -525,6 +534,7 @@ async function launchPlacementBundle(params: {
     formats,
     assetIds: assets.map((asset) => asset.id),
     metaCtaType: ctaToMetaEnumFromBrief(brief),
+    placementPlatforms: instagramUserId ? "facebook+instagram" : "facebook",
     adsManagerUrl: adsManagerUrl(params.adAccountId, metaAdId),
   })
 }
@@ -577,7 +587,7 @@ export async function POST(req: NextRequest) {
       )
     }
     console.log("[launch-creative] using ad account", adAccountId)
-    const pageId = requiredEnv("META_PAGE_ID")
+    const pageId = getMetaPageId()
 
     const launchStatus: LaunchStatus =
       body?.status === "ACTIVE" ? "ACTIVE" : "PAUSED"

@@ -18,12 +18,13 @@ import {
 import { uploadBufferToCreativeObject, refreshCreativeAssetUrl } from "@/lib/agent/gcs"
 import { parseAdName } from "@/lib/agent/naming-builder"
 
-const CREATIVE_BUILDER_TAB_CANDIDATES = [
-  "④ Creative Builder",
-  "Creative Builder",
+/** thrml_namer_v4 uses "Ad Builder"; older docs reference "Creative Builder". */
+export const CREATIVE_BUILDER_TAB_CANDIDATES = [
   "Ad Builder",
   "② Ad Builder",
   "2 Ad Builder",
+  "④ Creative Builder",
+  "Creative Builder",
 ]
 
 /** thrml_namer_v4 — canonical Creative Builder destination. */

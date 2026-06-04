@@ -21,10 +21,13 @@ import {
 import { normalizeStaticFormat } from "@/lib/agent/static-brief-plan"
 import {
   getMetaAdAccountId,
-  getMetaInstagramUserId,
   getMetaMarketingApiToken,
   getMetaPageId,
 } from "@/lib/agent/meta-api"
+import {
+  metaInstagramAccountMissingHint,
+  resolveMetaInstagramActorId,
+} from "@/lib/agent/meta-instagram-account"
 import { uploadVideo } from "@/lib/agent/meta-video-upload"
 import { requireAdminApi } from "@/lib/admin-guard"
 
@@ -130,6 +133,9 @@ function formatMetaActionError(action: string, payload: unknown): string {
       "(ads_management), then regenerate the system user token in Business Settings if needed."
     )
   }
+  if (err?.code === 100 && err.error_subcode === 1772103) {
+    return `${base} — ${metaInstagramAccountMissingHint()}`
+  }
   return base
 }
 
@@ -232,13 +238,14 @@ async function createMetaPlacementCreative(params: {
   token: string
   adAccountId: string
   pageId: string
-  instagramUserId?: string | null
+  instagramActorId?: string | null
   name: string
   assetFeedSpec: ReturnType<typeof buildPlacementAssetFeedSpec>
 }) {
   const objectStorySpec: Record<string, string> = { page_id: params.pageId }
-  if (params.instagramUserId) {
-    objectStorySpec.instagram_user_id = params.instagramUserId
+  if (params.instagramActorId) {
+    objectStorySpec.instagram_actor_id = params.instagramActorId
+    objectStorySpec.instagram_user_id = params.instagramActorId
   }
 
   const body = {
@@ -468,34 +475,93 @@ async function launchPlacementBundle(params: {
   )
 
   const launchCopy = resolvedLaunchCopyStrings(brief)
-  const instagramUserId = getMetaInstagramUserId()
-  const assetFeedSpec = buildPlacementAssetFeedSpec({
+  const instagram = await resolveMetaInstagramActorId({
+    pageId: params.pageId,
+    adAccountId: params.adAccountId,
+    token: params.token,
+  })
+  if (instagram.diagnostics.length) {
+    console.log("[launch-creative] instagram resolve", {
+      source: instagram.source,
+      id: instagram.id,
+      diagnostics: instagram.diagnostics,
+    })
+  }
+
+  let instagramActorId = instagram.id
+  let placementPlatforms: "facebook+instagram" | "facebook" | "facebook-fallback" =
+    instagramActorId ? "facebook+instagram" : "facebook"
+  let assetFeedSpec = buildPlacementAssetFeedSpec({
     images: placementImages,
     landingUrl,
     primaryCopy: launchCopy.primaryCopy,
     headline: launchCopy.headline,
     description: metaSubtext,
     brief,
-    includeInstagram: Boolean(instagramUserId),
+    includeInstagram: Boolean(instagramActorId),
   })
 
-  const metaCreativeId = await createMetaPlacementCreative({
+  let metaCreativeId = await createMetaPlacementCreative({
     token: params.token,
     adAccountId: params.adAccountId,
     pageId: params.pageId,
-    instagramUserId,
+    instagramActorId,
     name: adName,
     assetFeedSpec,
   })
 
-  const metaAdId = await createMetaAd({
-    token: params.token,
-    adAccountId: params.adAccountId,
-    adsetId: params.adsetId,
-    creativeId: metaCreativeId,
-    name: adName,
-    status: params.launchStatus,
-  })
+  let metaAdId: string
+  try {
+    metaAdId = await createMetaAd({
+      token: params.token,
+      adAccountId: params.adAccountId,
+      adsetId: params.adsetId,
+      creativeId: metaCreativeId,
+      name: adName,
+      status: params.launchStatus,
+    })
+  } catch (adError) {
+    const adErrorMessage = adError instanceof Error ? adError.message : ""
+    if (
+      instagramActorId &&
+      (adErrorMessage.includes("1772103") ||
+        adErrorMessage.includes("Instagram Account Is Missing"))
+    ) {
+      console.warn(
+        "[launch-creative] Instagram ad create failed (1772103); retrying Facebook-only placement bundle",
+        { diagnostics: instagram.diagnostics }
+      )
+      instagramActorId = null
+      placementPlatforms = "facebook-fallback"
+      assetFeedSpec = buildPlacementAssetFeedSpec({
+        images: placementImages,
+        landingUrl,
+        primaryCopy: launchCopy.primaryCopy,
+        headline: launchCopy.headline,
+        description: metaSubtext,
+        brief,
+        includeInstagram: false,
+      })
+      metaCreativeId = await createMetaPlacementCreative({
+        token: params.token,
+        adAccountId: params.adAccountId,
+        pageId: params.pageId,
+        instagramActorId: null,
+        name: `${adName}_fb`,
+        assetFeedSpec,
+      })
+      metaAdId = await createMetaAd({
+        token: params.token,
+        adAccountId: params.adAccountId,
+        adsetId: params.adsetId,
+        creativeId: metaCreativeId,
+        name: `${adName}_fb`,
+        status: params.launchStatus,
+      })
+    } else {
+      throw adError
+    }
+  }
 
   const launchedAt = new Date().toISOString()
   const formats = placementImages.map((row) => row.format)
@@ -534,7 +600,10 @@ async function launchPlacementBundle(params: {
     formats,
     assetIds: assets.map((asset) => asset.id),
     metaCtaType: ctaToMetaEnumFromBrief(brief),
-    placementPlatforms: instagramUserId ? "facebook+instagram" : "facebook",
+    placementPlatforms,
+    instagramActorSource: instagram.source,
+    instagramActorId: instagramActorId ?? null,
+    instagramDiagnostics: instagram.diagnostics,
     adsManagerUrl: adsManagerUrl(params.adAccountId, metaAdId),
   })
 }

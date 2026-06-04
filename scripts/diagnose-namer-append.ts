@@ -8,6 +8,7 @@ import { config } from "dotenv"
 
 import {
   appendApprovedCreativeToNamer,
+  CREATIVE_BUILDER_TAB_CANDIDATES,
   resolveNamerSheetId,
   THRML_NAMER_V4_SHEET_ID,
 } from "@/lib/agent/namer-creative-append"
@@ -85,10 +86,10 @@ async function main() {
     try {
       const sheets = createGoogleSheetsClient()
       const tabs = await listSpreadsheetTabs(sheets, resolvedSheetId)
-      const tab = resolveTabTitle(tabs, "④ Creative Builder", "Creative Builder")
+      const tab = resolveTabTitle(tabs, ...CREATIVE_BUILDER_TAB_CANDIDATES)
       console.log("\n=== Sheet access ===")
       console.log("Tabs:", tabs.join(" | "))
-      console.log("Creative Builder tab:", tab ?? "(not found)")
+      console.log("Namer append tab (Ad/Creative Builder):", tab ?? "(not found)")
     } catch (err) {
       console.log("\n=== Sheet access FAILED ===")
       console.log(err instanceof Error ? err.message : err)

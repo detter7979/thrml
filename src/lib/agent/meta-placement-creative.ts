@@ -12,7 +12,11 @@ const FORMAT_LABEL: Record<StaticFormat, string> = {
   "9x16": "thrml_story",
 }
 
-/** Placement targeting per aspect ratio — positions must match Meta Marketing API enums. */
+/**
+ * Placement targeting per aspect ratio (Meta API enums only).
+ * Default creative (is_default rule) uses 1x1 — these specs apply only where that ratio is required.
+ * 4x5 / 9x16 must not include feed/stream slots already covered by the 1x1 default.
+ */
 const FORMAT_RULE_SPEC: Record<
   StaticFormat,
   {
@@ -21,12 +25,12 @@ const FORMAT_RULE_SPEC: Record<
   }
 > = {
   "1x1": {
-    facebook_positions: ["feed", "right_hand_column", "marketplace"],
-    instagram_positions: ["stream", "explore", "profile_feed"],
+    facebook_positions: ["feed", "right_hand_column", "marketplace", "search"],
+    instagram_positions: ["stream", "explore", "profile_feed", "ig_search"],
   },
   "4x5": {
-    facebook_positions: ["feed", "marketplace"],
-    instagram_positions: ["stream", "explore", "profile_feed"],
+    facebook_positions: ["marketplace"],
+    instagram_positions: ["profile_feed"],
   },
   "9x16": {
     facebook_positions: ["story", "video_feeds"],
@@ -77,7 +81,8 @@ export function buildPlacementAssetFeedSpec(params: {
   const includeInstagram = params.includeInstagram !== false
   const sorted = sortPlacementFormats(params.images.map((row) => row.format))
   const imageByFormat = new Map(params.images.map((row) => [row.format, row.imageHash]))
-  const defaultFormat = sorted.includes("1x1") ? "1x1" : sorted[0]
+  /** Feed + most placements use square unless a format-specific rule matches first. */
+  const defaultFormat: StaticFormat = sorted.includes("1x1") ? "1x1" : sorted[0]
   const ctaType = ctaToMetaEnumFromBrief(params.brief)
 
   const images = sorted.map((format) => ({

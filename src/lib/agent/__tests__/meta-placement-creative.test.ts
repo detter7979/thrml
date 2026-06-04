@@ -21,6 +21,10 @@ describe("buildPlacementAssetFeedSpec", () => {
     expect(spec.asset_customization_rules.length).toBeGreaterThanOrEqual(2)
     expect(spec.optimization_type).toBe("PLACEMENT")
     expect(spec.call_to_action_types[0]).toBe("SIGN_UP")
+    const defaultRule = spec.asset_customization_rules.find(
+      (rule) => (rule as { is_default?: boolean }).is_default
+    ) as { image_label?: { name?: string } }
+    expect(defaultRule?.image_label?.name).toBe("thrml_square")
   })
 
   it("uses facebook-only rules when Instagram is not configured", () => {

@@ -18,6 +18,13 @@ import {
 import { fetchMetaAd, fetchMetaAdSet } from "@/lib/agent/namer-meta-client"
 import { uploadBufferToCreativeObject, refreshCreativeAssetUrl } from "@/lib/agent/gcs"
 import { parseAdName } from "@/lib/agent/naming-builder"
+import { allocateNextThrmlLegacyId } from "@/lib/agent/namer-legacy-ids"
+import {
+  AD_BUILDER_ENSURE_COLUMNS,
+  HEADER_PATTERNS,
+  type MetaPlatformIds,
+} from "@/lib/agent/namer-sheet-schema"
+import { resolveThrmlLegacyIdsFromPlatform } from "@/lib/agent/namer-thrml-id-resolve"
 
 /** thrml_namer_v4 uses "Ad Builder"; older docs reference "Creative Builder". */
 export const CREATIVE_BUILDER_TAB_CANDIDATES = [
@@ -108,12 +115,7 @@ export type NamerCreativeAppendResult = {
   assetGcsLink?: string
 }
 
-/** Meta platform object IDs written to Ad Builder after launch (not convention tokens). */
-export type MetaPlatformIds = {
-  adId: string
-  adSetId: string
-  campaignId: string
-}
+export type { MetaPlatformIds } from "@/lib/agent/namer-sheet-schema"
 
 export type NamerPlatformSyncResult = {
   ok: boolean
@@ -235,7 +237,10 @@ export function normalizeTestId(testId: string): string {
 
 function extendedHeadersForLayout(layout: NamerSheetLayout, headers: string[]): readonly string[] {
   const hasGcsPath = colIndex(headers, [/^gcs path$/i]) >= 0
-  if (layout === "ad_builder" || hasGcsPath) return NAMER_EXTENDED_HEADERS_AD_BUILDER
+  if (layout === "ad_builder") {
+    return [...new Set([...AD_BUILDER_ENSURE_COLUMNS, ...NAMER_EXTENDED_HEADERS_AD_BUILDER])]
+  }
+  if (hasGcsPath) return NAMER_EXTENDED_HEADERS_AD_BUILDER
   return NAMER_EXTENDED_HEADERS_WITH_LINK
 }
 
@@ -383,7 +388,7 @@ export function buildNamerCreativeRow(
   provenance: { campaignGen: ProvenanceLabel; adSetGen: ProvenanceLabel },
   links: { gcsPath: string; signedUrl: string },
   layout: NamerSheetLayout = "creative_builder",
-  platformIds?: MetaPlatformIds
+  thrmlIds?: { campaignId: string; adSetId: string; adId: string }
 ): NamerCreativeRow | null {
   const conventionName = asset.convention_name?.trim()
   if (!conventionName) return null
@@ -398,9 +403,9 @@ export function buildNamerCreativeRow(
   const gcsPath = normalizeNamerGcsPath(links.gcsPath)
 
   return {
-    adId: platformIds?.adId?.trim() ?? "",
-    adSetId: platformIds?.adSetId?.trim() ?? "",
-    campaignId: platformIds?.campaignId?.trim() ?? "",
+    adId: thrmlIds?.adId?.trim() ?? "",
+    adSetId: thrmlIds?.adSetId?.trim() ?? "",
+    campaignId: thrmlIds?.campaignId?.trim() ?? "",
     testId: normalizeTestId(tokens.testId),
     variant: tokens.variant.toUpperCase().slice(0, 1),
     angle: tokens.angle,
@@ -772,7 +777,8 @@ async function loadPreparedSheetTab(
 function mapRowToHeaderColumns(
   headers: string[],
   row: NamerCreativeRow,
-  layout: NamerSheetLayout
+  layout: NamerSheetLayout,
+  platformIds?: MetaPlatformIds
 ): string[] {
   const values = new Array(headers.length).fill("")
   const set = (patterns: RegExp[], value: string) => {
@@ -780,9 +786,14 @@ function mapRowToHeaderColumns(
     if (idx >= 0) values[idx] = value
   }
 
-  set([/^ad id$/i], row.adId)
-  set([/^ad set id$/i, /^adset id$/i], row.adSetId)
-  set([/^campaign id$/i, /^campaign name \(ref\)$/i], row.campaignId)
+  set(HEADER_PATTERNS.thrmlAdId, row.adId)
+  set(HEADER_PATTERNS.thrmlAdSetId, row.adSetId)
+  set(HEADER_PATTERNS.thrmlCampaignId, row.campaignId)
+  if (platformIds) {
+    set(HEADER_PATTERNS.platformCampaignId, platformIds.campaignId)
+    set(HEADER_PATTERNS.platformAdSetId, platformIds.adSetId)
+    set(HEADER_PATTERNS.platformAdId, platformIds.adId)
+  }
 
   if (layout === "ad_builder") {
     set([/^test$/i, /^test id$/i], row.testId)
@@ -792,7 +803,6 @@ function mapRowToHeaderColumns(
     set([/^size$/i], row.sizeToken)
     set([/^video length$/i], row.videoLength)
     set([/^gcs path$/i], row.assetGcsPath)
-    set([/^platform ad id$/i], row.adId)
   } else if (layout === "creative_builder") {
     set([/^test id$/i], row.testId)
     set([/^variant$/i], row.variant)
@@ -877,14 +887,49 @@ export function buildPlatformIdSheetUpdates(
     })
   }
 
-  add([/^ad id$/i], ids.adId)
-  add([/^ad set id$/i, /^adset id$/i], ids.adSetId)
-  add([/^campaign id$/i, /^campaign name \(ref\)$/i], ids.campaignId)
-  if (layout === "ad_builder") {
-    add([/^platform ad id$/i], ids.adId)
-  }
+  add(HEADER_PATTERNS.platformCampaignId, ids.campaignId)
+  add(HEADER_PATTERNS.platformAdSetId, ids.adSetId)
+  add(HEADER_PATTERNS.platformAdId, ids.adId)
 
   return updates
+}
+
+export function buildThrmlIdSheetUpdates(
+  headers: string[],
+  sheetRow0Based: number,
+  tabTitle: string,
+  ids: { campaignId: string; adSetId: string; adId: string }
+): { range: string; values: string[][] }[] {
+  const escapedTab = tabTitle.replace(/'/g, "''")
+  const row1 = sheetRow0Based + 1
+  const updates: { range: string; values: string[][] }[] = []
+  const add = (patterns: RegExp[], value: string) => {
+    const v = value.trim()
+    if (!v) return
+    const idx = colIndex(headers, patterns)
+    if (idx < 0) return
+    updates.push({
+      range: `'${escapedTab}'!${columnToLetter(idx)}${row1}`,
+      values: [[v]],
+    })
+  }
+
+  add(HEADER_PATTERNS.thrmlCampaignId, ids.campaignId)
+  add(HEADER_PATTERNS.thrmlAdSetId, ids.adSetId)
+  add(HEADER_PATTERNS.thrmlAdId, ids.adId)
+
+  return updates
+}
+
+function collectColumnValues(rows: string[][], headers: string[], patterns: RegExp[]): string[] {
+  const col = colIndex(headers, patterns)
+  if (col < 0) return []
+  const values: string[] = []
+  for (const row of rows) {
+    const v = (row[col] ?? "").trim()
+    if (v) values.push(v)
+  }
+  return values
 }
 
 /**
@@ -1007,16 +1052,14 @@ export async function syncNamerPlatformIdsForAssets(
       continue
     }
 
-    const rowUpdates = buildPlatformIdSheetUpdates(
-      headers,
-      sheetRow,
-      tabTitle,
-      platformIds,
-      headerInfo.layout
-    )
+    const thrmlIds = await resolveThrmlLegacyIdsFromPlatform(admin, platformIds)
+    const rowUpdates = [
+      ...buildPlatformIdSheetUpdates(headers, sheetRow, tabTitle, platformIds, headerInfo.layout),
+      ...buildThrmlIdSheetUpdates(headers, sheetRow, tabTitle, thrmlIds),
+    ]
     if (!rowUpdates.length) {
       skipped++
-      errors.push({ assetId, reason: "Sheet has no platform ID columns" })
+      errors.push({ assetId, reason: "Sheet has no platform or Thrml ID columns" })
       continue
     }
 
@@ -1112,6 +1155,12 @@ export async function appendApprovedCreativeToNamer(
   }
 
   const { rows: existingRows, headerInfo, headers } = sheetState
+  const dataRows = existingRows.slice(headerInfo.headerRow + 1)
+  const existingThrmlAdIds = collectColumnValues(dataRows, headers, HEADER_PATTERNS.thrmlAdId)
+  const thrmlIds = await resolveThrmlLegacyIdsFromPlatform(admin, platformIds)
+  if (!thrmlIds.adId) {
+    thrmlIds.adId = allocateNextThrmlLegacyId(existingThrmlAdIds, "ad")
+  }
 
   const row = buildNamerCreativeRow(
     asset as AssetRow,
@@ -1119,23 +1168,22 @@ export async function appendApprovedCreativeToNamer(
     provenance,
     { gcsPath: assetGcsPath, signedUrl },
     headerInfo.layout,
-    platformIds
+    thrmlIds
   )
   if (!row) {
     return { ok: true, skipped: true, reason: "Could not parse convention_name for namer row" }
   }
 
+  const patchIdCells = (sheetRow: number) => [
+    ...buildPlatformIdSheetUpdates(headers, sheetRow, tabTitle, platformIds, headerInfo.layout),
+    ...buildThrmlIdSheetUpdates(headers, sheetRow, tabTitle, thrmlIds),
+  ]
+
   for (let r = headerInfo.headerRow + 1; r < existingRows.length; r++) {
     const line = existingRows[r] ?? []
     if (rowHasAssetUuid(line, headers, assetId)) {
       const sheetRow = r
-      const idUpdates = buildPlatformIdSheetUpdates(
-        headers,
-        sheetRow,
-        tabTitle,
-        platformIds,
-        headerInfo.layout
-      )
+      const idUpdates = patchIdCells(sheetRow)
       if (idUpdates.length) {
         try {
           await batchWriteCells(sheets, sheetId, idUpdates)
@@ -1157,13 +1205,7 @@ export async function appendApprovedCreativeToNamer(
     }
     if (rowHasConventionName(line, headers, conventionName)) {
       const sheetRow = r
-      const idUpdates = buildPlatformIdSheetUpdates(
-        headers,
-        sheetRow,
-        tabTitle,
-        platformIds,
-        headerInfo.layout
-      )
+      const idUpdates = patchIdCells(sheetRow)
       if (idUpdates.length) {
         try {
           await batchWriteCells(sheets, sheetId, idUpdates)
@@ -1323,20 +1365,21 @@ export async function repairSyncedNamerRows(
     const signedUrl = await resolveAssetGcsLink(loaded.asset)
     const provenance = await resolveRegistryProvenance(admin, loaded.asset, conventionName)
     const platformIds = await resolveMetaPlatformIds(admin, loaded.asset)
+    const thrmlIds = await resolveThrmlLegacyIdsFromPlatform(admin, platformIds)
     const row = buildNamerCreativeRow(
       loaded.asset,
       loaded.brief,
       provenance,
       { gcsPath: loaded.asset.gcs_path ?? "", signedUrl },
       headerInfo.layout,
-      platformIds
+      thrmlIds.adId || thrmlIds.adSetId || thrmlIds.campaignId ? thrmlIds : undefined
     )
     if (!row) {
       errors.push(`${assetId}: could not build row`)
       continue
     }
 
-    const values = mapRowToHeaderColumns(headers, row, headerInfo.layout)
+    const values = mapRowToHeaderColumns(headers, row, headerInfo.layout, platformIds)
     const endCol = columnToLetter(headers.length - 1)
     const escapedTab = tabTitle.replace(/'/g, "''")
     const row1Based = sheetRow + 1

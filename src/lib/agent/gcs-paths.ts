@@ -1,5 +1,9 @@
 // Path builder utilities for thrml creative GCS buckets.
-// Unified taxonomy: {year}/{month}/{category}/{angle}/Static[/{templateSlug}]/{variant}_{format}.{ext}
+// Unified taxonomy:
+//   Static base:      {year}/{month}/{category}/{angle}/Static/base/[{templateSlug}/]base_{variant}_{format}.{ext}
+//   Static composite: {year}/{month}/{category}/{angle}/Static/composite/[{templateSlug}/]{variant}_{format}.{ext}
+//   Video base:       {year}/{month}/{category}/{angle}/Video/base/base_{asset}_v{n}.mp4
+//   Video composite:  {year}/{month}/{category}/{angle}/Video/composite/{variant}_9x16_v{n}.mp4
 // Legacy bases/renders paths remain readable via asset library.
 
 /** Legacy default when env is unset; prefer resolveCreativeBucketName() for writes/URLs. */
@@ -77,20 +81,20 @@ function slug(value: string): string {
 export function unifiedStaticBasePath(args: UnifiedStaticPathArgs): string {
   const ext = args.ext ?? "png"
   const templateSegment = args.templateSlug ? `${slug(args.templateSlug)}/` : ""
-  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/${templateSegment}base_${args.variant}_${args.format}.${ext}`
+  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/base/${templateSegment}base_${args.variant}_${args.format}.${ext}`
 }
 
 /** Unified static output path on main bucket. */
 export function unifiedStaticPath(args: UnifiedStaticPathArgs): string {
   const ext = args.ext ?? "png"
   const templateSegment = args.templateSlug ? `${slug(args.templateSlug)}/` : ""
-  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/${templateSegment}${args.variant}_${args.format}.${ext}`
+  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/composite/${templateSegment}${args.variant}_${args.format}.${ext}`
 }
 
 /** Unified video base path on creative bucket. */
 export function unifiedVideoBasePath(args: UnifiedVideoBasePathArgs): string {
   const { date, category, angleSlug, assetSlug, source, version = 1, taskId } = args
-  const prefix = `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video`
+  const prefix = `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/base`
   if (source === "runway") {
     if (!taskId) throw new Error("taskId required for runway source")
     return `${prefix}/base_${slug(assetSlug)}_runway_${taskId}.mp4`
@@ -101,7 +105,7 @@ export function unifiedVideoBasePath(args: UnifiedVideoBasePathArgs): string {
 /** Unified composited video render path on creative bucket. */
 export function unifiedVideoRenderPath(args: UnifiedVideoRenderPathArgs): string {
   const { date, category, angleSlug, variantSlug, templateVersion } = args
-  return `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/${slug(variantSlug)}_9x16_v${templateVersion}.mp4`
+  return `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/composite/${slug(variantSlug)}_9x16_v${templateVersion}.mp4`
 }
 
 /**
@@ -165,6 +169,8 @@ export function parseUnifiedPath(objectPath: string): {
   category?: string
   angle?: string
   mediaType?: "Static" | "Video"
+  /** base | composite when using split folders; undefined for legacy flat paths. */
+  assetStage?: "base" | "composite"
   filename?: string
 } | null {
   const parts = objectPath.split("/")
@@ -172,12 +178,17 @@ export function parseUnifiedPath(objectPath: string): {
   if (!/^\d{4}$/.test(parts[0]) || !/^\d{2}$/.test(parts[1])) return null
   const mediaType = parts[4] === "Static" || parts[4] === "Video" ? parts[4] : undefined
   if (!mediaType) return null
+
+  const stage = parts[5] === "base" || parts[5] === "composite" ? parts[5] : undefined
+  const filename = stage ? parts[parts.length - 1] : parts[5]
+
   return {
     year: parts[0],
     month: parts[1],
     category: parts[2],
     angle: parts[3],
     mediaType,
-    filename: parts[5],
+    assetStage: stage,
+    filename,
   }
 }

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { fetchMarketingObjectStatus } from "@/lib/agent/meta-api"
+import {
+  upsertAdSetRegistryInNamer,
+  upsertCampaignRegistryInNamer,
+} from "@/lib/agent/namer-registry-append"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export async function GET() {
@@ -283,6 +287,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: crErr.message }, { status: 500 })
     }
     creativeRow = creative
+  }
+
+  try {
+    if (campaignRow?.platform_id && !String(campaignRow.platform_id).startsWith("pending-")) {
+      await upsertCampaignRegistryInNamer(admin!, {
+        platform_id: String(campaignRow.platform_id),
+        campaign_name: (campaignRow.campaign_name as string | null) ?? null,
+        objective: (campaignRow.objective as string | null) ?? null,
+        aud_type: (campaignRow.aud_type as string | null) ?? null,
+        market: (campaignRow.market as string | null) ?? null,
+        status: (campaignRow.status as string | null) ?? null,
+        agent_managed: campaignRow.agent_managed as boolean | null,
+      })
+    }
+    if (adsetRow?.platform_id) {
+      await upsertAdSetRegistryInNamer(admin!, {
+        platform_id: String(adsetRow.platform_id),
+        campaign_platform_id: campaignRow?.platform_id
+          ? String(campaignRow.platform_id)
+          : null,
+        adset_name: (adsetRow.adset_name as string | null) ?? null,
+        audience_desc: (adsetRow.audience_desc as string | null) ?? null,
+        status: (adsetRow.status as string | null) ?? null,
+        agent_managed: adsetRow.agent_managed as boolean | null,
+      })
+    }
+  } catch (err) {
+    console.warn("[registry] namer sheet upsert failed:", err)
   }
 
   return NextResponse.json({ campaign: campaignRow, adset: adsetRow, creative: creativeRow })

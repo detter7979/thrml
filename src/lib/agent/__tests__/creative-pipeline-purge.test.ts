@@ -27,17 +27,24 @@ function collectBriefGcsPathsForTest(
 
 describe("creative pipeline purge paths", () => {
   it("preserves any path with base in the name", () => {
+    expect(isPreservedCreativeObjectPath("2026/05/hosts/pov_earnings/Video/base/base_sauna_v1.mp4")).toBe(true)
     expect(isPreservedCreativeObjectPath("2026/05/hosts/pov_earnings/Video/base_sauna_v1.mp4")).toBe(true)
     expect(isPreservedCreativeObjectPath("bases/2026/05/pov-earnings/sauna_v1.mp4")).toBe(true)
+    expect(isPreservedCreativeObjectPath("2026/05/hosts/pov_earnings/Static/base/base_A_9x16.png")).toBe(true)
     expect(isPreservedCreativeObjectPath("2026/05/hosts/pov_earnings/Static/base_A_9x16.png")).toBe(true)
   })
 
   it("marks generated static and rendered video paths for deletion", () => {
+    expect(isGeneratedCreativeObjectPath("2026/05/hosts/pov_earnings/Static/composite/A_9x16.png")).toBe(true)
     expect(isGeneratedCreativeObjectPath("2026/05/hosts/pov_earnings/Static/A_9x16.png")).toBe(true)
+    expect(
+      isGeneratedCreativeObjectPath("2026/05/hosts/pov_earnings/Video/composite/pov-idle-income_9x16_v1.mp4")
+    ).toBe(true)
     expect(isGeneratedCreativeObjectPath("2026/05/hosts/pov_earnings/Video/pov-idle-income_9x16_v1.mp4")).toBe(
       true
     )
     expect(isGeneratedCreativeObjectPath("renders/2026/05/pov-earnings/pov-idle-income_v1.mp4")).toBe(true)
+    expect(isGeneratedCreativeObjectPath("namer/exports/asset-uuid.json")).toBe(true)
   })
 
   it("does not delete paths with base in the name", () => {

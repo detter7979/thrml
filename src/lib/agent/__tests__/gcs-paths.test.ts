@@ -64,7 +64,7 @@ describe("gcs-paths", () => {
         variant: "A",
         format: "9x16",
       })
-    ).toBe("2026/05/hosts/pov_earnings/Static/A_9x16.png")
+    ).toBe("2026/05/hosts/pov_earnings/Static/composite/A_9x16.png")
   })
 
   it("builds unified static path with template slug", () => {
@@ -77,7 +77,7 @@ describe("gcs-paths", () => {
         format: "1x1",
         templateSlug: "block_split",
       })
-    ).toBe("2026/05/hosts/pov_earnings/Static/block_split/A_1x1.png")
+    ).toBe("2026/05/hosts/pov_earnings/Static/composite/block_split/A_1x1.png")
   })
 
   it("builds unified video paths when category set", () => {
@@ -90,7 +90,7 @@ describe("gcs-paths", () => {
         category: "Hosts",
         angleSlug: "pov_earnings",
       })
-    ).toBe("2026/05/hosts/pov_earnings/Video/base_sauna_v1.mp4")
+    ).toBe("2026/05/hosts/pov_earnings/Video/base/base_sauna_v1.mp4")
 
     expect(
       unifiedVideoRenderPath({
@@ -100,6 +100,6 @@ describe("gcs-paths", () => {
         variantSlug: "pov-earn-1000",
         templateVersion: 1,
       })
-    ).toBe("2026/05/hosts/pov_earnings/Video/pov-earn-1000_9x16_v1.mp4")
+    ).toBe("2026/05/hosts/pov_earnings/Video/composite/pov-earn-1000_9x16_v1.mp4")
   })
 })

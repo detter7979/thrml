@@ -65,9 +65,12 @@ export function CreativePipelinePurgePanel({
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-red-800">Reset creative pipeline</h2>
           <p className="text-xs text-red-900/80 mt-1 max-w-2xl leading-relaxed">
-            Deletes every creative brief, asset row, render job, and generated GCS files (final static composites,
-            rendered POV videos). Skips any object path with &quot;base&quot; in the name. Bundled hero images and
-            template configs are unchanged.
+            Deletes every creative brief, asset row, render job, and generated GCS files under{" "}
+            <code className="font-mono">Static/composite/</code>, <code className="font-mono">Video/composite/</code>,
+            legacy flat composites, <code className="font-mono">renders/</code>, and{" "}
+            <code className="font-mono">namer/exports/</code>. Keeps anything under{" "}
+            <code className="font-mono">Static/base/</code>, <code className="font-mono">Video/base/</code>, legacy{" "}
+            <code className="font-mono">bases/</code>, and any path with &quot;base&quot; in the name.
           </p>
         </div>
         <button

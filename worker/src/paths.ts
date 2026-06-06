@@ -20,7 +20,7 @@ export function unifiedVideoRenderPath(args: {
   templateVersion: number
 }): string {
   const { date, category, angleSlug, variantSlug, templateVersion } = args
-  return `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/${slug(variantSlug)}_9x16_v${templateVersion}.mp4`
+  return `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/composite/${slug(variantSlug)}_9x16_v${templateVersion}.mp4`
 }
 
 export function angleSlugFromConcept(conceptSlug: string): string {

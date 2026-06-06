@@ -7,14 +7,16 @@ import {
 
 const AD_BUILDER_HEADERS = [
   "Ad ID",
-  "AdSet ID",
-  "Campaign Name (ref)",
+  "Ad Set ID",
+  "Campaign ID",
   "TEST",
   "VAR",
   "ANGLE",
   "FORMAT",
   "CTA",
   "Ad Name (auto)",
+  "Platform Campaign ID",
+  "Platform Ad Set ID",
   "Platform Ad ID",
   "GCS Path",
 ]
@@ -32,16 +34,15 @@ describe("buildPlatformIdSheetUpdates", () => {
       },
       "ad_builder"
     )
-    expect(updates).toHaveLength(4)
+    expect(updates).toHaveLength(3)
     expect(updates.map((u) => u.range)).toEqual(
       expect.arrayContaining([
-        "'Ad Builder'!A4",
-        "'Ad Builder'!B4",
-        "'Ad Builder'!C4",
         "'Ad Builder'!J4",
+        "'Ad Builder'!K4",
+        "'Ad Builder'!L4",
       ])
     )
-    expect(updates.find((u) => u.range.endsWith("J4"))?.values[0][0]).toBe("120001")
+    expect(updates.find((u) => u.range.endsWith("L4"))?.values[0][0]).toBe("120001")
   })
 
   it("returns no updates when all IDs are empty", () => {
@@ -82,10 +83,10 @@ describe("buildNamerCreativeRow with platform IDs", () => {
       { campaignGen: "Human", adSetGen: "Bot" },
       { gcsPath: "gs://thrml-creative/square.png", signedUrl: "" },
       "ad_builder",
-      { adId: "120001", adSetId: "238002", campaignId: "440003" }
+      { adId: "AD042", adSetId: "AS005", campaignId: "C003" }
     )
-    expect(row?.adId).toBe("120001")
-    expect(row?.adSetId).toBe("238002")
-    expect(row?.campaignId).toBe("440003")
+    expect(row?.adId).toBe("AD042")
+    expect(row?.adSetId).toBe("AS005")
+    expect(row?.campaignId).toBe("C003")
   })
 })

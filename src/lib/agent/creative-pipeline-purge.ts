@@ -46,9 +46,12 @@ export function isGeneratedCreativeObjectPath(objectPath: string): boolean {
   const path = objectPath.replace(/^\/+/, "")
   const lower = path.toLowerCase()
 
-  if (/\/static\//i.test(path)) return true
-  if (/\/video\//i.test(path)) return true
+  if (/\/static\/composite\//i.test(path)) return true
+  if (/\/video\/composite\//i.test(path)) return true
+  if (/\/static\//i.test(path) && !/\/static\/base\//i.test(path)) return true
+  if (/\/video\//i.test(path) && !/\/video\/base\//i.test(path)) return true
   if (lower.startsWith("renders/")) return true
+  if (lower.startsWith("namer/exports/")) return true
   if (/^\d{4}-\d{2}\/[^/]+\/[0-9a-f-]{36}\/(statics|videos|references)\//i.test(path)) return true
 
   return false

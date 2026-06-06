@@ -14,6 +14,7 @@ import { CookieConsentBanner } from "@/components/cookie-consent"
 import {
   COOKIE_CONSENT_ACCEPTED,
   COOKIE_CONSENT_DECLINED,
+  COOKIE_CONSENT_KEY,
   grantAnalyticsConsent,
   getCookieConsent,
   revokeAnalyticsConsent,
@@ -45,17 +46,31 @@ export function CookieConsentProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const consent = getCookieConsent()
-    if (!consent) {
-      const timer = setTimeout(() => setBannerVisible(true), 1200)
-      return () => clearTimeout(timer)
+    function syncFromStorage() {
+      const consent = getCookieConsent()
+      if (!consent) {
+        setBannerVisible(true)
+        return
+      }
+
+      setBannerVisible(false)
+      if (consent === COOKIE_CONSENT_ACCEPTED) {
+        grantAnalyticsConsent()
+      } else if (consent === COOKIE_CONSENT_DECLINED) {
+        revokeAnalyticsConsent()
+      }
     }
 
-    if (consent === COOKIE_CONSENT_ACCEPTED) {
-      grantAnalyticsConsent()
-    } else if (consent === COOKIE_CONSENT_DECLINED) {
-      revokeAnalyticsConsent()
+    syncFromStorage()
+
+    function onStorage(event: StorageEvent) {
+      if (event.key === null || event.key === COOKIE_CONSENT_KEY) {
+        syncFromStorage()
+      }
     }
+
+    window.addEventListener("storage", onStorage)
+    return () => window.removeEventListener("storage", onStorage)
   }, [])
 
   const value = useMemo(

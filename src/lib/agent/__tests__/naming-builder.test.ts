@@ -14,6 +14,19 @@ describe("buildAdName", () => {
     ).toBe("T05_A_pov_earnings_Video_15s_list_now")
   })
 
+  it("prefixes internal Ad ID when provided", () => {
+    expect(
+      buildAdName({
+        thrmlAdId: "AD001",
+        testId: "T05",
+        variant: "A",
+        angle: "pov_earnings",
+        format: "Static_9x16",
+        cta: "list_now",
+      })
+    ).toBe("AD001_T05_A_pov_earnings_Static_9x16_list_now")
+  })
+
   it("handles single-word angle", () => {
     expect(
       buildAdName({
@@ -67,6 +80,17 @@ describe("parseAdName", () => {
       variant: "A",
       angle: "pov_earnings",
       format: "Video_15s",
+      cta: "list_now",
+    })
+  })
+
+  it("parses names with internal Ad ID prefix", () => {
+    expect(parseAdName("AD001_T05_A_pov_earnings_Static_9x16_list_now")).toEqual({
+      thrmlAdId: "AD001",
+      testId: "T05",
+      variant: "A",
+      angle: "pov_earnings",
+      format: "Static_9x16",
       cta: "list_now",
     })
   })

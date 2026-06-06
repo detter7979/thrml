@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 
 import {
   COOKIE_CONSENT_ACCEPTED,
@@ -17,6 +19,11 @@ type CookieConsentBannerProps = {
 }
 
 export function CookieConsentBanner({ visible, onClose }: CookieConsentBannerProps) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   function handleAccept() {
     localStorage.setItem(COOKIE_CONSENT_KEY, COOKIE_CONSENT_ACCEPTED)
     notifyConsentChanged(COOKIE_CONSENT_ACCEPTED)
@@ -31,13 +38,14 @@ export function CookieConsentBanner({ visible, onClose }: CookieConsentBannerPro
     onClose()
   }
 
-  if (!visible) return null
+  if (!visible || !mounted) return null
 
-  return (
+  return createPortal(
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6"
+      className="fixed bottom-0 left-0 right-0 z-[200] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:p-6"
       role="dialog"
       aria-label="Cookie consent"
+      aria-modal="false"
     >
       <div className="mx-auto flex max-w-2xl flex-col items-start gap-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-xl sm:flex-row sm:items-center">
         <div className="flex-1">
@@ -65,6 +73,7 @@ export function CookieConsentBanner({ visible, onClose }: CookieConsentBannerPro
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

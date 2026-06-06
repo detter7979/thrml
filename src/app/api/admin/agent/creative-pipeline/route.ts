@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { appendApprovedCreativeToNamer } from "@/lib/agent/namer-creative-append"
+import { appendApprovedCreativeToNamer, cloneNamerAdToAdSet } from "@/lib/agent/namer-creative-append"
 import { deleteCreativeBrief, purgeCreativePipeline } from "@/lib/agent/creative-pipeline-purge"
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
 import { isRunwayConfigured } from "@/lib/agent/runway"
@@ -47,6 +47,7 @@ const PIPELINE_ACTIONS = new Set([
   "edit_static_photo",
   "edit_runway_video",
   "purge_creative_pipeline",
+  "clone_namer_to_adset",
 ])
 
 type AdminClient = NonNullable<Awaited<ReturnType<typeof requireAdminApi>>["admin"]>
@@ -459,6 +460,7 @@ export async function PATCH(req: NextRequest) {
     formats?: string[]
     variation_label?: string
     visual_direction?: string
+    ad_set_legacy_id?: string
   } | null
 
   if (!body?.action || !PIPELINE_ACTIONS.has(body.action)) {
@@ -874,6 +876,26 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true, result })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Video edit failed"
+      return NextResponse.json({ error: message }, { status: 500 })
+    }
+  }
+
+  if (body.action === "clone_namer_to_adset") {
+    if (!body.asset_id) return NextResponse.json({ error: "asset_id is required" }, { status: 400 })
+    const adSetLegacyId =
+      typeof body.ad_set_legacy_id === "string" ? body.ad_set_legacy_id.trim() : ""
+    if (!adSetLegacyId) {
+      return NextResponse.json({ error: "ad_set_legacy_id is required (e.g. AS001)" }, { status: 400 })
+    }
+
+    try {
+      const result = await cloneNamerAdToAdSet(admin!, body.asset_id, adSetLegacyId)
+      if (!result.ok) {
+        return NextResponse.json({ error: result.reason ?? "Clone failed" }, { status: 400 })
+      }
+      return NextResponse.json({ ok: true, clone: result })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Clone failed"
       return NextResponse.json({ error: message }, { status: 500 })
     }
   }

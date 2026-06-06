@@ -31,6 +31,7 @@ import {
 import { uploadVideo } from "@/lib/agent/meta-video-upload"
 import { requireAdminApi } from "@/lib/admin-guard"
 import { syncNamerPlatformIdsForAssets } from "@/lib/agent/namer-creative-append"
+import { syncPaidMediaFromCreativeLaunch } from "@/lib/agent/namer-supabase-sync"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -591,6 +592,7 @@ async function launchPlacementBundle(params: {
   await maybeMarkBriefLaunched(params.admin, assets[0]!.brief_id!)
 
   let namerPlatformSync: Awaited<ReturnType<typeof syncNamerPlatformIdsForAssets>> | undefined
+  let paidMediaSync: Awaited<ReturnType<typeof syncPaidMediaFromCreativeLaunch>>[] = []
   try {
     namerPlatformSync = await syncNamerPlatformIdsForAssets(
       params.admin,
@@ -601,6 +603,18 @@ async function launchPlacementBundle(params: {
     }
   } catch (err) {
     console.warn("[launch-creative] namer platform ID sync failed", err)
+  }
+
+  for (const asset of assets) {
+    try {
+      const result = await syncPaidMediaFromCreativeLaunch(params.admin, asset.id)
+      paidMediaSync.push(result)
+      if (!result.ok) {
+        console.warn("[launch-creative] paid-media sync failed", asset.id, result.reason)
+      }
+    } catch (err) {
+      console.warn("[launch-creative] paid-media sync error", asset.id, err)
+    }
   }
 
   return NextResponse.json({
@@ -620,6 +634,7 @@ async function launchPlacementBundle(params: {
     instagramDiagnostics: instagram.diagnostics,
     adsManagerUrl: adsManagerUrl(params.adAccountId, metaAdId),
     namerPlatformSync,
+    paidMediaSync,
   })
 }
 
@@ -880,6 +895,7 @@ export async function POST(req: NextRequest) {
     await maybeMarkBriefLaunched(admin!, creativeAsset.brief_id)
 
     let namerPlatformSync: Awaited<ReturnType<typeof syncNamerPlatformIdsForAssets>> | undefined
+    let paidMediaSync: Awaited<ReturnType<typeof syncPaidMediaFromCreativeLaunch>> | undefined
     try {
       namerPlatformSync = await syncNamerPlatformIdsForAssets(admin!, [assetId])
       if (namerPlatformSync.errors.length) {
@@ -887,6 +903,15 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.warn("[launch-creative] namer platform ID sync failed", err)
+    }
+
+    try {
+      paidMediaSync = await syncPaidMediaFromCreativeLaunch(admin!, assetId)
+      if (!paidMediaSync.ok) {
+        console.warn("[launch-creative] paid-media sync failed", paidMediaSync.reason)
+      }
+    } catch (err) {
+      console.warn("[launch-creative] paid-media sync error", err)
     }
 
     return NextResponse.json({
@@ -902,6 +927,7 @@ export async function POST(req: NextRequest) {
       ...videoMetaFields,
       adsManagerUrl: adsManagerUrl(adAccountId, metaAdId),
       namerPlatformSync,
+      paidMediaSync,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown launch error"

@@ -146,6 +146,37 @@ describe("normalizeTestId", () => {
 })
 
 describe("buildNamerCreativeRow", () => {
+  it("prefixes Ad Name when thrml Ad ID is allocated", () => {
+    const row = buildNamerCreativeRow(
+      {
+        id: "asset-uuid",
+        brief_id: "brief-uuid",
+        convention_name: "T05_A_pov_earnings_Static_9x16_list_now",
+        gcs_path: "gs://thrml-creative/static.png",
+        gcs_url: null,
+        format: "9x16",
+        meta_ad_id: null,
+        meta_adset_id: null,
+        namer_synced_at: null,
+      },
+      {
+        id: "brief-uuid",
+        trigger_type: "manual",
+        trigger_data: {},
+        created_by: "admin",
+        hook: null,
+        copy_headline: null,
+      },
+      { campaignGen: "Pending", adSetGen: "Pending" },
+      { gcsPath: "gs://thrml-creative/static.png", signedUrl: "" },
+      "ad_builder",
+      { campaignId: "C001", adSetId: "AS001", adId: "AD001" }
+    )
+
+    expect(row?.adId).toBe("AD001")
+    expect(row?.adName).toBe("AD001_T05_A_pov_earnings_Static_9x16_list_now")
+  })
+
   it("builds a Creative Builder row from convention_name", () => {
     const row = buildNamerCreativeRow(
       {

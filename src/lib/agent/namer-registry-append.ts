@@ -14,25 +14,19 @@ import {
 } from "@/lib/agent/google-sheets-client"
 import { allocateNextThrmlLegacyId } from "@/lib/agent/namer-legacy-ids"
 import { resolveNamerSheetId } from "@/lib/agent/namer-creative-append"
+import {
+  cellValue,
+  colIndex,
+  findAdSetBuilderHeader,
+  findCampaignBuilderHeader,
+} from "@/lib/agent/namer-header-utils"
+import { parseAdSetConventionName } from "@/lib/agent/namer-convention-parse"
+import {
+  buildAdSetAutoNameFormula,
+  buildAdSetCampaignRefFormula,
+  buildCampaignAutoNameFormula,
+} from "@/lib/agent/namer-sheet-formulas"
 import { HEADER_PATTERNS, NAMER_TAB_CANDIDATES } from "@/lib/agent/namer-sheet-schema"
-
-function colIndex(headers: string[], patterns: readonly RegExp[]): number {
-  for (let i = 0; i < headers.length; i++) {
-    if (patterns.some((p) => p.test(headers[i] ?? ""))) return i
-  }
-  return -1
-}
-
-function findHeaderRow(rows: string[][]): { headerRow: number; headers: string[] } | null {
-  for (let r = 0; r < Math.min(rows.length, 15); r++) {
-    const line = rows[r] ?? []
-    const joined = line.join(" ").toLowerCase()
-    if (joined.includes("campaign id") || joined.includes("ad set id")) {
-      return { headerRow: r, headers: line.map((c) => String(c).trim()) }
-    }
-  }
-  return null
-}
 
 function collectColumnValues(rows: string[][], headers: string[], patterns: RegExp[]): string[] {
   const col = colIndex(headers, patterns)
@@ -44,15 +38,41 @@ function findRowByPlatformId(
   rows: string[][],
   headerRow: number,
   headers: string[],
-  platformPatterns: RegExp[],
+  platformPatterns: readonly RegExp[],
   platformId: string
 ): number {
   const col = colIndex(headers, platformPatterns)
   if (col < 0) return -1
+  const target = platformId.replace(/\D/g, "").trim()
   for (let r = headerRow + 1; r < rows.length; r++) {
-    if ((rows[r]?.[col] ?? "").trim() === platformId) return r
+    const raw = (rows[r]?.[col] ?? "").trim().replace(/\D/g, "")
+    if (raw && raw === target) return r
   }
   return -1
+}
+
+async function resolveCampaignThrmlIdFromSheet(
+  sheetId: string,
+  campaignPlatformId: string
+): Promise<string> {
+  const sheets = createGoogleSheetsClient()
+  const tabs = await listSpreadsheetTabs(sheets, sheetId)
+  const tab = resolveTabTitle(tabs, ...NAMER_TAB_CANDIDATES.campaign)
+  if (!tab) return ""
+
+  const rows = await readSheetValues(sheets, sheetId, tab)
+  const header = findCampaignBuilderHeader(rows)
+  if (!header) return ""
+
+  const rowIdx = findRowByPlatformId(
+    rows,
+    header.headerRow,
+    header.headers,
+    HEADER_PATTERNS.platformCampaignId,
+    campaignPlatformId
+  )
+  if (rowIdx < 0) return ""
+  return cellValue(rows[rowIdx] ?? [], header.headers, HEADER_PATTERNS.thrmlCampaignId)
 }
 
 export async function upsertCampaignRegistryInNamer(
@@ -81,7 +101,7 @@ export async function upsertCampaignRegistryInNamer(
   if (!tab) return { ok: false, reason: "Campaign Builder tab not found" }
 
   const rows = await readSheetValues(sheets, sheetId, tab)
-  const header = findHeaderRow(rows)
+  const header = findCampaignBuilderHeader(rows)
   if (!header) return { ok: false, reason: "Campaign Builder header not found" }
 
   const dataRows = rows.slice(header.headerRow + 1)
@@ -104,10 +124,15 @@ export async function upsertCampaignRegistryInNamer(
 
   set(HEADER_PATTERNS.thrmlCampaignId, existingRow >= 0 ? "" : thrmlId)
   set(HEADER_PATTERNS.platformCampaignId, platformId)
-  set([/^campaign name/i], row.campaign_name?.trim() ?? "")
+  const campaignNameCol = colIndex(header.headers, [/^campaign name/i])
+  if (campaignNameCol >= 0) {
+    const row1 = existingRow >= 0 ? existingRow + 1 : header.headerRow + dataRows.length + 2
+    const formula = buildCampaignAutoNameFormula(header.headers, row1)
+    if (formula) values[campaignNameCol] = formula
+    else if (row.campaign_name?.trim()) values[campaignNameCol] = row.campaign_name.trim()
+  }
   set([/^platform$/i], "META")
-  set([/^objective$/i], row.objective?.trim() ?? "")
-  set([/^audience type$/i], row.aud_type?.trim() ?? "")
+  set([/^persona$/i], row.aud_type?.trim().toLowerCase() === "guest" ? "guest" : "host")
   set([/^geo$/i], row.market?.trim() ?? "")
   set([/^status$/i], row.status?.trim() ?? "DRAFT")
   set([/^campaign gen$/i], row.agent_managed === false ? "Human" : "Bot")
@@ -158,7 +183,7 @@ export async function upsertAdSetRegistryInNamer(
   if (!tab) return { ok: false, reason: "Ad Set Builder tab not found" }
 
   const rows = await readSheetValues(sheets, sheetId, tab)
-  const header = findHeaderRow(rows)
+  const header = findAdSetBuilderHeader(rows)
   if (!header) return { ok: false, reason: "Ad Set Builder header not found" }
 
   const dataRows = rows.slice(header.headerRow + 1)
@@ -167,16 +192,12 @@ export async function upsertAdSetRegistryInNamer(
 
   let campaignThrmlId = ""
   if (row.campaign_platform_id?.trim()) {
-    const campRow = findRowByPlatformId(
-      rows,
-      header.headerRow,
-      header.headers,
-      HEADER_PATTERNS.platformCampaignId,
-      row.campaign_platform_id.trim()
-    )
-    // Campaign tab lookup would be better — leave Campaign ID blank if not on ad set sheet
-    void campRow
+    campaignThrmlId = await resolveCampaignThrmlIdFromSheet(sheetId, row.campaign_platform_id.trim())
   }
+
+  const parsedAdSet = row.adset_name?.trim()
+    ? parseAdSetConventionName(row.adset_name.trim())
+    : null
 
   const values = new Array(header.headers.length).fill("")
   const set = (patterns: readonly RegExp[], value: string) => {
@@ -196,8 +217,28 @@ export async function upsertAdSetRegistryInNamer(
   set(HEADER_PATTERNS.thrmlCampaignId, campaignThrmlId)
   set(HEADER_PATTERNS.platformAdSetId, platformId)
   set(HEADER_PATTERNS.platformCampaignId, row.campaign_platform_id?.trim() ?? "")
-  set([/^ad set name/i], row.adset_name?.trim() ?? "")
-  set([/^audience details/i], row.audience_desc?.trim() ?? "")
+
+  const adSetNameCol = colIndex(header.headers, [/^ad set name/i])
+  if (adSetNameCol >= 0) {
+    const row1 = existingRow >= 0 ? existingRow + 1 : header.headerRow + dataRows.length + 2
+    const formula = buildAdSetAutoNameFormula(header.headers, row1)
+    if (formula) values[adSetNameCol] = formula
+    else if (row.adset_name?.trim()) values[adSetNameCol] = row.adset_name.trim()
+  }
+
+  if (parsedAdSet) {
+    set([/^audience.?src$/i, /^audience_src$/i], parsedAdSet.audience_src)
+    set([/^placement$/i], parsedAdSet.placement)
+  }
+
+  const refCol = colIndex(header.headers, [/^campaign name \(ref\)$/i])
+  if (refCol >= 0 && campaignThrmlId) {
+    const row1 = existingRow >= 0 ? existingRow + 1 : header.headerRow + dataRows.length + 2
+    const refFormula = buildAdSetCampaignRefFormula(header.headers, row1)
+    if (refFormula) values[refCol] = refFormula
+  }
+
+  set([/^audience details/i, /^notes$/i], row.audience_desc?.trim() ?? "")
   set([/^status$/i], row.status?.trim() ?? "DRAFT")
   set([/^ad set gen$/i], row.agent_managed === false ? "Human" : "Bot")
 

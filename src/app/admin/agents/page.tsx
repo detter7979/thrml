@@ -287,6 +287,7 @@ export default function AgentsDashboard() {
   const [viewingAsset, setViewingAsset] = useState<CreativeAsset | null>(null)
   const [photoEditPrompt, setPhotoEditPrompt] = useState("")
   const [assetEditPrompts, setAssetEditPrompts] = useState<Record<string, string>>({})
+  const [cloneAdSetIds, setCloneAdSetIds] = useState<Record<string, string>>({})
   const [launchProgress, setLaunchProgress] = useState<string | null>(null)
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -509,6 +510,35 @@ export default function AgentsDashboard() {
       setPipelineMessage(`Deleted ${videoBriefs.length} approved video briefs.`)
     } catch (err) {
       setPipelineMessage(err instanceof Error ? err.message : "Could not delete video briefs.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const cloneNamerToAdSet = async (assetId: string) => {
+    const adSetLegacyId = cloneAdSetIds[assetId]?.trim()
+    if (!adSetLegacyId) {
+      setPipelineMessage("Enter target ad set ID (e.g. AS002).")
+      return
+    }
+
+    setBusyAction(`clone-namer-${assetId}`)
+    setPipelineMessage(null)
+    try {
+      const json = (await patchPipeline({
+        action: "clone_namer_to_adset",
+        asset_id: assetId,
+        ad_set_legacy_id: adSetLegacyId,
+      })) as { clone?: { adId?: string } }
+      await mutatePipeline()
+      const newAdId = json.clone?.adId
+      setPipelineMessage(
+        newAdId
+          ? `Cloned to ${adSetLegacyId.toUpperCase()} as ${newAdId} in Ad Builder.`
+          : `Cloned to ${adSetLegacyId.toUpperCase()} in Ad Builder.`,
+      )
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not clone to ad set.")
     } finally {
       setBusyAction(null)
     }
@@ -1603,6 +1633,16 @@ export default function AgentsDashboard() {
                                 ? busyAction.slice(`expand-${asset.id}-`.length)
                                 : null
                             }
+                            cloneAdSetLegacyId={cloneAdSetIds[asset.id] ?? ""}
+                            onCloneAdSetLegacyIdChange={(value) =>
+                              setCloneAdSetIds((prev) => ({ ...prev, [asset.id]: value }))
+                            }
+                            onCloneToAdSet={
+                              asset.status === "approved"
+                                ? () => void cloneNamerToAdSet(asset.id)
+                                : undefined
+                            }
+                            cloneBusy={busyAction === `clone-namer-${asset.id}`}
                             preview={
                               <div className={`aspect-square w-full`}>
                                 {isVideoAsset(asset) ? (

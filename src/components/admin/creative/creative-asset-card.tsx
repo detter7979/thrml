@@ -30,6 +30,10 @@ type CreativeAssetCardProps = {
   onBuildOutSizes?: (format?: string) => void
   buildOutBusy?: boolean
   buildOutBusyFormat?: string | null
+  cloneAdSetLegacyId?: string
+  onCloneAdSetLegacyIdChange?: (value: string) => void
+  onCloneToAdSet?: () => void
+  cloneBusy?: boolean
 }
 
 export function canEditPhotoAsset(asset: {
@@ -102,6 +106,10 @@ export function CreativeAssetCard({
   onBuildOutSizes,
   buildOutBusy,
   buildOutBusyFormat,
+  cloneAdSetLegacyId,
+  onCloneAdSetLegacyIdChange,
+  onCloneToAdSet,
+  cloneBusy,
 }: CreativeAssetCardProps) {
   const status = asset.status ?? "generated"
   const isApproved = status === "approved"
@@ -181,6 +189,38 @@ export function CreativeAssetCard({
           </button>
           <p className="text-[10px] leading-snug text-muted-foreground">
             Reuses this preview photo — no new AI generation. Skip if you only need {asset.format ?? "this size"}.
+          </p>
+        </div>
+      ) : null}
+
+      {isApproved && onCloneToAdSet ? (
+        <div className="space-y-1.5 rounded-md border border-dashed border-muted-foreground/30 bg-muted/40 p-2">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Clone to ad set
+          </p>
+          <input
+            value={cloneAdSetLegacyId ?? ""}
+            onChange={(e) => onCloneAdSetLegacyIdChange?.(e.target.value)}
+            placeholder="AS002"
+            className="w-full rounded border bg-background px-2 py-1.5 text-[11px] uppercase"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault()
+                onCloneToAdSet()
+              }
+            }}
+          />
+          <button
+            type="button"
+            disabled={cloneBusy || !cloneAdSetLegacyId?.trim()}
+            onClick={onCloneToAdSet}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px] font-medium hover:bg-muted disabled:opacity-50"
+          >
+            {cloneBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            Duplicate row in Ad Builder
+          </button>
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            Same creative, new AD###, linked to the target ad set.
           </p>
         </div>
       ) : null}

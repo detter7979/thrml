@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireAdmin } from "@/lib/admin-guard"
+import { patchNamerSheetPlatformId } from "@/lib/agent/namer-supabase-sync"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { RecKindT } from "@/types/paid-media"
 
@@ -68,11 +69,24 @@ export async function launchCampaign(
     })
     .eq("id", campaignId)
     .eq("status", "DRAFT")
-    .select("id")
+    .select("id, legacy_id")
     .maybeSingle()
 
   if (error) return { ok: false, error: error.message }
   if (!updated) return { ok: false, error: "Campaign not in DRAFT status." }
+
+  if (updated.legacy_id) {
+    try {
+      await patchNamerSheetPlatformId(
+        admin,
+        "campaign",
+        String(updated.legacy_id),
+        payload.platformCampaignId.trim()
+      )
+    } catch (e) {
+      console.warn("[launchCampaign] namer sheet patch failed:", e)
+    }
+  }
 
   try {
     await insertLaunchLog(admin, {
@@ -105,7 +119,7 @@ export async function launchAdSet(adSetId: string, payload: { platformAdSetId: s
 
   const { data: row, error: fetchError } = await admin
     .from("ad_sets")
-    .select("id, campaign_id, status")
+    .select("id, campaign_id, legacy_id, status")
     .eq("id", adSetId)
     .maybeSingle()
 
@@ -129,6 +143,19 @@ export async function launchAdSet(adSetId: string, payload: { platformAdSetId: s
 
   if (error) return { ok: false, error: error.message }
   if (!updated) return { ok: false, error: "Ad set not in DRAFT status." }
+
+  if (row.legacy_id) {
+    try {
+      await patchNamerSheetPlatformId(
+        admin,
+        "ad_set",
+        String(row.legacy_id),
+        payload.platformAdSetId.trim()
+      )
+    } catch (e) {
+      console.warn("[launchAdSet] namer sheet patch failed:", e)
+    }
+  }
 
   try {
     await insertLaunchLog(admin, {
@@ -159,7 +186,7 @@ export async function launchAd(adId: string, payload: { platformAdId: string }):
 
   const { data: row, error: fetchError } = await admin
     .from("ads")
-    .select("id, campaign_id, ad_set_id, status")
+    .select("id, campaign_id, ad_set_id, legacy_id, status")
     .eq("id", adId)
     .maybeSingle()
 
@@ -183,6 +210,19 @@ export async function launchAd(adId: string, payload: { platformAdId: string }):
 
   if (error) return { ok: false, error: error.message }
   if (!updated) return { ok: false, error: "Ad not in DRAFT status." }
+
+  if (row.legacy_id) {
+    try {
+      await patchNamerSheetPlatformId(
+        admin,
+        "ad",
+        String(row.legacy_id),
+        payload.platformAdId.trim()
+      )
+    } catch (e) {
+      console.warn("[launchAd] namer sheet patch failed:", e)
+    }
+  }
 
   try {
     await insertLaunchLog(admin, {

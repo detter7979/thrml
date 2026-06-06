@@ -19,18 +19,23 @@ export const NAMER_TAB_CANDIDATES: Record<NamerTabKind, string[]> = {
   ad: ["Ad Builder", "② Ad Builder", "2 Ad Builder", "④ Creative Builder", "Creative Builder"],
 }
 
-/** Recommended Ad Builder column order (v4). Agents add missing columns at the end — no destructive reorder. */
+/**
+ * Recommended Ad Builder column order (v4).
+ * TEST / VAR sit after CTA so creative tokens group together before the auto-name.
+ * Platform Ad ID immediately follows Platform Ad Set ID.
+ * Agents add missing columns at the end — no destructive reorder.
+ */
 export const AD_BUILDER_HEADERS_V4 = [
   "Ad ID",
   "Ad Set ID",
   "Campaign ID",
-  "TEST",
-  "VAR",
   "ANGLE",
   "FORMAT",
   "Size",
   "Video Length",
   "CTA",
+  "TEST",
+  "VAR",
   "Ad Name (auto)",
   "Platform Campaign ID",
   "Platform Ad Set ID",
@@ -95,7 +100,7 @@ export const HEADER_PATTERNS: Record<
   | "gcsPath",
   NamerHeaderPatterns
 > = {
-  thrmlCampaignId: [/^campaign id$/i, /^campaign name \(ref\)$/i],
+  thrmlCampaignId: [/^camp id$/i, /^campaign id$/i, /^campaign name \(ref\)$/i],
   thrmlAdSetId: [/^ad set id$/i, /^adset id$/i],
   thrmlAdId: [/^ad id$/i],
   platformCampaignId: [/^platform campaign id$/i, /^platform camp id$/i],

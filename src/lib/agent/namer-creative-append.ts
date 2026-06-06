@@ -17,7 +17,13 @@ import {
 } from "@/lib/agent/google-sheets-client"
 import { fetchMetaAd, fetchMetaAdSet } from "@/lib/agent/namer-meta-client"
 import { uploadBufferToCreativeObject, refreshCreativeAssetUrl } from "@/lib/agent/gcs"
-import { parseAdName } from "@/lib/agent/naming-builder"
+import { buildAdName, parseAdName } from "@/lib/agent/naming-builder"
+import {
+  buildAdBuilderAdSetIdFormula,
+  buildAdBuilderAutoNameFormula,
+  buildAdBuilderCampaignIdFormula,
+} from "@/lib/agent/namer-sheet-formulas"
+import { syncPipelineTokensToTokenLibrary } from "@/lib/agent/namer-token-library-sync"
 import { allocateNextThrmlLegacyId } from "@/lib/agent/namer-legacy-ids"
 import {
   AD_BUILDER_ENSURE_COLUMNS,
@@ -113,6 +119,10 @@ export type NamerCreativeAppendResult = {
   tabTitle?: string
   gcsExportPath?: string
   assetGcsLink?: string
+  token_library?: {
+    added: string[]
+    skipped: number
+  }
 }
 
 export type { MetaPlatformIds } from "@/lib/agent/namer-sheet-schema"
@@ -131,6 +141,8 @@ type BriefRow = {
   created_by: string | null
   hook: string | null
   copy_headline: string | null
+  hypothesis?: string | null
+  campaign_short_name?: string | null
 }
 
 type AssetRow = {
@@ -396,6 +408,12 @@ export function buildNamerCreativeRow(
   const tokens = parseAdName(conventionName)
   if (!tokens) return null
 
+  const thrmlAdId = thrmlIds?.adId?.trim() || tokens.thrmlAdId?.trim() || ""
+  const adName =
+    thrmlAdId && !tokens.thrmlAdId
+      ? buildAdName({ ...tokens, thrmlAdId })
+      : conventionName
+
   const [formatType, length, aspectRatio] = splitFormatToken(tokens.format)
   const sizeToken = sizeFromFormatToken(tokens.format, aspectRatio)
   const videoLength = videoLengthDisplay(formatType, length)
@@ -403,7 +421,7 @@ export function buildNamerCreativeRow(
   const gcsPath = normalizeNamerGcsPath(links.gcsPath)
 
   return {
-    adId: thrmlIds?.adId?.trim() ?? "",
+    adId: thrmlAdId,
     adSetId: thrmlIds?.adSetId?.trim() ?? "",
     campaignId: thrmlIds?.campaignId?.trim() ?? "",
     testId: normalizeTestId(tokens.testId),
@@ -416,7 +434,7 @@ export function buildNamerCreativeRow(
     videoLength,
     aspectRatio,
     cta: tokens.cta,
-    adName: conventionName,
+    adName,
     hookPreview: hookCopyFromBrief(brief, layout),
     status,
     platform: "",
@@ -779,7 +797,8 @@ function mapRowToHeaderColumns(
   headers: string[],
   row: NamerCreativeRow,
   layout: NamerSheetLayout,
-  platformIds?: MetaPlatformIds
+  platformIds?: MetaPlatformIds,
+  row1Based?: number
 ): string[] {
   const values = new Array(headers.length).fill("")
   const set = (patterns: readonly RegExp[], value: string) => {
@@ -788,8 +807,19 @@ function mapRowToHeaderColumns(
   }
 
   set(HEADER_PATTERNS.thrmlAdId, row.adId)
-  set(HEADER_PATTERNS.thrmlAdSetId, row.adSetId)
-  set(HEADER_PATTERNS.thrmlCampaignId, row.campaignId)
+
+  const platformAdSetId = platformIds?.adSetId?.trim() ?? ""
+  const useAdSetLinkFormula = layout === "ad_builder" && Boolean(row1Based && platformAdSetId)
+  const useCampaignLinkFormula =
+    layout === "ad_builder" && Boolean(row1Based && (platformAdSetId || row.adSetId.trim()))
+
+  if (!useAdSetLinkFormula) {
+    set(HEADER_PATTERNS.thrmlAdSetId, row.adSetId)
+  }
+  if (!useCampaignLinkFormula) {
+    set(HEADER_PATTERNS.thrmlCampaignId, row.campaignId)
+  }
+
   if (platformIds) {
     set(HEADER_PATTERNS.platformCampaignId, platformIds.campaignId)
     set(HEADER_PATTERNS.platformAdSetId, platformIds.adSetId)
@@ -820,7 +850,25 @@ function mapRowToHeaderColumns(
   }
 
   set([/^cta$/i], row.cta)
-  set([/→?\s*ad name/i, /^ad name/i], row.adName)
+
+  const adNameFormula =
+    layout === "ad_builder" && row1Based
+      ? buildAdBuilderAutoNameFormula(headers, row1Based)
+      : null
+  if (adNameFormula) {
+    set([/→?\s*ad name/i, /^ad name/i], adNameFormula)
+  } else {
+    set([/→?\s*ad name/i, /^ad name/i], row.adName)
+  }
+
+  if (useAdSetLinkFormula && row1Based) {
+    const adSetLinkFormula = buildAdBuilderAdSetIdFormula(headers, row1Based, "Ad Set Builder")
+    if (adSetLinkFormula) set(HEADER_PATTERNS.thrmlAdSetId, adSetLinkFormula)
+  }
+  if (useCampaignLinkFormula && row1Based) {
+    const campaignLinkFormula = buildAdBuilderCampaignIdFormula(headers, row1Based, "Ad Set Builder")
+    if (campaignLinkFormula) set(HEADER_PATTERNS.thrmlCampaignId, campaignLinkFormula)
+  }
   set([/^hook copy/i, /^hook$/i], row.hookPreview)
   set([/^status$/i], row.status)
   set([/^platform$/i], row.platform)
@@ -1126,7 +1174,9 @@ export async function appendApprovedCreativeToNamer(
 
   const { data: brief, error: briefError } = await admin
     .from("creative_briefs")
-    .select("id, trigger_type, trigger_data, created_by, hook, copy_headline")
+    .select(
+      "id, trigger_type, trigger_data, created_by, hook, copy_headline, hypothesis, campaign_short_name"
+    )
     .eq("id", asset.brief_id)
     .maybeSingle()
 
@@ -1233,9 +1283,18 @@ export async function appendApprovedCreativeToNamer(
     }
   }
 
-  const sheetValues = mapRowToHeaderColumns(headers, row, headerInfo.layout)
+  const nextRow1Based = existingRows.length + 1
+  const sheetValues = mapRowToHeaderColumns(
+    headers,
+    row,
+    headerInfo.layout,
+    platformIds,
+    nextRow1Based
+  )
   const endCol = columnToLetter(Math.max(headers.length - 1, 0))
   const escapedTab = tabTitle.replace(/'/g, "''")
+
+  const fullConventionName = row.adName
 
   try {
     await sheets.spreadsheets.values.append({
@@ -1270,15 +1329,35 @@ export async function appendApprovedCreativeToNamer(
     .from("creative_assets")
     .update({
       namer_synced_at: now,
+      convention_name: fullConventionName,
       ...(gcsExportPath ? { namer_export_gcs_path: gcsExportPath } : {}),
     })
     .eq("id", assetId)
+
+  let tokenLibrary: NamerCreativeAppendResult["token_library"]
+  try {
+    const tokenSync = await syncPipelineTokensToTokenLibrary(sheetId, row, brief as BriefRow)
+    if (tokenSync.added.length) {
+      tokenLibrary = {
+        added: tokenSync.added.map((t) => `${t.category}:${t.value}`),
+        skipped: tokenSync.skipped,
+      }
+    } else if (tokenSync.skipped > 0) {
+      tokenLibrary = { added: [], skipped: tokenSync.skipped }
+    }
+    if (!tokenSync.ok && tokenSync.reason) {
+      console.error("[namer-creative-append] Token Library sync failed:", tokenSync.reason)
+    }
+  } catch (err) {
+    console.error("[namer-creative-append] Token Library sync error:", err)
+  }
 
   return {
     ok: true,
     tabTitle,
     gcsExportPath,
     assetGcsLink: row.assetGcsPath || undefined,
+    ...(tokenLibrary ? { token_library: tokenLibrary } : {}),
   }
 }
 
@@ -1295,7 +1374,9 @@ async function loadAssetAndBrief(admin: SupabaseClient, assetId: string) {
 
   const { data: brief, error: briefError } = await admin
     .from("creative_briefs")
-    .select("id, trigger_type, trigger_data, created_by, hook, copy_headline")
+    .select(
+      "id, trigger_type, trigger_data, created_by, hook, copy_headline, hypothesis, campaign_short_name"
+    )
     .eq("id", asset.brief_id)
     .maybeSingle()
 
@@ -1385,10 +1466,16 @@ export async function repairSyncedNamerRows(
       continue
     }
 
-    const values = mapRowToHeaderColumns(headers, row, headerInfo.layout, platformIds)
+    const row1Based = sheetRow + 1
+    const values = mapRowToHeaderColumns(
+      headers,
+      row,
+      headerInfo.layout,
+      platformIds,
+      row1Based
+    )
     const endCol = columnToLetter(headers.length - 1)
     const escapedTab = tabTitle.replace(/'/g, "''")
-    const row1Based = sheetRow + 1
     updates.push({
       range: `'${escapedTab}'!A${row1Based}:${endCol}${row1Based}`,
       values: [values],
@@ -1397,8 +1484,85 @@ export async function repairSyncedNamerRows(
   }
 
   if (updates.length) {
-    await batchWriteCells(sheets, sheetId, updates)
+    const hasFormulas = updates.some((u) => (u.values[0]?.[0] ?? "").trim().startsWith("="))
+    await batchWriteCells(sheets, sheetId, updates, { userEntered: hasFormulas })
   }
 
   return { repaired, errors }
+}
+
+export type CloneNamerAdResult = {
+  ok: boolean
+  reason?: string
+  adId?: string
+  tabTitle?: string
+}
+
+/** Duplicate an approved creative's Ad Builder row for another ad set (new AD###, same asset). */
+export async function cloneNamerAdToAdSet(
+  admin: SupabaseClient,
+  assetId: string,
+  targetAdSetLegacyId: string
+): Promise<CloneNamerAdResult> {
+  const adSetId = targetAdSetLegacyId.trim().toUpperCase()
+  if (!/^AS\d+$/i.test(adSetId)) {
+    return { ok: false, reason: "targetAdSetLegacyId must match AS###" }
+  }
+
+  const sheetId = await resolveNamerSheetId(admin)
+  if (!sheetId) return { ok: false, reason: "NAMER_SHEET_ID not configured" }
+
+  const loaded = await loadAssetAndBrief(admin, assetId)
+  if (!loaded) return { ok: false, reason: "Asset or brief not found" }
+
+  const sheets = createGoogleSheetsClient()
+  const tabTitles = await listSpreadsheetTabs(sheets, sheetId)
+  const tabTitle = resolveTabTitle(tabTitles, ...CREATIVE_BUILDER_TAB_CANDIDATES)
+  if (!tabTitle) return { ok: false, reason: "Ad Builder tab not found" }
+
+  const prepared = await loadPreparedSheetTab(sheets, sheetId, tabTitle)
+  if (!prepared) return { ok: false, reason: "Ad Builder header not found" }
+
+  const { rows, headerInfo, headers } = prepared
+  const dataRows = rows.slice(headerInfo.headerRow + 1)
+  const existingAdIds = collectColumnValues(dataRows, headers, HEADER_PATTERNS.thrmlAdId)
+
+  const conventionName = loaded.asset.convention_name!.trim()
+  const sourceIdx = findSheetRowForAsset(rows, headerInfo, assetId, conventionName)
+  if (sourceIdx < 0) {
+    return { ok: false, reason: "Source row not in Ad Builder — approve asset first" }
+  }
+
+  const newAdId = allocateNextThrmlLegacyId(existingAdIds, "ad")
+  const row = buildNamerCreativeRow(
+    loaded.asset,
+    loaded.brief,
+    { campaignGen: "Pending", adSetGen: "Pending" },
+    {
+      gcsPath: normalizeNamerGcsPath(loaded.asset.gcs_path),
+      signedUrl: loaded.asset.gcs_url?.trim() ?? "",
+    },
+    headerInfo.layout,
+    { campaignId: "", adSetId, adId: newAdId }
+  )
+  if (!row) return { ok: false, reason: "Could not build namer row" }
+
+  const nextRow1Based = rows.length + 1
+  const sheetValues = mapRowToHeaderColumns(headers, row, headerInfo.layout, undefined, nextRow1Based)
+  const endCol = columnToLetter(Math.max(headers.length - 1, 0))
+  const escapedTab = tabTitle.replace(/'/g, "''")
+
+  try {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: `'${escapedTab}'!A:${endCol}`,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: [sheetValues] },
+    })
+  } catch (err) {
+    return { ok: false, reason: sheetsErrorMessage(err) }
+  }
+
+  return { ok: true, adId: newAdId, tabTitle }
 }

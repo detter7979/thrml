@@ -9,10 +9,18 @@ export const COOKIE_CONSENT_DECLINED = "declined"
 export const COOKIE_CONSENT_ACCEPTED_EVENT = "thrml-cookie-consent-accepted"
 export const COOKIE_CONSENT_CHANGED_EVENT = "thrml-cookie-consent-changed"
 
-export function getCookieConsent(): string | null {
+export type CookieConsentValue = typeof COOKIE_CONSENT_ACCEPTED | typeof COOKIE_CONSENT_DECLINED
+
+/** Ignore corrupted or legacy localStorage values so the banner can show again. */
+export function parseCookieConsent(raw: string | null): CookieConsentValue | null {
+  if (raw === COOKIE_CONSENT_ACCEPTED || raw === COOKIE_CONSENT_DECLINED) return raw
+  return null
+}
+
+export function getCookieConsent(): CookieConsentValue | null {
   if (typeof window === "undefined") return null
   try {
-    return localStorage.getItem(COOKIE_CONSENT_KEY)
+    return parseCookieConsent(localStorage.getItem(COOKIE_CONSENT_KEY))
   } catch {
     return null
   }

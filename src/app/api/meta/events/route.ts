@@ -1,6 +1,7 @@
 import crypto from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 
+import { normalizeMetaPixelId } from "@/lib/analytics/env-ids"
 import { rateLimit } from "@/lib/rate-limit"
 
 type MetaEventsPayload = {
@@ -40,17 +41,15 @@ export async function POST(req: NextRequest) {
   })
   if (limited) return limited
 
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  const pixelId = normalizeMetaPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID)
   if (!pixelId) {
-    throw new Error("NEXT_PUBLIC_META_PIXEL_ID env var is required")
+    return NextResponse.json({ ok: false, skipped: "meta_pixel_unconfigured" })
   }
 
   const accessToken =
     process.env.META_CAPI_ACCESS_TOKEN ?? process.env.META_CONVERSIONS_API_TOKEN
   if (!accessToken) {
-    throw new Error(
-      "META_CONVERSIONS_API_TOKEN env var is required (or META_CAPI_ACCESS_TOKEN)"
-    )
+    return NextResponse.json({ ok: false, skipped: "meta_capi_unconfigured" })
   }
 
   let payload: MetaEventsPayload

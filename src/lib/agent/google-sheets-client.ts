@@ -63,13 +63,14 @@ export async function readSheetValues(
 export async function batchWriteCells(
   sheets: SheetsClient,
   spreadsheetId: string,
-  updates: { range: string; values: string[][] }[]
+  updates: { range: string; values: string[][] }[],
+  opts?: { userEntered?: boolean }
 ) {
   if (!updates.length) return
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId,
     requestBody: {
-      valueInputOption: "RAW",
+      valueInputOption: opts?.userEntered ? "USER_ENTERED" : "RAW",
       data: updates.map((u) => ({ range: u.range, values: u.values })),
     },
   })

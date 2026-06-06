@@ -16,7 +16,7 @@ import { allocateNextThrmlLegacyId } from "@/lib/agent/namer-legacy-ids"
 import { resolveNamerSheetId } from "@/lib/agent/namer-creative-append"
 import { HEADER_PATTERNS, NAMER_TAB_CANDIDATES } from "@/lib/agent/namer-sheet-schema"
 
-function colIndex(headers: string[], patterns: RegExp[]): number {
+function colIndex(headers: string[], patterns: readonly RegExp[]): number {
   for (let i = 0; i < headers.length; i++) {
     if (patterns.some((p) => p.test(headers[i] ?? ""))) return i
   }
@@ -89,7 +89,7 @@ export async function upsertCampaignRegistryInNamer(
   const thrmlId = allocateNextThrmlLegacyId(existingCampaignIds, "campaign")
 
   const values = new Array(header.headers.length).fill("")
-  const set = (patterns: RegExp[], value: string) => {
+  const set = (patterns: readonly RegExp[], value: string) => {
     const idx = colIndex(header.headers, patterns)
     if (idx >= 0 && value) values[idx] = value
   }
@@ -179,7 +179,7 @@ export async function upsertAdSetRegistryInNamer(
   }
 
   const values = new Array(header.headers.length).fill("")
-  const set = (patterns: RegExp[], value: string) => {
+  const set = (patterns: readonly RegExp[], value: string) => {
     const idx = colIndex(header.headers, patterns)
     if (idx >= 0 && value) values[idx] = value
   }

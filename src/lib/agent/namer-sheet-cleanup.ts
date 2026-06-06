@@ -25,7 +25,7 @@ export type NamerCleanupResult = {
   removedPreview: string[][]
 }
 
-function colIndex(headers: string[], patterns: RegExp[]): number {
+function colIndex(headers: string[], patterns: readonly RegExp[]): number {
   for (let i = 0; i < headers.length; i++) {
     const h = headers[i] ?? ""
     if (patterns.some((p) => p.test(h))) return i
@@ -66,7 +66,7 @@ function findHeaderRowCampaignAdSet(rows: string[][]): { headerRow: number; head
 }
 
 type DedupeConfig = {
-  keyCols: RegExp[][]
+  keyCols: readonly (readonly RegExp[])[]
   /** When true, blank-key rows are kept (manual drafts). */
   keepBlankKeys?: boolean
 }

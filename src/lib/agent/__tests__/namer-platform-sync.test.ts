@@ -89,4 +89,36 @@ describe("buildNamerCreativeRow with platform IDs", () => {
     expect(row?.adSetId).toBe("AS005")
     expect(row?.campaignId).toBe("C003")
   })
+
+  it("does not duplicate GCS link on ad_builder rows", () => {
+    const row = buildNamerCreativeRow(
+      {
+        id: "asset-uuid",
+        brief_id: "brief-uuid",
+        convention_name: "T05_A_pov_earnings_Static_1x1_list_now",
+        gcs_path: "gs://thrml/2026/06/hosts/pov_earnings/Static/composite/A_1x1.png",
+        gcs_url: "https://storage.googleapis.com/signed-temp",
+        format: "1x1",
+        meta_ad_id: null,
+        meta_adset_id: null,
+        namer_synced_at: null,
+      },
+      {
+        id: "brief-uuid",
+        trigger_type: "manual",
+        trigger_data: {},
+        created_by: "admin",
+        hook: null,
+        copy_headline: null,
+      },
+      { campaignGen: "Human", adSetGen: "Bot" },
+      {
+        gcsPath: "gs://thrml/2026/06/hosts/pov_earnings/Static/composite/A_1x1.png",
+        signedUrl: "https://storage.googleapis.com/signed-temp",
+      },
+      "ad_builder"
+    )
+    expect(row?.assetGcsPath).toContain("gs://")
+    expect(row?.assetGcsLink).toBe("")
+  })
 })

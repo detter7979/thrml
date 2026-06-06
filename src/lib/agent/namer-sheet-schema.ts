@@ -80,7 +80,21 @@ export const AD_SET_BUILDER_HEADERS_V4 = [
   "Notes",
 ] as const
 
-export const HEADER_PATTERNS = {
+export type NamerHeaderPatterns = RegExp[]
+
+export const HEADER_PATTERNS: Record<
+  | "thrmlCampaignId"
+  | "thrmlAdSetId"
+  | "thrmlAdId"
+  | "platformCampaignId"
+  | "platformAdSetId"
+  | "platformAdId"
+  | "assetUuid"
+  | "adName"
+  | "status"
+  | "gcsPath",
+  NamerHeaderPatterns
+> = {
   thrmlCampaignId: [/^campaign id$/i, /^campaign name \(ref\)$/i],
   thrmlAdSetId: [/^ad set id$/i, /^adset id$/i],
   thrmlAdId: [/^ad id$/i],
@@ -91,9 +105,8 @@ export const HEADER_PATTERNS = {
   adName: [/→?\s*ad name/i, /^ad name/i],
   status: [/^status$/i],
   gcsPath: [/^gcs path$/i],
-} as const
+}
 
-/** Columns auto-added to Ad Builder when missing (never removes Asset GCS Link if present). */
 /** Meta Graph object IDs — separate from C001 / AS001 / AD001. */
 export type MetaPlatformIds = {
   adId: string

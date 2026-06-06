@@ -423,7 +423,8 @@ export function buildNamerCreativeRow(
     phase: "",
     optEvent: "",
     assetGcsPath: gcsPath,
-    assetGcsLink: links.signedUrl,
+    /** Ad Builder uses GCS Path (gs://) only — avoid duplicating in Asset GCS Link. */
+    assetGcsLink: layout === "ad_builder" ? "" : links.signedUrl,
     pipelineTemplate: pipelineTemplateFromBrief(brief),
     assetUuid: asset.id,
     briefInput: briefInputProvenance(brief),
@@ -511,7 +512,7 @@ export function findCreativeBuilderHeader(
   return null
 }
 
-function colIndex(headers: string[], patterns: RegExp[]): number {
+function colIndex(headers: string[], patterns: readonly RegExp[]): number {
   for (let i = 0; i < headers.length; i++) {
     const h = headers[i] ?? ""
     if (patterns.some((p) => p.test(h))) return i
@@ -781,7 +782,7 @@ function mapRowToHeaderColumns(
   platformIds?: MetaPlatformIds
 ): string[] {
   const values = new Array(headers.length).fill("")
-  const set = (patterns: RegExp[], value: string) => {
+  const set = (patterns: readonly RegExp[], value: string) => {
     const idx = colIndex(headers, patterns)
     if (idx >= 0) values[idx] = value
   }
@@ -826,12 +827,13 @@ function mapRowToHeaderColumns(
   set([/^phase$/i], row.phase)
   set([/^opt\.?\s*event$/i, /^conv\.?\s*event$/i], row.optEvent)
 
-  const hasGcsPath = colIndex(headers, [/^gcs path$/i]) >= 0
-  if (!hasGcsPath) {
-    set(headerPatternsForExtended("Asset GCS Link"), row.assetGcsPath || row.assetGcsLink)
-  } else {
-    const linkCol = colIndex(headers, headerPatternsForExtended("Asset GCS Link"))
+  const hasGcsPath = colIndex(headers, HEADER_PATTERNS.gcsPath) >= 0
+  const linkCol = colIndex(headers, headerPatternsForExtended("Asset GCS Link"))
+  if (hasGcsPath) {
+    // Single source of truth: durable gs:// path in GCS Path; leave legacy link column empty.
     if (linkCol >= 0) values[linkCol] = ""
+  } else if (linkCol >= 0) {
+    set(headerPatternsForExtended("Asset GCS Link"), row.assetGcsPath || row.assetGcsLink)
   }
 
   set(headerPatternsForExtended("Pipeline Template"), row.pipelineTemplate)
@@ -876,7 +878,7 @@ export function buildPlatformIdSheetUpdates(
   const escapedTab = tabTitle.replace(/'/g, "''")
   const row1 = sheetRow0Based + 1
   const updates: { range: string; values: string[][] }[] = []
-  const add = (patterns: RegExp[], value: string) => {
+  const add = (patterns: readonly RegExp[], value: string) => {
     const v = value.trim()
     if (!v) return
     const idx = colIndex(headers, patterns)
@@ -903,7 +905,7 @@ export function buildThrmlIdSheetUpdates(
   const escapedTab = tabTitle.replace(/'/g, "''")
   const row1 = sheetRow0Based + 1
   const updates: { range: string; values: string[][] }[] = []
-  const add = (patterns: RegExp[], value: string) => {
+  const add = (patterns: readonly RegExp[], value: string) => {
     const v = value.trim()
     if (!v) return
     const idx = colIndex(headers, patterns)
@@ -921,7 +923,11 @@ export function buildThrmlIdSheetUpdates(
   return updates
 }
 
-function collectColumnValues(rows: string[][], headers: string[], patterns: RegExp[]): string[] {
+function collectColumnValues(
+  rows: string[][],
+  headers: string[],
+  patterns: readonly RegExp[]
+): string[] {
   const col = colIndex(headers, patterns)
   if (col < 0) return []
   const values: string[] = []
@@ -1272,7 +1278,7 @@ export async function appendApprovedCreativeToNamer(
     ok: true,
     tabTitle,
     gcsExportPath,
-    assetGcsLink: row.assetGcsPath || signedUrl || undefined,
+    assetGcsLink: row.assetGcsPath || undefined,
   }
 }
 

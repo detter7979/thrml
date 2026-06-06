@@ -230,7 +230,7 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
               </div>
 
               <p className="hero-anim-in hero-delay-900 mt-6 text-xs tracking-[0.06em] text-white/45">
-                Private • Instant Booking • Host Earnings up to $2,000+/mo
+                Private • Instant Booking • Free to list
               </p>
             </div>
           </div>
@@ -255,7 +255,7 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
           </div>
 
           <p className="hero-anim-in hero-delay-900 mt-5 text-xs leading-relaxed tracking-[0.04em] text-white/45">
-            Private • Instant Booking • Host Earnings up to $2,000+/mo
+            Private • Instant Booking • Free to list
           </p>
 
           <button

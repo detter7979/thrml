@@ -4,6 +4,10 @@ import Script from "next/script"
 import { useEffect, useState } from "react"
 
 import {
+  normalizeGaMeasurementId,
+  normalizeGoogleAdsId,
+} from "@/lib/analytics/env-ids"
+import {
   COOKIE_CONSENT_ACCEPTED_EVENT,
   COOKIE_CONSENT_CHANGED_EVENT,
   COOKIE_CONSENT_KEY,
@@ -20,8 +24,8 @@ export { COOKIE_CONSENT_ACCEPTED_EVENT } from "@/lib/cookie-consent"
  */
 export function GoogleTagLoader() {
   const [enabled, setEnabled] = useState(false)
-  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
-  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+  const googleAdsId = normalizeGoogleAdsId(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID)
+  const gaMeasurementId = normalizeGaMeasurementId(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID)
 
   useEffect(() => {
     function syncConsent() {
@@ -57,12 +61,14 @@ export function GoogleTagLoader() {
     }
   }, [])
 
-  if (!enabled || !googleAdsId || !gaMeasurementId) return null
+  if (!enabled || (!googleAdsId && !gaMeasurementId)) return null
+
+  const gtagLoaderId = googleAdsId ?? gaMeasurementId!
 
   return (
     <>
       <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsId}`}
+        src={`https://www.googletagmanager.com/gtag/js?id=${gtagLoaderId}`}
         strategy="lazyOnload"
       />
       <Script id="google-tag-init" strategy="lazyOnload">
@@ -76,8 +82,8 @@ export function GoogleTagLoader() {
             ad_user_data: 'granted',
             ad_personalization: 'granted',
           });
-          gtag('config', '${googleAdsId}');
-          gtag('config', '${gaMeasurementId}');
+          ${googleAdsId ? `gtag('config', '${googleAdsId}');` : ""}
+          ${gaMeasurementId ? `gtag('config', '${gaMeasurementId}');` : ""}
         `}
       </Script>
     </>

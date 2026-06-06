@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Script from "next/script"
 
+import { normalizeMetaPixelId } from "@/lib/analytics/env-ids"
 import {
   COOKIE_CONSENT_ACCEPTED_EVENT,
   COOKIE_CONSENT_CHANGED_EVENT,
@@ -34,7 +35,7 @@ declare global {
 }
 
 export function MetaPixel() {
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  const pixelId = normalizeMetaPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID)
   const [consented, setConsented] = useState(false)
 
   useEffect(() => {

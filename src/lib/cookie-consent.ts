@@ -1,3 +1,8 @@
+import {
+  normalizeGaMeasurementId,
+  normalizeGoogleAdsId,
+} from "@/lib/analytics/env-ids"
+
 export const COOKIE_CONSENT_KEY = "thrml_cookie_consent"
 export const COOKIE_CONSENT_ACCEPTED = "accepted"
 export const COOKIE_CONSENT_DECLINED = "declined"
@@ -18,10 +23,13 @@ export function isAnalyticsConsented(): boolean {
 }
 
 function getAnalyticsIds(): { gaMeasurementId: string; googleAdsId: string } | null {
-  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
-  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
-  if (!gaMeasurementId || !googleAdsId) return null
-  return { gaMeasurementId, googleAdsId }
+  const gaMeasurementId = normalizeGaMeasurementId(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID)
+  const googleAdsId = normalizeGoogleAdsId(process.env.NEXT_PUBLIC_GOOGLE_ADS_ID)
+  if (!gaMeasurementId && !googleAdsId) return null
+  return {
+    gaMeasurementId: gaMeasurementId ?? "",
+    googleAdsId: googleAdsId ?? "",
+  }
 }
 
 function getGtagFn(): (...args: unknown[]) => void {
@@ -35,8 +43,8 @@ function setGtagDisableFlags(disable: boolean) {
   if (!ids) return
   const { gaMeasurementId, googleAdsId } = ids
   const win = window as Window & Record<string, boolean | undefined>
-  win[`ga-disable-${gaMeasurementId}`] = disable ? true : undefined
-  win[`ga-disable-${googleAdsId}`] = disable ? true : undefined
+  if (gaMeasurementId) win[`ga-disable-${gaMeasurementId}`] = disable ? true : undefined
+  if (googleAdsId) win[`ga-disable-${googleAdsId}`] = disable ? true : undefined
 }
 
 function expireCookie(name: string) {

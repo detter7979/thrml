@@ -1,6 +1,11 @@
+import crypto from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 
 import { assertHostInsuranceAttested } from "@/lib/host/insurance-attestation"
+import {
+  fireHostListingCapiEvents,
+  newListingMetaEventIds,
+} from "@/lib/meta/host-acquisition-events"
 import { assertPublishableListingCopy } from "@/lib/listings/host-claim-policy"
 import { insertListingWithColumnFallback } from "@/lib/listings/insert-listing"
 import {
@@ -97,7 +102,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ listingId: data.id })
+    const { count } = await admin
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("host_id", user.id)
+
+    const isFirstListing = count === 1
+    const metaIds = newListingMetaEventIds(isFirstListing)
+    const eventSourceUrl =
+      request.headers.get("referer") ?? "https://usethrml.com/dashboard/host/new"
+
+    void fireHostListingCapiEvents(admin, user, {
+      listingId: data.id,
+      headers: request.headers,
+      eventSourceUrl,
+      hostListingCreatedEventId: metaIds.host_listing_created_event_id,
+      hostFirstListingCreatedEventId: metaIds.host_first_listing_created_event_id,
+      isFirstListing,
+    }).catch((err) => {
+      console.error("[POST /api/listings] host listing CAPI failed", err)
+    })
+
+    return NextResponse.json({
+      listingId: data.id,
+      meta: {
+        host_listing_created_event_id: metaIds.host_listing_created_event_id,
+        host_first_listing_created_event_id: metaIds.host_first_listing_created_event_id,
+        is_first_listing: isFirstListing,
+      },
+    })
   } catch (err) {
     const { message, code } = errorFromUnknown(err)
     console.error("[POST /api/listings] failed", {

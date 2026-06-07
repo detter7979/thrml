@@ -430,6 +430,7 @@ export function HostNewListingClient({
       keepalive: true,
       body: JSON.stringify({
         event_id: eventId,
+        event_source_url: window.location.href,
         ...(fbp ? { fbp } : {}),
         ...(fbc ? { fbc } : {}),
       }),

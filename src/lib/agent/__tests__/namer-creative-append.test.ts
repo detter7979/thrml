@@ -42,6 +42,7 @@ describe("briefInputProvenance", () => {
         trigger_data: {},
         created_by: "admin",
         hook: null,
+        copy_headline: null,
       })
     ).toBe("Human")
   })
@@ -54,6 +55,7 @@ describe("briefInputProvenance", () => {
         trigger_data: {},
         created_by: "agent",
         hook: null,
+        copy_headline: null,
       })
     ).toBe("Bot")
   })

@@ -61,8 +61,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           ? profile.ui_intent
           : "guest"
       }
-      hasListings={Boolean((listingCount ?? 0) > 0)}
-      activeListingsCount={Number(listingCount ?? 0)}
+      hasListings={Boolean((totalListingCount ?? 0) > 0)}
+      activeListingsCount={Number(activeListingCount ?? 0)}
     >
       {children}
     </DashboardShell>

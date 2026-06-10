@@ -82,9 +82,6 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
                     Disclaimers
                   </Link>
                 </li>
-                <li>
-                  <CookieSettingsLink className="transition-colors hover:text-white" />
-                </li>
               </ul>
             </div>
 
@@ -111,7 +108,13 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
           </div>
 
           <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-4 text-xs text-white/45 md:flex-row md:items-center md:justify-between">
-            <p>&copy; {currentYear} thrml</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p>&copy; {currentYear} thrml</p>
+              <span aria-hidden="true" className="hidden text-white/25 md:inline">
+                ·
+              </span>
+              <CookieSettingsLink className="transition-colors hover:text-white/70" />
+            </div>
             <div className="flex items-center gap-2 md:justify-end">
               <a
                 href="https://www.facebook.com/usethrml"

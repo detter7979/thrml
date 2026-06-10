@@ -236,36 +236,40 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
           </div>
         </div>
 
-        <div className="relative z-20 mx-auto max-w-6xl px-4 pt-2 pb-10 pointer-events-auto md:hidden">
-          <h1 className="font-serif text-[clamp(32px,8vw,44px)] font-medium leading-[0.98] tracking-tight text-[#F5EFE8]">
-            <span className="hero-anim-in hero-delay-150 block">Your Personal Sauna Awaits</span>
-          </h1>
-          <p className="hero-anim-in hero-delay-600 mt-6 max-w-xl text-[16px] leading-[1.65] text-white/65">
-            Private home saunas, booked by the hour. Browse a space near you - or list your own and
-            earn.
-          </p>
-
-          <div className="hero-anim-scale hero-delay-750 mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button asChild className={`${heroPrimaryCtaClass} w-full sm:w-auto`}>
-              <Link href="/explore">Browse Saunas</Link>
-            </Button>
-            <Button asChild variant="outline" className={`${heroSecondaryCtaClass} w-full sm:w-auto`}>
-              <Link href="/become-a-host">Become a Host</Link>
-            </Button>
+        <div className="relative z-20 mx-auto flex min-h-[calc(100svh-7rem)] w-full max-w-6xl flex-col px-4 pt-2 pb-8 pointer-events-auto md:hidden">
+          <div>
+            <h1 className="font-serif text-[clamp(32px,8vw,44px)] font-medium leading-[0.98] tracking-tight text-[#F5EFE8]">
+              <span className="hero-anim-in hero-delay-150 block">Your Personal Sauna Awaits</span>
+            </h1>
+            <p className="hero-anim-in hero-delay-600 mt-6 max-w-xl text-[16px] leading-[1.65] text-white/65">
+              Private home saunas, booked by the hour. Browse a space near you - or list your own and
+              earn.
+            </p>
           </div>
 
-          <p className="hero-anim-in hero-delay-900 mt-5 text-xs leading-relaxed tracking-[0.04em] text-white/45">
-            Private • Instant Booking • Free to list
-          </p>
+          <div className="hero-anim-scale hero-delay-750 mt-auto flex flex-col items-center gap-5 pb-2 pt-10">
+            <div className="flex w-full max-w-[220px] flex-col gap-3">
+              <Button asChild className={`${heroPrimaryCtaClass} w-full px-6`}>
+                <Link href="/explore">Browse Saunas</Link>
+              </Button>
+              <Button asChild variant="outline" className={`${heroSecondaryCtaClass} w-full px-6`}>
+                <Link href="/become-a-host">Become a Host</Link>
+              </Button>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
-            className="mx-auto mt-6 inline-flex w-full items-center justify-center gap-1 text-center text-[12px] tracking-[0.08em] text-white/85"
-          >
-            <span>Explore saunas</span>
-            <ChevronDown className="size-3.5" />
-          </button>
+            <p className="hero-anim-in hero-delay-900 text-center text-xs leading-relaxed tracking-[0.04em] text-white/45">
+              Private • Instant Booking • Free to list
+            </p>
+
+            <button
+              type="button"
+              onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
+              className="inline-flex items-center justify-center gap-1 text-center text-[12px] tracking-[0.08em] text-white/85"
+            >
+              <span>Explore saunas</span>
+              <ChevronDown className="size-3.5" />
+            </button>
+          </div>
         </div>
 
         <button

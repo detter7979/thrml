@@ -86,8 +86,8 @@ In the event of a merger, acquisition, or sale of substantially all of thrml's a
         <p className="mt-3">
           We use cookies and similar technologies to maintain sessions, remember preferences, and analyze platform
           usage. You can manage analytics and advertising cookies at any time through{" "}
-          <CookieSettingsLink className="text-[#C4623A] underline hover:text-[#b05530]" /> (also available in the site
-          footer). Declining analytics cookies stops Google Analytics and the Meta Pixel from loading on your device.
+          <CookieSettingsLink className="text-[#C4623A] underline hover:text-[#b05530]" /> (also in the footer bar).
+          Declining analytics cookies stops Google Analytics and the Meta Pixel from loading on your device.
           Disabling essential cookies in your browser may affect platform functionality.
         </p>
         <p className="mt-3">

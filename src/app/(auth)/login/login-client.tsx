@@ -235,7 +235,7 @@ function LoginForm() {
 
     const next = resolveNextPath()
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+    const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo },
     })
@@ -243,7 +243,16 @@ function LoginForm() {
     if (oauthError) {
       setError(toProviderErrorMessage("Google", oauthError.message))
       setIsGoogleLoading(false)
+      return
     }
+
+    if (data.url) {
+      window.location.href = data.url
+      return
+    }
+
+    setError("Could not start Google sign-in. Please try again.")
+    setIsGoogleLoading(false)
   }
 
   const isBusy = isPasswordLoading || isMagicLinkLoading || isGoogleLoading
@@ -269,19 +278,6 @@ function LoginForm() {
           if you believe this is a mistake.
         </div>
       ) : null}
-
-      <Button
-        type="button"
-        variant="outline"
-        className={authSocialButtonClassName}
-        onClick={handleGoogleLogin}
-        disabled={isBusy}
-      >
-        <GoogleIcon className="size-5 shrink-0" />
-        {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
-      </Button>
-
-      <AuthDivider />
 
       {view === "check-email" ? (
         <div className="space-y-4 rounded-2xl border border-[#E7DED3] bg-[#FCFAF7] p-5">
@@ -345,7 +341,6 @@ function LoginForm() {
                   </Link>
                 </div>
               </div>
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
               <Button className={authPrimaryButtonClassName} disabled={isBusy}>
                 {isPasswordLoading ? "Signing in..." : "Log in"}
               </Button>
@@ -366,14 +361,32 @@ function LoginForm() {
               <p className="text-sm leading-relaxed text-[#746558]">
                 We&apos;ll email you a secure link — no password needed.
               </p>
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
               <Button className={authPrimaryButtonClassName} disabled={isBusy}>
                 {isMagicLinkLoading ? "Sending link..." : "Email me a login link"}
               </Button>
             </form>
           ) : null}
+
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
       )}
+
+      {view !== "check-email" ? (
+        <>
+          <AuthDivider />
+
+          <Button
+            type="button"
+            variant="outline"
+            className={authSocialButtonClassName}
+            onClick={handleGoogleLogin}
+            disabled={isBusy}
+          >
+            <GoogleIcon className="size-5 shrink-0" />
+            {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
+          </Button>
+        </>
+      ) : null}
 
       <p className="text-center text-sm text-[#746558] md:text-left">
         New to thrml?{" "}

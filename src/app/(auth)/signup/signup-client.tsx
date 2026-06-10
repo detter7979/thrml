@@ -152,9 +152,17 @@ function SignupForm() {
     }
 
     setIsGoogleLoading(true)
+
+    document.cookie = "thrml_signup_terms=1; path=/; max-age=600; SameSite=Lax"
+    if (signupNewsletterOptIn) {
+      document.cookie = "thrml_signup_newsletter=1; path=/; max-age=600; SameSite=Lax"
+    } else {
+      document.cookie = "thrml_signup_newsletter=; path=/; max-age=0; SameSite=Lax"
+    }
+
     const next = getPostSignupDestination()
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+    const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo },
     })
@@ -162,7 +170,17 @@ function SignupForm() {
     if (oauthError) {
       setError(toProviderErrorMessage("Google", oauthError.message))
       setIsGoogleLoading(false)
+      return
     }
+
+    if (data.url) {
+      trackGaEvent("sign_up", { method: "google" })
+      window.location.href = data.url
+      return
+    }
+
+    setError("Could not start Google sign-up. Please try again.")
+    setIsGoogleLoading(false)
   }
 
   async function handleStepOne(event: FormEvent<HTMLFormElement>) {
@@ -324,19 +342,6 @@ function SignupForm() {
         </div>
       ) : step === 1 ? (
         <div className="space-y-5">
-          <Button
-            type="button"
-            variant="outline"
-            className={authSocialButtonClassName}
-            onClick={handleGoogleSignup}
-            disabled={isBusy}
-          >
-            <GoogleIcon className="size-5 shrink-0" />
-            {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
-          </Button>
-
-          <AuthDivider />
-
           <SignupStepIndicator step={1} />
 
           <form onSubmit={handleStepOne} className="space-y-5">
@@ -422,11 +427,25 @@ function SignupForm() {
               </label>
             </div>
 
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
             <Button className={authPrimaryButtonClassName} disabled={!signupTermsAccepted || isBusy}>
               Continue
             </Button>
           </form>
+
+          <AuthDivider />
+
+          <Button
+            type="button"
+            variant="outline"
+            className={authSocialButtonClassName}
+            onClick={handleGoogleSignup}
+            disabled={!signupTermsAccepted || isBusy}
+          >
+            <GoogleIcon className="size-5 shrink-0" />
+            {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
+          </Button>
+
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>
       ) : (
         <div className="space-y-5">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { sendGuestWelcomeEmail, markOnboardingEmailSent } from "@/lib/emails/onboarding"
+import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { recordReferral } from "@/lib/referral"
 import { sanitizeNextPath } from "@/lib/security"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -15,6 +16,40 @@ function loginFallbackUrl(requestUrl: URL, next: string | null) {
   return loginUrl
 }
 
+function clearOAuthSignupCookies(response: NextResponse) {
+  response.cookies.delete("thrml_signup_terms")
+  response.cookies.delete("thrml_signup_newsletter")
+  return response
+}
+
+async function applyOAuthSignupMetadata(request: NextRequest, userId: string) {
+  if (!request.cookies.get("thrml_signup_terms")?.value) return
+
+  const newsletterOptIn = request.cookies.get("thrml_signup_newsletter")?.value === "1"
+  const admin = createAdminClient()
+  const profilePayload: Record<string, unknown> = {
+    id: userId,
+    terms_accepted: true,
+    terms_accepted_at: new Date().toISOString(),
+    terms_version: LEGAL_VERSIONS.TERMS,
+    privacy_version: LEGAL_VERSIONS.PRIVACY,
+    newsletter_opted_in: newsletterOptIn,
+    newsletter_opted_in_at: newsletterOptIn ? new Date().toISOString() : null,
+    notification_preferences: {
+      marketing_wellness_tips: newsletterOptIn,
+    },
+  }
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const { error: profileError } = await admin.from("profiles").upsert(profilePayload, { onConflict: "id" })
+    if (!profileError) return
+    const missingColumnMatch = profileError.message?.match(/'([^']+)' column/i)
+    const missingColumn = missingColumnMatch?.[1]
+    if (!missingColumn || !(missingColumn in profilePayload)) return
+    delete profilePayload[missingColumn]
+  }
+}
+
 async function resolvePostAuthRedirect(request: NextRequest, requestUrl: URL, next: string | null) {
   const supabase = await createClient()
   const {
@@ -22,8 +57,10 @@ async function resolvePostAuthRedirect(request: NextRequest, requestUrl: URL, ne
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.redirect(loginFallbackUrl(requestUrl, next))
+    return clearOAuthSignupCookies(NextResponse.redirect(loginFallbackUrl(requestUrl, next)))
   }
+
+  await applyOAuthSignupMetadata(request, user.id)
 
   const refRaw = request.cookies.get("thrml_ref")?.value
   if (refRaw) {
@@ -48,7 +85,9 @@ async function resolvePostAuthRedirect(request: NextRequest, requestUrl: URL, ne
     }
   }
 
-  if (next) return NextResponse.redirect(new URL(next, requestUrl.origin))
+  if (next) {
+    return clearOAuthSignupCookies(NextResponse.redirect(new URL(next, requestUrl.origin)))
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -57,7 +96,7 @@ async function resolvePostAuthRedirect(request: NextRequest, requestUrl: URL, ne
     .maybeSingle()
 
   const destination = profile?.ui_intent === "host" ? "/dashboard" : "/explore"
-  return NextResponse.redirect(new URL(destination, requestUrl.origin))
+  return clearOAuthSignupCookies(NextResponse.redirect(new URL(destination, requestUrl.origin)))
 }
 
 export async function GET(request: NextRequest) {

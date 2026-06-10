@@ -409,7 +409,7 @@ export async function fetchLaunchableAdsets(adAccountId: string): Promise<MetaAd
  * ACT (activation): prefer `host_verified` when the host completed Stripe Identity — that is the
  * stronger activation signal. Generic `activation` / pixel custom activation still map to ACT.
  * When host_verified is firing, ACT means verified-and-listing-created in practice; until then ACT
- * may be sparse — NL remains the usual proxy for listing_created volume in reports.
+ * may be sparse — NL remains the usual proxy for host_first_listing_created volume in reports.
  */
 export function mapMetaActionsToEvents(actions: MetaAction[]): { event_t: string; conversions: number }[] {
   const byEvent = new Map<string, number>()
@@ -448,11 +448,22 @@ export function mapMetaActionsToEvents(actions: MetaAction[]): { event_t: string
       continue
     }
     if (
+      t === "offsite_conversion.fb_pixel_custom.host_first_listing_created" ||
+      t === "offsite_conversion.custom.host_first_listing_created" ||
+      t === "host_first_listing_created" ||
       t === "offsite_conversion.fb_pixel_custom.listing_created" ||
       t === "offsite_conversion.custom.listing_created" ||
       t === "listing_created"
     ) {
       add("NL", v)
+      continue
+    }
+    if (
+      t === "offsite_conversion.fb_pixel_custom.host_listing_created" ||
+      t === "offsite_conversion.custom.host_listing_created" ||
+      t === "host_listing_created"
+    ) {
+      add("HLC", v)
       continue
     }
     if (

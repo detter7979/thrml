@@ -16,11 +16,11 @@ const CAMPAIGNS = [
   ["C002","META","P1","REACH","PROSP","host","sauna", "ALL","become_host_click",    "1","Phase 1 host — sauna owner interest"],
   ["C003","META","P2","LEAD", "PROSP","host","gen",   "ALL","host_onboarding_started","2","Phase 2 host — PROSP, warm audiences"],
   ["C004","META","P2","LEAD", "LAL",  "host","sauna", "ALL","host_onboarding_started","2","Phase 2 host — 1% LAL expansion"],
-  ["C005","META","P3","CONV", "LAL",  "host","gen",   "ALL","listing_created",      "3","Phase 3 host — 2% LAL, close to listing"],
-  ["C006","META","P3","CONV", "LAL",  "host","sauna", "ALL","listing_created",      "3","Phase 3 host — 2% LAL, sauna-specific"],
+  ["C005","META","P3","CONV", "LAL",  "host","gen",   "ALL","host_first_listing_created","3","Phase 3 host — 2% LAL, optimize first listing"],
+  ["C006","META","P3","CONV", "LAL",  "host","sauna", "ALL","host_first_listing_created","3","Phase 3 host — 2% LAL, sauna-specific first listing"],
   ["C007","GOOG","P1","CONV", "PROSP","host","gen",   "SEA","become_host_click",    "1","Google Search — host keywords, Seattle"],
   ["C008","GOOG","P2","CONV", "PROSP","host","gen",   "SEA","host_onboarding_started","2","Google P2 — warm host audiences"],
-  ["C009","GOOG","P3","CONV", "PROSP","host","gen",   "SEA","listing_created",      "3","Google P3 — high-intent host search"],
+  ["C009","GOOG","P3","CONV", "PROSP","host","gen",   "SEA","host_first_listing_created","3","Google P3 — high-intent host search"],
   // ── GUEST CAMPAIGNS ────────────────────────────────────────────────────────
   ["C010","META","P3","CONV", "RT",   "guest","checkout_rt","ALL","Purchase",       "★","Priority 1 — checkout retargeting. Start here."],
   ["C011","META","P2","CONV", "RT",   "guest","listing_rt", "ALL","InitiateCheckout","2","Priority 2 — listing view retargeting"],
@@ -43,8 +43,8 @@ const ADSETS = [
   ["AS006","C003","META_P2_LEAD_PROSP_host_gen_ALL",    "income",   "lal1",      "FEED-STORIES","1% LAL of P1 become_host_click — all types",   "host_onboarding_started","30%"],
   ["AS007","C003","META_P2_LEAD_PROSP_host_gen_ALL",    "sauna",    "lal2",      "FEED-STORIES","2% LAL expansion — broader, lower CPM",        "host_onboarding_started","30%"],
   // ── HOST AD SETS (C005 - META_P3_CONV_LAL_host_gen_ALL) ─────────────────
-  ["AS008","C005","META_P3_CONV_LAL_host_gen_ALL",      "sauna",    "lal2",      "FEED-STORIES","2% LAL of P2 host_onboarding_started events",  "listing_created",       "50%"],
-  ["AS009","C005","META_P3_CONV_LAL_host_gen_ALL",      "income",   "lal2",      "FEED-STORIES","Advantage+ audiences (after 100+ P3 events)",  "listing_created",       "50%"],
+  ["AS008","C005","META_P3_CONV_LAL_host_gen_ALL",      "sauna",    "lal2",      "FEED-STORIES","2% LAL of P2 host_onboarding_started events",  "host_first_listing_created","50%"],
+  ["AS009","C005","META_P3_CONV_LAL_host_gen_ALL",      "income",   "lal2",      "FEED-STORIES","Advantage+ audiences (after 100+ P3 events)",  "host_first_listing_created","50%"],
   // ── HOST AD SETS (C007 - GOOG_P1_CONV_PROSP_host_gen_SEA) ───────────────
   ["AS010","C007","GOOG_P1_CONV_PROSP_host_gen_SEA",    "income",   "int",       "SEARCH",     "'sauna rental near me', 'rent sauna space'",    "become_host_click",     "100%"],
   // ── GUEST AD SETS (C010 - META_P3_CONV_RT_guest_checkout_rt_ALL) ─────────
@@ -76,9 +76,9 @@ const CREATIVES = [
   ["AD007","AS005","C003","T02","B","social_proof","Carousel",   "get_started","See what hosts earn…",        "Draft","META","P2","host_onboarding_started"],
   ["AD008","AS006","C003","T02","A","community",   "Static_9x16","get_started","Your space. Your rules.",     "Draft","META","P2","host_onboarding_started"],
   // ── HOST P3 — T03 (social_proof vs urgency) ───────────────────────────────
-  ["AD009","AS008","C005","T03","A","social_proof","Static_9x16","list_now", "First booking in 48 hrs",      "Draft","META","P3","listing_created"],
-  ["AD010","AS008","C005","T03","B","urgency",     "Video_30s",  "list_now", "Limited spots in Seattle",     "Draft","META","P3","listing_created"],
-  ["AD011","AS009","C005","T03","A","social_proof","UGC",        "list_now", "I listed mine last week…",     "Draft","META","P3","listing_created"],
+  ["AD009","AS008","C005","T03","A","social_proof","Static_9x16","list_now", "First booking in 48 hrs",      "Draft","META","P3","host_first_listing_created"],
+  ["AD010","AS008","C005","T03","B","urgency",     "Video_30s",  "list_now", "Limited spots in Seattle",     "Draft","META","P3","host_first_listing_created"],
+  ["AD011","AS009","C005","T03","A","social_proof","UGC",        "list_now", "I listed mine last week…",     "Draft","META","P3","host_first_listing_created"],
   // ── GUEST P3 CHECKOUT RT — T04 (fomo vs urgency vs social_proof) ──────────
   ["AD012","AS011","C010","T04","A","fomo",        "Static_9x16","book_now", "You were this close…",         "Draft","META","P3","Purchase"],
   ["AD013","AS011","C010","T04","B","urgency",     "Video_15s",  "book_now", "Only 3 spots left this week",  "Draft","META","P3","Purchase"],

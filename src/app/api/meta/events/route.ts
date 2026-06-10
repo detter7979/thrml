@@ -1,7 +1,6 @@
-import crypto from "crypto"
 import { NextRequest, NextResponse } from "next/server"
 
-import { normalizeMetaPixelId } from "@/lib/analytics/env-ids"
+import { fireCapiEvent, getClientIpFromHeaders } from "@/lib/meta-capi"
 import { rateLimit } from "@/lib/rate-limit"
 
 type MetaEventsPayload = {
@@ -11,26 +10,13 @@ type MetaEventsPayload = {
   customData?: Record<string, unknown>
   userData?: {
     email?: string
+    phone?: string
     firstName?: string
     lastName?: string
+    externalId?: string
     fbp?: string
     fbc?: string
   }
-}
-
-function normalizeForHash(value: string) {
-  return value.trim().toLowerCase()
-}
-
-function sha256(value: string) {
-  return crypto.createHash("sha256").update(value).digest("hex")
-}
-
-function hashIfPresent(value?: string) {
-  if (!value) return undefined
-  const normalized = normalizeForHash(value)
-  if (!normalized) return undefined
-  return /^[a-f0-9]{64}$/i.test(normalized) ? normalized : sha256(normalized)
 }
 
 export async function POST(req: NextRequest) {
@@ -40,17 +26,6 @@ export async function POST(req: NextRequest) {
     identifier: "meta-events",
   })
   if (limited) return limited
-
-  const pixelId = normalizeMetaPixelId(process.env.NEXT_PUBLIC_META_PIXEL_ID)
-  if (!pixelId) {
-    return NextResponse.json({ ok: false, skipped: "meta_pixel_unconfigured" })
-  }
-
-  const accessToken =
-    process.env.META_CAPI_ACCESS_TOKEN ?? process.env.META_CONVERSIONS_API_TOKEN
-  if (!accessToken) {
-    return NextResponse.json({ ok: false, skipped: "meta_capi_unconfigured" })
-  }
 
   let payload: MetaEventsPayload
   try {
@@ -63,51 +38,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "eventName is required" }, { status: 400 })
   }
 
-  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-  const userAgent = req.headers.get("user-agent") ?? undefined
-
-  const userData = {
-    ...(hashIfPresent(payload.userData?.email) ? { em: hashIfPresent(payload.userData?.email) } : {}),
-    ...(hashIfPresent(payload.userData?.firstName) ? { fn: hashIfPresent(payload.userData?.firstName) } : {}),
-    ...(hashIfPresent(payload.userData?.lastName) ? { ln: hashIfPresent(payload.userData?.lastName) } : {}),
-    ...(payload.userData?.fbp ? { fbp: payload.userData.fbp } : {}),
-    ...(payload.userData?.fbc ? { fbc: payload.userData.fbc } : {}),
-    ...(forwardedFor ? { client_ip_address: forwardedFor } : {}),
-    ...(userAgent ? { client_user_agent: userAgent } : {}),
-  }
-
-  const requestBody = {
-    data: [
-      {
-        event_name: payload.eventName,
-        event_time: Math.floor(Date.now() / 1000),
-        action_source: "website",
-        event_source_url: payload.eventSourceUrl ?? req.headers.get("referer") ?? undefined,
-        event_id: payload.eventId,
-        custom_data: payload.customData ?? {},
-        user_data: userData,
-      },
-    ],
-    ...(process.env.META_TEST_EVENT_CODE ? { test_event_code: process.env.META_TEST_EVENT_CODE } : {}),
-  }
-
-  try {
-    const response = await fetch(
-      `https://graph.facebook.com/v22.0/${pixelId}/events?access_token=${accessToken}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      }
-    )
-
-    if (!response.ok) {
-      const details = await response.text()
-      console.error("[Meta CAPI] Request failed", response.status, details)
-    }
-  } catch (error) {
-    console.error("[Meta CAPI] Send failed", error)
-  }
+  void fireCapiEvent(payload.eventName, {
+    eventId: payload.eventId,
+    eventSourceUrl: payload.eventSourceUrl ?? req.headers.get("referer") ?? undefined,
+    userData: {
+      email: payload.userData?.email,
+      phone: payload.userData?.phone,
+      firstName: payload.userData?.firstName,
+      lastName: payload.userData?.lastName,
+      externalId: payload.userData?.externalId,
+      fbp: payload.userData?.fbp,
+      fbc: payload.userData?.fbc,
+      clientIpAddress: getClientIpFromHeaders(req.headers),
+      clientUserAgent: req.headers.get("user-agent") ?? undefined,
+    },
+    customData: payload.customData,
+  }).catch((err) => {
+    console.error("[Meta CAPI] generic events route failed", err)
+  })
 
   return NextResponse.json({ ok: true })
 }

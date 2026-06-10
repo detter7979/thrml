@@ -252,7 +252,7 @@ export function parseNamingConvention(name: string): ParsedName {
   if (isHost) {
     base.optEvent = phaseNum === 1 ? "become_host_click"
       : phaseNum === 2 ? "host_onboarding_started"
-      : "listing_created"
+      : "host_first_listing_created"
   } else {
     base.optEvent = phaseNum >= 3 ? "Purchase"
       : phaseNum === 2 ? "InitiateCheckout"

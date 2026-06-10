@@ -5,7 +5,8 @@ P1 — Traffic/Engagement, optimized for `become_host_click` or `Lead`
      Budget: $15–25/day per ad set, low signal threshold
 P2 — Conversions, optimized for `host_onboarding_started` or `InitiateCheckout`
      Budget: $25–40/day, scale when 50+ events/week
-P3 — Conversions, optimized for `listing_created` or `Purchase`
+P3 — Conversions, optimized for `host_first_listing_created` (first listing) or `Purchase`
+     Funnel analytics: `host_listing_created` fires on every listing (not the P3 opt target)
      Budget: $40+/day, scale when 50+ events/week
 
 ## A/B testing framework

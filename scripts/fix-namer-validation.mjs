@@ -10,6 +10,18 @@ const CAMP_ID   = 686308242
 const ADSET_ID  = 603831521
 const CREAT_ID  = 1466176529
 
+/** Host + guest conversion events for Campaign / Ad Set / Ad Builder Opt. Event columns. */
+const NAMER_OPT_EVENTS = [
+  "become_host_click",
+  "host_onboarding_started",
+  "host_first_listing_created",
+  "host_listing_created",
+  "listing_created",
+  "ViewContent",
+  "InitiateCheckout",
+  "Purchase",
+]
+
 // ── Helper: dropdown validation rule ────────────────────────────────────────
 function dropdown(sheetId, startRow, endRow, startCol, endCol, values) {
   return {
@@ -61,10 +73,7 @@ async function main() {
       "wellness","biohacking","checkout_rt","listing_rt"
     ]),
     dropdown(CAMP_ID, 3, 50, 7, 8, ["ALL","SEA","US","LA","SF","NYC"]),             // Geo
-    dropdown(CAMP_ID, 3, 50, 9, 10, [                                               // Opt Event
-      "become_host_click","host_onboarding_started","listing_created",
-      "ViewContent","InitiateCheckout","Purchase"
-    ]),
+    dropdown(CAMP_ID, 3, 50, 9, 10, NAMER_OPT_EVENTS),                               // Opt Event
     dropdown(CAMP_ID, 3, 50, 10, 11, ["★","1","2","3","4"]),                        // Priority
   ]
 
@@ -75,10 +84,7 @@ async function main() {
     dropdown(ADSET_ID, 3, 60, 3, 4, ["sauna","hottub","coldplunge","income","gen","all_spaces"]),  // Space Type
     dropdown(ADSET_ID, 3, 60, 4, 5, ["int","lal1","lal2","crmatch","rt_checkout","rt_listing"]),  // Audience Src
     dropdown(ADSET_ID, 3, 60, 5, 6, ["FEED-STORIES","FEED","REELS","STORIES","SEARCH","PMAX","DEMAND-GEN"]), // Placement
-    dropdown(ADSET_ID, 3, 60, 8, 9, [                                               // Opt Event
-      "become_host_click","host_onboarding_started","listing_created",
-      "ViewContent","InitiateCheckout","Purchase"
-    ]),
+    dropdown(ADSET_ID, 3, 60, 8, 9, NAMER_OPT_EVENTS),                               // Opt Event
   ]
 
   // Creative Builder — NEW column layout with split format:
@@ -99,10 +105,7 @@ async function main() {
     dropdown(CREAT_ID, 3, 60, 12, 13, ["Live","Testing","Draft","Paused","Archived"]), // Status
     dropdown(CREAT_ID, 3, 60, 13, 14, ["META","GOOG","SNAP","TIKTOK"]),            // Platform
     dropdown(CREAT_ID, 3, 60, 14, 15, ["P1","P2","P3"]),                           // Phase
-    dropdown(CREAT_ID, 3, 60, 15, 16, [                                            // Opt Event
-      "become_host_click","host_onboarding_started","listing_created",
-      "ViewContent","InitiateCheckout","Purchase"
-    ]),
+    dropdown(CREAT_ID, 3, 60, 15, 16, NAMER_OPT_EVENTS),                            // Opt Event
   ]
 
   await sheets.spreadsheets.batchUpdate({ spreadsheetId: ID, requestBody: {
@@ -172,9 +175,9 @@ async function main() {
     ["AD006","AS005","C003","T02","A","idle_space",  "Video_15s",  "get_started","Setup takes 10 minutes…",    "Draft",  "META","P2","host_onboarding_started"],
     ["AD007","AS005","C003","T02","B","social_proof","Carousel",   "get_started","See what hosts earn…",        "Draft",  "META","P2","host_onboarding_started"],
     ["AD008","AS006","C003","T02","A","community",   "Static_9x16","get_started","Your space. Your rules.",     "Draft",  "META","P2","host_onboarding_started"],
-    ["AD009","AS008","C005","T03","A","social_proof","Static_9x16","list_now", "First booking in 48 hrs",      "Draft",  "META","P3","listing_created"],
-    ["AD010","AS008","C005","T03","B","urgency",     "Video_30s",  "list_now", "Limited spots in Seattle",     "Draft",  "META","P3","listing_created"],
-    ["AD011","AS009","C005","T03","A","social_proof","UGC",        "list_now", "I listed mine last week…",     "Draft",  "META","P3","listing_created"],
+    ["AD009","AS008","C005","T03","A","social_proof","Static_9x16","list_now", "First booking in 48 hrs",      "Draft",  "META","P3","host_first_listing_created"],
+    ["AD010","AS008","C005","T03","B","urgency",     "Video_30s",  "list_now", "Limited spots in Seattle",     "Draft",  "META","P3","host_first_listing_created"],
+    ["AD011","AS009","C005","T03","A","social_proof","UGC",        "list_now", "I listed mine last week…",     "Draft",  "META","P3","host_first_listing_created"],
     ["AD012","AS011","C010","T04","A","fomo",        "Static_9x16","book_now", "You were this close…",         "Draft",  "META","P3","Purchase"],
     ["AD013","AS011","C010","T04","B","urgency",     "Video_15s",  "book_now", "Only 3 spots left this week",  "Draft",  "META","P3","Purchase"],
     ["AD014","AS012","C010","T04","A","social_proof","UGC",        "book_now", '"Warmest hour of my week"',    "Draft",  "META","P3","Purchase"],

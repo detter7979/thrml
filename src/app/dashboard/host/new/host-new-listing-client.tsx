@@ -941,6 +941,13 @@ export function HostNewListingClient({
     }
 
     let listingId: string | null = null
+    let listingMeta:
+      | {
+          host_listing_created_event_id?: string
+          host_first_listing_created_event_id?: string
+          is_first_listing?: boolean
+        }
+      | undefined
     try {
       const createResponse = await fetch("/api/listings", {
         method: "POST",
@@ -963,12 +970,21 @@ export function HostNewListingClient({
         return
       }
 
-      const createPayload = await parseJsonResponse<{ listingId?: string; error?: string }>(createResponse)
+      const createPayload = await parseJsonResponse<{
+        listingId?: string
+        error?: string
+        meta?: {
+          host_listing_created_event_id?: string
+          host_first_listing_created_event_id?: string
+          is_first_listing?: boolean
+        }
+      }>(createResponse)
       if (!createPayload?.listingId) {
         setSubmitError(createPayload?.error ?? "Failed to create listing.")
         return
       }
       listingId = createPayload.listingId
+      listingMeta = createPayload.meta
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Network error while creating listing. Please try again."
@@ -1007,7 +1023,14 @@ export function HostNewListingClient({
       return
     }
 
-    trackHostListingPublishedMeta({ listingId: listing.id, userId })
+    trackHostListingPublishedMeta({
+      listingId: listing.id,
+      userId,
+      hostListingCreatedEventId: listingMeta?.host_listing_created_event_id,
+      hostFirstListingCreatedEventId: listingMeta?.host_first_listing_created_event_id,
+      isFirstListing: listingMeta?.is_first_listing ?? false,
+      sendServer: false,
+    })
 
     const win = window as { gtag?: (...args: unknown[]) => void }
     if (win.gtag) {

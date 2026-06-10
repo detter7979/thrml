@@ -29,8 +29,8 @@ const ADSET_DATA = [
   ["AS005","C003","sauna",    "lal1",      "FEED-STORIES","1% LAL of P1 become_host_click events",           "host_onboarding_started","40%"],
   ["AS006","C003","income",   "lal1",      "FEED-STORIES","1% LAL of P1 become_host_click — all types",     "host_onboarding_started","30%"],
   ["AS007","C003","sauna",    "lal2",      "FEED-STORIES","2% LAL expansion — broader, lower CPM",           "host_onboarding_started","30%"],
-  ["AS008","C005","sauna",    "lal2",      "FEED-STORIES","2% LAL of P2 host_onboarding_started events",    "listing_created",       "50%"],
-  ["AS009","C005","income",   "lal2",      "FEED-STORIES","Advantage+ audiences (after 100+ P3 events)",    "listing_created",       "50%"],
+  ["AS008","C005","sauna",    "lal2",      "FEED-STORIES","2% LAL of P2 host_onboarding_started events",    "host_first_listing_created","50%"],
+  ["AS009","C005","income",   "lal2",      "FEED-STORIES","Advantage+ audiences (after 100+ P3 events)",    "host_first_listing_created","50%"],
   ["AS010","C007","income",   "int",       "SEARCH",      "'sauna rental near me', 'rent sauna space'",      "become_host_click",     "100%"],
   ["AS011","C010","all_spaces","rt_checkout","FEED-STORIES","RT: InitiateCheckout no Purchase, 14d. Excl: purchasers.","Purchase","40%"],
   ["AS012","C010","sauna",    "rt_checkout","FEED-STORIES","RT: sauna listing views, no checkout, 7d",       "Purchase",              "0% — activate when freq > 3"],
@@ -75,9 +75,9 @@ const CREAT_DATA = [
   ["AD006","AS005","C003","T02","A","idle_space",  "Video","15s","9:16","get_started","Setup takes 10 minutes…",   "Draft",  "META","P2","host_onboarding_started"],
   ["AD007","AS005","C003","T02","B","social_proof","Carousel","NA","1:1","get_started","See what hosts earn…",     "Draft",  "META","P2","host_onboarding_started"],
   ["AD008","AS006","C003","T02","A","community",   "Static","NA","9:16","get_started","Your space. Your rules.",   "Draft",  "META","P2","host_onboarding_started"],
-  ["AD009","AS008","C005","T03","A","social_proof","Static","NA","9:16","list_now", "First booking in 48 hrs",     "Draft",  "META","P3","listing_created"],
-  ["AD010","AS008","C005","T03","B","urgency",     "Video","30s","9:16","list_now", "Limited spots in Seattle",    "Draft",  "META","P3","listing_created"],
-  ["AD011","AS009","C005","T03","A","social_proof","UGC",  "NA","9:16","list_now", "I listed mine last week…",     "Draft",  "META","P3","listing_created"],
+  ["AD009","AS008","C005","T03","A","social_proof","Static","NA","9:16","list_now", "First booking in 48 hrs",     "Draft",  "META","P3","host_first_listing_created"],
+  ["AD010","AS008","C005","T03","B","urgency",     "Video","30s","9:16","list_now", "Limited spots in Seattle",    "Draft",  "META","P3","host_first_listing_created"],
+  ["AD011","AS009","C005","T03","A","social_proof","UGC",  "NA","9:16","list_now", "I listed mine last week…",     "Draft",  "META","P3","host_first_listing_created"],
   ["AD012","AS011","C010","T04","A","fomo",        "Static","NA","9:16","book_now", "You were this close…",        "Draft",  "META","P3","Purchase"],
   ["AD013","AS011","C010","T04","B","urgency",     "Video","15s","9:16","book_now", "Only 3 spots left this week", "Draft",  "META","P3","Purchase"],
   ["AD014","AS012","C010","T04","A","social_proof","UGC",  "NA","9:16","book_now", '"Warmest hour of my week"',   "Draft",  "META","P3","Purchase"],
@@ -191,7 +191,7 @@ async function main() {
     dropdown(ADSET_GID, 1, 60, 3, 4, ["sauna","hottub","coldplunge","income","gen","all_spaces"]),  // D SpaceType
     dropdown(ADSET_GID, 1, 60, 4, 5, ["int","lal1","lal2","crmatch","rt_checkout","rt_listing"]),  // E AudSrc
     dropdown(ADSET_GID, 1, 60, 5, 6, ["FEED-STORIES","FEED","REELS","STORIES","SEARCH","PMAX","DEMAND-GEN"]), // F Placement
-    dropdown(ADSET_GID, 1, 60, 8, 9, ["become_host_click","host_onboarding_started","listing_created","ViewContent","InitiateCheckout","Purchase"]), // I OptEvent
+    dropdown(ADSET_GID, 1, 60, 8, 9, ["become_host_click","host_onboarding_started","host_first_listing_created","host_listing_created","listing_created","ViewContent","InitiateCheckout","Purchase"]), // I OptEvent
 
     // Creative Builder — clear all first
     clearVal(CREAT_GID, 0, 200, 0, 20),
@@ -207,7 +207,7 @@ async function main() {
     dropdown(CREAT_GID, 1, 60, 13, 14, ["Live","Testing","Draft","Paused","Archived"]),  // N Status
     dropdown(CREAT_GID, 1, 60, 14, 15, ["META","GOOG","SNAP","TIKTOK"]),       // O Platform
     dropdown(CREAT_GID, 1, 60, 15, 16, ["P1","P2","P3"]),                      // P Phase
-    dropdown(CREAT_GID, 1, 60, 16, 17, ["become_host_click","host_onboarding_started","listing_created","ViewContent","InitiateCheckout","Purchase"]), // Q OptEvent
+    dropdown(CREAT_GID, 1, 60, 16, 17, ["become_host_click","host_onboarding_started","host_first_listing_created","host_listing_created","listing_created","ViewContent","InitiateCheckout","Purchase"]), // Q OptEvent
   ]
 
   await sheets.spreadsheets.batchUpdate({ spreadsheetId: ID, requestBody: { requests: valRequests } })

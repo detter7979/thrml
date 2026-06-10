@@ -12,6 +12,7 @@ import { usePlatformFeePercents } from "@/contexts/platform-fees-context"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { formatHostKeepPercent } from "@/lib/fees"
 import { HOST_NEW_LISTING_PATH, isHostUser } from "@/lib/host/is-host-user"
+import { nextHostUiIntent } from "@/lib/host/promote-host-profile"
 import { trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { createClient } from "@/lib/supabase/client"
@@ -196,12 +197,22 @@ export function BecomeAHostClient() {
       } = await supabase.auth.getUser()
 
       if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("ui_intent")
+          .eq("id", user.id)
+          .maybeSingle()
+
         await supabase
           .from("profiles")
           .update({
             host_terms_accepted: true,
             host_terms_accepted_at: new Date().toISOString(),
             host_terms_version: LEGAL_VERSIONS.HOST_AGREEMENT,
+            ui_intent: nextHostUiIntent(
+              typeof profile?.ui_intent === "string" ? profile.ui_intent : null
+            ),
+            is_host: true,
           })
           .eq("id", user.id)
       }
@@ -217,6 +228,7 @@ export function BecomeAHostClient() {
       trackHostOnboardingComplete()
 
       router.push(HOST_NEW_LISTING_PATH)
+      router.refresh()
     } catch {
       setError("Something went wrong. Please try again.")
       setSaving(false)

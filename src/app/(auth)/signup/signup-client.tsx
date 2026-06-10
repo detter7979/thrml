@@ -2,17 +2,23 @@
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Camera, CheckCircle2, Mail } from "lucide-react"
+import { Camera } from "lucide-react"
 import { Suspense, type FormEvent, useEffect, useMemo, useState } from "react"
 
+import { AuthField } from "@/components/auth/AuthField"
+import {
+  authPrimaryButtonClassName,
+  authSocialButtonClassName,
+} from "@/components/auth/auth-field-styles"
 import { AuthShell } from "@/components/auth/AuthShell"
+import { GoogleIcon } from "@/components/auth/GoogleIcon"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { trackGaEvent } from "@/lib/analytics/ga"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
-import { trackGaEvent } from "@/lib/analytics/ga"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -27,11 +33,38 @@ function formatPhoneNumber(value: string) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
 }
 
+function AuthDivider() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-px flex-1 bg-[#E7DED3]" />
+      <span className="text-xs font-medium uppercase tracking-wide text-[#A89888]">or</span>
+      <div className="h-px flex-1 bg-[#E7DED3]" />
+    </div>
+  )
+}
+
+function SignupStepIndicator({ step }: { step: 1 | 2 }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-[#A89888]">
+        <span>Step {step} of 2</span>
+        <span>{step === 1 ? "Account details" : "Your profile"}</span>
+      </div>
+      <div className="flex gap-2">
+        <div className={cn("h-1 flex-1 rounded-full", step >= 1 ? "bg-[#C75B3A]" : "bg-[#E7DED3]")} />
+        <div className={cn("h-1 flex-1 rounded-full", step >= 2 ? "bg-[#C75B3A]" : "bg-[#E7DED3]")} />
+      </div>
+    </div>
+  )
+}
+
 function SignupForm() {
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestedNext = sanitizeNextPath(searchParams.get("next"), null)
+  const nextQuery = requestedNext ? `?next=${encodeURIComponent(requestedNext)}` : ""
+
   const [step, setStep] = useState<SignupStep>(1)
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -46,6 +79,7 @@ function SignupForm() {
   const [signupNewsletterOptIn, setSignupNewsletterOptIn] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
 
   const passwordScore = useMemo(() => {
     let score = 0
@@ -56,6 +90,9 @@ function SignupForm() {
     return score
   }, [password])
   const fullName = `${firstName} ${lastName}`.trim()
+  const strengthLabel = ["Weak", "Weak", "Okay", "Strong", "Very strong"][passwordScore]
+  const baseCard = "rounded-xl border border-[#E7DED3] p-4 text-left transition"
+  const isBusy = loading || isGoogleLoading
 
   function getPostSignupDestination() {
     if (requestedNext) return requestedNext
@@ -94,6 +131,38 @@ function SignupForm() {
 
     const { data } = supabase.storage.from("avatars").getPublicUrl(path)
     return data.publicUrl
+  }
+
+  function toProviderErrorMessage(providerLabel: string, raw: string) {
+    const normalized = raw.toLowerCase()
+    if (
+      normalized.includes("unsupported provider") ||
+      normalized.includes("provider is not enabled")
+    ) {
+      return `${providerLabel} sign-up isn't enabled yet. Use email for now, or enable ${providerLabel} in Supabase Auth providers.`
+    }
+    return raw
+  }
+
+  async function handleGoogleSignup() {
+    setError(null)
+    if (!signupTermsAccepted) {
+      setError("Please accept the Terms of Service and Privacy Policy.")
+      return
+    }
+
+    setIsGoogleLoading(true)
+    const next = getPostSignupDestination()
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    })
+
+    if (oauthError) {
+      setError(toProviderErrorMessage("Google", oauthError.message))
+      setIsGoogleLoading(false)
+    }
   }
 
   async function handleStepOne(event: FormEvent<HTMLFormElement>) {
@@ -189,7 +258,6 @@ function SignupForm() {
         })
       }
 
-      // Fire guest welcome email — idempotent, non-blocking.
       fetch("/api/events/user-registered", { method: "POST" }).catch(() => {})
     }
 
@@ -229,38 +297,60 @@ function SignupForm() {
     setError("Email is not verified yet. Please click the link in your inbox.")
   }
 
-  const strengthLabel = ["Weak", "Weak", "Okay", "Strong", "Very strong"][passwordScore]
-
-  const baseCard = "rounded-xl border border-[#E7DED3] p-4 text-left transition"
-
-  async function handleSignup(event: FormEvent<HTMLFormElement>) {
-    // This handler remains for compatibility with auto-complete submit behavior.
-    if (step === 1) return handleStepOne(event)
-    if (step === 2) return handleStepTwo(event)
-    event.preventDefault()
-  }
-
   return (
-    <AuthShell
-      title={step === 3 ? "Check your inbox" : "Create your account"}
-      subtitle={step === 3 ? "Confirm your email to finish signing up." : "One flow for guests and hosts."}
-    >
-      {step === 1 ? (
-        <form onSubmit={handleSignup} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>First name</Label>
-              <Input
+    <div className="space-y-6">
+      {step === 3 ? (
+        <div className="space-y-4 rounded-2xl border border-[#E7DED3] bg-[#FCFAF7] p-5">
+          <h2 className="font-serif text-xl text-[#1A1410]">Check your inbox</h2>
+          <p className="text-sm leading-relaxed text-[#746558]">
+            We sent a verification link to <strong className="text-[#1A1410]">{email}</strong>. Open
+            it on this device to finish creating your account.
+          </p>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 flex-1 rounded-full border-[#E7DED3]"
+              onClick={handleResendVerification}
+              disabled={resendCooldown > 0}
+            >
+              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend verification email"}
+            </Button>
+            <Button type="button" className={cn(authPrimaryButtonClassName, "flex-1")} onClick={handleIConfirmed}>
+              I&apos;ve verified my email
+            </Button>
+          </div>
+        </div>
+      ) : step === 1 ? (
+        <div className="space-y-5">
+          <Button
+            type="button"
+            variant="outline"
+            className={authSocialButtonClassName}
+            onClick={handleGoogleSignup}
+            disabled={isBusy}
+          >
+            <GoogleIcon className="size-5 shrink-0" />
+            {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
+          </Button>
+
+          <AuthDivider />
+
+          <SignupStepIndicator step={1} />
+
+          <form onSubmit={handleStepOne} className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <AuthField
+                label="First name"
                 placeholder="First"
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
                 autoComplete="given-name"
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Last name</Label>
-              <Input
+              <AuthField
+                label="Last name"
                 placeholder="Last"
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
@@ -268,175 +358,192 @@ function SignupForm() {
                 required
               />
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input type="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
-          </div>
-          <div className="space-y-2">
-            <Label>Password</Label>
-            <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} />
+            <AuthField
+              label="Email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
             <div className="space-y-2">
-              <div className="h-2 overflow-hidden rounded-full bg-[#EFE6DC]">
-                <div
-                  className={cn(
-                    "h-full transition-all",
-                    passwordScore <= 1 && "bg-red-400",
-                    passwordScore === 2 && "bg-amber-400",
-                    passwordScore >= 3 && "bg-emerald-500"
-                  )}
-                  style={{ width: `${Math.max(20, passwordScore * 25)}%` }}
-                />
+              <AuthField
+                label="Password"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                minLength={8}
+              />
+              <div className="space-y-2">
+                <div className="h-2 overflow-hidden rounded-full bg-[#EFE6DC]">
+                  <div
+                    className={cn(
+                      "h-full transition-all",
+                      passwordScore <= 1 && "bg-red-400",
+                      passwordScore === 2 && "bg-amber-400",
+                      passwordScore >= 3 && "bg-emerald-500"
+                    )}
+                    style={{ width: `${Math.max(20, passwordScore * 25)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-[#A89888]">Password strength: {strengthLabel}</p>
               </div>
-              <p className="text-xs text-muted-foreground">Password strength: {strengthLabel}</p>
             </div>
-          </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <div className="space-y-2 pt-1">
-            <label className="flex min-h-11 items-start gap-3 rounded-md">
-              <Checkbox checked={signupTermsAccepted} onCheckedChange={(checked) => setSignupTermsAccepted(Boolean(checked))} />
-              <span className="font-sans text-[13px] leading-5 text-[#1A1410]">
-                I agree to thrml&apos;s{" "}
-                <Link href="/terms" target="_blank" rel="noopener noreferrer" className="underline">
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="underline">
-                  Privacy Policy
-                </Link>
-                <span className="ml-1 text-destructive">*</span>
-              </span>
-            </label>
-            <label className="flex min-h-11 items-start gap-3 rounded-md">
-              <Checkbox
-                checked={signupNewsletterOptIn}
-                onCheckedChange={(checked) => setSignupNewsletterOptIn(Boolean(checked))}
-              />
-              <span className="font-sans text-[13px] leading-5 text-[#1A1410]">
-                I&apos;d like to receive wellness news and updates from thrml
-              </span>
-            </label>
-          </div>
-          <Button className="btn-primary h-11 w-full" disabled={!signupTermsAccepted}>
-            Continue
-          </Button>
-          <p className="type-label text-center md:text-left">
-            Already have an account?{" "}
-            <Link
-              href={requestedNext ? `/login?next=${encodeURIComponent(requestedNext)}` : "/login"}
-              className="text-brand-600"
-            >
-              Log in
-            </Link>
-          </p>
-        </form>
-      ) : null}
 
-      {step === 2 ? (
-        <form onSubmit={handleSignup} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Profile photo</Label>
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[#D8CCBF] p-3">
-              <div className="flex size-10 items-center justify-center rounded-full bg-[#F7F3EE]">
-                {photoPreview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photoPreview} alt="Profile preview" className="size-10 rounded-full object-cover" />
-                ) : (
-                  <Camera className="size-4 text-[#746558]" />
-                )}
-              </div>
-              <div className="text-sm">
-                <p className="font-medium text-[#1A1410]">Add a photo</p>
-                <p className="text-xs text-muted-foreground">Optional now, useful for trust later.</p>
-              </div>
-              <Input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] ?? null
-                  setPhotoFile(file)
-                  setPhotoPreview(file ? URL.createObjectURL(file) : null)
-                }}
-              />
-            </label>
-          </div>
+            <div className="space-y-2">
+              <label className="flex min-h-11 items-start gap-3 rounded-md">
+                <Checkbox
+                  checked={signupTermsAccepted}
+                  onCheckedChange={(checked) => setSignupTermsAccepted(Boolean(checked))}
+                />
+                <span className="text-[13px] leading-5 text-[#1A1410]">
+                  I agree to thrml&apos;s{" "}
+                  <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#C75B3A] hover:underline">
+                    Terms of Service
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#C75B3A] hover:underline">
+                    Privacy Policy
+                  </Link>
+                  <span className="ml-1 text-destructive">*</span>
+                </span>
+              </label>
+              <label className="flex min-h-11 items-start gap-3 rounded-md">
+                <Checkbox
+                  checked={signupNewsletterOptIn}
+                  onCheckedChange={(checked) => setSignupNewsletterOptIn(Boolean(checked))}
+                />
+                <span className="text-[13px] leading-5 text-[#746558]">
+                  I&apos;d like to receive wellness news and updates from thrml
+                </span>
+              </label>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Phone number</Label>
-            <Input
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            <Button className={authPrimaryButtonClassName} disabled={!signupTermsAccepted || isBusy}>
+              Continue
+            </Button>
+          </form>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <SignupStepIndicator step={2} />
+
+          <form onSubmit={handleStepTwo} className="space-y-5">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-[#1A1410]">Profile photo</Label>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-[#D8CCBF] bg-white p-3 transition hover:bg-[#FCFAF7]">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F7F3EE]">
+                  {photoPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoPreview} alt="Profile preview" className="size-10 rounded-full object-cover" />
+                  ) : (
+                    <Camera className="size-4 text-[#746558]" />
+                  )}
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium text-[#1A1410]">Add a photo</p>
+                  <p className="text-xs text-[#A89888]">Optional now, useful for trust later.</p>
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null
+                    setPhotoFile(file)
+                    setPhotoPreview(file ? URL.createObjectURL(file) : null)
+                  }}
+                />
+              </label>
+            </div>
+
+            <AuthField
+              label="Phone number"
               type="tel"
               placeholder="Optional at signup"
               value={phone}
               onChange={(event) => setPhone(formatPhoneNumber(event.target.value))}
             />
-            <p className="text-xs text-muted-foreground">You can add this later, but it is required before first booking or publishing.</p>
-          </div>
+            <p className="-mt-3 text-xs text-[#A89888]">
+              You can add this later, but it is required before your first booking or listing.
+            </p>
 
-          <div className="space-y-2">
-            <Label>What brings you to thrml?</Label>
-            <div className="grid gap-2">
-              <button
-                type="button"
-                onClick={() => setIntent("guest")}
-                className={cn(baseCard, intent === "guest" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]")}
-              >
-                I want to book wellness spaces
-              </button>
-              <button
-                type="button"
-                onClick={() => setIntent("host")}
-                className={cn(baseCard, intent === "host" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]")}
-              >
-                I want to list my space
-              </button>
-              <button
-                type="button"
-                onClick={() => setIntent("both")}
-                className={cn(baseCard, intent === "both" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]")}
-              >
-                Both
-              </button>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-[#1A1410]">What brings you to thrml?</Label>
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIntent("guest")}
+                  className={cn(
+                    baseCard,
+                    intent === "guest" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]"
+                  )}
+                >
+                  <span className="text-sm font-medium text-[#1A1410]">I want to book wellness spaces</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntent("host")}
+                  className={cn(
+                    baseCard,
+                    intent === "host" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]"
+                  )}
+                >
+                  <span className="text-sm font-medium text-[#1A1410]">I want to list my space</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntent("both")}
+                  className={cn(
+                    baseCard,
+                    intent === "both" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]"
+                  )}
+                >
+                  <span className="text-sm font-medium text-[#1A1410]">Both — book and list</span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button className="btn-primary h-11 w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Create account"}
-          </Button>
-          <button type="button" onClick={() => setStep(1)} className="w-full text-xs text-muted-foreground hover:underline">
-            Back
-          </button>
-        </form>
-      ) : null}
-
-      {step === 3 ? (
-        <div className="space-y-4 rounded-2xl border border-[#E7DED3] bg-[#FCFAF7] p-5">
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-[#FFF0E9] p-2">
-              <Mail className="size-5 text-[#C75B3A]" />
-            </div>
-            <p className="text-sm text-[#1A1410]">We sent a verification link to <strong>{email}</strong>.</p>
-          </div>
-
-          <Button className="btn-primary w-full" onClick={handleIConfirmed}>
-            <CheckCircle2 className="mr-2 size-4" />
-            I&apos;ve verified my email
-          </Button>
-          <Button variant="ghost" className="w-full" onClick={handleResendVerification} disabled={resendCooldown > 0}>
-            {resendCooldown > 0 ? `Resend available in ${resendCooldown}s` : "Resend verification email"}
-          </Button>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            <Button className={authPrimaryButtonClassName} disabled={isBusy}>
+              {loading ? "Creating account..." : "Create account"}
+            </Button>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null)
+                setStep(1)
+              }}
+              className="w-full text-sm text-[#746558] hover:text-[#1A1410] hover:underline"
+            >
+              Back to account details
+            </button>
+          </form>
         </div>
+      )}
+
+      {step !== 3 ? (
+        <p className="text-center text-sm text-[#746558] md:text-left">
+          Already have an account?{" "}
+          <Link href={`/login${nextQuery}`} className="font-medium text-[#C75B3A] hover:underline">
+            Log in
+          </Link>
+        </p>
       ) : null}
-    </AuthShell>
+    </div>
   )
 }
 
 export default function SignupClientPage() {
   return (
-    <Suspense fallback={<div className="text-sm text-muted-foreground">Loading signup...</div>}>
-      <SignupForm />
-    </Suspense>
+    <AuthShell title="Create your account" subtitle="Join thrml to book or list wellness spaces.">
+      <Suspense fallback={<div className="text-sm text-[#746558]">Loading signup...</div>}>
+        <SignupForm />
+      </Suspense>
+    </AuthShell>
   )
 }

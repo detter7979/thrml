@@ -1040,6 +1040,7 @@ export function HostNewListingClient({
 
     allowNavigationRef.current = true
     router.push("/dashboard/listings?created=1")
+    router.refresh()
   }
 
   return (

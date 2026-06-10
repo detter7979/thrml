@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { assertHostInsuranceAttested } from "@/lib/host/insurance-attestation"
+import { promoteProfileToHost } from "@/lib/host/promote-host-profile"
 import {
   fireHostListingCapiEvents,
   newListingMetaEventIds,
@@ -110,6 +111,10 @@ export async function POST(request: NextRequest) {
     const metaIds = newListingMetaEventIds(isFirstListing)
     const eventSourceUrl =
       request.headers.get("referer") ?? "https://usethrml.com/dashboard/host/new"
+
+    void promoteProfileToHost(admin, user.id).catch((err) => {
+      console.error("[POST /api/listings] promote host profile failed", err)
+    })
 
     void fireHostListingCapiEvents(admin, user, {
       listingId: data.id,

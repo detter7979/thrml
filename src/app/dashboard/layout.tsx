@@ -14,12 +14,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   const normalizeAvatarUrl = (value: unknown) => (typeof value === "string" && value.trim().length > 0 ? value : null)
   const normalizeName = (value: unknown) => (typeof value === "string" && value.trim().length > 0 ? value.trim() : null)
-  const [{ count: listingCount }, { data: profileById }] = await Promise.all([
+  const [{ count: activeListingCount }, { count: totalListingCount }, { data: profileById }] =
+    await Promise.all([
     supabase
       .from("listings")
       .select("*", { count: "exact", head: true })
       .eq("host_id", user.id)
       .eq("is_active", true),
+    supabase
+      .from("listings")
+      .select("*", { count: "exact", head: true })
+      .eq("host_id", user.id),
     supabase
       .from("profiles")
       .select("full_name, avatar_url, ui_intent, id_verified")

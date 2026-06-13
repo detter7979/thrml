@@ -420,9 +420,9 @@ export function HostNewListingClient({
   }, [initialInsuranceAttested])
 
   useEffect(() => {
-    if (!initialInsuranceAttestedAt) return
-    setInsuranceAttestedAt(initialInsuranceAttestedAt)
-  }, [initialInsuranceAttestedAt])
+    if (!insuranceAttestedAtProp) return
+    setInsuranceAttestedAt(insuranceAttestedAtProp)
+  }, [insuranceAttestedAtProp])
 
   async function handleInsuranceAttestationCheckedChange(checked: boolean) {
     setInsuranceAttestationChecked(checked)

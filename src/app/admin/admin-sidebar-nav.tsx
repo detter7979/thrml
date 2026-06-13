@@ -13,6 +13,7 @@ import {
   Megaphone,
   PieChart,
   Settings,
+  Shield,
   Sparkles,
   UserRound,
   Users,
@@ -52,7 +53,10 @@ const SECTIONS: NavSection[] = [
   },
   {
     label: "System",
-    items: [{ href: "/admin/settings", label: "Settings", icon: Settings }],
+    items: [
+      { href: "/admin/privacy-requests", label: "Privacy requests", icon: Shield },
+      { href: "/admin/settings", label: "Settings", icon: Settings },
+    ],
   },
 ]
 

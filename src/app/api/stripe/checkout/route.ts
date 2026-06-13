@@ -13,6 +13,7 @@ import { getFallbackServiceType } from "@/lib/service-types"
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
 import { roundUpTo30 } from "@/lib/slots"
 import { stripe } from "@/lib/stripe"
+import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
@@ -571,6 +572,14 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       )
     }
+
+    await recordLegalAcceptance({
+      admin,
+      userId: user.id,
+      docType: "session_waiver",
+      version: waiver_version.trim(),
+      headers: req.headers,
+    })
 
     const { data: booking, error: bookingError } = await supabase
       .from("bookings")

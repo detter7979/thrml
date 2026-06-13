@@ -2,6 +2,7 @@ import {
   normalizeGaMeasurementId,
   normalizeGoogleAdsId,
 } from "@/lib/analytics/env-ids"
+import { setAdConsentCookie } from "@/lib/advertising-consent"
 
 export const COOKIE_CONSENT_KEY = "thrml_cookie_consent"
 export const COOKIE_CONSENT_ACCEPTED = "accepted"
@@ -89,23 +90,31 @@ function revokeMetaPixel() {
   ;(window as Window & { __thrmlMetaQueue?: unknown[] }).__thrmlMetaQueue = []
 }
 
-export function grantAnalyticsConsent() {
-  if (typeof window === "undefined") return
-
-  setGtagDisableFlags(false)
-  const gtag = getGtagFn()
-  gtag("consent", "update", {
-    analytics_storage: "granted",
-    ad_storage: "granted",
-    ad_user_data: "granted",
-    ad_personalization: "granted",
-  })
+function grantMetaPixelConsent() {
+  const fbq = (window as Window & { fbq?: (...args: unknown[]) => void }).fbq
+  if (typeof fbq === "function") {
+    try {
+      fbq("consent", "grant")
+    } catch {
+      // Pixel may not be loaded yet.
+    }
+  }
 }
 
-/** Stops in-page GA/Meta after decline, including when gtag.js was already loaded. */
-export function revokeAnalyticsConsent() {
-  if (typeof window === "undefined") return
-
+function applyAnalyticsConsentLocal(accepted: boolean) {
+  setAdConsentCookie(accepted)
+  if (accepted) {
+    setGtagDisableFlags(false)
+    const gtag = getGtagFn()
+    gtag("consent", "update", {
+      analytics_storage: "granted",
+      ad_storage: "granted",
+      ad_user_data: "granted",
+      ad_personalization: "granted",
+    })
+    grantMetaPixelConsent()
+    return
+  }
   setGtagDisableFlags(true)
   const gtag = getGtagFn()
   gtag("consent", "update", {
@@ -116,6 +125,33 @@ export function revokeAnalyticsConsent() {
   })
   revokeMetaPixel()
   clearAnalyticsCookies()
+}
+
+function persistAdvertisingConsent(accepted: boolean) {
+  void fetch("/api/consent/advertising", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ consented: accepted }),
+  }).catch(() => undefined)
+}
+
+/** Restore consent state from storage on page load (no server sync). */
+export function restoreAnalyticsConsentFromStorage(accepted: boolean) {
+  if (typeof window === "undefined") return
+  applyAnalyticsConsentLocal(accepted)
+}
+
+export function grantAnalyticsConsent() {
+  if (typeof window === "undefined") return
+  applyAnalyticsConsentLocal(true)
+  persistAdvertisingConsent(true)
+}
+
+/** Stops in-page GA/Meta after decline, including when gtag.js was already loaded. */
+export function revokeAnalyticsConsent() {
+  if (typeof window === "undefined") return
+  applyAnalyticsConsentLocal(false)
+  persistAdvertisingConsent(false)
 }
 
 /** @deprecated Prefer grantAnalyticsConsent */

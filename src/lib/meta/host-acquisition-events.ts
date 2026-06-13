@@ -75,13 +75,17 @@ export function buildHostCapiUserData(
 
 function capiOptions(
   userData: CapiUserDataInput,
-  ctx: { eventId: string; eventSourceUrl?: string; customData?: Record<string, unknown> }
+  ctx: { eventId: string; eventSourceUrl?: string; customData?: Record<string, unknown> },
+  admin: SupabaseClient,
+  headers: Headers,
+  userId: string
 ): FireCapiEventOptions {
   return {
     eventId: ctx.eventId,
     eventSourceUrl: ctx.eventSourceUrl,
     userData,
     customData: ctx.customData,
+    consentContext: { admin, headers, userId },
   }
 }
 
@@ -130,7 +134,7 @@ export async function maybeFireHostOnboardingStarted(
       eventId: ctx.eventId,
       eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
       customData: { content_name: "Host Onboarding" },
-    })
+    }, admin, ctx.headers, user.id)
   ).catch((err) => {
     console.error("[CAPI] host_onboarding_started async failed", err)
   })
@@ -164,11 +168,17 @@ export async function fireHostListingCapiEvents(
 
   void fireCapiEvent(
     META_EVENT_HOST_LISTING_CREATED,
-    capiOptions(userData, {
-      eventId: ctx.hostListingCreatedEventId,
-      eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
-      customData: listingCustom,
-    })
+    capiOptions(
+      userData,
+      {
+        eventId: ctx.hostListingCreatedEventId,
+        eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
+        customData: listingCustom,
+      },
+      admin,
+      ctx.headers,
+      user.id
+    )
   ).catch((err) => {
     console.error("[CAPI] host_listing_created async failed", err)
   })
@@ -176,11 +186,17 @@ export async function fireHostListingCapiEvents(
   if (ctx.isFirstListing && ctx.hostFirstListingCreatedEventId) {
     void fireCapiEvent(
       META_EVENT_HOST_FIRST_LISTING_CREATED,
-      capiOptions(userData, {
-        eventId: ctx.hostFirstListingCreatedEventId,
-        eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
-        customData: listingCustom,
-      })
+      capiOptions(
+        userData,
+        {
+          eventId: ctx.hostFirstListingCreatedEventId,
+          eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
+          customData: listingCustom,
+        },
+        admin,
+        ctx.headers,
+        user.id
+      )
     ).catch((err) => {
       console.error("[CAPI] host_first_listing_created async failed", err)
     })

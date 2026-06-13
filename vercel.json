@@ -23,6 +23,7 @@
     { "path": "/api/cron/retarget",         "schedule": "0 14 * * 1" },
     { "path": "/api/cron/sync-ga4",         "schedule": "0 2 * * *" },
     { "path": "/api/cron/sync-meta",        "schedule": "0 2 * * *" },
-    { "path": "/api/cron/sync-bookings",    "schedule": "0 2 * * *" }
+    { "path": "/api/cron/sync-bookings",    "schedule": "0 2 * * *" },
+    { "path": "/api/cron/anonymize-deleted-accounts", "schedule": "0 1 * * *" }
   ]
 }

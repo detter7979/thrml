@@ -116,8 +116,8 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
 
   const heroImage = {
     url: "/hero-main-bg.png",
-    objectPosition: "center 42%",
-    alt: "Outdoor cedar sauna on a forest deck overlooking misty water",
+    objectPosition: "center center",
+    alt: "Barrel sauna glowing warmly in a misty evergreen forest",
   }
 
   async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {
@@ -172,7 +172,6 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
             className="pointer-events-none object-cover"
             style={{ objectPosition: heroImage.objectPosition }}
             sizes="(max-width: 767px) 0px, (max-width: 1280px) 100vw, 100vw"
-            quality={68}
             priority
             fetchPriority="high"
             loading="eager"
@@ -195,7 +194,6 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
             className="pointer-events-none object-cover"
             style={{ objectPosition: heroImage.objectPosition }}
             sizes="100vw"
-            quality={68}
             priority
             fetchPriority="high"
             loading="eager"

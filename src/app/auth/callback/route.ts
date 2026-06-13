@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { sendGuestWelcomeEmail, markOnboardingEmailSent } from "@/lib/emails/onboarding"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
+import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
 import { recordReferral } from "@/lib/referral"
 import { sanitizeNextPath } from "@/lib/security"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -39,6 +40,14 @@ async function applyOAuthSignupMetadata(request: NextRequest, userId: string) {
       marketing_wellness_tips: newsletterOptIn,
     },
   }
+
+  await recordLegalAcceptance({
+    admin,
+    userId,
+    docType: "terms_of_service",
+    version: LEGAL_VERSIONS.TERMS,
+    headers: request.headers,
+  })
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const { error: profileError } = await admin.from("profiles").upsert(profilePayload, { onConflict: "id" })

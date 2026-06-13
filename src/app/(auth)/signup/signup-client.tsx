@@ -247,10 +247,6 @@ function SignupForm() {
         phone_verified: false,
         profile_complete: false,
         avatar_url: avatarUrl,
-        terms_accepted: true,
-        terms_accepted_at: new Date().toISOString(),
-        terms_version: LEGAL_VERSIONS.TERMS,
-        privacy_version: LEGAL_VERSIONS.PRIVACY,
         newsletter_opted_in: signupNewsletterOptIn,
         newsletter_opted_in_at: signupNewsletterOptIn ? new Date().toISOString() : null,
         notification_preferences: {
@@ -275,6 +271,12 @@ function SignupForm() {
           headers: { "Content-Type": "application/json" },
         })
       }
+
+      void fetch("/api/legal/accept-terms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ docType: "terms_of_service", version: LEGAL_VERSIONS.TERMS }),
+      })
 
       fetch("/api/events/user-registered", { method: "POST" }).catch(() => {})
     }

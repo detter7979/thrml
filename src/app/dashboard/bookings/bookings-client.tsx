@@ -8,12 +8,20 @@ import {
   Calendar,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
+  CircleOff,
+  Clock,
   Copy,
+  KeyRound,
   List,
   MapPin,
+  Phone,
   Star,
+  Timer,
+  UserRound,
+  Users,
 } from "lucide-react"
 
 import { BookingReviewDialog } from "@/components/booking/BookingReviewDialog"
@@ -22,7 +30,7 @@ import { RescheduleModal } from "@/components/booking/RescheduleModal"
 import { Button } from "@/components/ui/button"
 import { guestCompletedTabBooking } from "@/lib/booking-session"
 import { resolveInstructions } from "@/lib/constants/access-types"
-import { formatServiceType, getServiceType } from "@/lib/constants/service-types"
+import { formatServiceType } from "@/lib/constants/service-types"
 
 type BookingStatus = "pending" | "pending_host" | "confirmed" | "cancelled" | "completed" | "declined" | string
 type ViewMode = "list" | "calendar"
@@ -79,11 +87,6 @@ type BookingRecord = {
     comment: string | null
     created_at?: string | null
   } | null
-}
-
-function serviceEmoji(serviceType: string | null) {
-  const key = (serviceType ?? "sauna").toLowerCase()
-  return getServiceType(key)?.emoji ?? "🔥"
 }
 
 function serviceName(serviceType: string | null) {
@@ -600,25 +603,31 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                 <BookingSkeleton />
               </>
             ) : visible.length === 0 ? (
-              <div className="rounded-3xl bg-white p-10 text-center shadow-[0_8px_30px_rgba(26,20,16,0.06)]">
-                <p className="mb-3 text-4xl">{activeTab === "upcoming" ? "🔥" : activeTab === "completed" ? "✨" : "🧾"}</p>
-                <p className="font-serif text-2xl">
+              <div className="rounded-2xl bg-white p-10 text-center">
+                {activeTab === "upcoming" ? (
+                  <CalendarDays className="mx-auto size-12 text-[#D4CCC2]" />
+                ) : activeTab === "completed" ? (
+                  <CheckCircle2 className="mx-auto size-12 text-[#D4CCC2]" />
+                ) : (
+                  <CircleOff className="mx-auto size-12 text-[#D4CCC2]" />
+                )}
+                <p className="mt-4 font-serif text-xl text-[#2E241D]">
                   {activeTab === "upcoming"
                     ? "No upcoming sessions"
                     : activeTab === "completed"
                       ? "No past sessions yet"
                       : "No cancelled bookings"}
                 </p>
-                <p className="mt-1 text-sm text-[#7C6B5E]">
+                <p className="mt-1 text-sm text-[#6D5E51]">
                   {activeTab === "upcoming"
                     ? "Time to book your next ritual"
                     : activeTab === "completed"
-                      ? "Once you complete a booking it will appear here"
+                      ? "Completed bookings will appear here"
                       : "You're all set"}
                 </p>
                 {activeTab !== "cancelled" ? (
-                  <Link href="/explore" className="mt-4 inline-flex rounded-xl bg-[#C75B3A] px-4 py-2 text-sm text-white">
-                    Explore services
+                  <Link href="/explore" className="mt-5 inline-flex text-sm font-medium text-[#C75B3A]">
+                    Explore services →
                   </Link>
                 ) : null}
               </div>
@@ -661,11 +670,8 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                             }`}
                           />
                         ) : (
-                          <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#F1E5D8] to-[#ECD8C7] text-3xl">
-                            <div className="text-center">
-                              <p>{serviceEmoji(booking.listings?.service_type ?? null)}</p>
-                              <p className="mt-1 text-xs text-[#6C5B4F]">{serviceName(booking.listings?.service_type ?? null)}</p>
-                            </div>
+                          <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#F1E5D8] to-[#ECD8C7]">
+                            <p className="font-serif text-lg text-[#8A7769]">{serviceName(booking.listings?.service_type ?? null)}</p>
                           </div>
                         )}
                       </div>
@@ -676,7 +682,6 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                             {booking.listings?.title ?? "thrml session"}
                           </h3>
                           <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} shrink-0 md:hidden`}>
-                            {serviceEmoji(booking.listings?.service_type ?? null)}{" "}
                             {serviceName(booking.listings?.service_type ?? null)}
                           </span>
                         </div>
@@ -696,7 +701,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
 
                       <div className="flex flex-col items-start gap-2 md:h-full md:items-end">
                         <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} hidden shrink-0 md:inline-flex`}>
-                          {serviceEmoji(booking.listings?.service_type ?? null)} {serviceName(booking.listings?.service_type ?? null)}
+                          {serviceName(booking.listings?.service_type ?? null)}
                         </span>
                         {isToday(booking.session_date) ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">
@@ -888,15 +893,17 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 ) : null}
                                 {accessType === "host_onsite" ? (
                                   <div className="rounded-lg bg-neutral-100 p-3">
-                                    <p className="text-sm font-medium text-neutral-800">
-                                      🙋 Your host will meet you on arrival
+                                    <p className="flex items-start gap-2 text-sm font-medium text-neutral-800">
+                                      <UserRound className="mt-0.5 size-4 shrink-0 text-[#A8988A]" />
+                                      Your host will meet you on arrival
                                     </p>
                                     {booking.listings?.access_instructions ? (
                                       <p className="mt-1 text-xs text-neutral-500">{booking.listings.access_instructions}</p>
                                     ) : null}
                                     {booking.listings?.onsite_contact_name && booking.listings?.onsite_contact_phone ? (
-                                      <p className="mt-2 text-xs text-neutral-500">
-                                        📞 {booking.listings.onsite_contact_name} · {booking.listings.onsite_contact_phone}
+                                      <p className="mt-2 flex items-center gap-2 text-xs text-neutral-500">
+                                        <Phone className="size-3.5 shrink-0 text-[#A8988A]" />
+                                        {booking.listings.onsite_contact_name} · {booking.listings.onsite_contact_phone}
                                       </p>
                                     ) : null}
                                   </div>
@@ -1004,7 +1011,6 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 </p>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
                                   <span className={serviceTypePill(booking.listings?.service_type ?? null)}>
-                                    {serviceEmoji(booking.listings?.service_type ?? null)}{" "}
                                     {serviceName(booking.listings?.service_type ?? null)}
                                   </span>
                                   <span className={`rounded-full px-2.5 py-1 text-xs capitalize ${statusPill(booking.status)}`}>
@@ -1013,19 +1019,57 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 </div>
                               </div>
                             </div>
-                            <section className="mt-3 space-y-2">
-                              <p>📅 Date: {booking.session_date ? new Date(`${booking.session_date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "TBD"}</p>
-                              <p>⏰ Time: {formatDateTime(booking).split(" · ")[1] ?? "TBD"}</p>
-                              <p>👥 Guests: {booking.guest_count ?? 1} person{Number(booking.guest_count ?? 1) === 1 ? "" : "s"}</p>
-                              <p>⏱ Duration: {Math.round(Number(booking.duration_hours ?? 1) * 60)} minutes</p>
+                            <section className="mt-3 space-y-2.5 text-sm text-[#5E4E42]">
+                              <p className="flex items-start gap-2">
+                                <CalendarDays className="mt-0.5 size-4 shrink-0 text-[#A8988A]" />
+                                <span>
+                                  <span className="text-[#7C6B5E]">Date</span>
+                                  {" · "}
+                                  {booking.session_date
+                                    ? new Date(`${booking.session_date}T12:00:00`).toLocaleDateString(undefined, {
+                                        weekday: "long",
+                                        month: "long",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      })
+                                    : "TBD"}
+                                </span>
+                              </p>
+                              <p className="flex items-start gap-2">
+                                <Clock className="mt-0.5 size-4 shrink-0 text-[#A8988A]" />
+                                <span>
+                                  <span className="text-[#7C6B5E]">Time</span>
+                                  {" · "}
+                                  {formatDateTime(booking).split(" · ")[1] ?? "TBD"}
+                                </span>
+                              </p>
+                              <p className="flex items-start gap-2">
+                                <Users className="mt-0.5 size-4 shrink-0 text-[#A8988A]" />
+                                <span>
+                                  <span className="text-[#7C6B5E]">Guests</span>
+                                  {" · "}
+                                  {booking.guest_count ?? 1} person{Number(booking.guest_count ?? 1) === 1 ? "" : "s"}
+                                </span>
+                              </p>
+                              <p className="flex items-start gap-2">
+                                <Timer className="mt-0.5 size-4 shrink-0 text-[#A8988A]" />
+                                <span>
+                                  <span className="text-[#7C6B5E]">Duration</span>
+                                  {" · "}
+                                  {Math.round(Number(booking.duration_hours ?? 1) * 60)} minutes
+                                </span>
+                              </p>
                             </section>
                             <div className="my-4 border-t border-[#F0E8E0]" />
-                            <section className="space-y-2">
-                              <p>
-                                📍{" "}
-                                {canShowAddress
-                                  ? booking.listings?.location_address ?? booking.listings?.location ?? "Location unavailable"
-                                  : [booking.listings?.city, booking.listings?.state].filter(Boolean).join(", ") || "Location shared after confirmation"}
+                            <section className="space-y-2 text-sm text-[#5E4E42]">
+                              <p className="flex items-start gap-2">
+                                <MapPin className="mt-0.5 size-4 shrink-0 text-[#A8988A]" />
+                                <span>
+                                  {canShowAddress
+                                    ? booking.listings?.location_address ?? booking.listings?.location ?? "Location unavailable"
+                                    : [booking.listings?.city, booking.listings?.state].filter(Boolean).join(", ") ||
+                                      "Location shared after confirmation"}
+                                </span>
                               </p>
                               {booking.status === "confirmed" ? (
                                 <button
@@ -1050,19 +1094,24 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                 <a
                                   href={bookingIcsDataUri(booking) ?? undefined}
                                   download="thermal-booking.ics"
-                                  className="inline-flex rounded-xl border border-[#E5DDD6] px-3 py-2 font-medium"
+                                  className="inline-flex items-center gap-2 rounded-xl border border-[#E5DDD6] px-3 py-2 text-sm font-medium text-[#5E4E42]"
                                 >
-                                  📆 Add to calendar
+                                  <Calendar className="size-4 text-[#A8988A]" />
+                                  Add to calendar
                                 </a>
                               ) : (
-                                <Button variant="outline" onClick={() => downloadIcs(booking)}>
-                                  📆 Add to calendar
+                                <Button variant="outline" onClick={() => downloadIcs(booking)} className="gap-2">
+                                  <Calendar className="size-4 text-[#A8988A]" />
+                                  Add to calendar
                                 </Button>
                               )}
                             </section>
                             <div className="my-4 border-t border-[#F0E8E0]" />
                             <section className="space-y-2">
-                              <p className="font-medium">🔐 Access details</p>
+                              <p className="flex items-center gap-2 font-medium text-[#1A1410]">
+                                <KeyRound className="size-4 text-[#A8988A]" />
+                                Access details
+                              </p>
                               {showAccessDetails ? (
                                 <>
                                   {(accessType === "code" || accessType === "lockbox") && !releaseState.released ? (

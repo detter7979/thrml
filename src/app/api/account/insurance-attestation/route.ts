@@ -1,12 +1,15 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
 import {
   assertHostInsuranceAttested,
+  INSURANCE_ATTESTATION_VERSION,
   insuranceAttestationUpdatePayload,
 } from "@/lib/host/insurance-attestation"
+import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -17,6 +20,15 @@ export async function POST() {
   if (existing.ok) {
     return NextResponse.json({ success: true, alreadyAttested: true })
   }
+
+  const admin = createAdminClient()
+  await recordLegalAcceptance({
+    admin,
+    userId: user.id,
+    docType: "insurance_attestation",
+    version: INSURANCE_ATTESTATION_VERSION,
+    headers: req.headers,
+  })
 
   const { error } = await supabase
     .from("profiles")

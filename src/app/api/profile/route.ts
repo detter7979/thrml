@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+import { LEGAL_VERSIONS } from "@/lib/legal-config"
+import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
 import { buildFullName } from "@/lib/name-utils"
 import { normalizeNotificationPreferences } from "@/lib/notification-preferences"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 const updateSchema = z
@@ -126,6 +129,20 @@ export async function PATCH(req: NextRequest) {
     if ("last_name" in updates) {
       updates.last_name = nextLastName
     }
+  }
+
+  if (updates.terms_accepted === true) {
+    const admin = createAdminClient()
+    await recordLegalAcceptance({
+      admin,
+      userId: user.id,
+      docType: "terms_of_service",
+      version:
+        typeof updates.terms_version === "string" ? updates.terms_version : LEGAL_VERSIONS.TERMS,
+      headers: req.headers,
+    })
+    if (!updates.terms_version) updates.terms_version = LEGAL_VERSIONS.TERMS
+    if (!updates.privacy_version) updates.privacy_version = LEGAL_VERSIONS.PRIVACY
   }
 
   let updateError: { message: string } | null = null

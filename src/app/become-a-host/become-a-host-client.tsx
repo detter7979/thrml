@@ -203,18 +203,19 @@ export function BecomeAHostClient() {
           .eq("id", user.id)
           .maybeSingle()
 
-        await supabase
-          .from("profiles")
-          .update({
-            host_terms_accepted: true,
-            host_terms_accepted_at: new Date().toISOString(),
-            host_terms_version: LEGAL_VERSIONS.HOST_AGREEMENT,
-            ui_intent: nextHostUiIntent(
-              typeof profile?.ui_intent === "string" ? profile.ui_intent : null
-            ),
+        const nextIntent = nextHostUiIntent(
+          typeof profile?.ui_intent === "string" ? profile.ui_intent : null
+        )
+        await fetch("/api/legal/accept-terms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            docType: "host_terms",
+            version: LEGAL_VERSIONS.HOST_AGREEMENT,
+            ui_intent: nextIntent,
             is_host: true,
-          })
-          .eq("id", user.id)
+          }),
+        })
       }
 
       trackGaEvent("host_onboarding_complete", {
@@ -402,11 +403,11 @@ export function BecomeAHostClient() {
                     </div>
                     <p className="border-t border-neutral-100 pt-3 text-xs text-neutral-400">
                       By agreeing, you also accept Thrml&apos;s{" "}
-                      <Link href="/terms" target="_blank" className="underline">
+                      <Link href="/legal/terms" target="_blank" className="underline">
                         Terms of Service
                       </Link>{" "}
                       and{" "}
-                      <Link href="/privacy" target="_blank" className="underline">
+                      <Link href="/legal/privacy" target="_blank" className="underline">
                         Privacy Policy
                       </Link>
                       . Version: {LEGAL_VERSIONS.HOST_AGREEMENT}

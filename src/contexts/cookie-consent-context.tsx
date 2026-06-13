@@ -15,13 +15,13 @@ import {
   COOKIE_CONSENT_ACCEPTED,
   COOKIE_CONSENT_DECLINED,
   COOKIE_CONSENT_KEY,
-  grantAnalyticsConsent,
   getCookieConsent,
-  revokeAnalyticsConsent,
+  restoreAnalyticsConsentFromStorage,
 } from "@/lib/cookie-consent"
 
 type CookieConsentContextValue = {
   openCookiePreferences: () => void
+  openDoNotSellPreferences: () => void
 }
 
 const CookieConsentContext = createContext<CookieConsentContextValue | null>(null)
@@ -36,13 +36,21 @@ export function useCookieConsent() {
 
 export function CookieConsentProvider({ children }: { children: ReactNode }) {
   const [bannerVisible, setBannerVisible] = useState(false)
+  const [showAdvertisingToggle, setShowAdvertisingToggle] = useState(false)
 
   const openCookiePreferences = useCallback(() => {
+    setShowAdvertisingToggle(false)
+    setBannerVisible(true)
+  }, [])
+
+  const openDoNotSellPreferences = useCallback(() => {
+    setShowAdvertisingToggle(true)
     setBannerVisible(true)
   }, [])
 
   const closeBanner = useCallback(() => {
     setBannerVisible(false)
+    setShowAdvertisingToggle(false)
   }, [])
 
   useEffect(() => {
@@ -55,9 +63,9 @@ export function CookieConsentProvider({ children }: { children: ReactNode }) {
 
       setBannerVisible(false)
       if (consent === COOKIE_CONSENT_ACCEPTED) {
-        grantAnalyticsConsent()
+        restoreAnalyticsConsentFromStorage(true)
       } else if (consent === COOKIE_CONSENT_DECLINED) {
-        revokeAnalyticsConsent()
+        restoreAnalyticsConsentFromStorage(false)
       }
     }
 
@@ -76,14 +84,19 @@ export function CookieConsentProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       openCookiePreferences,
+      openDoNotSellPreferences,
     }),
-    [openCookiePreferences]
+    [openCookiePreferences, openDoNotSellPreferences]
   )
 
   return (
     <CookieConsentContext.Provider value={value}>
       {children}
-      <CookieConsentBanner visible={bannerVisible} onClose={closeBanner} />
+      <CookieConsentBanner
+        visible={bannerVisible}
+        onClose={closeBanner}
+        showAdvertisingToggle={showAdvertisingToggle}
+      />
     </CookieConsentContext.Provider>
   )
 }

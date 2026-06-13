@@ -1,7 +1,11 @@
 import crypto from "crypto"
 
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+import { hasAdvertisingConsent, type AdvertisingConsentContext } from "@/lib/advertising-consent"
 import { hashIfPresent } from "@/lib/analytics/hash-for-meta"
 import { normalizeMetaPixelId } from "@/lib/analytics/env-ids"
+import { sanitizeMetaAdEventData } from "@/lib/meta/sanitize-ad-event-data"
 
 const GRAPH_VERSION = "v22.0"
 
@@ -89,6 +93,10 @@ export type FireCapiEventOptions = {
   eventSourceUrl?: string
   userData: CapiUserDataInput
   customData?: Record<string, unknown>
+  /** When set, CAPI is skipped unless advertising consent is granted. */
+  consentContext?: AdvertisingConsentContext & { admin?: SupabaseClient }
+  /** Internal — bypass consent check (never use for production ad events). */
+  skipConsentCheck?: boolean
 }
 
 export type FireCapiEventResult = {
@@ -109,6 +117,18 @@ export async function fireCapiEvent(
   const pid = pixelId()
   const token = capiAccessToken()
 
+  if (!options.skipConsentCheck) {
+    const consentCtx: AdvertisingConsentContext = options.consentContext ?? {}
+    if (!consentCtx.userId && options.userData.externalId) {
+      consentCtx.userId = options.userData.externalId
+    }
+    const consented = await hasAdvertisingConsent(consentCtx)
+    if (!consented) {
+      console.debug(`[CAPI] ${eventName} skipped — no advertising consent`)
+      return { ok: false, eventId, skipped: "no_advertising_consent" }
+    }
+  }
+
   if (!pid) {
     return { ok: false, eventId, skipped: "meta_pixel_unconfigured" }
   }
@@ -116,6 +136,7 @@ export async function fireCapiEvent(
     return { ok: false, eventId, skipped: "meta_capi_unconfigured" }
   }
 
+  const sanitizedCustom = sanitizeMetaAdEventData(options.customData)
   const user_data = buildCapiUserData(options.userData)
   const body: Record<string, unknown> = {
     data: [
@@ -126,8 +147,8 @@ export async function fireCapiEvent(
         event_id: eventId,
         ...(options.eventSourceUrl ? { event_source_url: options.eventSourceUrl } : {}),
         user_data,
-        ...(options.customData && Object.keys(options.customData).length > 0
-          ? { custom_data: options.customData }
+        ...(sanitizedCustom && Object.keys(sanitizedCustom).length > 0
+          ? { custom_data: sanitizedCustom }
           : {}),
       },
     ],

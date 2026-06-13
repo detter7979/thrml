@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Script from "next/script"
 
+import { readAdConsentFromCookieHeader, AD_CONSENT_ACCEPTED } from "@/lib/advertising-consent"
 import { normalizeMetaPixelId } from "@/lib/analytics/env-ids"
 import {
   COOKIE_CONSENT_ACCEPTED_EVENT,
@@ -10,6 +11,7 @@ import {
   COOKIE_CONSENT_KEY,
   isAnalyticsConsented,
 } from "@/lib/cookie-consent"
+import { sanitizeMetaAdEventData } from "@/lib/meta/sanitize-ad-event-data"
 
 type MetaUserData = {
   email?: string
@@ -40,7 +42,8 @@ export function MetaPixel() {
 
   useEffect(() => {
     function syncConsent() {
-      setConsented(isAnalyticsConsented())
+      const fromCookie = readAdConsentFromCookieHeader(document.cookie)
+      setConsented(fromCookie === AD_CONSENT_ACCEPTED || isAnalyticsConsented())
     }
 
     queueMicrotask(syncConsent)
@@ -133,8 +136,11 @@ export function trackMetaEvent(
   }
 ) {
   if (typeof window === "undefined") return
-  if (!isAnalyticsConsented()) return
+  const adConsented =
+    readAdConsentFromCookieHeader(document.cookie) === AD_CONSENT_ACCEPTED || isAnalyticsConsented()
+  if (!adConsented) return
 
+  const sanitizedParams = sanitizeMetaAdEventData(params) ?? {}
   const eventId =
     options?.eventId ?? (typeof params?.event_id === "string" ? (params.event_id as string) : undefined)
   const custom = Boolean(options?.custom)
@@ -142,13 +148,13 @@ export function trackMetaEvent(
   if (window.fbq) {
     const eventIdOpt = eventId ? { eventID: eventId } : undefined
     if (custom) {
-      window.fbq("trackCustom", eventName, params, eventIdOpt)
+      window.fbq("trackCustom", eventName, sanitizedParams, eventIdOpt)
     } else {
-      window.fbq("track", eventName, params, eventIdOpt)
+      window.fbq("track", eventName, sanitizedParams, eventIdOpt)
     }
   } else {
     window.__thrmlMetaQueue = window.__thrmlMetaQueue ?? []
-    window.__thrmlMetaQueue.push({ eventName, params, eventId, custom })
+    window.__thrmlMetaQueue.push({ eventName, params: sanitizedParams, eventId, custom })
   }
 
   if (options?.sendServer === false) return
@@ -167,7 +173,7 @@ export function trackMetaEvent(
       eventName,
       eventId,
       eventSourceUrl: window.location.href,
-      customData: params ?? {},
+      customData: sanitizedParams,
       userData,
     }),
   }).catch(() => undefined)

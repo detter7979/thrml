@@ -36,7 +36,7 @@ export function AuthShell({
   return (
     <div className="min-h-[100svh] md:grid md:grid-cols-2">
       <aside className="relative hidden md:block">
-        <Image src="/hero-sauna.png" alt="Wellness sauna interior" fill className="object-cover" />
+        <Image src="/hero-sauna.png" alt="Barrel sauna glowing warmly in a misty evergreen forest" fill className="object-cover" />
         <div className="absolute inset-0 bg-[#1A1410]/55" />
         <div className="absolute top-8 left-8">
           <Link href="/" className="font-serif text-4xl lowercase text-white">

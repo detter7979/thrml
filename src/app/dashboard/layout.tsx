@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import type { ReactNode } from "react"
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell"
+import { SiteFooter } from "@/components/shared/SiteFooter"
 import { createClient } from "@/lib/supabase/server"
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -65,6 +66,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       activeListingsCount={Number(activeListingCount ?? 0)}
     >
       {children}
+      <SiteFooter />
     </DashboardShell>
   )
 }

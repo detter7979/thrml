@@ -1,6 +1,7 @@
 import Link from "next/link"
 import type { ReactNode } from "react"
 
+import { SiteFooter } from "@/components/shared/SiteFooter"
 import { requireAdmin } from "@/lib/admin-guard"
 import { AdminSidebarNav } from "./admin-sidebar-nav"
 
@@ -19,7 +20,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <AdminSidebarNav />
       </aside>
       <main className="overflow-auto">
-        <div className="mx-auto w-full max-w-[1400px]">{children}</div>
+        <div className="mx-auto w-full max-w-[1400px]">
+          {children}
+          <SiteFooter />
+        </div>
       </main>
       <aside className="sticky bottom-0 border-t border-[#DCCDBA] bg-[#F3EADD] p-3 md:hidden">
         <Link

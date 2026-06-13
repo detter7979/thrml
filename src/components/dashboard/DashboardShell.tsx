@@ -96,7 +96,7 @@ export function DashboardShell({
         { href: "/dashboard", label: "Overview", icon: Home },
         { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
         { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-        { href: "/dashboard/saved", label: "Saved spaces", icon: Heart },
+        { href: "/dashboard/saved", label: "Saved", icon: Heart },
         { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
         { href: "/dashboard/account", label: "Account", icon: User },
       ]

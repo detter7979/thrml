@@ -26,9 +26,9 @@ import type { HomeListingCardRow } from "@/lib/listings/home-listings"
 const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const heroPrimaryCtaClass =
-  "inline-flex h-[52px] min-h-[52px] w-full items-center justify-center rounded-full bg-[#C75B3A] px-8 text-base font-medium text-white transition-colors hover:bg-[#B44D31] md:h-14 md:w-auto"
+  "inline-flex h-[52px] min-h-[52px] w-full items-center justify-center rounded-full bg-[#C75B3A] px-8 text-[15px] font-medium text-white transition-colors hover:bg-[#B44D31] md:h-14 md:w-auto md:text-base"
 const heroSecondaryCtaClass =
-  "inline-flex h-[52px] min-h-[52px] w-full items-center justify-center rounded-full border border-white/35 bg-transparent px-8 text-base font-medium text-[#F5EFE8] shadow-none transition-colors hover:bg-white/10 hover:text-[#F5EFE8] md:h-14 md:w-auto"
+  "inline-flex h-[52px] min-h-[52px] w-full items-center justify-center rounded-full border border-white/35 bg-transparent px-8 text-[15px] font-medium text-[#F5EFE8] shadow-none transition-colors hover:bg-white/10 hover:text-[#F5EFE8] md:h-14 md:w-auto md:text-base"
 
 type HomePageClientProps = {
   initialListings: HomeListingCardRow[]
@@ -211,13 +211,13 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
 
         <div className="relative z-20 min-h-[100svh] pointer-events-none">
           {/* Top cluster — headline + subhead over darker forest */}
-          <div className="absolute inset-x-0 top-[calc(4.75rem+env(safe-area-inset-top,0px))] px-4 text-center md:top-[14vh] md:px-8">
+          <div className="absolute inset-x-0 top-[calc(25svh+env(safe-area-inset-top,0px))] px-6 text-center md:top-[14vh] md:px-8">
             <div className="mx-auto w-full max-w-6xl md:text-left">
-              <div className="mx-auto max-w-[680px] md:mx-0">
-                <h1 className="font-serif text-[clamp(32px,8vw,44px)] font-medium leading-[0.98] tracking-tight text-[#F5EFE8] md:text-[68px] md:leading-[0.95]">
+              <div className="mx-auto max-w-[340px] md:mx-0 md:max-w-[680px]">
+                <h1 className="font-serif text-[clamp(28px,7vw,44px)] font-medium leading-[1.02] tracking-tight text-[#F5EFE8] md:text-[68px] md:leading-[0.95]">
                   <span className="hero-anim-in hero-delay-150 block">Your Personal Sauna Awaits</span>
                 </h1>
-                <p className="hero-anim-in hero-delay-600 mx-auto mt-3 max-w-xl text-[16px] leading-[1.6] text-white/65 md:mx-0 md:mt-4 md:text-[18px] md:leading-[1.65]">
+                <p className="hero-anim-in hero-delay-600 mx-auto mt-3 max-w-[320px] text-[15px] leading-[1.6] text-white/65 md:mx-0 md:mt-4 md:max-w-xl md:text-[18px] md:leading-[1.65]">
                   Private home saunas, booked by the hour. Browse a space near you - or list your own and earn.
                 </p>
               </div>
@@ -225,9 +225,9 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
           </div>
 
           {/* Bottom cluster — CTAs + trust line over darker foreground (~62% down) */}
-          <div className="absolute inset-x-0 top-[62%] -translate-y-1/2 px-4 md:px-8">
+          <div className="absolute inset-x-0 top-[77%] -translate-y-1/2 px-6 md:top-[62%] md:px-8">
             <div className="mx-auto w-full max-w-6xl">
-              <div className="mx-auto flex max-w-[680px] flex-col items-center pointer-events-auto md:mx-0 md:items-start">
+              <div className="mx-auto flex max-w-[340px] flex-col items-center pointer-events-auto md:mx-0 md:max-w-[680px] md:items-start">
                 <div className="hero-anim-scale hero-delay-750 flex w-full flex-col gap-3.5 md:w-auto md:flex-row md:flex-wrap md:gap-3">
                   <Button asChild className={heroPrimaryCtaClass}>
                     <Link href="/explore">Browse Saunas</Link>

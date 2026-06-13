@@ -1547,8 +1547,9 @@ export function ListingDetailClient({
                 <Link href={`/hosts/${host.id}?from=${encodeURIComponent(listingPathWithReturn)}`} className="block">
                   <Card className="rounded-xl border border-[#E6DDD3] bg-[#FCFAF7] py-4 shadow-none transition hover:bg-[#F8F4EE]">
                     <CardContent className="px-4">
-                      <div className="flex items-center gap-4">
-                        <Avatar className="size-14 ring-1 ring-[#C75B3A33]">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+                        <div className="flex min-w-0 flex-1 items-start gap-4">
+                        <Avatar className="size-14 shrink-0 ring-1 ring-[#C75B3A33]">
                           <AvatarImage src={host?.avatar_url || undefined} alt={hostName} />
                           <AvatarFallback className="bg-[#C75B3A1F] text-[#5D4D41]">
                             {hostInitials}
@@ -1592,7 +1593,8 @@ export function ListingDetailClient({
                             </div>
                           ) : null}
                         </div>
-                        <span className="inline-flex min-h-[44px] shrink-0 items-center text-sm font-medium text-[#5D4D41]">View profile →</span>
+                        </div>
+                        <span className="inline-flex min-h-[44px] shrink-0 items-center self-end text-sm font-medium text-[#5D4D41] md:self-center">View profile →</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1600,8 +1602,9 @@ export function ListingDetailClient({
               ) : (
                 <Card className="rounded-xl border border-[#E6DDD3] bg-[#FCFAF7] py-4 shadow-none">
                   <CardContent className="px-4">
-                    <div className="flex items-center gap-4">
-                      <Avatar className="size-14 ring-1 ring-[#C75B3A33]">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
+                      <div className="flex min-w-0 flex-1 items-start gap-4">
+                      <Avatar className="size-14 shrink-0 ring-1 ring-[#C75B3A33]">
                         <AvatarImage src={host?.avatar_url || undefined} alt={hostName} />
                         <AvatarFallback className="bg-[#C75B3A1F] text-[#5D4D41]">
                           {hostInitials}
@@ -1641,7 +1644,8 @@ export function ListingDetailClient({
                           </div>
                         ) : null}
                       </div>
-                      <span className="inline-flex min-h-[44px] shrink-0 items-center text-sm font-medium text-[#5D4D41]">View profile →</span>
+                      </div>
+                      <span className="inline-flex min-h-[44px] shrink-0 items-center self-end text-sm font-medium text-[#5D4D41] md:self-center">View profile →</span>
                     </div>
                   </CardContent>
                 </Card>

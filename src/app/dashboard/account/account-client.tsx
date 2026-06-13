@@ -184,8 +184,15 @@ export function AccountClient({
   const [insuranceAttestationError, setInsuranceAttestationError] = useState<string | null>(null)
 
   useEffect(() => {
-    setInsuranceAttested(initialInsuranceAttested)
+    if (!initialInsuranceAttested) return
+    setInsuranceAttested(true)
+    setInsuranceAttestationChecked(true)
   }, [initialInsuranceAttested])
+
+  useEffect(() => {
+    if (!initialInsuranceAttestedAt) return
+    setInsuranceAttestedAt(initialInsuranceAttestedAt)
+  }, [initialInsuranceAttestedAt])
 
   useEffect(() => {
     setName(fullName)
@@ -575,9 +582,10 @@ export function AccountClient({
     }
   }
 
-  async function saveInsuranceAttestation() {
+  async function saveInsuranceAttestation(options?: { checkedOverride?: boolean }) {
     if (insuranceAttested) return
-    if (!insuranceAttestationChecked) {
+    const isChecked = options?.checkedOverride ?? insuranceAttestationChecked
+    if (!isChecked) {
       setInsuranceAttestationError("Please confirm the insurance attestation to continue.")
       return
     }
@@ -601,12 +609,21 @@ export function AccountClient({
         typeof payload?.attestedAt === "string" ? payload.attestedAt : new Date().toISOString()
       )
       setInsuranceAttestationMessage(null)
+      router.refresh()
     } catch (error) {
       setInsuranceAttestationError(
         error instanceof Error ? error.message : "Unable to save insurance attestation."
       )
     } finally {
       setSavingInsuranceAttestation(false)
+    }
+  }
+
+  function handleInsuranceAttestationCheckedChange(checked: boolean) {
+    setInsuranceAttestationChecked(checked)
+    setInsuranceAttestationError(null)
+    if (checked && !insuranceAttested && !savingInsuranceAttestation) {
+      void saveInsuranceAttestation({ checkedOverride: true })
     }
   }
 
@@ -987,7 +1004,7 @@ export function AccountClient({
             attested={insuranceAttested}
             attestedAt={insuranceAttestedAt}
             checked={insuranceAttestationChecked}
-            onCheckedChange={setInsuranceAttestationChecked}
+            onCheckedChange={handleInsuranceAttestationCheckedChange}
             error={insuranceAttestationError}
           />
           {!insuranceAttested ? (

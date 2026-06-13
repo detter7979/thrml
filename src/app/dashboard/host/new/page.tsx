@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 
+import { getHostInsuranceAttestationStatus } from "@/lib/host/insurance-attestation"
 import { createClient } from "@/lib/supabase/server"
 
 import { HostNewListingClient } from "./host-new-listing-client"
@@ -14,11 +15,10 @@ export default async function NewHostListingPage() {
     redirect("/")
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("house_rules, insurance_attested, insurance_attested_at")
-    .eq("id", user.id)
-    .single()
+  const [{ data: profile }, insuranceAttestation] = await Promise.all([
+    supabase.from("profiles").select("house_rules").eq("id", user.id).maybeSingle(),
+    getHostInsuranceAttestationStatus(supabase, user.id),
+  ])
   const defaultHouseRules = Array.isArray(profile?.house_rules)
     ? profile.house_rules.filter((rule): rule is string => typeof rule === "string")
     : []
@@ -27,10 +27,8 @@ export default async function NewHostListingPage() {
     <HostNewListingClient
       userId={user.id}
       defaultHouseRules={defaultHouseRules}
-      insuranceAttested={Boolean(profile?.insurance_attested)}
-      insuranceAttestedAt={
-        typeof profile?.insurance_attested_at === "string" ? profile.insurance_attested_at : null
-      }
+      insuranceAttested={insuranceAttestation.attested}
+      insuranceAttestedAt={insuranceAttestation.attestedAt}
     />
   )
 }

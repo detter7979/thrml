@@ -157,29 +157,31 @@ export default async function BookingConfirmationPage({
           )}
 
           <div className="space-y-3 text-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1 space-y-2">
                 <p className="text-lg font-medium">{title}</p>
                 <p className="text-muted-foreground">
                   {formatBookingDateTime(booking.session_date, booking.start_time, booking.end_time)}
                 </p>
                 <p className="text-muted-foreground">{booking.guest_count} guests</p>
-                <div className="space-y-1 rounded-lg border border-[#EDE8E2] bg-[#FCFAF7] p-3 text-sm">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Space subtotal</span>
-                    <span className="text-[#1A1410]">{formatMoney(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Service fee ({serviceFeePercentLabel}%)</span>
-                    <span className="text-[#1A1410]">{formatMoney(guestFee)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-[#EDE8E2] pt-2 font-semibold text-[#1A1410]">
-                    <span>{awaitingHost ? "Authorization hold" : "Total"}</span>
-                    <span>{formatMoney(totalPaid)}</span>
-                  </div>
-                </div>
               </div>
-              {!awaitingHost ? <AccessCodeCard code={booking.access_code} /> : null}
+              {!awaitingHost ? (
+                <AccessCodeCard code={booking.access_code} className="w-full max-w-none sm:max-w-[220px]" />
+              ) : null}
+            </div>
+            <div className="space-y-1 rounded-lg border border-[#EDE8E2] bg-[#FCFAF7] p-3 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Space subtotal</span>
+                <span className="text-[#1A1410]">{formatMoney(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Service fee ({serviceFeePercentLabel}%)</span>
+                <span className="text-[#1A1410]">{formatMoney(guestFee)}</span>
+              </div>
+              <div className="flex justify-between border-t border-[#EDE8E2] pt-2 font-semibold text-[#1A1410]">
+                <span>{awaitingHost ? "Authorization hold" : "Total"}</span>
+                <span>{formatMoney(totalPaid)}</span>
+              </div>
             </div>
           </div>
         </CardContent>

@@ -411,6 +411,36 @@ export function HostNewListingClient({
   const [submitError, setSubmitError] = useState<string | null>(null)
   const allowNavigationRef = useRef(false)
   const hostOnboardingPhase2TrackedRef = useRef(false)
+  const savingInsuranceAttestationRef = useRef(false)
+
+  useEffect(() => {
+    if (!initialInsuranceAttested) return
+    setInsuranceAttested(true)
+    setInsuranceAttestationChecked(true)
+  }, [initialInsuranceAttested])
+
+  useEffect(() => {
+    if (!initialInsuranceAttestedAt) return
+    setInsuranceAttestedAt(initialInsuranceAttestedAt)
+  }, [initialInsuranceAttestedAt])
+
+  async function handleInsuranceAttestationCheckedChange(checked: boolean) {
+    setInsuranceAttestationChecked(checked)
+    setInsuranceAttestationError(null)
+    if (!checked || insuranceAttested || savingInsuranceAttestationRef.current) return
+
+    savingInsuranceAttestationRef.current = true
+    try {
+      await persistInsuranceAttestation()
+    } catch (error) {
+      setInsuranceAttestationChecked(false)
+      setInsuranceAttestationError(
+        error instanceof Error ? error.message : "Unable to save insurance attestation."
+      )
+    } finally {
+      savingInsuranceAttestationRef.current = false
+    }
+  }
 
   useEffect(() => {
     if (hostOnboardingPhase2TrackedRef.current) return
@@ -1648,7 +1678,7 @@ export function HostNewListingClient({
                       attested={insuranceAttested}
                       attestedAt={insuranceAttestedAt}
                       checked={insuranceAttestationChecked}
-                      onCheckedChange={setInsuranceAttestationChecked}
+                      onCheckedChange={(checked) => void handleInsuranceAttestationCheckedChange(checked)}
                       error={insuranceAttestationError}
                       showAccountLink
                     />

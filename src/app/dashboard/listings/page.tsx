@@ -3,6 +3,7 @@ import Link from "next/link"
 import { HostListingNextSteps } from "@/components/host/host-listing-next-steps"
 import { Button } from "@/components/ui/button"
 import { guestCompletedTabBooking } from "@/lib/booking-session"
+import { getHostInsuranceAttestationStatus } from "@/lib/host/insurance-attestation"
 import { normalizeCancellationPolicy } from "@/lib/cancellations"
 import {
   PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
@@ -32,11 +33,21 @@ export default async function DashboardListingsPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [{ data: profile }, { data: listings }] = await Promise.all([
+  const [
+    { count: activeListingCount },
+    { data: profile },
+    { data: listings },
+    insuranceAttestation,
+  ] = await Promise.all([
+    supabase
+      .from("listings")
+      .select("*", { count: "exact", head: true })
+      .eq("host_id", user?.id ?? "")
+      .eq("is_active", true),
     supabase
       .from("profiles")
       .select(
-        "ui_intent, stripe_account_id, stripe_payouts_enabled, stripe_onboarding_complete, id_verification_status, id_verified, id_verified_at, insurance_attested, insurance_attested_at"
+        "ui_intent, stripe_account_id, stripe_payouts_enabled, stripe_onboarding_complete, id_verification_status, id_verified, id_verified_at"
       )
       .eq("id", user?.id ?? "")
       .maybeSingle(),
@@ -45,6 +56,7 @@ export default async function DashboardListingsPage({
       .select("*")
       .eq("host_id", user?.id ?? "")
       .order("created_at", { ascending: false }),
+    getHostInsuranceAttestationStatus(supabase, user?.id ?? ""),
   ])
 
   const allListings = (listings ?? []) as Record<string, unknown>[]
@@ -422,10 +434,8 @@ export default async function DashboardListingsPage({
           idVerifiedAt={typeof profile?.id_verified_at === "string" ? profile.id_verified_at : null}
           payoutsConnected={payoutsConnected}
           stripeOnboardingComplete={Boolean(profile?.stripe_onboarding_complete)}
-          insuranceAttested={Boolean(profile?.insurance_attested)}
-          insuranceAttestedAt={
-            typeof profile?.insurance_attested_at === "string" ? profile.insurance_attested_at : null
-          }
+          insuranceAttested={insuranceAttestation.attested}
+          insuranceAttestedAt={insuranceAttestation.attestedAt}
         />
       ) : null}
 

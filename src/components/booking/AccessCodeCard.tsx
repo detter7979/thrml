@@ -3,7 +3,9 @@
 import { useState } from "react"
 import { Check, Copy } from "lucide-react"
 
-export function AccessCodeCard({ code }: { code: string | null }) {
+import { cn } from "@/lib/utils"
+
+export function AccessCodeCard({ code, className }: { code: string | null; className?: string }) {
   const [copied, setCopied] = useState(false)
 
   async function copyCode() {
@@ -18,7 +20,7 @@ export function AccessCodeCard({ code }: { code: string | null }) {
   }
 
   return (
-    <div className="w-full max-w-[220px] shrink-0 rounded-lg border border-[#F1D4BA] bg-[#FFF4E8] p-2">
+    <div className={cn("w-full max-w-[220px] shrink-0 rounded-lg border border-[#F1D4BA] bg-[#FFF4E8] p-2", className)}>
       <p className="text-[10px] uppercase tracking-[0.16em] text-[#C75B3A]">Access code</p>
       <div className="mt-1 flex items-center justify-between gap-2">
         <p

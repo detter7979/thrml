@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 
 import {
   assertHostInsuranceAttested,
+  getHostInsuranceAttestationStatus,
   INSURANCE_ATTESTATION_VERSION,
-  insuranceAttestationUpdatePayload,
+  persistHostInsuranceAttestation,
 } from "@/lib/host/insurance-attestation"
 import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -18,16 +19,11 @@ export async function POST(req: NextRequest) {
 
   const existing = await assertHostInsuranceAttested(supabase, user.id)
   if (existing.ok) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("insurance_attested_at")
-      .eq("id", user.id)
-      .maybeSingle()
+    const status = await getHostInsuranceAttestationStatus(supabase, user.id)
     return NextResponse.json({
       success: true,
       alreadyAttested: true,
-      attestedAt:
-        typeof profile?.insurance_attested_at === "string" ? profile.insurance_attested_at : null,
+      attestedAt: status.attestedAt,
     })
   }
 
@@ -40,15 +36,13 @@ export async function POST(req: NextRequest) {
     headers: req.headers,
   })
 
-  const { error } = await admin
-    .from("profiles")
-    .update(insuranceAttestationUpdatePayload())
-    .eq("id", user.id)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  try {
+    const { attestedAt } = await persistHostInsuranceAttestation(admin, user.id)
+    return NextResponse.json({ success: true, attestedAt })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to save insurance attestation." },
+      { status: 500 }
+    )
   }
-
-  const attestedAt = new Date().toISOString()
-  return NextResponse.json({ success: true, attestedAt })
 }

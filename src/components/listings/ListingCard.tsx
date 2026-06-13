@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "framer-motion"
 
 import { SaveButton } from "@/components/listings/SaveButton"
 import { Badge } from "@/components/ui/badge"
+import { showServiceTypeTags } from "@/lib/launch-config"
 import { listingCardCoverUrl } from "@/lib/listings/thumbnail-url"
 
 const MotionLink = motion.create(Link)
@@ -87,7 +88,7 @@ export function ListingCard({
         </div>
       </div>
       <div className="space-y-1">
-        {listing.serviceTypeName ? (
+        {showServiceTypeTags() && listing.serviceTypeName ? (
           <Badge variant="secondary">
             <span className="mr-1">{listing.serviceTypeIcon ?? "✨"}</span>
             {listing.serviceTypeName}

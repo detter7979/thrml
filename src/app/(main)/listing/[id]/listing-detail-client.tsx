@@ -72,6 +72,7 @@ import { trackGaEvent } from "@/lib/analytics/ga"
 import { roundUpTo30 } from "@/lib/slots"
 import { createClient } from "@/lib/supabase/client"
 import type { BookingModel } from "@/lib/service-types"
+import { showServiceTypeTags } from "@/lib/launch-config"
 import { useScrollReveal } from "@/hooks/useScrollReveal"
 import { CASCADE_TRANSITION, listingCascadeDelay } from "@/lib/motion-system"
 
@@ -1491,10 +1492,12 @@ export function ListingDetailClient({
                 <p className="type-label">{locationLabel}</p>
                 <div className="flex items-start justify-between gap-3 sm:gap-4">
                   <div className="flex min-w-0 flex-wrap gap-2">
-                    <Badge variant="secondary">
-                      <span className="mr-1">{serviceTypeIcon}</span>
-                      {serviceTypeName}
-                    </Badge>
+                    {showServiceTypeTags() ? (
+                      <Badge variant="secondary">
+                        <span className="mr-1">{serviceTypeIcon}</span>
+                        {serviceTypeName}
+                      </Badge>
+                    ) : null}
                     {saunaType ? <Badge variant="secondary">{saunaType}</Badge> : null}
                     {capacity ? (
                       <Badge variant="secondary">Up to {capacity} guests</Badge>

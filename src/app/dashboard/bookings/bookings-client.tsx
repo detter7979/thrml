@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button"
 import { guestCompletedTabBooking } from "@/lib/booking-session"
 import { resolveInstructions } from "@/lib/constants/access-types"
 import { formatServiceType } from "@/lib/constants/service-types"
+import { showServiceTypeTags } from "@/lib/launch-config"
 
 type BookingStatus = "pending" | "pending_host" | "confirmed" | "cancelled" | "completed" | "declined" | string
 type ViewMode = "list" | "calendar"
@@ -671,7 +672,7 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#F1E5D8] to-[#ECD8C7]">
-                            <p className="font-serif text-lg text-[#8A7769]">{serviceName(booking.listings?.service_type ?? null)}</p>
+                            <p className="font-serif text-lg text-[#8A7769]">thrml</p>
                           </div>
                         )}
                       </div>
@@ -681,9 +682,11 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                           <h3 className="flex-1 font-serif text-[20px] leading-tight">
                             {booking.listings?.title ?? "thrml session"}
                           </h3>
-                          <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} shrink-0 md:hidden`}>
-                            {serviceName(booking.listings?.service_type ?? null)}
-                          </span>
+                          {showServiceTypeTags() ? (
+                            <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} shrink-0 md:hidden`}>
+                              {serviceName(booking.listings?.service_type ?? null)}
+                            </span>
+                          ) : null}
                         </div>
                         <p className="text-sm text-[#7C6B5E]">with {booking.host?.full_name ?? "thrml host"}</p>
                         <p className="text-sm font-semibold">{formatDateTime(booking)}</p>
@@ -700,9 +703,11 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                       </div>
 
                       <div className="flex flex-col items-start gap-2 md:h-full md:items-end">
-                        <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} hidden shrink-0 md:inline-flex`}>
-                          {serviceName(booking.listings?.service_type ?? null)}
-                        </span>
+                        {showServiceTypeTags() ? (
+                          <span className={`${serviceTypePill(booking.listings?.service_type ?? null)} hidden shrink-0 md:inline-flex`}>
+                            {serviceName(booking.listings?.service_type ?? null)}
+                          </span>
+                        ) : null}
                         {isToday(booking.session_date) ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">
                             <span className="size-1.5 animate-pulse rounded-full bg-[#C75B3A]" />
@@ -1010,9 +1015,11 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                                   {booking.listings?.title ?? "thrml session"}
                                 </p>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                                  <span className={serviceTypePill(booking.listings?.service_type ?? null)}>
-                                    {serviceName(booking.listings?.service_type ?? null)}
-                                  </span>
+                                  {showServiceTypeTags() ? (
+                                    <span className={serviceTypePill(booking.listings?.service_type ?? null)}>
+                                      {serviceName(booking.listings?.service_type ?? null)}
+                                    </span>
+                                  ) : null}
                                   <span className={`rounded-full px-2.5 py-1 text-xs capitalize ${statusPill(booking.status)}`}>
                                     {booking.status}
                                   </span>

@@ -5,6 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css"
 import Image from "next/image"
 
 import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
+import { showServiceTypeTags } from "@/lib/launch-config"
 import { X } from "lucide-react"
 import type { RefObject } from "react"
 import MapboxMap, {
@@ -259,7 +260,9 @@ export function ExploreMapPanel({
                   {hasPublishedRating(popupListing.reviewCount, popupListing.rating)
                     ? `★ ${popupListing.rating.toFixed(1)} (${popupListing.reviewCount})`
                     : "New"}{" "}
-                  · {popupListing.serviceLabel} · {popupListing.distanceMiles.toFixed(1)} mi
+                  ·{" "}
+                  {showServiceTypeTags() ? `${popupListing.serviceLabel} · ` : ""}
+                  {popupListing.distanceMiles.toFixed(1)} mi
                 </p>
                 <p className="font-medium text-[#C75B3A]">
                   ${Math.round(popupListing.priceSolo)}{" "}

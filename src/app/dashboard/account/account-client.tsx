@@ -103,7 +103,7 @@ export function AccountClient({
   idVerified,
   idVerifiedAt,
   insuranceAttested: initialInsuranceAttested,
-  insuranceAttestedAt,
+  insuranceAttestedAt: initialInsuranceAttestedAt,
 }: {
   userId: string
   fullName: string
@@ -177,7 +177,8 @@ export function AccountClient({
   const [passwordResetNotice, setPasswordResetNotice] = useState<string | null>(null)
   const [passwordResetCooldown, setPasswordResetCooldown] = useState(0)
   const [insuranceAttested, setInsuranceAttested] = useState(initialInsuranceAttested)
-  const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(false)
+  const [insuranceAttestedAt, setInsuranceAttestedAt] = useState(initialInsuranceAttestedAt)
+  const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(initialInsuranceAttested)
   const [savingInsuranceAttestation, setSavingInsuranceAttestation] = useState(false)
   const [insuranceAttestationMessage, setInsuranceAttestationMessage] = useState<string | null>(null)
   const [insuranceAttestationError, setInsuranceAttestationError] = useState<string | null>(null)
@@ -587,13 +588,19 @@ export function AccountClient({
 
     try {
       const response = await fetch("/api/account/insurance-attestation", { method: "POST" })
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string
+        attestedAt?: string
+      } | null
       if (!response.ok) {
         throw new Error(payload?.error ?? "Unable to save insurance attestation.")
       }
       setInsuranceAttested(true)
-      setInsuranceAttestationChecked(false)
-      setInsuranceAttestationMessage("Insurance attestation saved.")
+      setInsuranceAttestationChecked(true)
+      setInsuranceAttestedAt(
+        typeof payload?.attestedAt === "string" ? payload.attestedAt : new Date().toISOString()
+      )
+      setInsuranceAttestationMessage(null)
     } catch (error) {
       setInsuranceAttestationError(
         error instanceof Error ? error.message : "Unable to save insurance attestation."

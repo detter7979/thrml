@@ -18,7 +18,17 @@ export async function POST(req: NextRequest) {
 
   const existing = await assertHostInsuranceAttested(supabase, user.id)
   if (existing.ok) {
-    return NextResponse.json({ success: true, alreadyAttested: true })
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("insurance_attested_at")
+      .eq("id", user.id)
+      .maybeSingle()
+    return NextResponse.json({
+      success: true,
+      alreadyAttested: true,
+      attestedAt:
+        typeof profile?.insurance_attested_at === "string" ? profile.insurance_attested_at : null,
+    })
   }
 
   const admin = createAdminClient()
@@ -30,7 +40,7 @@ export async function POST(req: NextRequest) {
     headers: req.headers,
   })
 
-  const { error } = await supabase
+  const { error } = await admin
     .from("profiles")
     .update(insuranceAttestationUpdatePayload())
     .eq("id", user.id)
@@ -39,5 +49,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true })
+  const attestedAt = new Date().toISOString()
+  return NextResponse.json({ success: true, attestedAt })
 }

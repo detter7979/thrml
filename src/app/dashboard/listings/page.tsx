@@ -36,7 +36,7 @@ export default async function DashboardListingsPage({
     supabase
       .from("profiles")
       .select(
-        "ui_intent, stripe_account_id, stripe_payouts_enabled, stripe_onboarding_complete, id_verification_status, id_verified, id_verified_at"
+        "ui_intent, stripe_account_id, stripe_payouts_enabled, stripe_onboarding_complete, id_verification_status, id_verified, id_verified_at, insurance_attested, insurance_attested_at"
       )
       .eq("id", user?.id ?? "")
       .maybeSingle(),
@@ -422,6 +422,10 @@ export default async function DashboardListingsPage({
           idVerifiedAt={typeof profile?.id_verified_at === "string" ? profile.id_verified_at : null}
           payoutsConnected={payoutsConnected}
           stripeOnboardingComplete={Boolean(profile?.stripe_onboarding_complete)}
+          insuranceAttested={Boolean(profile?.insurance_attested)}
+          insuranceAttestedAt={
+            typeof profile?.insurance_attested_at === "string" ? profile.insurance_attested_at : null
+          }
         />
       ) : null}
 

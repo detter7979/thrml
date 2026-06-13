@@ -32,7 +32,9 @@ export function HostInsuranceAttestation({
         <div className="flex items-start gap-2">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-700" />
           <div className="space-y-1">
-            <p className="text-sm font-medium text-emerald-900">Insurance attestation on file</p>
+            <p className="text-sm font-medium text-emerald-900">
+              Attestation accepted — approved to create listings
+            </p>
             {attestedAt ? (
               <p className="text-xs text-emerald-800">
                 Confirmed on {new Date(attestedAt).toLocaleDateString()}

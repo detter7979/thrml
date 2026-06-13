@@ -14,7 +14,6 @@ import { ReviewCard } from "@/components/reviews/ReviewCard"
 import { StarRating } from "@/components/reviews/StarRating"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { formatMoney, type ListingCancellationPolicy } from "@/lib/cancellations"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 type ListingRow = {
@@ -670,8 +669,7 @@ export function DashboardListingsClient({
                 <div className="text-left">
                   <p className="font-serif text-xl text-[#1A1410]">{listing.title}</p>
                   <p className="text-xs text-[#7A6A5D]">
-                    {listing.service_type} · {listing.is_active ? "Live" : "Draft"} ·{" "}
-                    {listing.active_booking_count} active booking
+                    {listing.is_active ? "Live" : "Draft"} · {listing.active_booking_count} active booking
                     {listing.active_booking_count === 1 ? "" : "s"}
                   </p>
                 </div>

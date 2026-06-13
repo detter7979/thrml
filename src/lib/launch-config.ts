@@ -48,3 +48,8 @@ export function getLaunchSelectableServiceTypes(currentServiceType?: string) {
   const current = SERVICE_TYPES.find((serviceType) => serviceType.value === currentServiceType)
   return current ? [...visible, current] : visible
 }
+
+/** Hide service-type pills/badges on listing and booking surfaces for now. */
+export function showServiceTypeTags() {
+  return false
+}

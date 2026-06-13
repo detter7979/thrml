@@ -388,7 +388,7 @@ export function HostNewListingClient({
   userId,
   defaultHouseRules,
   insuranceAttested: initialInsuranceAttested,
-  insuranceAttestedAt,
+  insuranceAttestedAt: insuranceAttestedAtProp,
 }: {
   userId: string
   defaultHouseRules: string[]
@@ -405,7 +405,8 @@ export function HostNewListingClient({
   const [mapError, setMapError] = useState<string | null>(null)
   const [showMoreAmenities, setShowMoreAmenities] = useState(false)
   const [insuranceAttested, setInsuranceAttested] = useState(initialInsuranceAttested)
-  const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(false)
+  const [insuranceAttestedAt, setInsuranceAttestedAt] = useState(insuranceAttestedAtProp)
+  const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(initialInsuranceAttested)
   const [insuranceAttestationError, setInsuranceAttestationError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const allowNavigationRef = useRef(false)
@@ -804,11 +805,18 @@ export function HostNewListingClient({
 
   async function persistInsuranceAttestation() {
     const response = await fetch("/api/account/insurance-attestation", { method: "POST" })
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string
+      attestedAt?: string
+    } | null
     if (!response.ok) {
       throw new Error(payload?.error ?? "Unable to save insurance attestation.")
     }
     setInsuranceAttested(true)
+    setInsuranceAttestationChecked(true)
+    setInsuranceAttestedAt(
+      typeof payload?.attestedAt === "string" ? payload.attestedAt : new Date().toISOString()
+    )
   }
 
   async function onSubmit(values: ListingFormValues) {

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { CheckCircle2 } from "lucide-react"
 
@@ -15,6 +16,8 @@ type HostListingNextStepsProps = {
   idVerifiedAt: string | null
   payoutsConnected: boolean
   stripeOnboardingComplete: boolean
+  insuranceAttested: boolean
+  insuranceAttestedAt: string | null
 }
 
 export function HostListingNextSteps({
@@ -25,12 +28,15 @@ export function HostListingNextSteps({
   idVerifiedAt,
   payoutsConnected,
   stripeOnboardingComplete,
+  insuranceAttested,
+  insuranceAttestedAt,
 }: HostListingNextStepsProps) {
   const [dismissed, setDismissed] = useState(false)
 
   const needsIdentity = !idVerified
   const needsPayouts = !payoutsConnected
-  const hasSetupWork = needsIdentity || needsPayouts
+  const needsAttestation = !insuranceAttested
+  const hasSetupWork = needsIdentity || needsPayouts || needsAttestation
 
   if (!hasListings && !listingJustCreated) return null
   if (!listingJustCreated && !hasSetupWork) return null
@@ -70,6 +76,22 @@ export function HostListingNextSteps({
       </div>
 
       <div className="mt-4 space-y-3">
+        {needsAttestation ? (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Complete your{" "}
+            <Link href="/dashboard/account#insurance-attestation" className="font-medium underline underline-offset-2">
+              insurance attestation
+            </Link>{" "}
+            before publishing or reactivating a listing.
+          </p>
+        ) : (
+          <p className="rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-sm font-medium text-[#166534]">
+            ✓ Attestation accepted — approved to create listings
+            {insuranceAttestedAt
+              ? ` · confirmed ${new Date(insuranceAttestedAt).toLocaleDateString()}`
+              : ""}
+          </p>
+        )}
         {needsIdentity ? (
           <IdentityVerificationCTA
             status={(idVerificationStatus ?? null) as IdentityUiStatus}

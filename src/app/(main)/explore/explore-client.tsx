@@ -20,6 +20,7 @@ import {
   getLaunchVisibleServiceTypes,
   isSaunasOnlyLaunch,
   sanitizeLaunchVisibleServiceTypes,
+  showServiceTypeTags,
 } from "@/lib/launch-config"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { cn } from "@/lib/utils"
@@ -1051,7 +1052,9 @@ export function ExploreClient() {
         </div>
         <div className="min-w-0 space-y-1">
           <p className="truncate text-[12px] text-[#6C5B4F]">
-            {listing.serviceIcon} {listing.serviceLabel} · {listing.distanceMiles.toFixed(1)} mi away
+            {showServiceTypeTags()
+              ? `${listing.serviceIcon} ${listing.serviceLabel} · ${listing.distanceMiles.toFixed(1)} mi away`
+              : `${listing.distanceMiles.toFixed(1)} mi away`}
           </p>
           <p className="truncate font-serif text-[15px]">{listing.title}</p>
           <p className="truncate text-[12px] text-[#7C6B5E]">

@@ -217,7 +217,7 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
 
         <div className="relative z-20 min-h-[100svh] pointer-events-none">
           {/* Top cluster — headline + subhead over darker forest */}
-          <div className={`absolute inset-x-0 top-[calc(5rem+env(safe-area-inset-top,0px))] text-center md:top-[14vh] ${pageXClass}`}>
+          <div className={`absolute inset-x-0 top-[calc(5rem+10svh+env(safe-area-inset-top,0px))] text-center md:top-[14vh] ${pageXClass}`}>
             <div className="mx-auto w-full max-w-6xl md:text-left">
               <div className="mx-auto w-full md:mx-0 md:max-w-[680px]">
                 <h1 className="font-serif text-[clamp(31px,8vw,44px)] font-medium leading-[1.0] tracking-tight text-[#F5EFE8] md:text-[68px] md:leading-[0.95]">
@@ -230,11 +230,40 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
             </div>
           </div>
 
-          {/* Bottom cluster — CTAs + trust line over darker foreground (~62% down) */}
-          <div className={`absolute inset-x-0 top-[77%] -translate-y-1/2 md:top-[62%] ${pageXClass}`}>
+          {/* Mobile bottom stack — CTAs above scroll cue */}
+          <div className="absolute inset-x-0 bottom-0 flex flex-col md:hidden">
+            <div className={`${pageXClass} pointer-events-auto pb-[10svh]`}>
+              <div className="mx-auto w-full max-w-6xl">
+                <div className="mx-auto flex w-full flex-col items-center">
+                  <div className="hero-anim-scale hero-delay-750 flex w-full flex-col gap-3.5">
+                    <Button asChild className={heroPrimaryCtaClass}>
+                      <Link href="/explore">Browse Saunas</Link>
+                    </Button>
+                    <Button asChild variant="outline" className={heroSecondaryCtaClass}>
+                      <Link href="/become-a-host">Become a Host</Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
+              aria-label="Scroll to explore saunas"
+              className={`z-20 inline-flex items-center justify-center gap-1 self-center pb-[max(1.25rem,env(safe-area-inset-bottom))] text-[12px] tracking-[0.08em] text-white/85 transition-opacity duration-300 pointer-events-auto ${
+                showScrollCue ? "opacity-100" : "pointer-events-none opacity-0"
+              }`}
+            >
+              <span>Explore saunas</span>
+              <ChevronDown className="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
+
+          {/* Desktop CTAs */}
+          <div className={`absolute inset-x-0 top-[62%] hidden -translate-y-1/2 md:block ${pageXClass}`}>
             <div className="mx-auto w-full max-w-6xl">
-              <div className="mx-auto flex w-full flex-col items-center pointer-events-auto md:mx-0 md:max-w-[680px] md:items-start">
-                <div className="hero-anim-scale hero-delay-750 flex w-full flex-col gap-3.5 md:w-auto md:flex-row md:flex-wrap md:gap-3">
+              <div className="mx-auto flex max-w-[680px] flex-col items-start pointer-events-auto">
+                <div className="hero-anim-scale hero-delay-750 flex w-auto flex-row flex-wrap gap-3">
                   <Button asChild className={heroPrimaryCtaClass}>
                     <Link href="/explore">Browse Saunas</Link>
                   </Button>
@@ -242,26 +271,21 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
                     <Link href="/become-a-host">Become a Host</Link>
                   </Button>
                 </div>
-                <p className="hero-anim-in hero-delay-900 mt-4 text-center text-xs tracking-[0.06em] text-white/45 md:text-left">
-                  Private • Instant Booking • Free to list
-                </p>
               </div>
             </div>
           </div>
 
-          {/* Scroll cue — pinned bottom, separate from trust line */}
+          {/* Scroll cue — desktop only */}
           <button
             type="button"
             onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
             aria-label="Scroll to explore saunas"
-            className={`absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-20 inline-flex -translate-x-1/2 items-center justify-center gap-1 text-[12px] tracking-[0.08em] text-white/85 transition-opacity duration-300 pointer-events-auto md:bottom-6 md:flex-col md:gap-0 md:text-center ${
+            className={`absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-20 hidden -translate-x-1/2 flex-col gap-0 text-center transition-opacity duration-300 pointer-events-auto md:bottom-6 md:flex ${
               showScrollCue ? "opacity-100" : "pointer-events-none opacity-0"
             }`}
           >
-            <span className="md:hidden">Explore saunas</span>
-            <ChevronDown className="size-3.5 md:hidden" aria-hidden="true" />
-            <span className="hidden text-[10px] tracking-[0.2em] text-white/75 md:block">EXPLORE SAUNAS</span>
-            <span className="hero-scroll-bounce mt-1 hidden text-base md:block" aria-hidden="true">
+            <span className="text-[10px] tracking-[0.2em] text-white/75">EXPLORE SAUNAS</span>
+            <span className="hero-scroll-bounce mt-1 text-base" aria-hidden="true">
               ↓
             </span>
           </button>

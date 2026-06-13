@@ -26,9 +26,9 @@ import type { HomeListingCardRow } from "@/lib/listings/home-listings"
 const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const heroPrimaryCtaClass =
-  "inline-flex h-14 min-h-14 items-center justify-center rounded-full bg-[#C75B3A] px-8 text-base font-medium text-white transition-colors hover:bg-[#B44D31] md:h-14"
+  "inline-flex h-[52px] min-h-[52px] w-full items-center justify-center rounded-full bg-[#C75B3A] px-8 text-base font-medium text-white transition-colors hover:bg-[#B44D31] md:h-14 md:w-auto"
 const heroSecondaryCtaClass =
-  "inline-flex h-14 min-h-14 items-center justify-center rounded-full border border-white/35 bg-transparent px-8 text-base font-medium text-[#F5EFE8] shadow-none transition-colors hover:bg-white/10 hover:text-[#F5EFE8] md:h-14"
+  "inline-flex h-[52px] min-h-[52px] w-full items-center justify-center rounded-full border border-white/35 bg-transparent px-8 text-base font-medium text-[#F5EFE8] shadow-none transition-colors hover:bg-white/10 hover:text-[#F5EFE8] md:h-14 md:w-auto"
 
 type HomePageClientProps = {
   initialListings: HomeListingCardRow[]
@@ -114,10 +114,17 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
   const blurDataURL =
     "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL..."
 
-  const heroImage = {
-    url: "/hero-main-bg.png",
-    objectPosition: "center center",
-    alt: "Barrel sauna glowing warmly in a misty evergreen forest",
+  const heroImages = {
+    mobile: {
+      url: "/hero-main-bg-mobile.jpg",
+      objectPosition: "center center",
+      alt: "Barrel sauna glowing warmly on a backyard deck at dusk",
+    },
+    desktop: {
+      url: "/hero-main-bg.jpg",
+      objectPosition: "center center",
+      alt: "Barrel sauna glowing warmly on a backyard deck at dusk",
+    },
   }
 
   async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {
@@ -163,36 +170,27 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
 
   return (
     <div className="min-h-screen bg-warm-50">
-      <section className="relative min-h-[100svh] bg-[#1A1410] pt-24 pb-8 md:min-h-[100svh] md:pt-0 md:pb-0">
-        <div className="pointer-events-none absolute inset-0 hidden md:block">
+      <section className="relative min-h-[100svh] bg-[#1A1410]">
+        <div className="pointer-events-none absolute inset-0">
           <Image
-            src={heroImage.url}
-            alt={heroImage.alt}
+            src={heroImages.mobile.url}
+            alt={heroImages.mobile.alt}
             fill
-            className="pointer-events-none object-cover"
-            style={{ objectPosition: heroImage.objectPosition }}
-            sizes="(max-width: 767px) 0px, (max-width: 1280px) 100vw, 100vw"
+            className="object-cover scale-x-[-1] md:hidden"
+            style={{ objectPosition: heroImages.mobile.objectPosition }}
+            sizes="100vw"
             priority
             fetchPriority="high"
             loading="eager"
             placeholder="blur"
             blurDataURL={blurDataURL}
           />
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(to right, rgba(26,20,16,0.78) 0%, rgba(26,20,16,0.78) 45%, rgba(26,20,16,0.42) 50%, rgba(26,20,16,0.1) 58%, rgba(26,20,16,0) 66%)",
-            }}
-          />
-        </div>
-        <div className="pointer-events-none absolute inset-0 md:hidden">
           <Image
-            src={heroImage.url}
-            alt={heroImage.alt}
+            src={heroImages.desktop.url}
+            alt={heroImages.desktop.alt}
             fill
-            className="pointer-events-none object-cover"
-            style={{ objectPosition: heroImage.objectPosition }}
+            className="hidden object-cover md:block"
+            style={{ objectPosition: heroImages.desktop.objectPosition }}
             sizes="100vw"
             priority
             fetchPriority="high"
@@ -201,85 +199,67 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
             blurDataURL={blurDataURL}
           />
           <div
-            className="pointer-events-none absolute inset-0"
+            className="absolute inset-0 hidden md:block"
             style={{
-              background: "linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.6) 100%)",
+              background:
+                "linear-gradient(to right, rgba(26,20,16,0.78) 0%, rgba(26,20,16,0.78) 45%, rgba(26,20,16,0.42) 50%, rgba(26,20,16,0.1) 58%, rgba(26,20,16,0) 66%)",
             }}
           />
+          <div className="absolute inset-x-0 top-0 h-[42%] bg-gradient-to-b from-black/55 via-black/20 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-[52%] bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
         </div>
-        <div className="relative z-20 hidden pointer-events-auto md:flex md:min-h-[100svh] md:items-center">
-          <div className="mx-auto w-full max-w-6xl px-4 md:px-8">
-            <div className="w-full max-w-[680px]">
-              <h1 className="font-serif text-[44px] font-medium leading-[0.95] tracking-tight text-[#F5EFE8] md:text-[68px]">
-                <span className="hero-anim-in hero-delay-150 block">Your Personal Sauna Awaits</span>
-              </h1>
-              <p className="hero-anim-in hero-delay-600 mt-8 max-w-xl text-[17px] leading-[1.65] text-white/65 md:text-[18px]">
-                Private home saunas, booked by the hour. Browse a space near you - or list your own
-                and earn.
-              </p>
 
-              <div className="hero-anim-scale hero-delay-750 mt-10 flex flex-wrap items-center gap-3">
-                <Button asChild className={heroPrimaryCtaClass}>
-                  <Link href="/explore">Browse Saunas</Link>
-                </Button>
-                <Button asChild variant="outline" className={heroSecondaryCtaClass}>
-                  <Link href="/become-a-host">Become a Host</Link>
-                </Button>
+        <div className="relative z-20 min-h-[100svh] pointer-events-none">
+          {/* Top cluster — headline + subhead over darker forest */}
+          <div className="absolute inset-x-0 top-[calc(4.75rem+env(safe-area-inset-top,0px))] px-4 text-center md:top-[14vh] md:px-8">
+            <div className="mx-auto w-full max-w-6xl md:text-left">
+              <div className="mx-auto max-w-[680px] md:mx-0">
+                <h1 className="font-serif text-[clamp(32px,8vw,44px)] font-medium leading-[0.98] tracking-tight text-[#F5EFE8] md:text-[68px] md:leading-[0.95]">
+                  <span className="hero-anim-in hero-delay-150 block">Your Personal Sauna Awaits</span>
+                </h1>
+                <p className="hero-anim-in hero-delay-600 mx-auto mt-3 max-w-xl text-[16px] leading-[1.6] text-white/65 md:mx-0 md:mt-4 md:text-[18px] md:leading-[1.65]">
+                  Private home saunas, booked by the hour. Browse a space near you - or list your own and earn.
+                </p>
               </div>
-
-              <p className="hero-anim-in hero-delay-900 mt-6 text-xs tracking-[0.06em] text-white/45">
-                Private • Instant Booking • Free to list
-              </p>
             </div>
           </div>
-        </div>
 
-        <div className="relative z-20 mx-auto flex min-h-[calc(100svh-7rem)] w-full max-w-6xl flex-col px-4 pt-2 pb-8 pointer-events-auto md:hidden">
-          <div>
-            <h1 className="font-serif text-[clamp(32px,8vw,44px)] font-medium leading-[0.98] tracking-tight text-[#F5EFE8]">
-              <span className="hero-anim-in hero-delay-150 block">Your Personal Sauna Awaits</span>
-            </h1>
-            <p className="hero-anim-in hero-delay-600 mt-6 max-w-xl text-[16px] leading-[1.65] text-white/65">
-              Private home saunas, booked by the hour. Browse a space near you - or list your own and
-              earn.
-            </p>
-          </div>
-
-          <div className="hero-anim-scale hero-delay-750 mt-auto flex flex-col items-center gap-5 pb-2 pt-10">
-            <div className="flex w-full max-w-[220px] flex-col gap-3">
-              <Button asChild className={`${heroPrimaryCtaClass} w-full px-6`}>
-                <Link href="/explore">Browse Saunas</Link>
-              </Button>
-              <Button asChild variant="outline" className={`${heroSecondaryCtaClass} w-full px-6`}>
-                <Link href="/become-a-host">Become a Host</Link>
-              </Button>
+          {/* Bottom cluster — CTAs + trust line over darker foreground (~62% down) */}
+          <div className="absolute inset-x-0 top-[62%] -translate-y-1/2 px-4 md:px-8">
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="mx-auto flex max-w-[680px] flex-col items-center pointer-events-auto md:mx-0 md:items-start">
+                <div className="hero-anim-scale hero-delay-750 flex w-full flex-col gap-3.5 md:w-auto md:flex-row md:flex-wrap md:gap-3">
+                  <Button asChild className={heroPrimaryCtaClass}>
+                    <Link href="/explore">Browse Saunas</Link>
+                  </Button>
+                  <Button asChild variant="outline" className={heroSecondaryCtaClass}>
+                    <Link href="/become-a-host">Become a Host</Link>
+                  </Button>
+                </div>
+                <p className="hero-anim-in hero-delay-900 mt-4 text-center text-xs tracking-[0.06em] text-white/45 md:text-left">
+                  Private • Instant Booking • Free to list
+                </p>
+              </div>
             </div>
-
-            <p className="hero-anim-in hero-delay-900 text-center text-xs leading-relaxed tracking-[0.04em] text-white/45">
-              Private • Instant Booking • Free to list
-            </p>
-
-            <button
-              type="button"
-              onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
-              className="inline-flex items-center justify-center gap-1 text-center text-[12px] tracking-[0.08em] text-white/85"
-            >
-              <span>Explore saunas</span>
-              <ChevronDown className="size-3.5" />
-            </button>
           </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
-          className={`absolute bottom-6 left-1/2 z-20 hidden -translate-x-1/2 text-center text-white transition-opacity duration-300 md:block ${
-            showScrollCue ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          <span className="block text-[10px] tracking-[0.2em] text-white/75">EXPLORE SAUNAS</span>
-          <span className="hero-scroll-bounce mt-1 block text-base">↓</span>
-        </button>
+          {/* Scroll cue — pinned bottom, separate from trust line */}
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: window.innerHeight - 72, behavior: "smooth" })}
+            aria-label="Scroll to explore saunas"
+            className={`absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 z-20 inline-flex -translate-x-1/2 items-center justify-center gap-1 text-[12px] tracking-[0.08em] text-white/85 transition-opacity duration-300 pointer-events-auto md:bottom-6 md:flex-col md:gap-0 md:text-center ${
+              showScrollCue ? "opacity-100" : "pointer-events-none opacity-0"
+            }`}
+          >
+            <span className="md:hidden">Explore saunas</span>
+            <ChevronDown className="size-3.5 md:hidden" aria-hidden="true" />
+            <span className="hidden text-[10px] tracking-[0.2em] text-white/75 md:block">EXPLORE SAUNAS</span>
+            <span className="hero-scroll-bounce mt-1 hidden text-base md:block" aria-hidden="true">
+              ↓
+            </span>
+          </button>
+        </div>
       </section>
 
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 md:px-8">

@@ -51,19 +51,23 @@ export function SiteFooter() {
 
           <div>
             <p className="mb-3 text-sm font-medium text-[#F5EFE8]">Legal</p>
-            <ul className="space-y-2 text-sm text-white/65">
+            <ul className="space-y-3 text-sm text-white/65">
               <li>
                 <Link href="/legal/privacy" className="transition-colors hover:text-white">
                   Privacy Policy
                 </Link>
-              </li>
-              <li>
-                <Link href="/privacy-request" className="transition-colors hover:text-white">
-                  Privacy request
+                <Link
+                  href="/privacy-request"
+                  className="mt-1 block text-xs text-white/45 transition-colors hover:text-white/70"
+                >
+                  Submit a privacy request
                 </Link>
               </li>
               <li>
-                <Link href="/legal/consumer-health-data" className="transition-colors hover:text-white">
+                <Link
+                  href="/legal/consumer-health-data"
+                  className="block leading-snug transition-colors hover:text-white"
+                >
                   Consumer Health Data Privacy Policy
                 </Link>
               </li>
@@ -71,12 +75,6 @@ export function SiteFooter() {
                 <Link href="/legal/terms" className="transition-colors hover:text-white">
                   Terms of Service
                 </Link>
-              </li>
-              <li>
-                <CookieSettingsLink className="text-left transition-colors hover:text-white" />
-              </li>
-              <li>
-                <DoNotSellLink className="text-left transition-colors hover:text-white" />
               </li>
             </ul>
           </div>
@@ -113,7 +111,7 @@ export function SiteFooter() {
             <span aria-hidden="true" className="text-white/25">
               ·
             </span>
-            <DoNotSellLink className="transition-colors hover:text-white/70" />
+            <DoNotSellLink compact className="transition-colors hover:text-white/70" />
           </div>
           <div className="flex items-center gap-2 md:justify-end">
             <a

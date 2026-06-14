@@ -220,7 +220,7 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
           <div className={`absolute inset-x-0 top-[calc(5rem+10svh+env(safe-area-inset-top,0px))] text-center md:top-[14vh] ${pageXClass}`}>
             <div className="mx-auto w-full max-w-6xl md:text-left">
               <div className="mx-auto w-full md:mx-0 md:max-w-[680px]">
-                <h1 className="font-serif text-[clamp(31px,8vw,44px)] font-medium leading-[1.0] tracking-tight text-[#F5EFE8] md:text-[68px] md:leading-[0.95]">
+                <h1 className="font-serif text-[clamp(22px,5.85vw,44px)] font-medium leading-[1.0] tracking-tight text-[#F5EFE8] md:text-[68px] md:leading-[0.95]">
                   <span className="hero-anim-in hero-delay-150 block">Your Personal Sauna Awaits</span>
                 </h1>
                 <p className="hero-anim-in hero-delay-600 mx-auto mt-3 text-[16px] leading-[1.6] text-white/65 md:mx-0 md:mt-4 md:max-w-xl md:text-[18px] md:leading-[1.65]">
@@ -232,7 +232,7 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
 
           {/* Mobile bottom stack — CTAs above scroll cue */}
           <div className="absolute inset-x-0 bottom-0 flex flex-col md:hidden">
-            <div className={`${pageXClass} pointer-events-auto pb-[10svh]`}>
+            <div className={`${pageXClass} pointer-events-auto pb-[5svh]`}>
               <div className="mx-auto w-full max-w-6xl">
                 <div className="mx-auto flex w-full flex-col items-center">
                   <div className="hero-anim-scale hero-delay-750 flex w-full flex-col gap-3.5">

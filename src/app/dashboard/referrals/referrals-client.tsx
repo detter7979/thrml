@@ -1,8 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Check, Copy, Gift, Loader2, Mail, MessageSquare } from "lucide-react"
+import { Check, Copy, Gift, Mail, MessageSquare } from "lucide-react"
 
+import { ReferralsPageSkeleton } from "@/components/dashboard/dashboard-loading-skeletons"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -94,11 +95,7 @@ export function ReferralsClient() {
     : null
 
   if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center px-4 py-12">
-        <Loader2 className="size-8 animate-spin text-[#C75B3A]" />
-      </div>
-    )
+    return <ReferralsPageSkeleton />
   }
 
   if (data?.error) {

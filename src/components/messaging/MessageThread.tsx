@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { format, isToday, isYesterday } from "date-fns"
 
+import { DashboardSkeletonBlock } from "@/components/dashboard/dashboard-loading-skeletons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { createClient } from "@/lib/supabase/client"
 import { MessageInput } from "./MessageInput"
@@ -212,7 +213,19 @@ export function MessageThread({
       </header>
 
       <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-[#F7F3EE] px-4 py-4">
-        {loading ? <p className="text-sm text-[#7A6A5D]">Loading messages...</p> : null}
+        {loading ? (
+          <div className="space-y-4">
+            <div className="flex justify-start">
+              <DashboardSkeletonBlock className="h-10 w-48 rounded-2xl" />
+            </div>
+            <div className="flex justify-end">
+              <DashboardSkeletonBlock className="h-10 w-36 rounded-2xl" />
+            </div>
+            <div className="flex justify-start">
+              <DashboardSkeletonBlock className="h-14 w-56 rounded-2xl" />
+            </div>
+          </div>
+        ) : null}
         {messages.map((message, index) => {
           const dateBreak =
             index === 0 ||

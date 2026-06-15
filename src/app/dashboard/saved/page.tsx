@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Heart } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
+import { SavedListingCardSkeleton } from "@/components/dashboard/dashboard-loading-skeletons"
 import { ListingCard, type ListingCardData } from "@/components/listings/ListingCard"
 import { getServiceType } from "@/lib/constants/service-types"
 
@@ -137,7 +138,13 @@ export default function DashboardSavedPage() {
         <p className="text-sm text-[#6D5E51]">{savedCount} spaces saved</p>
       </div>
 
-      {loading ? <div className="h-24 animate-pulse rounded-2xl bg-white" /> : null}
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <SavedListingCardSkeleton />
+          <SavedListingCardSkeleton />
+          <SavedListingCardSkeleton />
+        </div>
+      ) : null}
 
       {!loading && savedCount === 0 ? (
         <div className="rounded-2xl bg-white p-10 text-center shadow-sm">

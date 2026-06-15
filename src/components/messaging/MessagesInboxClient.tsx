@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react"
 
+import {
+  ConversationListSkeleton,
+  MessageThreadSkeleton,
+} from "@/components/dashboard/dashboard-loading-skeletons"
 import { ConversationList, type ConversationItem } from "@/components/messaging/ConversationList"
 import { MessageThread } from "@/components/messaging/MessageThread"
 import { createClient } from "@/lib/supabase/client"
@@ -108,8 +112,11 @@ export function MessagesInboxClient({
 
   if (loading && conversations.length === 0) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-[#F7F3EE] px-4 text-sm text-[#7A6A5D]">
-        Loading messages...
+      <div className="grid min-h-[calc(100dvh-80px)] grid-cols-1 md:grid-cols-[360px_1fr]">
+        <ConversationListSkeleton />
+        <div className="hidden bg-[#F7F3EE] md:block">
+          <MessageThreadSkeleton />
+        </div>
       </div>
     )
   }
@@ -123,7 +130,9 @@ export function MessagesInboxClient({
         onOpenConversation={handleOpenConversation}
       />
       <div className="bg-[#F7F3EE]">
-        {!loading && selectedId ? (
+        {loading && selectedId ? (
+          <MessageThreadSkeleton />
+        ) : selectedId ? (
           <MessageThread
             conversationId={selectedId}
             currentUserId={currentUserId}
@@ -131,7 +140,7 @@ export function MessagesInboxClient({
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-[#7A6A5D]">
-            {loading ? "Loading conversations..." : "Select a conversation to start messaging."}
+            Select a conversation to start messaging.
           </div>
         )}
       </div>

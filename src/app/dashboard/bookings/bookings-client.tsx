@@ -27,6 +27,7 @@ import {
 import { BookingReviewDialog } from "@/components/booking/BookingReviewDialog"
 import { CancelModal } from "@/components/booking/CancelModal"
 import { RescheduleModal } from "@/components/booking/RescheduleModal"
+import { BookingCardSkeleton } from "@/components/dashboard/dashboard-loading-skeletons"
 import { Button } from "@/components/ui/button"
 import { guestCompletedTabBooking } from "@/lib/booking-session"
 import { resolveInstructions } from "@/lib/constants/access-types"
@@ -313,27 +314,6 @@ function getAccessReleaseState(booking: BookingRecord) {
   }
 }
 
-function BookingSkeleton() {
-  return (
-    <div className="rounded-3xl bg-white p-4 shadow-[0_8px_30px_rgba(26,20,16,0.06)] md:p-5">
-      <div className="grid animate-pulse gap-4 md:grid-cols-[180px_1fr_180px]">
-        <div className="h-32 rounded-2xl bg-[#EEE7DE]" />
-        <div className="space-y-3">
-          <div className="h-4 w-32 rounded bg-[#EEE7DE]" />
-          <div className="h-6 w-2/3 rounded bg-[#EEE7DE]" />
-          <div className="h-4 w-1/2 rounded bg-[#EEE7DE]" />
-          <div className="h-4 w-2/3 rounded bg-[#EEE7DE]" />
-        </div>
-        <div className="space-y-3">
-          <div className="h-7 w-24 rounded bg-[#EEE7DE]" />
-          <div className="h-5 w-20 rounded bg-[#EEE7DE]" />
-          <div className="h-10 w-full rounded-xl bg-[#EEE7DE]" />
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function BookingDetailSheet({
   isOpen,
   onClose,
@@ -599,9 +579,9 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
             ) : null}
             {loading ? (
               <>
-                <BookingSkeleton />
-                <BookingSkeleton />
-                <BookingSkeleton />
+                <BookingCardSkeleton />
+                <BookingCardSkeleton />
+                <BookingCardSkeleton />
               </>
             ) : visible.length === 0 ? (
               <div className="rounded-2xl bg-white p-10 text-center">

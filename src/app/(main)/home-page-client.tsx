@@ -262,7 +262,7 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
           {/* Desktop CTAs */}
           <div className={`absolute inset-x-0 top-[62%] hidden -translate-y-1/2 md:block ${pageXClass}`}>
             <div className="mx-auto w-full max-w-6xl">
-              <div className="mx-auto flex max-w-[680px] flex-col items-start pointer-events-auto">
+              <div className="mx-auto flex w-full max-w-[680px] flex-col items-start pointer-events-auto md:mx-0">
                 <div className="hero-anim-scale hero-delay-750 flex w-auto flex-row flex-wrap gap-3">
                   <Button asChild className={heroPrimaryCtaClass}>
                     <Link href="/explore">Browse Saunas</Link>

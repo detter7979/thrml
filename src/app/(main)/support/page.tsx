@@ -2,6 +2,8 @@
 
 import type { ComponentType, FormEvent } from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Turnstile } from "@marsidev/react-turnstile"
+import type { TurnstileInstance } from "@marsidev/react-turnstile"
 import Link from "next/link"
 import {
   AlertTriangle,
@@ -65,6 +67,7 @@ type SubmissionResult = {
 
 const SUPPORT_CONTACT_EMAIL = "hello@usethrml.com"
 const NO_BOOKING_VALUE = "__none__"
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!
 
 const HELP_TILES: HelpTile[] = [
   { label: "I can't access the space", href: "#access", icon: KeyRound },
@@ -226,7 +229,9 @@ export default function SupportPage() {
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState<SubmissionResult | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [bookings, setBookings] = useState<BookingOption[]>([])
+  const turnstileRef = useRef<TurnstileInstance | null>(null)
   const [form, setForm] = useState<FormState>({
     name: "",
     email: "",
@@ -390,6 +395,8 @@ export default function SupportPage() {
     setSubmitted(null)
     setSubmitError(null)
     setFieldErrors({})
+    setTurnstileToken(null)
+    turnstileRef.current?.reset()
     setForm((current) => ({
       ...current,
       subject: "",
@@ -425,6 +432,7 @@ export default function SupportPage() {
           booking_id: form.bookingId.trim() || null,
           message: form.message.trim(),
           website,
+          turnstile_token: turnstileToken,
         }),
       })
 
@@ -441,10 +449,18 @@ export default function SupportPage() {
         if (response.status === 400 && payload?.errors) {
           const mappedErrors = mapServerErrors(payload.errors)
           setFieldErrors(mappedErrors)
+          if (payload.errors.turnstile) {
+            setTurnstileToken(null)
+            turnstileRef.current?.reset()
+            setSubmitError(payload.errors.turnstile)
+            return
+          }
           focusFirstInvalidField(mappedErrors)
           return
         }
         setSubmitError(`Something went wrong. Please try again or email us at ${SUPPORT_CONTACT_EMAIL}`)
+        setTurnstileToken(null)
+        turnstileRef.current?.reset()
         return
       }
 
@@ -458,6 +474,8 @@ export default function SupportPage() {
     } catch (submitError) {
       console.error("Support form submit failed", submitError)
       setSubmitError(`Something went wrong. Please try again or email us at ${SUPPORT_CONTACT_EMAIL}`)
+      setTurnstileToken(null)
+      turnstileRef.current?.reset()
     } finally {
       setIsSubmitting(false)
     }
@@ -761,6 +779,16 @@ export default function SupportPage() {
               {fieldErrors.message ? <p className="text-xs text-[#B93838]">{fieldErrors.message}</p> : null}
             </div>
 
+            {TURNSTILE_SITE_KEY ? (
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={TURNSTILE_SITE_KEY}
+                onSuccess={setTurnstileToken}
+                onExpire={() => setTurnstileToken(null)}
+                onError={() => setTurnstileToken(null)}
+              />
+            ) : null}
+
             <div className="space-y-2">
               {submitError ? (
                 <p className="rounded-md border border-[#F0C7C7] bg-[#FFF5F5] px-3 py-2 text-sm text-[#B93838]">
@@ -769,7 +797,7 @@ export default function SupportPage() {
               ) : null}
               <Button
                 type="submit"
-                disabled={isSubmitting || form.message.length >= 500}
+                disabled={isSubmitting || form.message.length >= 500 || !turnstileToken}
                 className="w-full rounded-full bg-[#C75B3A] px-6 text-white hover:bg-[#B45033] sm:w-auto"
               >
                 {isSubmitting ? (

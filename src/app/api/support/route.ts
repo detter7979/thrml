@@ -4,6 +4,7 @@ import { buildSupportConfirmationEmail, buildSupportInternalAlertEmail } from "@
 import { resolveResendFrom, sendEmail } from "@/lib/emails/send"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
+import { verifyTurnstile } from "@/lib/security/verify-turnstile"
 import { deriveSupportPriority, SUPPORT_SUBJECTS, type SupportSubject } from "@/lib/support"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
@@ -14,6 +15,7 @@ type ValidationErrors = {
   subject?: string
   message?: string
   booking_id?: string
+  turnstile?: string
 }
 
 type ValidSupportPayload = {
@@ -96,7 +98,7 @@ export async function POST(req: NextRequest) {
     })
     if (limited) return limited
 
-    const body = (await req.json().catch(() => null)) as { website?: unknown } | null
+    const body = (await req.json().catch(() => null)) as { website?: unknown; turnstile_token?: unknown } | null
     const honeypot = typeof body?.website === "string" ? body.website.trim() : ""
     if (honeypot.length > 0) {
       // Silently accept but do not process to avoid tipping off bots.
@@ -106,6 +108,17 @@ export async function POST(req: NextRequest) {
     const validation = validateSupportPayload(body)
     if (validation.errors) {
       return NextResponse.json({ errors: validation.errors }, { status: 400 })
+    }
+
+    const turnstileToken =
+      typeof body?.turnstile_token === "string" ? body.turnstile_token.trim() : ""
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    const turnstileOk = await verifyTurnstile(turnstileToken, ip)
+    if (!turnstileOk) {
+      return NextResponse.json(
+        { errors: { turnstile: "Verification failed. Please complete the check and try again." } },
+        { status: 400 }
+      )
     }
 
     const { name, email, subject, message, booking_id } = validation.data as ValidSupportPayload

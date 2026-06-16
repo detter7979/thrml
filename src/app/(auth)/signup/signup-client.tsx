@@ -16,8 +16,10 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { signUpWithPassword } from "@/app/(auth)/signup/actions"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
+import { MIN_PASSWORD_LENGTH } from "@/lib/security/set-password"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -78,12 +80,13 @@ function SignupForm() {
   const [signupTermsAccepted, setSignupTermsAccepted] = useState(false)
   const [signupNewsletterOptIn, setSignupNewsletterOptIn] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
 
   const passwordScore = useMemo(() => {
     let score = 0
-    if (password.length >= 8) score += 1
+    if (password.length >= MIN_PASSWORD_LENGTH) score += 1
     if (/[A-Z]/.test(password)) score += 1
     if (/[0-9]/.test(password)) score += 1
     if (/[^A-Za-z0-9]/.test(password)) score += 1
@@ -193,11 +196,13 @@ function SignupForm() {
       setError("Please accept the Terms of Service and Privacy Policy.")
       return
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.")
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setPasswordError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`)
+      setError(null)
       return
     }
     setError(null)
+    setPasswordError(null)
     setStep(2)
   }
 
@@ -209,23 +214,28 @@ function SignupForm() {
     const redirectTo = `${window.location.origin}/auth/callback${
       requestedNext ? `?next=${encodeURIComponent(requestedNext)}` : ""
     }`
-    const { data, error: signUpError } = await supabase.auth.signUp({
+    const signUpResult = await signUpWithPassword({
       email,
       password,
-      options: {
-        data: {
-          full_name: fullName,
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          ui_intent: intent,
-          phone: formatPhoneNumber(phone) || null,
-        },
-        emailRedirectTo: redirectTo,
+      emailRedirectTo: redirectTo,
+      metadata: {
+        full_name: fullName,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        ui_intent: intent,
+        phone: formatPhoneNumber(phone) || null,
       },
     })
 
-    if (signUpError) {
-      setError(signUpError.message)
+    if (!signUpResult.ok) {
+      if (signUpResult.field === "password") {
+        setPasswordError(signUpResult.error)
+        setError(null)
+        setStep(1)
+      } else {
+        setError(signUpResult.error)
+        setPasswordError(null)
+      }
       setLoading(false)
       return
     }
@@ -234,7 +244,7 @@ function SignupForm() {
       method: "email",
     })
 
-    const userId = data.user?.id
+    const userId = signUpResult.userId
     if (userId) {
       const avatarUrl = await uploadAvatar(userId)
       const profilePayload: Record<string, unknown> = {
@@ -380,10 +390,15 @@ function SignupForm() {
                 type="password"
                 autoComplete="new-password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => {
+                  setPassword(event.target.value)
+                  if (passwordError) setPasswordError(null)
+                }}
                 required
-                minLength={8}
+                minLength={MIN_PASSWORD_LENGTH}
+                aria-invalid={passwordError ? true : undefined}
               />
+              {passwordError ? <p className="text-sm text-destructive">{passwordError}</p> : null}
               <div className="space-y-2">
                 <div className="h-2 overflow-hidden rounded-full bg-[#EFE6DC]">
                   <div

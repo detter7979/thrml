@@ -9,6 +9,8 @@ import { AuthShell } from "@/components/auth/AuthShell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { updatePassword } from "@/app/auth/reset-password/actions"
+import { MIN_PASSWORD_LENGTH } from "@/lib/security/set-password"
 import { createClient } from "@/lib/supabase/client"
 
 export default function ResetPasswordPage() {
@@ -22,6 +24,7 @@ export default function ResetPasswordPage() {
   const [hasRecoverySession, setHasRecoverySession] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [newPasswordError, setNewPasswordError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
@@ -48,9 +51,10 @@ export default function ResetPasswordPage() {
     if (isSubmitting || success) return
 
     setError(null)
+    setNewPasswordError(null)
 
-    if (newPassword.length < 8) {
-      setError("Password should be at least 8 characters.")
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      setNewPasswordError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`)
       return
     }
 
@@ -60,22 +64,16 @@ export default function ResetPasswordPage() {
     }
 
     setIsSubmitting(true)
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: newPassword,
-    })
+    const result = await updatePassword(newPassword)
     setIsSubmitting(false)
 
-    if (updateError) {
-      const message = updateError.message.toLowerCase()
-      if (message.includes("at least 6 characters")) {
-        setError("Password should be at least 8 characters.")
+    if (!result.ok) {
+      if (result.field === "password") {
+        setNewPasswordError(result.error)
+        setError(null)
         return
       }
-      if (message.includes("different from the old password")) {
-        setError("New password should be different from old password.")
-        return
-      }
-      setError(updateError.message)
+      setError(result.error)
       return
     }
 
@@ -127,11 +125,16 @@ export default function ResetPasswordPage() {
               id="new-password"
               type={showNewPassword ? "text" : "password"}
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
               value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
+              onChange={(event) => {
+                setNewPassword(event.target.value)
+                if (newPasswordError) setNewPasswordError(null)
+              }}
               required
+              aria-invalid={newPasswordError ? true : undefined}
             />
+            {newPasswordError ? <p className="text-sm text-destructive">{newPasswordError}</p> : null}
           </div>
 
           <div className="space-y-2">
@@ -150,7 +153,7 @@ export default function ResetPasswordPage() {
               id="confirm-password"
               type={showConfirmPassword ? "text" : "password"}
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               required

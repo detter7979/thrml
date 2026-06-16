@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { updatePassword } from "@/app/auth/reset-password/actions"
-import { MIN_PASSWORD_LENGTH } from "@/lib/security/set-password"
+import { MIN_PASSWORD_LENGTH } from "@/lib/security/password-policy"
 import { createClient } from "@/lib/supabase/client"
 
 export default function ResetPasswordPage() {

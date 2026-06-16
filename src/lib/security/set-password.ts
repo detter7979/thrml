@@ -1,9 +1,7 @@
 import { checkPwnedPassword } from "@/lib/security/pwned-password"
+import { MIN_PASSWORD_LENGTH, PWNED_PASSWORD_ERROR } from "@/lib/security/password-policy"
 
-export const MIN_PASSWORD_LENGTH = 10
-
-export const PWNED_PASSWORD_ERROR =
-  "This password appeared in a known data breach. Please choose a different one."
+export { MIN_PASSWORD_LENGTH, PWNED_PASSWORD_ERROR } from "@/lib/security/password-policy"
 
 export type SetPasswordValidationResult = { ok: true } | { ok: false; error: string }
 

@@ -178,7 +178,7 @@ export function BriefIntakePanel({
   const [svgTokens, setSvgTokens] = useState<Record<string, string>>({
     TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR.",
     HEADLINE: DEFAULT_HOST_HEADLINE,
-    SUBHEAD: "Backyard and cabin saunas in Seattle + LA.",
+    SUBHEAD: "Backyard and cabin saunas in Seattle.",
   })
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)

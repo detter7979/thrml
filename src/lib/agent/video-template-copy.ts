@@ -23,7 +23,7 @@ export type BlockSplitVideoOverlay = {
 export const DEFAULT_BLOCK_SPLIT_VIDEO_OVERLAY: BlockSplitVideoOverlay = {
   taglineEyebrow: "PRIVATE WELLNESS, BY THE HOUR.",
   headline: "Turn your idle sauna into income.",
-  subhead: "Backyard and cabin saunas in Seattle + LA.",
+  subhead: "Backyard and cabin saunas in Seattle.",
 }
 
 export function formatPovVideoOverlay(copy: string): string {

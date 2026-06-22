@@ -167,6 +167,11 @@ const nextConfig: NextConfig = {
         destination: "/listings/:id",
         permanent: true,
       },
+      {
+        source: "/legal/privacy",
+        destination: "/privacy",
+        permanent: true,
+      },
     ];
   },
 };

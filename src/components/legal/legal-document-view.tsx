@@ -1,7 +1,9 @@
 import Link from "next/link"
 
+import { LegalDocumentMarkdown } from "@/components/legal/legal-document-markdown"
 import { formatLegalEffectiveDate } from "@/lib/legal/fetch-document"
 import type { LegalDocumentContent } from "@/lib/legal/fallback-content"
+import { sanitizeLegalBody } from "@/lib/legal/sanitize-legal-body"
 
 type LegalDocumentViewProps = {
   document: LegalDocumentContent
@@ -9,6 +11,8 @@ type LegalDocumentViewProps = {
 }
 
 export function LegalDocumentView({ document, showPrivacyRequestLink = false }: LegalDocumentViewProps) {
+  const body = sanitizeLegalBody(document.body, document.title)
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-12 text-[#1A1410] md:px-8">
       <h1 className="font-serif text-4xl">{document.title}</h1>
@@ -20,16 +24,20 @@ export function LegalDocumentView({ document, showPrivacyRequestLink = false }: 
         {formatLegalEffectiveDate(document.effectiveAt)}
       </p>
 
-      <div className="mt-8 whitespace-pre-line text-sm leading-relaxed text-[#2F241E]">{document.body}</div>
+      <div className="mt-8">
+        <LegalDocumentMarkdown body={body} />
+      </div>
 
       {showPrivacyRequestLink ? (
-        <p className="mt-8 text-sm text-[#5F5148]">
-          To exercise your privacy rights,{" "}
-          <Link href="/privacy-request" className="text-[#C4623A] underline hover:text-[#b05530]">
-            submit a privacy request
-          </Link>
-          . We respond within 30 days.
-        </p>
+        <section className="mt-10 rounded-xl border border-[#E8DDD6] bg-[#FAF6F2] px-5 py-4">
+          <p className="text-sm leading-relaxed text-[#2F241E]">
+            To exercise your privacy rights,{" "}
+            <Link href="/privacy-request" className="font-medium text-[#C4623A] underline hover:text-[#b05530]">
+              submit a privacy request
+            </Link>
+            . We respond within 30 days.
+          </p>
+        </section>
       ) : null}
     </main>
   )

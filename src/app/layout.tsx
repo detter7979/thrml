@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     template: "%s | thrml",
   },
   description:
-    "thrml is a peer-to-peer marketplace to book private saunas, cold plunges, float tanks, infrared therapy, and more — hosted by real people in Seattle and Los Angeles.",
+    "thrml is a peer-to-peer marketplace to book private saunas, cold plunges, float tanks, infrared therapy, and more — hosted by real people in Seattle.",
   openGraph: {
     type: "website",
     siteName: "thrml",

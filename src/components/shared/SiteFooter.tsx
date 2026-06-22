@@ -51,16 +51,10 @@ export function SiteFooter() {
 
           <div>
             <p className="mb-3 text-sm font-medium text-[#F5EFE8]">Legal</p>
-            <ul className="space-y-3 text-sm text-white/65">
+            <ul className="space-y-2 text-sm text-white/65">
               <li>
-                <Link href="/legal/privacy" className="transition-colors hover:text-white">
+                <Link href="/privacy" className="transition-colors hover:text-white">
                   Privacy Policy
-                </Link>
-                <Link
-                  href="/privacy-request"
-                  className="mt-1 block text-xs text-white/45 transition-colors hover:text-white/70"
-                >
-                  Submit a privacy request
                 </Link>
               </li>
               <li>

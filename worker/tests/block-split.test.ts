@@ -11,7 +11,7 @@ describe("block split overlay", () => {
       JSON.stringify({
         taglineEyebrow: "PRIVATE WELLNESS, BY THE HOUR.",
         headline: "Turn your idle sauna into income.",
-        subhead: "Backyard and cabin saunas in Seattle + LA.",
+        subhead: "Backyard and cabin saunas in Seattle.",
       }),
     )
     expect(overlay.headline).toContain("Turn your idle sauna")
@@ -30,7 +30,7 @@ describe("buildBlockSplitFilterComplex", () => {
       overlay: {
         taglineEyebrow: "PRIVATE WELLNESS, BY THE HOUR.",
         headline: "Turn your idle sauna into income.",
-        subhead: "Backyard and cabin saunas in Seattle + LA.",
+        subhead: "Backyard and cabin saunas in Seattle.",
       },
       textFiles: {
         brand: "/tmp/block-brand.txt",

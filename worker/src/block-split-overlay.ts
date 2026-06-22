@@ -10,7 +10,7 @@ export function parseBlockSplitVideoOverlay(copyText: string): BlockSplitVideoOv
     return {
       taglineEyebrow: "PRIVATE WELLNESS, BY THE HOUR.",
       headline: "Turn your idle sauna into income.",
-      subhead: "Backyard and cabin saunas in Seattle + LA.",
+      subhead: "Backyard and cabin saunas in Seattle.",
     }
   }
 
@@ -35,7 +35,7 @@ export function parseBlockSplitVideoOverlay(copyText: string): BlockSplitVideoOv
             ? parsed.subhead
             : typeof parsed.SUBHEAD === "string"
               ? parsed.SUBHEAD
-              : "Backyard and cabin saunas in Seattle + LA.",
+              : "Backyard and cabin saunas in Seattle.",
       }
     } catch {
       // fall through to plain text
@@ -45,7 +45,7 @@ export function parseBlockSplitVideoOverlay(copyText: string): BlockSplitVideoOv
   return {
     taglineEyebrow: "PRIVATE WELLNESS, BY THE HOUR.",
     headline: trimmed,
-    subhead: "Backyard and cabin saunas in Seattle + LA.",
+    subhead: "Backyard and cabin saunas in Seattle.",
   }
 }
 

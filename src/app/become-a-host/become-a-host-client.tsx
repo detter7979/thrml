@@ -407,7 +407,7 @@ export function BecomeAHostClient() {
                         Terms of Service
                       </Link>{" "}
                       and{" "}
-                      <Link href="/legal/privacy" target="_blank" className="underline">
+                      <Link href="/privacy" target="_blank" className="underline">
                         Privacy Policy
                       </Link>
                       . Version: {LEGAL_VERSIONS.HOST_AGREEMENT}

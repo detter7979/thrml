@@ -56,10 +56,7 @@ const siteSchema = {
         addressRegion: "WA",
         addressCountry: "US",
       },
-      areaServed: [
-        { "@type": "City", name: "Seattle" },
-        { "@type": "City", name: "Los Angeles" },
-      ],
+      areaServed: [{ "@type": "City", name: "Seattle" }],
       hasOfferCatalog: {
         "@type": "OfferCatalog",
         name: "Wellness space rentals",

@@ -159,6 +159,9 @@ function buildJsonLd(args: {
 export default async function LocalServiceCityPage({ params }: { params: Promise<PageParams> }) {
   const { service: serviceSegment, city: citySlug } = await params
 
+  // Avoid shadowing static app routes like /legal/privacy when the static page is unavailable.
+  if (serviceSegment.toLowerCase() === "legal") notFound()
+
   if (!isValidCitySlug(citySlug)) notFound()
 
   const resolved = resolveServiceFromSlug(serviceSegment)

@@ -110,7 +110,7 @@ templates:
       campaign_short_name: pov-earnings
     svg_tokens:
       TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
-      SUBHEAD: "Backyard and cabin saunas in Seattle + LA."
+      SUBHEAD: "Backyard and cabin saunas in Seattle."
     svg_variations:
       - variation_label: A
         tokens:
@@ -152,7 +152,7 @@ templates:
       campaign_short_name: pov-earnings
     svg_tokens:
       TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
-      SUBHEAD: "Backyard and cabin saunas in Seattle + LA."
+      SUBHEAD: "Backyard and cabin saunas in Seattle."
     svg_variations:
       - variation_label: A
         tokens:
@@ -189,7 +189,7 @@ templates:
       campaign_short_name: pov-earnings
     svg_tokens:
       TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR."
-      SUBHEAD: "Backyard and cabin saunas in Seattle + LA."
+      SUBHEAD: "Backyard and cabin saunas in Seattle."
     video:
       source: uploaded
       layout: block_split

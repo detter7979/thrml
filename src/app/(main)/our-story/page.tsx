@@ -25,7 +25,7 @@ export default function OurStoryPage() {
           Built for people who take recovery seriously
         </h1>
         <p className="mt-6 text-sm tracking-[0.08em] text-[#7B6D63]">
-          Seattle · Los Angeles · More coming soon
+          Seattle · More coming soon
         </p>
       </section>
 
@@ -53,7 +53,7 @@ export default function OurStoryPage() {
         </p>
 
         <p>
-          We are starting in Seattle and Los Angeles because those cities already have the culture — the cold plunge
+          We are starting in Seattle because the city already has the culture — the cold plunge
           communities, the sauna clubs, the biohacking crowd. But the vision is bigger: a world where access to
           restorative wellness is not a luxury, it is something anyone can find in their neighborhood on a Tuesday
           afternoon.

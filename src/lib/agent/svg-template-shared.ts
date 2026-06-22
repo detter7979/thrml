@@ -22,7 +22,7 @@ export const DEFAULT_HOST_HEADLINE = "Turn your idle sauna into income." as cons
 
 export const SPLIT_HEADER_DEFAULTS = {
   TAGLINE_EYEBROW: "PRIVATE WELLNESS, BY THE HOUR.",
-  SUBHEAD: "Backyard and cabin saunas in Seattle + LA.",
+  SUBHEAD: "Backyard and cabin saunas in Seattle.",
   HEADLINE: DEFAULT_HOST_HEADLINE,
 } as const
 

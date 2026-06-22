@@ -31,7 +31,7 @@ const FAQS = [
   },
   {
     question: "Is thrml available in my city?",
-    answer: "thrml is currently live in Seattle and Los Angeles, with more cities coming soon. Browse the explore page to see what's available near you.",
+    answer: "thrml is currently live in Seattle, with more cities coming soon. Browse the explore page to see what's available near you.",
   },
   {
     question: "How do I contact support?",

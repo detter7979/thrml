@@ -71,7 +71,7 @@ export function CookieConsentBanner({
             We use analytics and advertising cookies (retained up to 14 months) to understand how people use thrml and
             measure ad performance. We never sell your data for money. Under some state laws, ad measurement may
             constitute &quot;sharing.&quot;{" "}
-            <Link href="/legal/privacy" className="text-neutral-600 underline hover:text-neutral-900">
+            <Link href="/privacy" className="text-neutral-600 underline hover:text-neutral-900">
               Privacy Policy
             </Link>
           </p>

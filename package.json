@@ -25,6 +25,7 @@
     "finance:rebuild-sheet": "tsx scripts/rebuild-finance-tracker-sheet.ts",
     "test:email": "tsx scripts/test-email.ts",
     "email:mock": "tsx scripts/preview-email-mock.ts",
+    "email:previews": "tsx scripts/preview-lifecycle-emails.ts",
     "brand:email-profile": "tsx scripts/render-email-profile-asset.ts"
   },
   "dependencies": {

@@ -2,12 +2,13 @@ import { render } from "@react-email/render"
 
 import ThrmlEmailLayout, {
   type CreditHighlight,
+  type HeroBlock,
   type SummaryRow,
   type ThrmlEmailLayoutProps,
   THRML_EMAIL_COLORS,
 } from "../../../emails/ThrmlEmailLayout"
 
-export type { CreditHighlight, SummaryRow, ThrmlEmailLayoutProps }
+export type { CreditHighlight, HeroBlock, SummaryRow, ThrmlEmailLayoutProps }
 export { THRML_EMAIL_COLORS }
 
 export async function renderThrmlEmail(props: ThrmlEmailLayoutProps): Promise<string> {
@@ -22,6 +23,13 @@ export function buildPlainText(props: ThrmlEmailLayoutProps): string {
 
   if (props.greeting) {
     lines.push(props.greeting)
+    lines.push("")
+  }
+
+  if (props.hero) {
+    lines.push(props.hero.headline)
+    if (props.hero.subline) lines.push(props.hero.subline)
+    if (props.hero.cta) lines.push(`${props.hero.cta.label}: ${props.hero.cta.href}`)
     lines.push("")
   }
 

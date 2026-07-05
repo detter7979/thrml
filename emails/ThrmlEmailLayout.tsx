@@ -36,6 +36,13 @@ export type CreditHighlight = {
   subline?: string
 }
 
+/** Big, bold statement block used by newsletter/marketing sends. */
+export type HeroBlock = {
+  headline: string
+  subline?: string
+  cta?: { label: string; href: string }
+}
+
 export type ThrmlEmailLayoutProps = {
   preview: string
   /** Small caps label above the headline, e.g. "Booking confirmed" */
@@ -49,6 +56,8 @@ export type ThrmlEmailLayoutProps = {
   listItems?: string[]
   summary?: SummaryRow[]
   creditHighlight?: CreditHighlight
+  /** Oversized statement block rendered above paragraphs (newsletter style) */
+  hero?: HeroBlock
   /** Raw HTML block (listing cards, ticket details, etc.) */
   contentHtml?: string
   children?: React.ReactNode
@@ -74,6 +83,7 @@ export function ThrmlEmailLayout({
   listItems = [],
   summary,
   creditHighlight,
+  hero,
   contentHtml,
   children,
   cta,
@@ -104,6 +114,20 @@ export function ThrmlEmailLayout({
               {kicker ? <Text style={styles.kicker}>{kicker}</Text> : null}
               <Text style={styles.title}>{title}</Text>
               {greeting ? <Text style={styles.greeting}>{greeting}</Text> : null}
+
+              {hero ? (
+                <Section style={styles.heroBox}>
+                  <Text style={styles.heroHeadline}>{hero.headline}</Text>
+                  {hero.subline ? <Text style={styles.heroSubline}>{hero.subline}</Text> : null}
+                  {hero.cta ? (
+                    <Section style={styles.heroCtaWrap}>
+                      <Button href={hero.cta.href} style={styles.heroButton}>
+                        {hero.cta.label}
+                      </Button>
+                    </Section>
+                  ) : null}
+                </Section>
+              ) : null}
 
               {creditHighlight ? (
                 <Section style={styles.creditBox}>
@@ -255,6 +279,39 @@ const styles = {
     fontSize: "16px",
     lineHeight: "1.6",
     color: THRML_EMAIL_COLORS.body,
+  },
+  heroBox: {
+    margin: "0 0 24px",
+    padding: "32px 26px",
+    backgroundColor: THRML_EMAIL_COLORS.orange,
+    textAlign: "center" as const,
+  },
+  heroHeadline: {
+    margin: "0 0 10px",
+    fontFamily: 'Georgia, "Times New Roman", "DM Serif Display", serif',
+    fontSize: "36px",
+    lineHeight: "1.15",
+    fontWeight: 400,
+    color: THRML_EMAIL_COLORS.white,
+    letterSpacing: "-0.01em",
+  },
+  heroSubline: {
+    margin: "0 0 4px",
+    fontSize: "15px",
+    lineHeight: "1.6",
+    color: "rgba(255, 255, 255, 0.92)",
+  },
+  heroCtaWrap: {
+    margin: "18px 0 0",
+  },
+  heroButton: {
+    backgroundColor: THRML_EMAIL_COLORS.white,
+    color: THRML_EMAIL_COLORS.orange,
+    fontSize: "15px",
+    fontWeight: 700,
+    padding: "14px 30px",
+    borderRadius: "999px",
+    textDecoration: "none",
   },
   creditBox: {
     margin: "0 0 20px",

@@ -7,10 +7,10 @@ import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "")
 
-const DIGEST_SELECT =
+export const DIGEST_SELECT =
   "id, title, service_type, session_type, fixed_session_price, price_solo, location_city, city, location_state, state, country, location, created_at, instant_book, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
 
-type DigestListingRow = {
+export type DigestListingRow = {
   id: string
   title: string | null
   service_type: string | null
@@ -90,19 +90,18 @@ function resolveListingStorageUrl(supabase: SupabaseClient, raw: unknown): strin
   return data.publicUrl || null
 }
 
-function bestPhotoUrl(supabase: SupabaseClient, row: DigestListingRow): string | null {
+function bestPhotoUrl(
+  supabase: SupabaseClient,
+  row: DigestListingRow,
+  size: { width: number; height: number; quality: number } = { width: 532, height: 332, quality: 78 }
+): string | null {
   const sorted = [...(row.listing_photos ?? [])].sort(
     (a, b) => (a.order_index ?? 999) - (b.order_index ?? 999)
   )
   for (const p of sorted) {
     const resolved = resolveListingStorageUrl(supabase, p.url)
     if (resolved) {
-      return listingPhotoThumbnailUrl(resolved, {
-        width: 532,
-        height: 332,
-        quality: 78,
-        resize: "cover",
-      })
+      return listingPhotoThumbnailUrl(resolved, { ...size, resize: "cover" })
     }
   }
   return null
@@ -259,6 +258,40 @@ function renderListingCardHtml(supabase: SupabaseClient, row: DigestListingRow):
         <p style="margin:14px 0 0;">
           <a href="${url}" style="display:inline-block;font-size:14px;font-weight:700;color:#C4623A;text-decoration:none;">View space →</a>
         </p>
+      </td>
+    </tr>
+  </table>`
+}
+
+/**
+ * Compact horizontal card (thumbnail left, details right) for short lists
+ * like saved-spaces reminders. Same email-safe table markup as the digest card.
+ */
+export function renderListingCardCompactHtml(supabase: SupabaseClient, row: DigestListingRow): string {
+  const url = `${APP_URL}/listings/${row.id}`
+  const title = escapeHtml(row.title?.trim() || "Wellness space")
+  const location = escapeHtml(deriveLocation(row))
+  const typeLabel = escapeHtml(getServiceLabel(row.service_type ?? "wellness_space"))
+  const price = escapeHtml(listingPriceLabel(row))
+  const rating = ratingLine(row)
+  const imgUrl = bestPhotoUrl(supabase, row, { width: 264, height: 198, quality: 74 })
+  const imageBlock = imgUrl
+    ? `<a href="${url}" style="text-decoration:none;display:block;line-height:0;font-size:0;">
+        <img src="${escapeHtml(imgUrl)}" alt="${title}" width="132" height="99" style="display:block;width:132px;height:99px;border:0;background:#E9DED4;" />
+      </a>`
+    : `<a href="${url}" style="display:block;text-decoration:none;width:132px;height:99px;background:linear-gradient(145deg,#3D2E26,#1A1410);font-size:0;line-height:99px;">&nbsp;</a>`
+
+  return `
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 14px;border-collapse:collapse;border:1px solid #FFE8DC;background:#fff;">
+    <tr>
+      <td width="132" style="padding:0;line-height:0;font-size:0;vertical-align:top;">${imageBlock}</td>
+      <td style="padding:12px 16px;vertical-align:top;">
+        <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#8B6F5C;">${typeLabel}</p>
+        <p style="margin:0 0 4px;font-size:15px;line-height:1.3;font-weight:700;">
+          <a href="${url}" style="color:#1F1914;text-decoration:none;">${title}</a>
+        </p>
+        <p style="margin:0 0 6px;font-size:13px;line-height:1.4;color:#5B4A40;">${location}</p>
+        <p style="margin:0;font-size:14px;font-weight:700;color:#1F1914;">${price}${rating ? ` · <span style="color:#5B4A40;font-size:12px;font-weight:400;">${escapeHtml(rating)}</span>` : ""}</p>
       </td>
     </tr>
   </table>`

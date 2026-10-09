@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { getGA4AccessToken } from "@/lib/analytics/ga4-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { envClean } from "@/lib/env"
 
 function yesterday() {
   const d = new Date()
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const propertyId = process.env.GA4_PROPERTY_ID
+  const propertyId = envClean("GA4_PROPERTY_ID")
   if (!propertyId) {
     return NextResponse.json({ error: "GA4_PROPERTY_ID not set" }, { status: 500 })
   }

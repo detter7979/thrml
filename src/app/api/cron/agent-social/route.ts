@@ -119,9 +119,9 @@ Return a JSON object with these exact fields:
   "hashtags": ["3", "to", "5", "relevant", "hashtags"]
 }`
 
-      const result = await callAgentJson<SocialBrief>({ skill: "social", prompt, maxTokens: 800 })
+      const result = await callAgentJson<SocialBrief>({ skill: "social", prompt, maxTokens: 2000 })
       if (!result) {
-        console.error("[agent-social] Claude returned null for", platform.key, "- check ANTHROPIC_API_KEY in Vercel")
+        console.error("[agent-social] Claude returned null for", platform.key, "- see the [agent/claude] log line above for the cause")
       }
       if (result) {
         generated.push(result)

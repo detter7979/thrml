@@ -1,10 +1,12 @@
+import { envClean } from "@/lib/env"
+
 // Generates a JWT and exchanges it for a Google OAuth access token
 // using the service account credentials stored in env vars.
 // No external JWT library needed — uses the Web Crypto API available in Node 18+.
 
 export async function getGA4AccessToken(): Promise<string> {
-  const email = process.env.GA4_SERVICE_ACCOUNT_EMAIL
-  const rawKey = process.env.GA4_SERVICE_ACCOUNT_PRIVATE_KEY
+  const email = envClean("GA4_SERVICE_ACCOUNT_EMAIL")
+  const rawKey = envClean("GA4_SERVICE_ACCOUNT_PRIVATE_KEY")
 
   if (!email || !rawKey) {
     throw new Error("GA4_SERVICE_ACCOUNT_EMAIL or GA4_SERVICE_ACCOUNT_PRIVATE_KEY not set")

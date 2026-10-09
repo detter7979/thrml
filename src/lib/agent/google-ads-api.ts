@@ -1,14 +1,16 @@
+import { envClean } from "@/lib/env"
+
 // Google Ads API via REST
 // https://developers.google.com/google-ads/api/rest
 
 function customerIdRaw() {
-  const id = process.env.GOOGLE_ADS_CUSTOMER_ID
+  const id = envClean("GOOGLE_ADS_CUSTOMER_ID")
   if (!id) throw new Error("GOOGLE_ADS_CUSTOMER_ID is not set")
   return id.replace(/-/g, "")
 }
 
 function devToken() {
-  const t = process.env.GOOGLE_ADS_DEVELOPER_TOKEN
+  const t = envClean("GOOGLE_ADS_DEVELOPER_TOKEN")
   if (!t) throw new Error("GOOGLE_ADS_DEVELOPER_TOKEN is not set")
   return t
 }
@@ -26,9 +28,9 @@ async function getGoogleAccessToken(): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_ADS_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET!,
-      refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN!,
+      client_id: envClean("GOOGLE_ADS_CLIENT_ID") ?? "",
+      client_secret: envClean("GOOGLE_ADS_CLIENT_SECRET") ?? "",
+      refresh_token: envClean("GOOGLE_ADS_REFRESH_TOKEN") ?? "",
       grant_type: "refresh_token",
     }),
   })
@@ -46,7 +48,7 @@ function gadsHeaders(token: string) {
     "developer-token": devToken(),
     "Content-Type": "application/json",
   }
-  const login = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.replace(/-/g, "")
+  const login = envClean("GOOGLE_ADS_LOGIN_CUSTOMER_ID")?.replace(/-/g, "")
   if (login) h["login-customer-id"] = login
   return h
 }

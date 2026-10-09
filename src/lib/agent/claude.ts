@@ -35,7 +35,7 @@ export type AgentCallOptions = {
   skill: string
   /** The task prompt to send */
   prompt: string
-  /** Claude model override (default is current Sonnet 4) */
+  /** Claude model override (default: CLAUDE_MODEL) */
   model?: string
   /** Max tokens (default 1000) */
   maxTokens?: number
@@ -47,6 +47,7 @@ export type AgentCallResult = {
   text: string
   inputTokens: number
   outputTokens: number
+  stopReason?: string
 }
 
 /**
@@ -80,6 +81,7 @@ export async function callAgent(opts: AgentCallOptions): Promise<AgentCallResult
       text,
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
+      stopReason: response.stop_reason ?? undefined,
     }
   } catch (err) {
     console.error(`[agent/claude] callAgent failed for skill=${opts.skill}`, err)
@@ -98,10 +100,16 @@ export async function callAgent(opts: AgentCallOptions): Promise<AgentCallResult
 export async function callAgentJson<T>(opts: AgentCallOptions): Promise<T | null> {
   const result = await callAgent({ ...opts, prompt: opts.prompt + "\n\nRespond with valid JSON only. No markdown, no preamble." })
   if (!result.text) return null
+  const cleaned = result.text.replace(/```json|```/g, "").trim()
+  // Tolerate stray text around the JSON by taking the outermost object/array.
+  const start = cleaned.search(/[[{]/)
+  const end = Math.max(cleaned.lastIndexOf("}"), cleaned.lastIndexOf("]"))
+  const candidate = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned
   try {
-    return JSON.parse(result.text.replace(/```json|```/g, "").trim()) as T
+    return JSON.parse(candidate) as T
   } catch {
-    console.error(`[agent/claude] JSON parse failed for skill=${opts.skill}`, result.text.slice(0, 200))
+    const hint = result.stopReason === "max_tokens" ? " (hit maxTokens; raise it for this skill)" : ""
+    console.error(`[agent/claude] JSON parse failed for skill=${opts.skill}${hint}`, result.text.slice(0, 200))
     return null
   }
 }

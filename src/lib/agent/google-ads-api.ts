@@ -34,10 +34,21 @@ async function getGoogleAccessToken(): Promise<string> {
       grant_type: "refresh_token",
     }),
   })
-  const json = (await res.json()) as { access_token?: string; error?: string; error_description?: string }
+  const raw = await res.text()
+  let json: { access_token?: string; error?: string; error_description?: string } = {}
+  try {
+    json = JSON.parse(raw)
+  } catch {
+    // non-JSON body; fall through with raw text
+  }
   if (!res.ok || !json.access_token) {
-    const detail = json.error_description ?? json.error ?? res.statusText
-    throw new Error(`Google OAuth failed: ${detail}`)
+    const missing = ["GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET", "GOOGLE_ADS_REFRESH_TOKEN"].filter(
+      (k) => !envClean(k)
+    )
+    const detail = [json.error, json.error_description].filter(Boolean).join(": ") || raw.slice(0, 300) || res.statusText
+    throw new Error(
+      `Google OAuth failed (${res.status}): ${detail}${missing.length ? ` — not set: ${missing.join(", ")}` : ""}`
+    )
   }
   return json.access_token
 }

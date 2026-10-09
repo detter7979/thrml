@@ -1,4 +1,4 @@
-// Google Ads API v18 via REST
+// Google Ads API via REST
 // https://developers.google.com/google-ads/api/rest
 
 function customerIdRaw() {
@@ -13,8 +13,12 @@ function devToken() {
   return t
 }
 
+// v18 was sunset in 2025. Google now ships monthly and sunsets each version
+// after about a year; override with GOOGLE_ADS_API_VERSION instead of editing code.
+const GOOGLE_ADS_API_VERSION = process.env.GOOGLE_ADS_API_VERSION?.trim() || "v25"
+
 function baseUrl() {
-  return `https://googleads.googleapis.com/v18/customers/${customerIdRaw()}`
+  return `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${customerIdRaw()}`
 }
 
 async function getGoogleAccessToken(): Promise<string> {

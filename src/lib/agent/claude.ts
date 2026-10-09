@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk"
 import fs from "fs"
 import path from "path"
 
+import { CLAUDE_MODEL } from "./model"
+
 const client = new Anthropic()
 
 // Cache skill file content so we don't re-read on every request in the same process
@@ -63,7 +65,7 @@ export async function callAgent(opts: AgentCallOptions): Promise<AgentCallResult
 
   try {
     const response = await client.messages.create({
-      model: opts.model ?? "claude-sonnet-4-20250514",
+      model: opts.model ?? CLAUDE_MODEL,
       max_tokens: opts.maxTokens ?? 1000,
       system: systemPrompt,
       messages,

@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 
+import { CLAUDE_MODEL } from "@/lib/agent/model"
+
 export type DisputeCategory =
   | "access_failure"
   | "space_not_as_described"
@@ -124,7 +126,7 @@ Return this exact JSON shape (no other text):
 }`
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 1000,
     messages: [{ role: "user", content: userPrompt }],
     system: systemPrompt,

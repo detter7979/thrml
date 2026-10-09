@@ -53,7 +53,7 @@ Every agent MUST log its run to the `agent_runs` table on completion.
 - Never expose PII in logs beyond first name + masked email
 
 ## Claude API Usage
-- Model: claude-sonnet-4-20250514 for all reasoning tasks
+- Model: CLAUDE_MODEL from src/lib/agent/model.ts (override with ANTHROPIC_MODEL) for all reasoning tasks
 - Max tokens: 1000 for classification, 2000 for content generation, 500 for summaries
 - Always wrap Claude calls in try/catch — never let a Claude failure block a cron job
 - Read skill file content from /agents/<name>.md and inject as system prompt context

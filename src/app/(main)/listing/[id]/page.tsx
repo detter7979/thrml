@@ -91,7 +91,7 @@ async function fetchListingById(id: string) {
   const { data: listing } = await admin
     .from("listings")
     .select(
-      "id, title, description, city, state, service_type, price_solo, fixed_session_price, session_type, listing_photos(url, order_index)"
+      "id, title, description, city, state, location_city, location_state, service_type, price_solo, fixed_session_price, session_type, listing_photos(url, order_index)"
     )
     .eq("id", id)
     .eq("is_deleted", false)
@@ -116,11 +116,16 @@ export async function generateMetadata({
   const firstPhoto = Array.isArray(listing.listing_photos)
     ? [...listing.listing_photos].sort((a, b) => (a.order_index ?? 999) - (b.order_index ?? 999))[0]
     : undefined
-  const title = `${listing.title ?? "thrml Wellness Space"} — ${listing.city ?? "City"}, ${listing.state ?? "State"}`
+  // Legacy rows keep city/state empty and store location in location_city/location_state.
+  const city = trimStr(listing.city) || trimStr(listing.location_city)
+  const state = trimStr(listing.state) || trimStr(listing.location_state)
+  const place = [city, state].filter(Boolean).join(", ")
+  const listingTitle = listing.title ?? "thrml Wellness Space"
+  const title = place ? `${listingTitle} — ${place}` : listingTitle
   const normalizedServiceType = (listing.service_type ?? "wellness_space").replace(/_/g, " ")
-  const description = `Book ${listing.title ?? "this space"}, a private ${normalizedServiceType} in ${
-    listing.city ?? "your city"
-  }, ${listing.state ?? "your state"}. From $${price}. Instant access.`
+  const description = `Book ${listing.title ?? "this space"}, a private ${normalizedServiceType}${
+    place ? ` in ${place}` : ""
+  }. From $${price}. Instant access.`
 
   return {
     title,

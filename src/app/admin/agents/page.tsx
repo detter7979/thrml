@@ -23,6 +23,7 @@ import {
 import { briefUsesSvgTemplate } from "@/lib/agent/svg-template-shared"
 import { BriefIntakePanel } from "@/components/admin/creative/brief-intake-panel"
 import { CreativePipelinePurgePanel } from "@/components/admin/creative/creative-pipeline-purge-panel"
+import { SocialPostsPanel } from "@/components/admin/creative/social-posts-panel"
 import {
   canEditPhotoAsset,
   CreativeAssetCard,
@@ -1199,6 +1200,8 @@ export default function AgentsDashboard() {
           {pipelineError ? (
             <p className="text-sm text-red-500">{pipelineError instanceof Error ? pipelineError.message : "Could not load creative pipeline."}</p>
           ) : null}
+
+          <SocialPostsPanel />
 
           <BriefIntakePanel
             onCreated={() => void mutatePipeline()}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
+import { formatSocialCaption, SOCIAL_STATUS } from "@/lib/agent/social-generator"
 
 function cronAuth(req: NextRequest) {
   return (
@@ -10,13 +11,14 @@ function cronAuth(req: NextRequest) {
   )
 }
 
-type QueueItem = {
+type SocialPost = {
   id: string
-  queue_type: string
-  copy_suggestion: string | null
-  audience_suggestion: string | null
-  platform: string
-  hook_suggestion: string | null
+  copy_primary: string | null
+  trigger_data: unknown
+}
+
+function platformOf(post: SocialPost): string {
+  return ((post.trigger_data as { platform?: string } | null)?.platform ?? "").toString()
 }
 
 // ── Meta Instagram Content Publishing API ─────────────────────────────────
@@ -88,8 +90,8 @@ async function publishToTwitter(
   return lastTweetId
 }
 
-function formatCaption(item: QueueItem): string {
-  let text = item.copy_suggestion ?? ""
+function formatCaption(item: SocialPost): string {
+  let text = formatSocialCaption(item)
   if (!text.includes("usethrml.com")) {
     text = text.trimEnd() + "\n\nBook at usethrml.com"
   }
@@ -133,25 +135,25 @@ export async function GET(req: NextRequest) {
 
     // Fetch approved, unpublished items (max 4 per run — 2 per platform)
     const { data: items } = await admin
-      .from("creative_queue")
-      .select("id, queue_type, copy_suggestion, audience_suggestion, platform, hook_suggestion")
-      .eq("status", "PENDING")
-      .not("approved_at", "is", null)
+      .from("creative_briefs")
+      .select("id, copy_primary, trigger_data")
+      .eq("trigger_type", "social")
+      .eq("status", SOCIAL_STATUS.approved)
       .is("published_at", null)
-      .in("queue_type", ["social_reel", "social_static", "social_thread"])
       .order("approved_at", { ascending: true })
       .limit(6)
 
     const platformCount: Record<string, number> = {}
 
-    for (const item of (items ?? []) as QueueItem[]) {
+    for (const item of (items ?? []) as SocialPost[]) {
+      const platform = platformOf(item)
       try {
         const caption = formatCaption(item)
         let publishedId: string | null = null
         let publishedPlatform = ""
 
         // Route by queue_type
-        if ((item.queue_type === "social_reel" || item.queue_type === "social_static") && metaToken && metaPageId) {
+        if ((platform === "instagram_reel" || platform === "instagram_static") && metaToken && metaPageId) {
           const platformKey = "facebook"
           if ((platformCount[platformKey] ?? 0) >= 2) { results.skipped++; continue }
 
@@ -163,7 +165,7 @@ export async function GET(req: NextRequest) {
           publishedPlatform = "facebook/instagram"
           platformCount[platformKey] = (platformCount[platformKey] ?? 0) + 1
 
-        } else if (item.queue_type === "social_thread" && twitterToken) {
+        } else if (platform === "twitter_thread" && twitterToken) {
           const platformKey = "twitter"
           if ((platformCount[platformKey] ?? 0) >= 2) { results.skipped++; continue }
 
@@ -176,8 +178,8 @@ export async function GET(req: NextRequest) {
         }
 
         if (publishedId) {
-          await admin.from("creative_queue").update({
-            status: "PUBLISHED",
+          await admin.from("creative_briefs").update({
+            status: SOCIAL_STATUS.published,
             published_at: new Date().toISOString(),
             publish_platform_id: publishedId,
           }).eq("id", item.id)

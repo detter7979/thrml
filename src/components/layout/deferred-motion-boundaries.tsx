@@ -3,17 +3,19 @@
 import dynamic from "next/dynamic"
 import type { ReactNode } from "react"
 
-/** Framer Motion + Lenis load after first paint (not in the server bundle). */
+/**
+ * Code-split, but still server-rendered. These wrap every page, so `ssr: false` here made the
+ * server send an empty <body> (all content client-rendered: blank HTML for crawlers, CLS 0.85).
+ * Lenis itself is still imported lazily inside an effect.
+ */
 export const SmoothScrollProviderDeferred = dynamic(
   () =>
     import("@/components/providers/SmoothScrollProvider").then((m) => m.SmoothScrollProvider),
-  { ssr: false }
 )
 
-/** Page-transition motion; client-only so the animation chunk is not on the critical path. */
+/** Page-transition motion (AnimatePresence initial={false}, so first load renders with no animation). */
 export const MainContentMotionDeferred = dynamic(
   () => import("@/components/shared/MainContentMotion").then((m) => m.MainContentMotion),
-  { ssr: false }
 )
 
 export function DeferredMainWithMotion({ children }: { children: ReactNode }) {

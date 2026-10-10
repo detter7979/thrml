@@ -105,7 +105,7 @@ export function CookieConsentBanner({
           {showAdvertisingToggle ? (
             <button
               onClick={handleSavePreferences}
-              className="rounded-full bg-[#C4623A] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#b05530]"
+              className="rounded-full bg-[#A9502E] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#8F4326]"
             >
               Save preferences
             </button>
@@ -119,7 +119,7 @@ export function CookieConsentBanner({
               </button>
               <button
                 onClick={handleAccept}
-                className="rounded-full bg-[#C4623A] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#b05530]"
+                className="rounded-full bg-[#A9502E] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#8F4326]"
               >
                 Accept
               </button>

@@ -48,6 +48,7 @@ import {
 } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
 import { DurationSelector } from "@/components/booking/DurationSelector"
 import { RatingSummary } from "@/components/reviews/RatingSummary"
 import { ReviewCard } from "@/components/reviews/ReviewCard"
@@ -75,6 +76,16 @@ import type { BookingModel } from "@/lib/service-types"
 import { showServiceTypeTags } from "@/lib/launch-config"
 import { useScrollReveal } from "@/hooks/useScrollReveal"
 import { CASCADE_TRANSITION, listingCascadeDelay } from "@/lib/motion-system"
+
+/** Resized via Supabase image transforms; full-size uploads are 300-600 KB each. */
+function sizedPhoto(url: string | null | undefined, width: number) {
+  return listingPhotoThumbnailUrl(url, { width }) ?? url ?? undefined
+}
+
+/** Host avatars are shown at 56-98 px but uploaded at full size (one was 518 KB). */
+function sizedAvatar(url: string | null | undefined) {
+  return listingPhotoThumbnailUrl(url, { width: 192, height: 192, resize: "cover" }) ?? url ?? undefined
+}
 
 function DetailCascade({ step, children }: { step: number; children: React.ReactNode }) {
   const reduce = useReducedMotion()
@@ -1327,17 +1338,21 @@ export function ListingDetailClient({
                   {index === 0 && heroMotionProps ? (
                     <motion.div {...heroMotionProps} className="aspect-[16/9] w-full overflow-hidden">
                       <img
-                        src={photo.url}
+                        src={sizedPhoto(photo.url, 828)}
                         alt={`${title} — photo ${index + 1}`}
                         className="h-full w-full object-cover object-center"
+                        fetchPriority="high"
                       />
                     </motion.div>
                   ) : (
                     <div className="aspect-[16/9] w-full overflow-hidden">
                       <img
-                        src={photo.url}
+                        src={sizedPhoto(photo.url, 828)}
                         alt={`${title} — photo ${index + 1}`}
                         className="h-full w-full object-cover object-center"
+                        loading={index === 0 ? undefined : "lazy"}
+                        fetchPriority={index === 0 ? "high" : undefined}
+                        decoding="async"
                       />
                     </div>
                   )}
@@ -1364,17 +1379,19 @@ export function ListingDetailClient({
             heroMotionProps ? (
             <motion.div {...heroMotionProps} className="overflow-hidden rounded-2xl">
               <img
-                src={photos[0].url}
+                src={sizedPhoto(photos[0].url, 1600)}
                 alt={`${title} — photo 1`}
                 className="aspect-[16/9] w-full object-cover object-center"
+                loading="lazy"
               />
             </motion.div>
             ) : (
               <div className="overflow-hidden rounded-2xl">
                 <img
-                  src={photos[0].url}
+                  src={sizedPhoto(photos[0].url, 1600)}
                   alt={`${title} — photo 1`}
                   className="aspect-[16/9] w-full object-cover object-center"
+                  loading="lazy"
                 />
               </div>
             )
@@ -1388,15 +1405,17 @@ export function ListingDetailClient({
                     className="aspect-[16/9] overflow-hidden rounded-xl"
                   >
                     <img
-                      src={photo.url}
+                      src={sizedPhoto(photo.url, 960)}
                       alt={`${title} — photo ${index + 1}`}
                       className="h-full w-full object-cover object-center"
+                      loading="lazy"
                     />
                   </motion.div>
                 ) : (
                   <div key={`${photo.url}-${index}`} className="aspect-[16/9] overflow-hidden rounded-xl">
                     <img
-                      src={photo.url}
+                      src={sizedPhoto(photo.url, 960)}
+                      loading="lazy"
                       alt={`${title} — photo ${index + 1}`}
                       className="h-full w-full object-cover object-center"
                     />
@@ -1409,17 +1428,19 @@ export function ListingDetailClient({
               {heroMotionProps ? (
               <motion.div {...heroMotionProps} className="relative min-h-0 overflow-hidden">
               <img
-                src={galleryPhotos[0]?.url}
+                src={sizedPhoto(galleryPhotos[0]?.url, 1280)}
                 alt={`${title} — photo 1`}
                 className="h-full w-full object-cover object-center"
+                loading="lazy"
               />
               </motion.div>
               ) : (
               <div className="relative min-h-0 overflow-hidden">
               <img
-                src={galleryPhotos[0]?.url}
+                src={sizedPhoto(galleryPhotos[0]?.url, 1280)}
                 alt={`${title} — photo 1`}
                 className="h-full w-full object-cover object-center"
+                loading="lazy"
               />
               </div>
               )}
@@ -1427,7 +1448,8 @@ export function ListingDetailClient({
                 {galleryPhotos.slice(1, 3).map((photo, index) => (
                   <div key={`${photo.url}-${index + 1}`} className="relative min-h-0 overflow-hidden">
                     <img
-                      src={photo.url}
+                      src={sizedPhoto(photo.url, 640)}
+                      loading="lazy"
                       alt={`${title} — photo ${index + 2}`}
                       className="h-full w-full object-cover object-center"
                     />
@@ -1466,7 +1488,8 @@ export function ListingDetailClient({
                   {photos.map((photo, index) => (
                     <div key={`${photo.url}-${index}`} className="aspect-[16/9] overflow-hidden rounded-xl bg-[#F3E8DE]">
                       <img
-                        src={photo.url}
+                        src={sizedPhoto(photo.url, 1200)}
+                        loading="lazy"
                         alt={`${title} — photo ${index + 1}`}
                         className="h-full w-full object-cover object-center"
                       />
@@ -1550,7 +1573,7 @@ export function ListingDetailClient({
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
                         <div className="flex min-w-0 flex-1 items-start gap-4">
                         <Avatar className="size-14 shrink-0 ring-1 ring-[#C75B3A33]">
-                          <AvatarImage src={host?.avatar_url || undefined} alt={hostName} />
+                          <AvatarImage src={sizedAvatar(host?.avatar_url)} alt={hostName} />
                           <AvatarFallback className="bg-[#C75B3A1F] text-[#5D4D41]">
                             {hostInitials}
                           </AvatarFallback>
@@ -1605,7 +1628,7 @@ export function ListingDetailClient({
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
                       <div className="flex min-w-0 flex-1 items-start gap-4">
                       <Avatar className="size-14 shrink-0 ring-1 ring-[#C75B3A33]">
-                        <AvatarImage src={host?.avatar_url || undefined} alt={hostName} />
+                        <AvatarImage src={sizedAvatar(host?.avatar_url)} alt={hostName} />
                         <AvatarFallback className="bg-[#C75B3A1F] text-[#5D4D41]">
                           {hostInitials}
                         </AvatarFallback>

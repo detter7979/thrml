@@ -56,7 +56,9 @@ function waitForReady(redis: Redis): Promise<Redis | null> {
 
 /** Returns a ready Redis client, or null if Redis is not configured or not reachable right now. */
 export async function getRedis(): Promise<Redis | null> {
-  const url = envClean("thrml_REDIS_URL")
+  // REDIS_URL / KV_URL are what Vercel's Storage integrations inject when a database is connected;
+  // thrml_REDIS_URL is the original hand-set name (its Redis Cloud database was deleted Oct 2026).
+  const url = envClean("REDIS_URL") ?? envClean("KV_URL") ?? envClean("thrml_REDIS_URL")
   if (!url) return null
   if (!client) client = createClient(url)
   if (client.status === "ready") return client

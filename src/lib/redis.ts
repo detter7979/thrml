@@ -1,5 +1,7 @@
 import Redis from "ioredis"
 
+import { envClean } from "@/lib/env"
+
 /**
  * Shared Redis client for rate limiting.
  *
@@ -14,6 +16,7 @@ const CONNECT_TIMEOUT_MS = 2000
 const RETRY_COOLDOWN_MS = 30_000
 
 let unavailableUntil = 0
+let lastError: string | null = null
 
 let client: Redis | null = null
 let connecting: Promise<Redis | null> | null = null
@@ -26,7 +29,9 @@ function createClient(url: string) {
     connectTimeout: CONNECT_TIMEOUT_MS,
   })
   // Prevent unhandled 'error' events from crashing the function; callers handle failures.
-  redis.on("error", () => {})
+  redis.on("error", (err: Error) => {
+    lastError = err.message
+  })
   return redis
 }
 
@@ -51,7 +56,7 @@ function waitForReady(redis: Redis): Promise<Redis | null> {
 
 /** Returns a ready Redis client, or null if Redis is not configured or not reachable right now. */
 export async function getRedis(): Promise<Redis | null> {
-  const url = process.env.thrml_REDIS_URL
+  const url = envClean("thrml_REDIS_URL")
   if (!url) return null
   if (!client) client = createClient(url)
   if (client.status === "ready") return client
@@ -61,7 +66,15 @@ export async function getRedis(): Promise<Redis | null> {
       .then((ready) => {
         if (!ready) {
           unavailableUntil = Date.now() + RETRY_COOLDOWN_MS
-          console.error("[redis] not reachable; rate limits fail open for 30s")
+          // Log where it was trying to go (never the password) and why it failed.
+          let target = "unparseable URL"
+          try {
+            const u = new URL(url)
+            target = `${u.protocol}//${u.hostname}:${u.port || "default"}`
+          } catch {}
+          console.error(
+            `[redis] not reachable (${target}, status ${client?.status}, last error: ${lastError ?? "none, timed out"}); rate limits fail open for 30s`
+          )
         }
         return ready
       })

@@ -62,7 +62,9 @@ export type ExploreMapPanelProps = {
   activeId: string | null
   activeSource: "hover" | "pin" | null
   onMapBackgroundClick: () => void
-  onMoveEnd: (view: ViewState) => void
+  onMoveEnd: (view: ViewState, userInitiated: boolean) => void
+  /** Called once the map has loaded (e.g. to fit it to results that arrived first). */
+  onLoad?: () => void
   loading: boolean
   shouldShowSearchArea: boolean
   onSearchThisArea: () => void
@@ -85,6 +87,7 @@ export function ExploreMapPanel({
   activeSource,
   onMapBackgroundClick,
   onMoveEnd,
+  onLoad,
   loading,
   shouldShowSearchArea,
   onSearchThisArea,
@@ -103,8 +106,10 @@ export function ExploreMapPanel({
         initialViewState={{ latitude: center.lat, longitude: center.lng, zoom: 12 }}
         mapStyle="mapbox://styles/mapbox/light-v11"
         onClick={onMapBackgroundClick}
+        onLoad={onLoad}
         onMoveEnd={(event) => {
-          onMoveEnd(event.viewState)
+          // mapbox-gl sets originalEvent only on moves the user made (drag, scroll, pinch).
+          onMoveEnd(event.viewState, Boolean((event as { originalEvent?: unknown }).originalEvent))
         }}
       >
         <NavigationControl position="top-right" />

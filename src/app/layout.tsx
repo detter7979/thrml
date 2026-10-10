@@ -8,6 +8,7 @@ import { SmoothScrollProviderDeferred } from "@/components/layout/deferred-motio
 import { CookieConsentProvider } from "@/contexts/cookie-consent-context";
 import { MetaPixel } from "@/components/meta-pixel";
 import { ReferralCapture } from "@/components/ReferralCapture";
+import { SITE_COPY } from "@/lib/site-copy";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -28,17 +29,15 @@ const dmSerifDisplay = DM_Serif_Display({
 export const metadata: Metadata = {
   metadataBase: new URL("https://usethrml.com"),
   title: {
-    default: "thrml — Book Private Wellness Spaces",
+    default: SITE_COPY.defaultTitle,
     template: "%s | thrml",
   },
-  description:
-    "thrml is a peer-to-peer marketplace to book private saunas, cold plunges, float tanks, infrared therapy, and more — hosted by real people in Seattle.",
+  description: SITE_COPY.description,
   openGraph: {
     type: "website",
     siteName: "thrml",
-    title: "thrml — Book Private Saunas, Cold Plunges & Wellness Spaces",
-    description:
-      "Book private saunas, cold plunges, float tanks and more — hosted by people in your city. No memberships. No front desks.",
+    title: SITE_COPY.socialTitle,
+    description: SITE_COPY.socialDescription,
     url: "https://usethrml.com",
     images: [
       {
@@ -52,9 +51,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     site: "@usethrml",
-    title: "thrml — Book Private Saunas, Cold Plunges & Wellness Spaces",
-    description:
-      "Book private saunas, cold plunges, float tanks and more — hosted by people in your city.",
+    title: SITE_COPY.socialTitle,
+    description: SITE_COPY.socialDescription,
     images: ["https://usethrml.com/opengraph-image"],
   },
   robots: {

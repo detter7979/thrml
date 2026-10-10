@@ -1,15 +1,6 @@
 import { NextRequest } from "next/server"
-import Redis from "ioredis"
 
-const redis = process.env.thrml_REDIS_URL ? new Redis(process.env.thrml_REDIS_URL, {
-  maxRetriesPerRequest: 1,
-  enableOfflineQueue: false,
-  lazyConnect: true,
-}) : null
-
-// Prevent unhandled 'error' events from crashing the serverless function.
-// All errors are handled inside the try/catch in applyMemoryRateLimit.
-redis?.on("error", () => {})
+import { hitWindow } from "@/lib/redis"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -35,18 +26,14 @@ export async function applyMemoryRateLimit(params: {
   max: number
   windowMs: number
 }): Promise<{ allowed: boolean; remaining: number; retryAfterSec: number }> {
-  if (!redis) return { allowed: true, remaining: params.max, retryAfterSec: 0 }
-
   const windowSeconds = Math.ceil(params.windowMs / 1000)
 
   try {
-    const count = await redis.incr(params.key)
-    if (count === 1) {
-      await redis.expire(params.key, windowSeconds)
-    }
+    const hit = await hitWindow(params.key, windowSeconds)
+    if (!hit) return { allowed: true, remaining: params.max, retryAfterSec: 0 }
+    const { count, ttl } = hit
 
     if (count > params.max) {
-      const ttl = await redis.ttl(params.key)
       return {
         allowed: false,
         remaining: 0,

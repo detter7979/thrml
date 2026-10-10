@@ -1,15 +1,16 @@
 import type { Metadata } from "next"
 
+import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { getHomeListingsForCards } from "@/lib/listings/home-listings"
+import { SITE_COPY } from "@/lib/site-copy"
 
 import { HomePageClient } from "./home-page-client"
 
 export const revalidate = 60
 
 export const metadata: Metadata = {
-  title: { absolute: "Your Personal Sauna Awaits | Book Private Home Saunas Near You" },
-  description:
-    "Book private home saunas by the hour. Experience deep recovery in intimate backyard and cabin saunas near you. Hosts earn meaningful passive income sharing their personal wellness spaces.",
+  title: { absolute: SITE_COPY.homeTitle },
+  description: SITE_COPY.homeDescription,
   alternates: { canonical: "https://usethrml.com" },
 }
 
@@ -44,8 +45,7 @@ const siteSchema = {
       "@type": "LocalBusiness",
       "@id": "https://usethrml.com/#business",
       name: "thrml",
-      description:
-        "Book private saunas, cold plunges, float tanks, infrared therapy, and more — hosted by real people. No memberships. No front desks.",
+      description: SITE_COPY.schemaDescription,
       url: "https://usethrml.com",
       image: "https://usethrml.com/og-image.png",
       priceRange: "$$",
@@ -60,7 +60,7 @@ const siteSchema = {
       hasOfferCatalog: {
         "@type": "OfferCatalog",
         name: "Wellness space rentals",
-        itemListElement: [
+        itemListElement: ([
           {
             "@type": "Offer",
             itemOffered: {
@@ -94,7 +94,10 @@ const siteSchema = {
               description: "Private infrared sauna sessions available by the hour.",
             },
           },
-        ],
+        ]).filter(
+          // During the saunas-only launch, only advertise what guests can book.
+          (offer) => !isSaunasOnlyLaunch() || offer.itemOffered.name === "Private sauna rental"
+        ),
       },
     },
   ],

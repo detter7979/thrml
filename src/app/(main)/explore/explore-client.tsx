@@ -299,6 +299,8 @@ export function ExploreClient() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const mapRef = useRef<MapRef | null>(null)
+  /** Search (center + filters) the map was last fitted to, so each search fits once. */
+  const fittedSearchKeyRef = useRef<string | null>(null)
   const listRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const mobileMapCardsRef = useRef<HTMLDivElement | null>(null)
   const mapCardTapRef = useRef<{
@@ -841,6 +843,35 @@ export function ExploreClient() {
     }
   }, [filters, queryBounds, searchCenter.lat, searchCenter.lng, serviceMetaMap])
 
+  const searchKey = `${searchCenter.lat.toFixed(5)},${searchCenter.lng.toFixed(5)}|${JSON.stringify(filters)}`
+
+  /** Frame the map around the current results (once per search). */
+  function fitMapToResults() {
+    const map = mapRef.current
+    if (!map || loading || fittedSearchKeyRef.current === searchKey) return
+    const points = modeListings.filter((l) => Number.isFinite(l.lat) && Number.isFinite(l.lng))
+    if (points.length === 0) return
+    fittedSearchKeyRef.current = searchKey
+    if (points.length === 1) {
+      map.flyTo({ center: [points[0].lng, points[0].lat], zoom: Math.max(map.getZoom(), 13) })
+      return
+    }
+    const lngs = points.map((p) => p.lng)
+    const lats = points.map((p) => p.lat)
+    map.fitBounds(
+      [
+        [Math.min(...lngs), Math.min(...lats)],
+        [Math.max(...lngs), Math.max(...lats)],
+      ],
+      { padding: { top: 70, bottom: 70, left: 50, right: 50 }, maxZoom: 14, duration: 600 }
+    )
+  }
+
+  useEffect(() => {
+    fitMapToResults()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, modeListings, searchKey])
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (!hasTrackedSearchRef.current) {
@@ -882,8 +913,11 @@ export function ExploreClient() {
     node?.scrollIntoView({ behavior: "smooth", block: "nearest" })
   }, [activeId, activeSource])
 
-  function onMapMoveEnd(view: ViewState) {
-    setCenter({ lat: view.latitude, lng: view.longitude })
+  function onMapMoveEnd(view: ViewState, userInitiated: boolean) {
+    const next = { lat: view.latitude, lng: view.longitude }
+    setCenter(next)
+    // Moves made by code (fit to results, distance change) shouldn't offer "Search this area".
+    if (!userInitiated) setOriginCenter(next)
   }
 
   function mapGeoJson() {
@@ -970,9 +1004,12 @@ export function ExploreClient() {
         setActiveSource(null)
       }}
       onMoveEnd={onMapMoveEnd}
+      onLoad={fitMapToResults}
       loading={loading}
       shouldShowSearchArea={shouldShowSearchArea}
       onSearchThisArea={() => {
+        // The user framed this area themselves; don't re-fit the map to its results.
+        fittedSearchKeyRef.current = `${center.lat.toFixed(5)},${center.lng.toFixed(5)}|${JSON.stringify(filters)}`
         setOriginCenter(center)
         setSearchCenter(center)
       }}

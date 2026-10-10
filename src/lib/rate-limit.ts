@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import Redis from "ioredis"
 
-const redis = process.env.thrml_REDIS_URL ? new Redis(process.env.thrml_REDIS_URL, {
-  maxRetriesPerRequest: 1,
-  enableOfflineQueue: false,
-  lazyConnect: true,
-}) : null
-
-// Prevent unhandled 'error' events from crashing the serverless function.
-redis?.on("error", () => {})
+import { hitWindow } from "@/lib/redis"
 
 interface RateLimitOptions {
   maxRequests: number
@@ -22,8 +14,6 @@ export async function rateLimit(
 ): Promise<NextResponse | null> {
   const { maxRequests, windowMs, identifier } = options
 
-  if (!redis) return null
-
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
@@ -33,13 +23,11 @@ export async function rateLimit(
   const windowSeconds = Math.ceil(windowMs / 1000)
 
   try {
-    const count = await redis.incr(key)
-    if (count === 1) {
-      await redis.expire(key, windowSeconds)
-    }
+    const hit = await hitWindow(key, windowSeconds)
+    if (!hit) return null
+    const { count, ttl } = hit
 
     if (count > maxRequests) {
-      const ttl = await redis.ttl(key)
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         {

@@ -88,7 +88,8 @@ Contact: hello@usethrml.com`
 export const LEGAL_FALLBACK: Record<LegalDocTypeKey, LegalDocumentContent> = {
   privacy_policy: {
     title: "Privacy Policy",
-    version: LEGAL_VERSIONS.PRIVACY,
+    // Fallback text is the original v1.0; v1.1 lives in legal_documents.
+    version: "v1.0",
     effectiveAt: "2026-03-01T00:00:00.000Z",
     body: PRIVACY_BODY,
   },
@@ -101,13 +102,13 @@ export const LEGAL_FALLBACK: Record<LegalDocTypeKey, LegalDocumentContent> = {
   terms_of_service: {
     title: "Terms of Service",
     version: LEGAL_VERSIONS.TERMS,
-    effectiveAt: "2026-03-01T00:00:00.000Z",
+    effectiveAt: "2026-10-09T00:00:00.000Z",
     body: TERMS_BODY,
   },
   host_terms: {
     title: "Host Terms of Service",
     version: LEGAL_VERSIONS.HOST_AGREEMENT,
-    effectiveAt: "2026-03-01T00:00:00.000Z",
+    effectiveAt: "2026-10-09T00:00:00.000Z",
     body: HOST_TERMS_BODY,
   },
 }

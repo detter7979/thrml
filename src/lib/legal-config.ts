@@ -4,7 +4,8 @@
  * and deploy so clients / profile writes stay aligned with on-site policy text.
  */
 export const LEGAL_VERSIONS = {
-  TERMS: "v1.0",
-  PRIVACY: "v1.0",
-  HOST_AGREEMENT: "host-v1.0-2026-03",
+  // Must match the active rows in legal_documents (the published text).
+  TERMS: "v1.1",
+  PRIVACY: "v1.1",
+  HOST_AGREEMENT: "host-v1.1-2026-10",
 } as const

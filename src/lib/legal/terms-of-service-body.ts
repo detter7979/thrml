@@ -1,4 +1,9 @@
-/** Full Terms of Service text — shared by /terms and /legal/terms fallback. */
+/**
+ * Full Terms of Service text — shared by /terms and the /legal/terms fallback.
+ * The published copy is the active `terms_of_service` row in legal_documents (v1.1).
+ * To change the Terms: edit this text, insert a new legal_documents row with a new
+ * version, and bump LEGAL_VERSIONS.TERMS so acceptances record the right version.
+ */
 export const TERMS_OF_SERVICE_BODY = `Please read these Terms of Service carefully before using the thrml platform. By accessing or using our services, you agree to be bound by these terms.
 
 1. About thrml

@@ -201,6 +201,11 @@ export async function GET(req: NextRequest) {
     .order("goal_type")
 
   if (!configs?.length) {
+    // Record the run as finished so it doesn't sit in "running" forever.
+    if (runId) await supabase.from("agent_runs").update({
+      status: "skipped", completed_at: new Date().toISOString(),
+      duration_ms: Date.now() - runStart, results: { reason: "No active agent configs" },
+    }).eq("id", runId)
     return NextResponse.json({ ok: true, message: "No active agent configs" })
   }
 

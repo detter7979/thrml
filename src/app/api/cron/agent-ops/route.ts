@@ -171,11 +171,25 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Write all alerts to DB
-    if (alerts.length > 0) {
+    // Write alerts: skip ones already open, and close open ones whose condition has cleared.
+    const { data: openAlerts } = await admin
+      .from("ops_alerts")
+      .select("id, message")
+      .eq("resolved", false)
+    const raised = new Set(alerts.map(a => a.message))
+    const alreadyOpen = new Set((openAlerts ?? []).map(a => a.message))
+    const fresh = alerts.filter(a => !alreadyOpen.has(a.message))
+    if (fresh.length > 0) {
       await admin.from("ops_alerts").insert(
-        alerts.map(a => ({ ...a, details: a.details ?? null }))
+        fresh.map(a => ({ ...a, details: a.details ?? null }))
       )
+    }
+    const cleared = (openAlerts ?? []).filter(a => !raised.has(a.message)).map(a => a.id)
+    if (cleared.length > 0) {
+      await admin
+        .from("ops_alerts")
+        .update({ resolved: true, resolved_at: new Date().toISOString() })
+        .in("id", cleared)
     }
 
     const summary = {
@@ -183,6 +197,8 @@ export async function GET(req: NextRequest) {
       warning: alerts.filter(a => a.severity === "WARNING").length,
       info: alerts.filter(a => a.severity === "INFO").length,
       total: alerts.length,
+      new: fresh.length,
+      auto_resolved: cleared.length,
     }
 
     if (runId) await admin.from("agent_runs").update({

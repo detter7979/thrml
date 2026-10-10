@@ -4,7 +4,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
-import { createClient } from "@/lib/supabase/client"
 import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
 import { resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
@@ -47,11 +46,6 @@ type OpsAlert = {
 type FinanceSnap = {
   snapshot_date: string; booking_count: number; gross_booking_value: number
   platform_revenue: number; net_platform_revenue: number; new_users: number
-}
-type QueueItem = {
-  id: string; queue_type: string; platform: string; concept: string | null
-  copy_suggestion: string | null; hook_suggestion: string | null
-  status: string; approved_at: string | null; created_at: string
 }
 type InboxDraft = {
   id: string; from_email: string; subject: string | null; category: string
@@ -277,7 +271,7 @@ export default function AgentsDashboard() {
   const [runs, setRuns] = useState<AgentRun[]>([])
   const [alerts, setAlerts] = useState<OpsAlert[]>([])
   const [finance, setFinance] = useState<FinanceSnap[]>([])
-  const [queue, setQueue] = useState<QueueItem[]>([])
+  const [socialDraftCount, setSocialDraftCount] = useState(0)
   const [drafts, setDrafts] = useState<InboxDraft[]>([])
   const [launchAssetIds, setLaunchAssetIds] = useState<string[]>([])
   const [selectedCampaignId, setSelectedCampaignId] = useState("")
@@ -322,24 +316,15 @@ export default function AgentsDashboard() {
   }, [tab, videoJobsInFlight, mutatePipeline])
 
   const load = useCallback(async () => {
-    const sb = createClient()
-    const [r1, r2, r3, r4, r5] = await Promise.all([
-      sb.from("agent_runs").select("*").order("started_at", { ascending: false }).limit(30),
-      sb.from("ops_alerts").select("*").eq("resolved", false).order("created_at", { ascending: false }).limit(20),
-      sb.from("finance_snapshots").select("*").order("snapshot_date", { ascending: false }).limit(14),
-      sb
-        .from("creative_queue")
-        .select("*")
-        .in("status", ["PENDING", "brief_ready"])
-        .order("created_at", { ascending: false })
-        .limit(40),
-      sb.from("inbox_drafts").select("*").eq("approved", false).is("sent_at", null).order("created_at", { ascending: false }).limit(20),
-    ])
-    setRuns((r1.data ?? []) as AgentRun[])
-    setAlerts((r2.data ?? []) as OpsAlert[])
-    setFinance((r3.data ?? []) as FinanceSnap[])
-    setQueue((r4.data ?? []) as QueueItem[])
-    setDrafts((r5.data ?? []) as InboxDraft[])
+    // These tables are server-only (RLS, no client policies), so read via the admin API.
+    const res = await fetch("/api/admin/agent/overview", { cache: "no-store" })
+    const json = res.ok ? await res.json() : null
+    if (!res.ok) console.error("[admin/agents] overview load failed", res.status)
+    setRuns((json?.runs ?? []) as AgentRun[])
+    setAlerts((json?.alerts ?? []) as OpsAlert[])
+    setFinance((json?.finance ?? []) as FinanceSnap[])
+    setDrafts((json?.drafts ?? []) as InboxDraft[])
+    setSocialDraftCount(Number(json?.socialDraftCount ?? 0))
     setLoading(false)
   }, [])
 
@@ -358,22 +343,21 @@ export default function AgentsDashboard() {
     [router],
   )
 
-  const resolveAlert = async (id: string) => {
-    const sb = createClient()
-    await sb.from("ops_alerts").update({ resolved: true, resolved_at: new Date().toISOString() }).eq("id", id)
-    setAlerts(a => a.filter(x => x.id !== id))
+  const postOverviewAction = async (action: "resolve_alert" | "approve_draft", id: string) => {
+    const res = await fetch("/api/admin/agent/overview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, id }),
+    })
+    return res.ok
   }
 
-  const approveQueueItem = async (id: string) => {
-    const sb = createClient()
-    await sb.from("creative_queue").update({ approved_at: new Date().toISOString(), approved_by: "dom" }).eq("id", id)
-    setQueue(q => q.filter(x => x.id !== id))
+  const resolveAlert = async (id: string) => {
+    if (await postOverviewAction("resolve_alert", id)) setAlerts(a => a.filter(x => x.id !== id))
   }
 
   const approveDraft = async (id: string) => {
-    const sb = createClient()
-    await sb.from("inbox_drafts").update({ approved: true, approved_at: new Date().toISOString() }).eq("id", id)
-    setDrafts(d => d.filter(x => x.id !== id))
+    if (await postOverviewAction("approve_draft", id)) setDrafts(d => d.filter(x => x.id !== id))
   }
 
   const patchPipeline = async (body: Record<string, unknown>) => {
@@ -988,7 +972,7 @@ export default function AgentsDashboard() {
 
   const TABS = [
     { key: "overview", label: `Overview${criticalCount > 0 ? ` 🚨${criticalCount}` : ""}` },
-    { key: "queue", label: `Content Queue${queue.length > 0 ? ` (${queue.length})` : ""}` },
+    { key: "queue", label: `Social Posts${socialDraftCount > 0 ? ` (${socialDraftCount})` : ""}` },
     { key: "inbox", label: `Inbox Drafts${drafts.length > 0 ? ` (${drafts.length})` : ""}` },
     { key: "finance", label: "Finance" },
     { key: "creative", label: `Creative Pipeline${briefs.length + variationReadyCount > 0 ? ` (${briefs.length + variationReadyCount})` : ""}` },
@@ -1011,7 +995,7 @@ export default function AgentsDashboard() {
         {[
           { label: "Yesterday Revenue", value: latestFinance ? fmt(latestFinance.net_platform_revenue) : "—" },
           { label: "Open Alerts", value: String(alerts.length), danger: criticalCount > 0 },
-          { label: "Content Pending", value: String(queue.length) },
+          { label: "Social Drafts", value: String(socialDraftCount) },
           { label: "Inbox Drafts", value: String(drafts.length) },
         ].map(s => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
@@ -1094,38 +1078,9 @@ export default function AgentsDashboard() {
         </div>
       )}
 
-      {/* CONTENT QUEUE TAB */}
-      {tab === "queue" && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Social + ad content generated by agents. Review and approve to schedule.</p>
-          {queue.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending content.</p>
-          ) : queue.map(item => (
-            <div key={item.id} className="rounded-lg border p-4 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{item.queue_type}</span>
-                  <span className="text-xs text-muted-foreground">{item.platform}</span>
-                  {item.concept && <span className="text-xs text-muted-foreground">· {item.concept}</span>}
-                  <span className="text-xs text-muted-foreground">· {timeAgo(item.created_at)}</span>
-                </div>
-                <button onClick={() => approveQueueItem(item.id)}
-                  className="shrink-0 text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
-                  ✓ Approve
-                </button>
-              </div>
-              {item.hook_suggestion && (
-                <p className="text-xs font-medium text-foreground">Hook: {item.hook_suggestion}</p>
-              )}
-              {item.copy_suggestion && (
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">{item.copy_suggestion}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      {/* SOCIAL POSTS TAB */}
+      {tab === "queue" && <SocialPostsPanel />}
 
-      {/* INBOX DRAFTS TAB */}
       {tab === "inbox" && (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">Email replies drafted by the inbox agent. Approve to mark as ready to send.</p>
@@ -1200,8 +1155,6 @@ export default function AgentsDashboard() {
           {pipelineError ? (
             <p className="text-sm text-red-500">{pipelineError instanceof Error ? pipelineError.message : "Could not load creative pipeline."}</p>
           ) : null}
-
-          <SocialPostsPanel />
 
           <BriefIntakePanel
             onCreated={() => void mutatePipeline()}

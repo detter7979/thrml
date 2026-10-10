@@ -65,13 +65,6 @@ export async function POST(req: NextRequest) {
       briefId: data.id,
     })
 
-    const queueUpdate = await admin!
-      .from("creative_queue")
-      .update({ approved_at: now, approved_by: "dom", status: "brief_ready" })
-      .eq("brief_id", briefId)
-    if (queueUpdate.error && queueUpdate.error.code !== "42703") {
-      console.warn("[agent/approve-brief] creative_queue update failed", queueUpdate.error)
-    }
 
     return NextResponse.json({ ok: true, briefId: data.id, video: true, generated: null })
   }
@@ -96,13 +89,6 @@ export async function POST(req: NextRequest) {
 
       const expanded = await expandStaticSizesFromAsset({ assetId: anchor.id })
 
-      const queueUpdate = await admin!
-        .from("creative_queue")
-        .update({ approved_at: now, approved_by: "dom", status: "brief_ready" })
-        .eq("brief_id", briefId)
-      if (queueUpdate.error && queueUpdate.error.code !== "42703") {
-        console.warn("[agent/approve-brief] creative_queue update failed", queueUpdate.error)
-      }
 
       return NextResponse.json({
         ok: true,
@@ -119,13 +105,6 @@ export async function POST(req: NextRequest) {
         formats: [previewFormat],
       })
 
-      const queueUpdate = await admin!
-        .from("creative_queue")
-        .update({ approved_at: now, approved_by: "dom", status: "brief_ready" })
-        .eq("brief_id", briefId)
-      if (queueUpdate.error && queueUpdate.error.code !== "42703") {
-        console.warn("[agent/approve-brief] creative_queue update failed", queueUpdate.error)
-      }
 
       return NextResponse.json({ ok: true, briefId: data.id, generated, preview: true })
     }
@@ -135,13 +114,6 @@ export async function POST(req: NextRequest) {
       formats: formatsForBrief(data.format),
     })
 
-    const queueUpdate = await admin!
-      .from("creative_queue")
-      .update({ approved_at: now, approved_by: "dom", status: "brief_ready" })
-      .eq("brief_id", briefId)
-    if (queueUpdate.error && queueUpdate.error.code !== "42703") {
-      console.warn("[agent/approve-brief] creative_queue update failed", queueUpdate.error)
-    }
 
     return NextResponse.json({ ok: true, briefId: data.id, generated })
   } catch (err) {

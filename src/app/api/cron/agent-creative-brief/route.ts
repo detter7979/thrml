@@ -322,24 +322,6 @@ export async function GET(req: NextRequest) {
         if (updateError) throw updateError
         results.briefed++
 
-        const { error: queueError } = await admin.from("creative_queue").insert({
-          type: "paid_ad",
-          queue_type: "paid_ad",
-          status: "brief_ready",
-          brief_id: brief.id,
-          copy_suggestion: generated.copy_primary,
-          hook_suggestion: generated.hook,
-          cta: generated.cta,
-          format: row.format,
-          reason: generated.rationale ?? `Creative brief generated from ${brief.trigger_type ?? "pending"} trigger`,
-          platform: "meta",
-          goal_type: patch?.goal_type === "host" ? "host" : "guest",
-          priority: "MEDIUM",
-          concept: brief.trigger_type,
-          audience_suggestion: generated.target_audience,
-        })
-        if (queueError) throw queueError
-        results.queued++
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error"
         results.errors.push({ briefId: brief.id, error: message })

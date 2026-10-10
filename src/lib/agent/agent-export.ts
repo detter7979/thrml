@@ -18,12 +18,14 @@ export async function exportAgentData(admin: AdminClient, goalFilter: string | n
   let adsetsQ = admin.from("adset_registry").select("*").order("created_at", { ascending: false })
   if (goalFilter) adsetsQ = adsetsQ.eq("goal_type", goalFilter)
 
+  // Open creative work: briefs awaiting review/generation (paid) and social drafts.
   let queueQ = admin
-    .from("creative_queue")
+    .from("creative_briefs")
     .select("*")
-    .in("status", ["PENDING", "IN_PROGRESS"])
+    .is("approved_at", null)
+    .in("status", ["pending", "briefed", "generating", "variations_ready", "social_draft"])
     .order("created_at", { ascending: false })
-  if (goalFilter) queueQ = queueQ.eq("goal_type", goalFilter)
+  if (goalFilter) queueQ = queueQ.eq("trigger_data->>goal_type", goalFilter)
 
   const [campaigns, adsets, creatives, decisions, abTests, queue] = await Promise.all([
     campaignsQ,

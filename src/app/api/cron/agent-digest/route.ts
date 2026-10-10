@@ -73,12 +73,12 @@ export async function GET(req: NextRequest) {
       .select("id", { count: "exact", head: true })
       .eq("status", "pending_human")
 
-    // ── Social queue items pending review ──────────────────────────────────
+    // ── Social post drafts awaiting review ─────────────────────────────────
     const { count: pendingSocial } = await admin
-      .from("creative_queue")
+      .from("creative_briefs")
       .select("id", { count: "exact", head: true })
-      .eq("status", "PENDING")
-      .gte("created_at", h24Ago)
+      .eq("trigger_type", "social")
+      .eq("status", "social_draft")
 
     // ── Build email ────────────────────────────────────────────────────────
     const subjectPrefix = criticals.length > 0 ? "🚨 " : warnings.length > 0 ? "⚠️ " : "✅ "

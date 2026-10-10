@@ -13,14 +13,13 @@ export async function POST(req: NextRequest) {
 
   const body = (await req.json().catch(() => null)) as {
     brief_id?: string
-    queue_id?: string
     limit?: number
   } | null
 
   try {
     const briefId = typeof body?.brief_id === "string" ? body.brief_id.trim() : ""
-    const queueId = typeof body?.queue_id === "string" ? body.queue_id.trim() : ""
-    const limit = typeof body?.limit === "number" ? body.limit : briefId || queueId ? 1 : 1
+    if (!briefId) return NextResponse.json({ error: "Expected { brief_id: string }" }, { status: 400 })
+    const limit = 1
 
     if (briefId) {
       const now = new Date().toISOString()
@@ -33,19 +32,11 @@ export async function POST(req: NextRequest) {
 
       if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
       if (!data) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
-
-      const { error: queueError } = await admin!
-        .from("creative_queue")
-        .update({ approved_at: now, approved_by: "dom", status: "brief_ready" })
-        .eq("brief_id", briefId)
-
-      if (queueError) return NextResponse.json({ error: queueError.message }, { status: 500 })
     }
 
     const results = await generateCreativeVariations({
       limit,
       ...(briefId ? { briefIds: [briefId] } : {}),
-      ...(queueId ? { queueIds: [queueId] } : {}),
     })
 
     const ok = results.errors.length === 0

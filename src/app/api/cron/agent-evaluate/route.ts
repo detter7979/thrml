@@ -509,27 +509,20 @@ export async function GET(req: NextRequest) {
                   }
                 }
 
-                try {
-                  await supabase.from("creative_queue").insert({
+                // Follow-up task for the founder: surfaced in /admin → Agents → Overview.
+                const { error: alertErr } = await supabase.from("ops_alerts").insert({
+                  severity: "WARNING",
+                  category: "ads_audience_update",
+                  message: `A/B ad set created from "${decision.entity_name}" needs its audience swapped to "${decision.audience_suggestion ?? "new audience"}" before activating`,
+                  details: {
                     platform,
                     goal_type: goalType,
-                    priority: "HIGH",
-                    reason: `A/B test created from "${decision.entity_name}" — needs audience update before activating`,
-                    concept: null,
-                    format: null,
-                    ratio: null,
-                    cta: null,
-                    copy_suggestion: `New ad set ID: ${newAdsetId}\n\nSwap audience to: ${decision.audience_suggestion}\n\nActivate once you've updated the audience in Meta Ads Manager.`,
-                    hook_suggestion: null,
-                    target_adset_id: newAdsetId,
-                    status: "PENDING",
-                    queue_type: "audience",
-                    audience_suggestion: decision.audience_suggestion ?? null,
+                    new_adset_id: newAdsetId,
                     source_adset_platform_id: decision.entity_id,
-                  })
-                } catch (qErr) {
-                  console.error("[agent-evaluate] creative_queue audience insert failed", qErr)
-                }
+                    audience_suggestion: decision.audience_suggestion ?? null,
+                  },
+                })
+                if (alertErr) console.error("[agent-evaluate] audience follow-up alert failed", alertErr)
 
                 executed = true
                 results[platform].actions++
@@ -589,22 +582,26 @@ export async function GET(req: NextRequest) {
             decision.entity_type === "creative"
               ? (decision.parent_entity_id ?? decision.entity_id)
               : decision.entity_id
-          await supabase.from("creative_queue").insert({
-            platform: decision.platform,
-            goal_type: goalType,
-            priority: decision.action_taken === "PAUSED" ? "HIGH" : "MEDIUM",
-            reason: `${decision.entity_name} paused — ${decision.rule_triggered}`,
-            concept: extractConcept(decision.entity_name),
-            format: decision.platform === "meta" ? "VID" : "RSA",
-            ratio: decision.platform === "meta" ? "9x16" : "—",
+          // Replacement creative needed: open a brief in the creative pipeline (Admin → Creative).
+          const { error: briefErr } = await supabase.from("creative_briefs").insert({
+            trigger_type: "fatigue",
+            status: "pending",
+            hook: generateHookSuggestion(decision.rule_triggered),
+            format: decision.platform === "meta" ? "9x16" : null,
+            copy_primary: decision.creative_brief,
             cta: "BookNow",
-            copy_suggestion: decision.creative_brief,
-            hook_suggestion: generateHookSuggestion(decision.rule_triggered),
-            target_adset_id: targetAdset,
-            status: "PENDING",
-            queue_type: "creative",
-            audience_suggestion: decision.audience_suggestion ?? null,
+            target_audience: decision.audience_suggestion ?? null,
+            rationale: `${decision.entity_name} paused — ${decision.rule_triggered}`,
+            trigger_data: {
+              source: "agent-evaluate",
+              platform: decision.platform,
+              goal_type: goalType,
+              concept: extractConcept(decision.entity_name),
+              target_adset_id: targetAdset,
+              priority: decision.action_taken === "PAUSED" ? "HIGH" : "MEDIUM",
+            },
           })
+          if (briefErr) console.error("[agent-evaluate] replacement creative brief insert failed", briefErr)
         }
       }
 

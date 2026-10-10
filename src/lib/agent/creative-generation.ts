@@ -9,13 +9,6 @@ const HIGGSFIELD_MAX_ATTEMPTS = 8
 const CREATIVE_REVIEW_RECIPIENT = "etter.dom@gmail.com"
 const DEFAULT_VIDEO_VARIATION_COUNT = 1
 
-type CreativeQueueRow = {
-  id: string
-  brief_id: string | null
-  status: string | null
-  approved_at: string | null
-}
-
 type CreativeBriefRow = {
   id: string
   visual_direction: string | null
@@ -29,12 +22,12 @@ export type CreativeGenerationResult = {
   processed: number
   generated: number
   queued: number
-  errors: Array<{ queueId: string; briefId?: string | null; error: string }>
+  errors: Array<{ briefId: string; error: string }>
 }
 
 type GenerateCreativeOptions = {
   limit?: number
-  queueIds?: string[]
+  /** Briefs to generate Higgsfield video variations for. Required: there is no automatic queue. */
   briefIds?: string[]
 }
 
@@ -254,21 +247,10 @@ async function sendReadyEmail(briefId: string, previewLinks: string[]) {
   })
 }
 
-async function processQueueItem(admin: ReturnType<typeof createAdminClient>, item: CreativeQueueRow) {
-  if (!item.brief_id) throw new Error("Creative queue item is missing brief_id")
+async function processBrief(admin: ReturnType<typeof createAdminClient>, brief: CreativeBriefRow) {
+  await admin.from("creative_briefs").update({ status: "generating" }).eq("id", brief.id)
 
-  const { data: brief, error: briefError } = await admin
-    .from("creative_briefs")
-    .select("id, visual_direction, reference_image_urls, campaign_short_name")
-    .eq("id", item.brief_id)
-    .maybeSingle()
-
-  if (briefError) throw briefError
-  if (!brief) throw new Error("Linked creative brief not found")
-
-  await admin.from("creative_queue").update({ status: "generating" }).eq("id", item.id)
-
-  const creativeBrief = brief as CreativeBriefRow
+  const creativeBrief = brief
   const variations = await Promise.all(videoVariationIndexes().map((index) => generateVariation(creativeBrief, index)))
   const uploaded = []
 
@@ -300,54 +282,40 @@ async function processQueueItem(admin: ReturnType<typeof createAdminClient>, ite
     uploaded.push(gcsUrl)
   }
 
-  const { error: queueError } = await admin
-    .from("creative_queue")
+  const { error: statusError } = await admin
+    .from("creative_briefs")
     .update({ status: "variations_ready" })
-    .eq("id", item.id)
-  if (queueError) throw queueError
-
-  await admin.from("creative_briefs").update({ status: "variations_ready" }).eq("id", creativeBrief.id)
+    .eq("id", creativeBrief.id)
+  if (statusError) throw statusError
   await sendReadyEmail(creativeBrief.id, uploaded)
 
   return uploaded.length
 }
 
 export async function generateCreativeVariations(options: GenerateCreativeOptions = {}): Promise<CreativeGenerationResult> {
+  const admin = createAdminClient()
+  const briefIds = (options.briefIds ?? []).filter(Boolean).slice(0, Math.max(options.limit ?? 1, 1))
+  const result: CreativeGenerationResult = { processed: 0, generated: 0, queued: briefIds.length, errors: [] }
+  if (briefIds.length === 0) return result
   requireEnv("HIGGSFIELD_API_KEY")
   requireEnv("GCS_BUCKET_NAME")
 
-  const admin = createAdminClient()
-  const limit = Math.min(Math.max(options.limit ?? 1, 1), 1)
-  let query = admin
-    .from("creative_queue")
-    .select("id, brief_id, status, approved_at")
-    .eq("status", "brief_ready")
+  const { data: briefs, error: briefError } = await admin
+    .from("creative_briefs")
+    .select("id, visual_direction, reference_image_urls, campaign_short_name")
+    .in("id", briefIds)
     .not("approved_at", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(limit)
+  if (briefError) throw briefError
 
-  if (options.queueIds?.length) query = query.in("id", options.queueIds)
-  if (options.briefIds?.length) query = query.in("brief_id", options.briefIds)
-
-  const { data: queueItems, error: queueError } = await query
-  if (queueError) throw queueError
-
-  const result: CreativeGenerationResult = {
-    processed: 0,
-    generated: 0,
-    queued: queueItems?.length ?? 0,
-    errors: [],
-  }
-
-  for (const item of (queueItems ?? []) as CreativeQueueRow[]) {
+  for (const brief of (briefs ?? []) as CreativeBriefRow[]) {
     result.processed++
     try {
-      result.generated += await processQueueItem(admin, item)
+      result.generated += await processBrief(admin, brief)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown creative generation error"
-      result.errors.push({ queueId: item.id, briefId: item.brief_id, error: message })
-      console.error("[creative-generation] failed", { queueId: item.id, briefId: item.brief_id, error: err })
-      await admin.from("creative_queue").update({ status: "generation_failed" }).eq("id", item.id)
+      result.errors.push({ briefId: brief.id, error: message })
+      console.error("[creative-generation] failed", { briefId: brief.id, error: err })
+      await admin.from("creative_briefs").update({ status: "generation_failed" }).eq("id", brief.id)
     }
   }
 

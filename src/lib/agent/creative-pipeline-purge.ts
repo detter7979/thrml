@@ -108,20 +108,6 @@ async function collectGeneratedGcsPaths(admin: ReturnType<typeof createAdminClie
   return paths
 }
 
-async function unlinkCreativeQueueBrief(admin: ReturnType<typeof createAdminClient>, briefId: string) {
-  const { error } = await admin.from("creative_queue").update({ brief_id: null }).eq("brief_id", briefId)
-  if (error && !/creative_queue|does not exist|relation/i.test(error.message)) {
-    throw new Error(error.message)
-  }
-}
-
-async function unlinkCreativeQueueBriefs(admin: ReturnType<typeof createAdminClient>) {
-  const { error } = await admin.from("creative_queue").update({ brief_id: null }).not("brief_id", "is", null)
-  if (error && !/creative_queue|does not exist|relation/i.test(error.message)) {
-    throw new Error(error.message)
-  }
-}
-
 function collectBriefGcsPaths(
   assets: AssetRow[],
   jobs: RenderJobRow[],
@@ -175,8 +161,6 @@ export async function deleteCreativeBrief(briefId: string): Promise<DeleteCreati
 
   const { generated: gcsToDelete } = collectBriefGcsPaths(assetRows, jobRows)
 
-  await unlinkCreativeQueueBrief(admin, briefId)
-
   const { error: parentError } = await admin
     .from("creative_briefs")
     .update({ parent_brief_id: null })
@@ -222,7 +206,6 @@ const DELETE_ALL_FILTER_ID = "00000000-0000-0000-0000-000000000000"
 
 /** Explicit row deletes — prod FK on creative_assets.brief_id may lack ON DELETE CASCADE. */
 async function deleteAllCreativePipelineRows(admin: ReturnType<typeof createAdminClient>) {
-  await unlinkCreativeQueueBriefs(admin)
 
   const { error: parentError } = await admin
     .from("creative_briefs")

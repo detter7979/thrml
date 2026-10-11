@@ -971,7 +971,11 @@ export function DashboardBookingsClient({ userRole = "guest" }: { userRole?: "gu
                               variant="outline"
                               onClick={() =>
                                 window.open(
-                                  `https://www.google.com/maps/search/?api=1&query=${booking.listings?.lat ?? ""},${booking.listings?.lng ?? ""}`,
+                                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                    // The street address is exact; public lat/lng are snapped to ~400 m for privacy.
+                                    booking.listings?.location_address ||
+                                      `${booking.listings?.lat ?? ""},${booking.listings?.lng ?? ""}`
+                                  )}`,
                                   "_blank"
                                 )
                               }

@@ -22,9 +22,9 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const [{ count: guestBookings }, { count: totalListings }, { count: reviewsReceived }, { data: guestRating }] =
     await Promise.all([
-    supabase.from("bookings").select("*", { count: "exact", head: true }).eq("guest_id", id),
-    supabase.from("listings").select("*", { count: "exact", head: true }).eq("host_id", id),
-    supabase.from("listing_reviews").select("*", { count: "exact", head: true }).eq("host_id", id),
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("guest_id", id),
+    supabase.from("listings").select("id", { count: "exact", head: true }).eq("host_id", id),
+    supabase.from("listing_reviews").select("id", { count: "exact", head: true }).eq("host_id", id),
     supabase.from("guest_ratings").select("avg_overall, review_count").eq("guest_id", id).maybeSingle(),
   ])
 

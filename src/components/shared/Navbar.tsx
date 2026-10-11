@@ -157,7 +157,7 @@ export function Navbar() {
       setAvatarUrl(normalizeAvatarUrl(profile?.avatar_url))
       const { count: listingCount } = await supabase
         .from("listings")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("host_id", user.id)
         .eq("is_active", true)
       setIsHost(

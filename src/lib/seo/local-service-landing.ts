@@ -290,11 +290,11 @@ const SEATTLE_METRO_TEXT_CITIES = [
 const LOCAL_LANDING_LIMIT = 250
 
 const LOCAL_LANDING_SELECT =
-  "id, title, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
+  "id, title, service_type, session_type, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
 
 /** Same row shape but without rating embed (older DBs / schema drift). */
 const LOCAL_LANDING_SELECT_MINIMAL =
-  "id, title, service_type, session_type, location, location_address, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index)"
+  "id, title, service_type, session_type, location_city, location_state, city, state, country, lat, lng, price_solo, fixed_session_price, is_featured, created_at, listing_photos(url, order_index)"
 
 type LocalListingQueryRow = LocalListingRow & {
   is_featured?: boolean | null
@@ -309,8 +309,6 @@ function buildCityTextOrFilter(cityDisplayName: string): string {
   return [
     `city.ilike.${ilikePattern}`,
     `location_city.ilike.${ilikePattern}`,
-    `location.ilike.${ilikePattern}`,
-    `location_address.ilike.${ilikePattern}`,
   ].join(",")
 }
 
@@ -356,7 +354,7 @@ export function mapRowToListingCard(row: LocalListingRow): ListingCardData {
   const parts = [city, state, country].filter((p) => p.length > 0)
   const derivedLocation = parts.join(", ")
   const fallbackLocation =
-    typeof row.location === "string" ? row.location : "Location available after booking"
+    "Location available after booking"
 
   const serviceTypeId = typeof row.service_type === "string" ? row.service_type : null
   const st = serviceTypeId ? getFallbackServiceType(serviceTypeId) : undefined

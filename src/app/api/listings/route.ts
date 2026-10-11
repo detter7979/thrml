@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase
     .from("listings")
     .select(
-      "id, title, service_type, session_type, is_featured, fixed_session_price, price_solo, location, location_address, location_city, location_state, city, state, country, lat, lng, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
+      "id, title, service_type, session_type, is_featured, fixed_session_price, price_solo, location_city, location_state, city, state, country, lat, lng, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
     )
     .eq("is_active", true)
     .eq("is_deleted", false)
@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
     const parts = [city, state, country].filter((part) => part.length > 0)
     const derivedLocation = parts.join(", ")
     const fallbackLocation =
-      typeof listing.location === "string" ? listing.location : "Location available after booking"
+      "Location available after booking"
 
     return {
       ...listing,

@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 
 /** Fields required for home page cards, trending strip, and filters — no description or heavy joins. */
 const HOME_LISTINGS_SELECT =
-  "id, title, service_type, session_type, is_featured, fixed_session_price, price_solo, location_city, city, location_state, state, country, location, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
+  "id, title, service_type, session_type, is_featured, fixed_session_price, price_solo, location_city, city, location_state, state, country, created_at, listing_photos(url, order_index), listing_ratings(avg_overall, review_count)"
 
 export type HomeListingCardRow = {
   id: string
@@ -38,7 +38,7 @@ function deriveLocation(listing: Record<string, unknown>): string {
   }
   if (parts.length > 0) return parts.join(", ")
   const fallback =
-    (typeof listing.location === "string" && listing.location.trim()) || "Location available after booking"
+    "Location available after booking"
   return fallback
 }
 

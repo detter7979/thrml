@@ -121,9 +121,9 @@ const LISTINGS_BASE_NO_RATINGS =
   "id, title, service_type, session_type, lat, lng, location_city, city, listing_photos(url, order_index), price_solo, fixed_session_price, capacity, instant_book, amenities, is_featured, created_at"
 const LISTINGS_SELECT_NO_RATINGS = `${LISTINGS_BASE_NO_RATINGS}, availability`
 const LISTINGS_SELECT_LEGACY =
-  "id, title, service_type, session_type, lat, lng, city, location, listing_photos(url, order_index), price_solo, price_2, price_3, price_4plus, capacity, is_featured, created_at, instant_book, amenities"
+  "id, title, service_type, session_type, lat, lng, city, listing_photos(url, order_index), price_solo, price_2, price_3, price_4plus, capacity, is_featured, created_at, instant_book, amenities"
 const LISTINGS_SELECT_MINIMAL =
-  "id, title, service_type, session_type, lat, lng, city, location, price_solo, price_2, is_featured, created_at"
+  "id, title, service_type, session_type, lat, lng, city, price_solo, price_2, is_featured, created_at"
 
 function haversineMiles(aLat: number, aLng: number, bLat: number, bLng: number) {
   const toRad = (value: number) => (value * Math.PI) / 180

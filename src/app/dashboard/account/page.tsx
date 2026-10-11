@@ -20,7 +20,7 @@ export default async function DashboardAccountPage() {
   const [{ count: activeListingCount }, { data: profileById }, insuranceAttestation] = await Promise.all([
     supabase
       .from("listings")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("host_id", user.id)
       .eq("is_active", true),
     supabase.from("profiles").select(profileColumns).eq("id", user.id).maybeSingle(),

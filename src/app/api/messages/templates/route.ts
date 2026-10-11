@@ -37,7 +37,7 @@ async function canUserManageTemplates() {
   const [{ count: listingCount }, { data: profile }] = await Promise.all([
     supabase
       .from("listings")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("host_id", session.user.id)
       .eq("is_active", true),
     supabase.from("profiles").select("ui_intent").eq("id", session.user.id).maybeSingle(),

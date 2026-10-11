@@ -19,12 +19,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     await Promise.all([
     supabase
       .from("listings")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("host_id", user.id)
       .eq("is_active", true),
     supabase
       .from("listings")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("host_id", user.id),
     supabase
       .from("profiles")

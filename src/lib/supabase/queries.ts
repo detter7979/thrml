@@ -22,7 +22,7 @@ export async function getNearbyListings(
   let query = supabase
     .from("listings")
     .select(
-      "id, host_id, title, description, service_type, sauna_type, session_type, is_active, is_featured, price_solo, price_2, price_3, price_4plus, location, location_address, city, state, country, lat, lng, created_at, listing_photos(url, order_index), listing_ratings(avg_rating, review_count)"
+      "id, host_id, title, description, service_type, sauna_type, session_type, is_active, is_featured, price_solo, price_2, price_3, price_4plus, city, state, country, lat, lng, created_at, listing_photos(url, order_index), listing_ratings(avg_rating, review_count)"
     )
     .eq("is_active", true)
     .gte("lat", lat - delta)

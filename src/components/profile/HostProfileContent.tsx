@@ -133,7 +133,7 @@ export async function HostProfileContent({
     ? await admin
         .from("listings")
         .select(
-          "id, host_id, title, service_type, session_type, price_solo, location_city, location_state, location_address, is_active, created_at"
+          "id, host_id, title, service_type, session_type, price_solo, location_city, location_state, is_active, created_at"
         )
         .in("host_id", hostIds)
         .order("created_at", { ascending: false })
@@ -271,7 +271,7 @@ export async function HostProfileContent({
     const avgRating = reviewCount
       ? reviewRowsForListing.reduce((sum, row) => sum + Number(row.rating_overall ?? 0), 0) / reviewCount
       : 0
-    const location = [listing.location_city, listing.location_state, listing.location_address]
+    const location = [listing.location_city, listing.location_state]
       .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
       .slice(0, 2)
       .join(", ")

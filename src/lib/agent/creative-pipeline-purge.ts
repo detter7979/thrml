@@ -243,9 +243,9 @@ export async function purgeCreativePipeline(opts?: { dryRun?: boolean }): Promis
   const admin = createAdminClient()
 
   const [{ count: assetCount }, { count: jobCount }, { count: briefCount }] = await Promise.all([
-    admin.from("creative_assets").select("*", { count: "exact", head: true }),
-    admin.from("render_jobs").select("*", { count: "exact", head: true }),
-    admin.from("creative_briefs").select("*", { count: "exact", head: true }),
+    admin.from("creative_assets").select("id", { count: "exact", head: true }),
+    admin.from("render_jobs").select("id", { count: "exact", head: true }),
+    admin.from("creative_briefs").select("id", { count: "exact", head: true }),
   ])
 
   const gcsPaths = await collectGeneratedGcsPaths(admin)

@@ -30,7 +30,6 @@ type ListingRow = {
   session_type: string | null
   fixed_session_price: number | null
   price_solo: number | null
-  location_address: string | null
   location_city: string | null
   location_state: string | null
   lat: number | null
@@ -53,7 +52,6 @@ export async function getListingsForFeed(): Promise<FeedListing[]> {
       session_type,
       fixed_session_price,
       price_solo,
-      location_address,
       location_city,
       location_state,
       lat,
@@ -92,7 +90,8 @@ export async function getListingsForFeed(): Promise<FeedListing[]> {
       service_type: listing.service_type ?? "wellness_space",
       price,
       session_type: listing.session_type ?? "hourly",
-      location_address: listing.location_address ?? "",
+      // City-level only: exact street addresses are private until a guest books.
+      location_address: [listing.location_city, listing.location_state].filter(Boolean).join(", "),
       location_city: listing.location_city ?? "",
       location_state: listing.location_state ?? "",
       lat: Number(listing.lat ?? 0),

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(
@@ -13,7 +14,9 @@ export async function POST(
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { data: original, error: originalError } = await supabase
+  // Read the host's own listing (incl. private fields) server-side, scoped by host_id.
+  const admin = createAdminClient()
+  const { data: original, error: originalError } = await admin
     .from("listings")
     .select("*")
     .eq("id", id)
@@ -43,7 +46,7 @@ export async function POST(
 
   let cloned: Record<string, unknown> | null = null
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const { data, error } = await supabase.from("listings").insert(clonePayload).select("*").single()
+    const { data, error } = await supabase.from("listings").insert(clonePayload).select("id").single()
     if (!error && data) {
       cloned = data
       break

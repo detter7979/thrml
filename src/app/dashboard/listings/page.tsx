@@ -9,6 +9,7 @@ import {
   PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
   PUBLIC_PROFILES_TABLE,
 } from "@/lib/supabase/public-profiles"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardListingsClient } from "./listings-client"
 
@@ -51,7 +52,8 @@ export default async function DashboardListingsPage({
       )
       .eq("id", user?.id ?? "")
       .maybeSingle(),
-    supabase
+    // Host's own listings incl. private fields: server-side, scoped by host_id.
+    createAdminClient()
       .from("listings")
       .select("*")
       .eq("host_id", user?.id ?? "")

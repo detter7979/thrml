@@ -16,6 +16,7 @@ import { stripe } from "@/lib/stripe"
 import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { LISTING_PUBLIC_COLUMNS } from "@/lib/listings/private-fields"
 
 const checkoutSchema = z.object({
   listingId: z.string().trim().min(1),
@@ -304,7 +305,7 @@ export async function POST(req: NextRequest) {
     const [{ data: listing, error: listingError }, { data: availabilityRows }] = await Promise.all([
       supabase
         .from("listings")
-        .select("*")
+        .select(LISTING_PUBLIC_COLUMNS)
         .eq("id", listingId)
         .single(),
       supabase

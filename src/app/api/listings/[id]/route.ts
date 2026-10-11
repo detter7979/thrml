@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { assertPublishableListingCopy } from "@/lib/listings/host-claim-policy"
 import { sanitizeText } from "@/lib/sanitize"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 async function getActiveBookingCount(
@@ -141,10 +142,18 @@ export async function PATCH(
       .update(updatePayload)
       .eq("id", id)
       .eq("host_id", user.id)
-      .select("*")
+      .select("id")
       .single()
 
-    if (!error) return NextResponse.json({ listing: data })
+    if (!error && data) {
+      const { data: updated } = await createAdminClient()
+        .from("listings")
+        .select("*")
+        .eq("id", id)
+        .eq("host_id", user.id)
+        .maybeSingle()
+      return NextResponse.json({ listing: updated ?? data })
+    }
 
     const message = error.message ?? ""
     const missingColumnMatch = message.match(/'([^']+)' column/i)

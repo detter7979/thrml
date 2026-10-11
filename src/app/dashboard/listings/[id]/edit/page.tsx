@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 import { EditListingClient } from "./edit-listing-client"
@@ -45,7 +46,9 @@ export default async function EditListingPage({
   } = await supabase.auth.getUser()
   if (!user) redirect("/login?next=/dashboard/listings")
 
-  const { data: listing, error } = await supabase
+  // Private fields (address, access, contacts) are not readable by session clients; the host's
+  // own listing is read server-side, scoped by host_id.
+  const { data: listing, error } = await createAdminClient()
     .from("listings")
     .select("*")
     .eq("id", id)

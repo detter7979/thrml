@@ -30,7 +30,6 @@ begin
   return new;
 end $$;
 
-drop trigger if exists listings_approximate_coordinates on public.listings;
 create trigger listings_approximate_coordinates
   before insert or update of lat, lng on public.listings
   for each row execute function public.listings_approximate_coordinates();

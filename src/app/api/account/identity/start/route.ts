@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { createVerificationSession } from "@/lib/stripe-identity"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 
 function appBaseUrl() {
@@ -24,7 +25,8 @@ export async function POST() {
 
   try {
     const { url, sessionId } = await createVerificationSession(user.id, returnUrl)
-    const { error } = await supabase
+    // Verification status columns are not user-writable; write them with the service role.
+    const { error } = await createAdminClient()
       .from("profiles")
       .update({
         stripe_identity_verification_id: sessionId,

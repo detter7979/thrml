@@ -141,9 +141,24 @@ export async function PATCH(req: NextRequest) {
         typeof updates.terms_version === "string" ? updates.terms_version : LEGAL_VERSIONS.TERMS,
       headers: req.headers,
     })
+    await recordLegalAcceptance({
+      admin,
+      userId: user.id,
+      docType: "privacy_policy",
+      version:
+        typeof updates.privacy_version === "string" ? updates.privacy_version : LEGAL_VERSIONS.PRIVACY,
+      headers: req.headers,
+    })
     if (!updates.terms_version) updates.terms_version = LEGAL_VERSIONS.TERMS
-    if (!updates.privacy_version) updates.privacy_version = LEGAL_VERSIONS.PRIVACY
   }
+
+  // Accepted for back-compat with older clients, but these are not profiles columns:
+  // privacy acceptance lives in legal_acceptances, and offer/product-update opt-ins live in
+  // notification_preferences. Writing them made the whole update fail.
+  for (const key of ["privacy_version", "waiver_accepted", "offers_opted_in", "product_updates_opted_in"]) {
+    delete updates[key]
+  }
+  if (!Object.keys(updates).length) return NextResponse.json({ success: true })
 
   let updateError: { message: string } | null = null
   let hasPersistedChanges = false

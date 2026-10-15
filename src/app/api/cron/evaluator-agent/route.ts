@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { runEvaluator } from "@/lib/agent/evaluator"
+import { syncMetaStatuses } from "@/lib/agent/meta-status-sync"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export const maxDuration = 60
 
@@ -17,6 +19,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  // Bring statuses in line with Meta first so the rules only judge what is actually live.
+  let statusSync: { changes: number; notFound: number } | { error: string } | null = null
+  try {
+    const sync = await syncMetaStatuses(createAdminClient())
+    statusSync = { changes: sync.changes.length, notFound: sync.notFound.length }
+  } catch (e) {
+    statusSync = { error: e instanceof Error ? e.message : String(e) }
+    console.error("[evaluator-agent] meta status sync failed", statusSync.error)
+  }
+
   try {
     const result = await runEvaluator({ dryRun: false })
     if (!result.ok) {
@@ -30,6 +42,7 @@ export async function GET(req: NextRequest) {
       proposals_after_dedupe: result.proposalsAfterDedupe,
       proposals_written: result.proposalsWritten,
       duration_ms: result.duration_ms,
+      status_sync: statusSync,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error"

@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { DataExports } from "@/components/admin/DataExports"
+import { ReconciliationPanel } from "@/components/admin/ReconciliationPanel"
 
 type FinancePeriod = "7d" | "mtd" | "30d" | "90d" | "ytd"
 
@@ -297,6 +298,8 @@ export function AdminFinanceClient() {
           )
         })}
       </div>
+
+      <ReconciliationPanel />
 
       <DataExports />
 

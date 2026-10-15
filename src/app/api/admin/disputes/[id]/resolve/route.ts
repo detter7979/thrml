@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { logAdminAction } from "@/lib/admin-audit"
 import { requireAdminApi } from "@/lib/admin-guard"
 import type { BookingContext, RecommendedAction } from "@/lib/disputes/classifier"
 import { executeResolution } from "@/lib/disputes/executor"
@@ -123,6 +124,13 @@ export async function POST(
       }
     }
 
+    await logAdminAction(admin, {
+      adminId: user.id,
+      action: "dispute_resolve",
+      targetType: "support_request",
+      targetId: supportRequestId,
+      details: { action: "reject" },
+    })
     return NextResponse.json({ ok: true, action: "reject" })
   }
 
@@ -231,5 +239,12 @@ export async function POST(
     })
     .eq("id", latest.id as string)
 
+  await logAdminAction(admin, {
+    adminId: user.id,
+    action: "dispute_resolve",
+    targetType: "support_request",
+    targetId: supportRequestId,
+    details: { action },
+  })
   return NextResponse.json({ ok: true, action, execution })
 }

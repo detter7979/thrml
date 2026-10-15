@@ -3,6 +3,7 @@ import { z } from "zod"
 
 import { parsePercentFromSetting } from "@/lib/fees"
 import { invalidatePlatformFeePercentsCache } from "@/lib/fees-server"
+import { logAdminAction } from "@/lib/admin-audit"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 const DEFAULT_SETTINGS = {
@@ -155,6 +156,14 @@ export async function PATCH(req: NextRequest) {
   if (key === "guest_fee_percent" || key === "host_fee_percent") {
     invalidatePlatformFeePercentsCache()
   }
+
+  await logAdminAction(admin, {
+    adminId: user.id,
+    action: "settings_update",
+    targetType: "platform_setting",
+    targetId: key,
+    details: { value: storeValue },
+  })
 
   return NextResponse.json({ success: true })
 }

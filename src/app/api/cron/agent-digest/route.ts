@@ -22,6 +22,10 @@ function badge(severity: string) {
   return `<span style="background:#27AE60;color:#fff;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">INFO</span>`
 }
 
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
 export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET || cronAuth(req) !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -81,7 +85,11 @@ export async function GET(req: NextRequest) {
       .eq("status", "social_draft")
 
     // ── Build email ────────────────────────────────────────────────────────
-    const subjectPrefix = criticals.length > 0 ? "🚨 " : warnings.length > 0 ? "⚠️ " : "✅ "
+    // Agent failures used to appear only as a row in the table while the subject said "all clear".
+    const failedRuns = (agentRuns ?? []).filter((r) => r.status === "error")
+    const failedAgentNames = Array.from(new Set(failedRuns.map((r) => r.agent_name)))
+    const subjectPrefix =
+      criticals.length > 0 ? "🚨 " : warnings.length > 0 || failedRuns.length > 0 ? "⚠️ " : "✅ "
     const bookingRevenue = (newBookings ?? []).reduce((s, b) => s + Number(b.total_charged ?? 0), 0)
 
     const alertsHtml = (alerts ?? []).length === 0
@@ -143,11 +151,12 @@ ${bookingsHtml}
 </table>
 
 <!-- Action items -->
-${(pendingTickets ?? 0) > 0 || criticals.length > 0 ? `
+${(pendingTickets ?? 0) > 0 || criticals.length > 0 || failedRuns.length > 0 ? `
 <div style="margin-top:20px;background:#FEF3F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px">
   <p style="margin:0;font-size:13px;font-weight:600;color:#C0392B">Action Required</p>
   ${(pendingTickets ?? 0) > 0 ? `<p style="margin:4px 0 0;font-size:13px">· ${pendingTickets} support ticket(s) need your review → <a href="${disputesInboxUrl}" style="color:#C4623A">Review now</a></p>` : ""}
   ${criticals.map(a => `<p style="margin:4px 0 0;font-size:13px">· ${a.message}</p>`).join("")}
+  ${failedRuns.map(r => `<p style="margin:4px 0 0;font-size:13px">· Agent <b>${r.agent_name}</b> failed: ${escapeHtml(String(r.error_message ?? "unknown error").slice(0, 200))}</p>`).join("")}
 </div>` : ""}
 
 `
@@ -163,18 +172,33 @@ ${(pendingTickets ?? 0) > 0 || criticals.length > 0 ? `
     })
 
     const subjectRevenue = finance ? ` · ${fmt(Number(finance.net_platform_revenue))} revenue` : ""
-    const alertSummary = criticals.length > 0 ? ` · ${criticals.length} critical` : warnings.length > 0 ? ` · ${warnings.length} warnings` : " · all clear"
+    const alertSummary =
+      criticals.length > 0
+        ? ` · ${criticals.length} critical`
+        : failedAgentNames.length > 0
+          ? ` · ${failedAgentNames.length} agent${failedAgentNames.length === 1 ? "" : "s"} failing`
+          : warnings.length > 0
+            ? ` · ${warnings.length} warnings`
+            : " · all clear"
 
     await sendEmail({
       to: "etter.dom@gmail.com",
       subject: `${subjectPrefix}thrml Digest${subjectRevenue}${alertSummary}`,
       html,
-      text: `thrml Agent Digest — ${today}\n\nAlerts: ${criticals.length} critical, ${warnings.length} warnings\nBookings: ${(newBookings ?? []).length} (${fmt(bookingRevenue)})\nOpen tickets: ${pendingTickets ?? 0}\nContent queued: ${pendingSocial ?? 0}`,
+      text: `thrml Agent Digest — ${today}\n\nAlerts: ${criticals.length} critical, ${warnings.length} warnings\nFailing agents: ${failedAgentNames.join(", ") || "none"}\nBookings: ${(newBookings ?? []).length} (${fmt(bookingRevenue)})\nOpen tickets: ${pendingTickets ?? 0}\nContent queued: ${pendingSocial ?? 0}`,
+    })
+
+    await admin.from("agent_runs").insert({
+      agent_name: "digest",
+      status: "success",
+      completed_at: new Date().toISOString(),
+      results: { failing_agents: failedAgentNames, alerts: (alerts ?? []).length },
     })
 
     return NextResponse.json({ ok: true, date: today, alertCount: (alerts ?? []).length, bookingCount: (newBookings ?? []).length })
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error"
+    await admin.from("agent_runs").insert({ agent_name: "digest", status: "error", error_message: msg })
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 }

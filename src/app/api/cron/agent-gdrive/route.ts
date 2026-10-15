@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { google } from "googleapis"
-import type { GoogleAuth } from "google-auth-library"
 
-import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { syncMarketplaceFinanceSheet } from "@/lib/finance/sync-marketplace-sheet"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -12,38 +9,6 @@ function cronAuth(req: NextRequest) {
     req.headers.get("authorization")?.replace("Bearer ", "") ??
     null
   )
-}
-
-function getGoogleAuth(): GoogleAuth | null {
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null
-  return new google.auth.GoogleAuth({
-    credentials: loadGoogleServiceAccountCredentials(),
-    scopes: [
-      "https://www.googleapis.com/auth/spreadsheets",
-      "https://www.googleapis.com/auth/drive.file",
-    ],
-  })
-}
-
-async function getOrCreateSheetId(
-  admin: ReturnType<typeof createAdminClient>,
-  auth: GoogleAuth,
-  folderId: string | null
-): Promise<string | null> {
-  // Check if a sheet ID is already stored (either pre-created or from a prior run)
-  const { data: setting } = await admin
-    .from("platform_settings").select("value").eq("key", "gdrive_finance_sheet_id").maybeSingle()
-  if (setting?.value) return String(setting.value).replace(/^"|"$/g, "")
-
-  // No sheet ID stored — agent cannot create one (service account quota limits).
-  // Solution: create the sheet manually in your Google Drive, share it with
-  // thrml-agent@watchful-muse-350902.iam.gserviceaccount.com (Editor),
-  // then store the sheet ID:
-  //   INSERT INTO platform_settings (key, value)
-  //   VALUES ('gdrive_finance_sheet_id', '"YOUR_SHEET_ID"')
-  //   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-  console.error("[agent-gdrive] No gdrive_finance_sheet_id in platform_settings. Create sheet manually and store ID.")
-  return null
 }
 
 export async function GET(req: NextRequest) {
@@ -61,70 +26,9 @@ export async function GET(req: NextRequest) {
   const runId = runRow?.id ?? null
 
   try {
-    const auth = getGoogleAuth()
-    if (!auth) throw new Error("Google auth init failed — check GOOGLE_SERVICE_ACCOUNT_JSON format")
-
-    const { data: folderSetting } = await admin
-      .from("platform_settings").select("value").eq("key", "gdrive_folder_id").maybeSingle()
-    const folderId = folderSetting?.value
-      ? String(folderSetting.value).replace(/^"|"$/g, "")
-      : null
-
-    const spreadsheetId = await getOrCreateSheetId(admin, auth, folderId)
-    if (!spreadsheetId) throw new Error("Could not create/find Google Sheet")
-
-    const { data: snapshots } = await admin
-      .from("finance_snapshots").select("*").order("snapshot_date", { ascending: true })
-
-    if (!snapshots?.length) {
-      if (runId) await admin.from("agent_runs").update({
-        status: "success", completed_at: new Date().toISOString(), results: { rows: 0 },
-      }).eq("id", runId)
-      return NextResponse.json({ ok: true, rows: 0 })
-    }
-
-    const sheets = google.sheets({ version: "v4", auth })
-
-    // Write headers first (idempotent — just overwrites row 1 each time)
-    await sheets.spreadsheets.values.update({
-      spreadsheetId, range: "Sheet1!A1:K1", valueInputOption: "RAW",
-      requestBody: {
-        values: [[
-          "Date",
-          "Bookings",
-          "Gross",
-          "Gross Take",
-          "Cash Platform Rev",
-          "Host Payouts",
-          "Refunds",
-          "Credits Applied",
-          "Chargebacks",
-          "Net Rev",
-          "New Users",
-        ]],
-      },
-    })
-
-    const rows = snapshots.map((s) => [
-      s.snapshot_date,
-      s.booking_count,
-      Number(s.gross_booking_value).toFixed(2),
-      Number(s.gross_platform_take ?? 0).toFixed(2),
-      Number(s.platform_revenue).toFixed(2),
-      Number(s.host_payouts).toFixed(2),
-      Number(s.refunds_issued).toFixed(2),
-      Number(s.credits_applied ?? 0).toFixed(2),
-      Number(s.chargebacks ?? 0).toFixed(2),
-      Number(s.net_platform_revenue).toFixed(2),
-      s.new_users,
-    ])
-
-    await sheets.spreadsheets.values.update({
-      spreadsheetId, range: `Sheet1!A2:K${rows.length + 1}`,
-      valueInputOption: "RAW", requestBody: { values: rows },
-    })
-
-    let trackerSync: { rows: number; spreadsheetId: string } | null = null
+    // The Finance Tracker's "Marketplace Data" tab is the single destination for daily
+    // marketplace numbers. (The old "Sheet1" write failed: the tracker has no Sheet1 tab,
+    // and it duplicated the same rows.)
     const { data: trackerSetting } = await admin
       .from("platform_settings")
       .select("value")
@@ -132,20 +36,9 @@ export async function GET(req: NextRequest) {
       .maybeSingle()
     const trackerSheetId = trackerSetting?.value
       ? String(trackerSetting.value).replace(/^"|"$/g, "")
-      : null
-    if (trackerSheetId) {
-      try {
-        trackerSync = await syncMarketplaceFinanceSheet(admin, trackerSheetId)
-      } catch (syncErr) {
-        console.error("[agent-gdrive] marketplace tracker sync failed", syncErr)
-      }
-    }
-
-    const results = {
-      rows: rows.length,
-      spreadsheetId,
-      trackerSync,
-    }
+      : undefined
+    const trackerSync = await syncMarketplaceFinanceSheet(admin, trackerSheetId)
+    const results = { rows: trackerSync.rows, spreadsheetId: trackerSync.spreadsheetId, tab: "Marketplace Data" }
     if (runId) await admin.from("agent_runs").update({
       status: "success", completed_at: new Date().toISOString(),
       duration_ms: Date.now() - runStart, results,

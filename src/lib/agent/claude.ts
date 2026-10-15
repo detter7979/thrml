@@ -48,6 +48,8 @@ export type AgentCallResult = {
   inputTokens: number
   outputTokens: number
   stopReason?: string
+  /** Set when the API call itself failed (bad key, no credit, retired model, overload…). */
+  error?: string
 }
 
 /**
@@ -85,10 +87,13 @@ export async function callAgent(opts: AgentCallOptions): Promise<AgentCallResult
     }
   } catch (err) {
     console.error(`[agent/claude] callAgent failed for skill=${opts.skill}`, err)
+    const status = (err as { status?: number })?.status
+    const message = err instanceof Error ? err.message : String(err)
     return {
       text: "",
       inputTokens: 0,
       outputTokens: 0,
+      error: `Claude API error${status ? ` ${status}` : ""}: ${message.slice(0, 200)}`,
     }
   }
 }
@@ -98,18 +103,25 @@ export async function callAgent(opts: AgentCallOptions): Promise<AgentCallResult
  * Returns parsed object or null on failure.
  */
 export async function callAgentJson<T>(opts: AgentCallOptions): Promise<T | null> {
+  return (await callAgentJsonResult<T>(opts)).data
+}
+
+/** Like callAgentJson, but also says why it failed so callers can record it in agent_runs. */
+export async function callAgentJsonResult<T>(
+  opts: AgentCallOptions
+): Promise<{ data: T | null; error?: string }> {
   const result = await callAgent({ ...opts, prompt: opts.prompt + "\n\nRespond with valid JSON only. No markdown, no preamble." })
-  if (!result.text) return null
+  if (!result.text) return { data: null, error: result.error ?? `Claude returned an empty reply (stop: ${result.stopReason ?? "unknown"})` }
   const cleaned = result.text.replace(/```json|```/g, "").trim()
   // Tolerate stray text around the JSON by taking the outermost object/array.
   const start = cleaned.search(/[[{]/)
   const end = Math.max(cleaned.lastIndexOf("}"), cleaned.lastIndexOf("]"))
   const candidate = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned
   try {
-    return JSON.parse(candidate) as T
+    return { data: JSON.parse(candidate) as T }
   } catch {
     const hint = result.stopReason === "max_tokens" ? " (hit maxTokens; raise it for this skill)" : ""
     console.error(`[agent/claude] JSON parse failed for skill=${opts.skill}${hint}`, result.text.slice(0, 200))
-    return null
+    return { data: null, error: `Reply wasn't valid JSON${hint}: ${result.text.slice(0, 120)}` }
   }
 }

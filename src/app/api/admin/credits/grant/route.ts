@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+import { logAdminAction } from "@/lib/admin-audit"
 import { requireAdminApi } from "@/lib/admin-guard"
 import { sendCreditGrantedEmail } from "@/lib/emails/credit-granted"
 
@@ -11,8 +12,8 @@ const bodySchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { error, admin } = await requireAdminApi()
-  if (error || !admin) return error
+  const { error, admin, user } = await requireAdminApi()
+  if (error || !admin || !user) return error
 
   const body = await req.json().catch(() => null)
   const parsed = bodySchema.safeParse(body)
@@ -39,6 +40,14 @@ export async function POST(req: NextRequest) {
   if (rpcError) {
     return NextResponse.json({ error: rpcError.message }, { status: 500 })
   }
+
+  await logAdminAction(admin, {
+    adminId: user.id,
+    action: "grant_credit",
+    targetType: "user",
+    targetId: userId,
+    details: { amountCents, reason },
+  })
 
   const { data: credits } = await admin.from("user_credits").select("balance").eq("user_id", userId).maybeSingle()
 

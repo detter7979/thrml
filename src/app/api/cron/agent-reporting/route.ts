@@ -222,7 +222,17 @@ async function deleteOldFiles(
     fields: "files(id)",
   })
   let deleted = 0
-  for (const f of res.data.files ?? []) { await drive.files.delete({ fileId: f.id! }); deleted++ }
+  for (const f of res.data.files ?? []) {
+    // Move to trash rather than hard-delete, and skip files the service account can't
+    // remove (e.g. files owned by someone else). One un-deletable file used to fail the
+    // whole daily report with "insufficient permissions".
+    try {
+      await drive.files.update({ fileId: f.id!, requestBody: { trashed: true } })
+      deleted++
+    } catch (e) {
+      console.warn("[agent-reporting] could not trash old file", f.id, e instanceof Error ? e.message : e)
+    }
+  }
   return deleted
 }
 
@@ -324,6 +334,15 @@ async function updatePnLDashboard(
   })
 }
 
+/** Runs one step and prefixes its name onto any error, so agent_runs.error_message says where it failed. */
+async function step<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    throw new Error(`${name}: ${e instanceof Error ? e.message : String(e)}`)
+  }
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET || cronAuth(req) !== process.env.CRON_SECRET) {
@@ -361,8 +380,8 @@ export async function GET(req: NextRequest) {
 
     const masterId = getSetting(settings, "gdrive_master_report_id")
     if (masterId) {
-      await ensureMasterReportTabs(sheets, masterId)
-      await updateOpExTab(sheets, masterId)
+      await step("master report tabs", () => ensureMasterReportTabs(sheets, masterId))
+      await step("OpEx tab", () => updateOpExTab(sheets, masterId))
     }
 
     const date = yesterday()
@@ -417,7 +436,9 @@ export async function GET(req: NextRequest) {
     }
 
     // ── 45-day retention ──────────────────────────────────────────────────
-    results.oldDeleted = await deleteOldFiles(drive, rawFolderId, 45) + await deleteOldFiles(drive, cleanedFolderId, 45)
+    results.oldDeleted = await step("old file cleanup", async () =>
+      (await deleteOldFiles(drive, rawFolderId, 45)) + (await deleteOldFiles(drive, cleanedFolderId, 45))
+    )
 
     if (runId) await admin.from("agent_runs").update({
       status: "success", completed_at: new Date().toISOString(), duration_ms: Date.now() - runStart, results,

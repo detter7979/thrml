@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { callAgentJson } from "@/lib/agent/claude"
+import { callAgentJsonResult } from "@/lib/agent/claude"
 
 /**
  * Organic social post generation. Used by the nightly agent-social cron and the
@@ -116,13 +116,16 @@ export async function generateSocialPosts(
   const result: GenerateSocialResult = { pillar, created: [], failed: [] }
 
   for (const platform of wanted) {
-    const draft = await callAgentJson<SocialDraft>({
+    const { data: draft, error: draftError } = await callAgentJsonResult<SocialDraft>({
       skill: "social",
       prompt: buildPrompt({ pillar, platformLabel: platform.label, listingContext, direction: opts.direction }),
       maxTokens: 2000,
     })
     if (!draft?.caption) {
-      result.failed.push({ platform: platform.key, reason: "Claude returned no usable post (see [agent/claude] log)" })
+      result.failed.push({
+        platform: platform.key,
+        reason: draftError ?? "Claude's reply had no caption field",
+      })
       continue
     }
 

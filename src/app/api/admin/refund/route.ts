@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+import { logAdminAction } from "@/lib/admin-audit"
 import { requireAdminApi } from "@/lib/admin-guard"
 import { persistBookingRefund } from "@/lib/finance/booking-refund"
 import { stripe } from "@/lib/stripe"
@@ -11,8 +12,8 @@ const payloadSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const { error, admin } = await requireAdminApi()
-  if (error || !admin) return error
+  const { error, admin, user } = await requireAdminApi()
+  if (error || !admin || !user) return error
 
   const parsed = payloadSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
@@ -42,10 +43,15 @@ export async function POST(req: NextRequest) {
 
   let refundId: string | null = null
   try {
-    const refund = await stripe.refunds.create({
-      payment_intent: booking.stripe_payment_intent_id,
-      amount: amountInCents,
-    })
+    // Same booking + same refunded-so-far + same amount = same key, so a double click
+    // returns the first refund instead of issuing a second one (Stripe keeps keys 24h).
+    const refund = await stripe.refunds.create(
+      {
+        payment_intent: booking.stripe_payment_intent_id,
+        amount: amountInCents,
+      },
+      { idempotencyKey: `admin-refund:${bookingId}:${alreadyRefundedCents}:${amountInCents}` }
+    )
     refundId = refund.id
   } catch (stripeError) {
     const message = stripeError instanceof Error ? stripeError.message : "Stripe refund failed"
@@ -64,6 +70,14 @@ export async function POST(req: NextRequest) {
   if (!persisted.ok) {
     return NextResponse.json({ error: persisted.error }, { status: 500 })
   }
+
+  await logAdminAction(admin, {
+    adminId: user.id,
+    action: "refund",
+    targetType: "booking",
+    targetId: bookingId,
+    details: { amount, refundId, refundedTotal: persisted.refundedAmount },
+  })
 
   return NextResponse.json({
     success: true,

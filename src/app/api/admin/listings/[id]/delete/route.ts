@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { logAdminAction } from "@/lib/admin-audit"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export async function PATCH(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { error, admin } = await requireAdminApi()
-  if (error || !admin) return error
+  const { error, admin, user } = await requireAdminApi()
+  if (error || !admin || !user) return error
 
   const { error: updateError } = await admin
     .from("listings")
@@ -17,5 +18,6 @@ export async function PATCH(_: NextRequest, { params }: { params: Promise<{ id: 
     .eq("id", id)
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+  await logAdminAction(admin, { adminId: user.id, action: "listing_delete", targetType: "listing", targetId: id })
   return NextResponse.json({ success: true })
 }

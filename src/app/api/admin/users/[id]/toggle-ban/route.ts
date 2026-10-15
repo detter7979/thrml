@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { logAdminAction } from "@/lib/admin-audit"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 /** ~100 years — effectively permanent for Supabase Auth ban_duration. */
@@ -50,6 +51,14 @@ export async function PATCH(_: Request, { params }: { params: Promise<{ id: stri
       .eq("id", id)
     return NextResponse.json({ error: authError.message }, { status: 500 })
   }
+
+  await logAdminAction(admin, {
+    adminId: user.id,
+    action: "toggle_ban",
+    targetType: "user",
+    targetId: id,
+    details: { is_banned: nextIsBanned },
+  })
 
   return NextResponse.json({ success: true, is_banned: nextIsBanned })
 }

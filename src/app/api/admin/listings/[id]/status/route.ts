@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
+import { logAdminAction } from "@/lib/admin-audit"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 const payloadSchema = z.object({
@@ -9,8 +10,8 @@ const payloadSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { error, admin } = await requireAdminApi()
-  if (error || !admin) return error
+  const { error, admin, user } = await requireAdminApi()
+  if (error || !admin || !user) return error
 
   const parsed = payloadSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
@@ -27,5 +28,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq("is_deleted", false)
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+  await logAdminAction(admin, {
+    adminId: user.id,
+    action: "listing_status",
+    targetType: "listing",
+    targetId: id,
+    details: { is_active: parsed.data.is_active },
+  })
   return NextResponse.json({ success: true, is_active: parsed.data.is_active })
 }

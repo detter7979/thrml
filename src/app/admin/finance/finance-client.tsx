@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DataExports } from "@/components/admin/DataExports"
 
 type FinancePeriod = "7d" | "mtd" | "30d" | "90d" | "ytd"
 
@@ -296,6 +297,8 @@ export function AdminFinanceClient() {
           )
         })}
       </div>
+
+      <DataExports />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-[#DCCDBA] bg-[#F3EADD] p-5">

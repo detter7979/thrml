@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { logAdminAction } from "@/lib/admin-audit"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export async function PATCH(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +23,14 @@ export async function PATCH(_: Request, { params }: { params: Promise<{ id: stri
   const nextIsAdmin = !Boolean(profile.is_admin)
   const { error: updateError } = await admin.from("profiles").update({ is_admin: nextIsAdmin }).eq("id", id)
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+
+  await logAdminAction(admin, {
+    adminId: user.id,
+    action: "toggle_admin",
+    targetType: "user",
+    targetId: id,
+    details: { is_admin: nextIsAdmin },
+  })
 
   return NextResponse.json({ success: true, is_admin: nextIsAdmin })
 }

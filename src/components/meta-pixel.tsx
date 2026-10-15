@@ -116,6 +116,14 @@ function getCookieValue(cookieName: string): string | undefined {
 }
 
 /** _fbp / _fbc for Meta CAPI payloads (browser only). */
+function newMetaEventId(eventName: string): string {
+  const rand =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  return `${eventName}_${rand}`
+}
+
 export function getFacebookPixelCookies(): { fbp?: string; fbc?: string } {
   const fbp = getCookieValue("_fbp")
   const fbc = getCookieValue("_fbc")
@@ -141,8 +149,12 @@ export function trackMetaEvent(
   if (!adConsented) return
 
   const sanitizedParams = sanitizeMetaAdEventData(params) ?? {}
+  // The browser event and its server copy (/api/meta/events) must share one event_id, or Meta
+  // can't deduplicate them and counts the conversion twice.
   const eventId =
-    options?.eventId ?? (typeof params?.event_id === "string" ? (params.event_id as string) : undefined)
+    options?.eventId ??
+    (typeof params?.event_id === "string" ? (params.event_id as string) : undefined) ??
+    newMetaEventId(eventName)
   const custom = Boolean(options?.custom)
 
   if (window.fbq) {

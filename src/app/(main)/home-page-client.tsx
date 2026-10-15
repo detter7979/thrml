@@ -159,13 +159,19 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
       if (!response.ok) {
         throw new Error("Newsletter subscribe request failed")
       }
+      const subscribed = (await response.json().catch(() => null)) as { lead_event_id?: string } | null
 
       trackGaEvent("newsletter_subscribe", {
         source: "home_page",
       })
-      trackMetaEvent("Lead", {
-        content_name: "newsletter_subscribe",
-      })
+      // Lead only for new subscribers; the server already sent the CAPI copy with this id.
+      if (subscribed?.lead_event_id) {
+        trackMetaEvent(
+          "Lead",
+          { content_name: "newsletter_subscribe", content_category: "homepage" },
+          { eventId: subscribed.lead_event_id, sendServer: false }
+        )
+      }
       setNewsletterStatus("success")
       setNewsletterEmail("")
     } catch {

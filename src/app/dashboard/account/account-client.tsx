@@ -495,16 +495,22 @@ export function AccountClient({
         const newsletterResponse = await fetch(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify(isMarketingOptedIn ? { email, source: "account" } : { email }),
         })
-        const newsletterPayload = (await newsletterResponse.json().catch(() => null)) as { error?: string } | null
+        const newsletterPayload = (await newsletterResponse.json().catch(() => null)) as {
+          error?: string
+          lead_event_id?: string
+        } | null
         if (!newsletterResponse.ok) {
           throw new Error(newsletterPayload?.error ?? "Saved preferences, but failed to sync newsletter settings.")
         }
-        if (isMarketingOptedIn) {
-          trackMetaEvent("Lead", {
-            content_name: "newsletter_subscribe",
-          })
+        // Lead only for new subscribers; the server already sent the CAPI copy with this id.
+        if (isMarketingOptedIn && newsletterPayload?.lead_event_id) {
+          trackMetaEvent(
+            "Lead",
+            { content_name: "newsletter_subscribe", content_category: "account" },
+            { eventId: newsletterPayload.lead_event_id, sendServer: false }
+          )
         }
       }
 

@@ -222,10 +222,11 @@ export function BecomeAHostClient() {
         step: 3,
         terms_version: LEGAL_VERSIONS.HOST_AGREEMENT,
       })
-      trackMetaEvent("Lead", {
-        content_name: "host_onboarding_complete",
-        content_type: "host_onboarding",
-      })
+      trackMetaEvent(
+        "host_onboarding_complete",
+        { content_name: "host_onboarding_complete", content_type: "host_onboarding" },
+        { custom: true }
+      )
       trackHostOnboardingComplete()
 
       router.push(HOST_NEW_LISTING_PATH)

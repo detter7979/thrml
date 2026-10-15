@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from "next/server"
+import { after, NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
 import { resolveResendFrom, resolveResendReplyTo } from "@/lib/emails/send"
 import { newsletterWelcomeVariantA as welcomeEmail } from "@/lib/emails/newsletter-welcome"
+import { fireNewsletterLead, newNewsletterLeadEventId, type NewsletterSource } from "@/lib/meta/newsletter-lead"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createClient } from "@/lib/supabase/server"
 
 const VALID_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -23,6 +25,7 @@ export async function POST(request: NextRequest) {
       website?: unknown
       market_city?: unknown
       market_state?: unknown
+      source?: unknown
     } | null
     const honeypot = typeof body?.website === "string" ? body.website.trim() : ""
     if (honeypot.length > 0) {
@@ -47,6 +50,7 @@ export async function POST(request: NextRequest) {
     const marketCity = sanitizeMarket(body?.market_city)
     const marketState = sanitizeMarket(body?.market_state)
 
+    const source: NewsletterSource = body?.source === "account" ? "account" : "homepage"
     const supabase = createAdminClient()
     const { data: existing, error: selectError } = await supabase
       .from("newsletter_subscribers")
@@ -68,7 +72,7 @@ export async function POST(request: NextRequest) {
       .upsert(
         {
           email,
-          source: "homepage",
+          source,
           is_active: true,
           unsubscribed_at: null,
           ...(marketCity
@@ -86,10 +90,21 @@ export async function POST(request: NextRequest) {
     if (upsertError) throw upsertError
     console.log("Subscriber inserted:", insertData)
 
+    // Meta Lead (new subscribers only). Sent after the response so signup stays fast; the
+    // browser fires the pixel copy with the same id for deduplication.
+    const leadEventId = newNewsletterLeadEventId()
+    const {
+      data: { user },
+    } = await (await createClient()).auth.getUser().catch(() => ({ data: { user: null } }))
+    after(async () => {
+      const r = await fireNewsletterLead(request, supabase, { email, eventId: leadEventId, source, userId: user?.id })
+      if (!r.ok && r.skipped !== "no_advertising_consent") console.warn("[newsletter/subscribe] Lead CAPI", r)
+    })
+
     const resendApiKey = process.env.RESEND_API_KEY
     if (!resendApiKey) {
       console.error("RESEND_API_KEY is not set")
-      return NextResponse.json({ message: "Subscribed" })
+      return NextResponse.json({ message: "Subscribed", lead_event_id: leadEventId })
     }
 
     const resend = new Resend(resendApiKey)
@@ -118,7 +133,7 @@ export async function POST(request: NextRequest) {
       console.error("Welcome email failed:", emailError)
     }
 
-    return NextResponse.json({ message: "Subscribed" })
+    return NextResponse.json({ message: "Subscribed", lead_event_id: leadEventId })
   } catch (error) {
     console.error("Subscription failed:", error)
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 })

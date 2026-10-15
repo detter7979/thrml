@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     eventId: payload.eventId,
     eventSourceUrl: payload.eventSourceUrl ?? req.headers.get("referer") ?? undefined,
     userData: {
-      email: payload.userData?.email,
+      email: payload.userData?.email ?? user?.email,
       phone: payload.userData?.phone,
       firstName: payload.userData?.firstName,
       lastName: payload.userData?.lastName,

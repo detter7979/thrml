@@ -10,6 +10,10 @@ import { sanitizeMetaAdEventData } from "@/lib/meta/sanitize-ad-event-data"
 const GRAPH_VERSION = "v22.0"
 
 export const META_EVENT_HOST_ONBOARDING_STARTED = "host_onboarding_started"
+/** Host finished onboarding (terms + profile). Custom event so it never mixes with guest Lead. */
+export const META_EVENT_HOST_ONBOARDING_COMPLETE = "host_onboarding_complete"
+/** Standard Lead is reserved for new newsletter subscribers (guest P1). */
+export const META_EVENT_NEWSLETTER_LEAD = "Lead"
 export const META_EVENT_HOST_LISTING_CREATED = "host_listing_created"
 export const META_EVENT_HOST_FIRST_LISTING_CREATED = "host_first_listing_created"
 /** Legacy alias still seen in older namer rows and reporting pivots. */

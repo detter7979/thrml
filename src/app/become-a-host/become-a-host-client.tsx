@@ -128,10 +128,12 @@ export function BecomeAHostClient() {
 
   useEffect(() => {
     trackGaEvent("host_onboarding_start", { step: 1 })
-    trackMetaEvent("ViewContent", {
-      content_name: "host_onboarding_start",
-      content_type: "host_onboarding",
-    })
+    // Custom host event — ViewContent is reserved for guest listing views (C012 optimizes on it).
+    trackMetaEvent(
+      "host_onboarding_viewed",
+      { content_name: "host_onboarding_start", content_type: "host_onboarding" },
+      { custom: true }
+    )
   }, [])
 
   useEffect(() => {
@@ -179,10 +181,11 @@ export function BecomeAHostClient() {
     if (!rulesAccepted) return
     setStep(3)
     trackGaEvent("host_onboarding_rules_accepted", { step: 3 })
-    trackMetaEvent("ViewContent", {
-      content_name: "host_onboarding_rules_accepted",
-      content_type: "host_onboarding",
-    })
+    trackMetaEvent(
+      "host_rules_accepted",
+      { content_name: "host_onboarding_rules_accepted", content_type: "host_onboarding" },
+      { custom: true }
+    )
   }
 
   async function handleTermsAccept() {

@@ -1,6 +1,5 @@
 {
   "crons": [
-    { "path": "/api/cron/agent-evaluate",   "schedule": "0 3 * * *" },
     { "path": "/api/cron/agent-disputes",   "schedule": "0 3 * * *" },
     { "path": "/api/cron/agent-reporting",  "schedule": "30 2 * * *" },
     { "path": "/api/cron/agent-finance",    "schedule": "0 4 * * *" },

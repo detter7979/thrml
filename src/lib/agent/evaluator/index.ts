@@ -3,7 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type { RecKindT } from "@/types/paid-media"
 
+import { autoApprovalDecision, isAutoApproveMode, maxAutoActionsPerRun } from "./auto-approve"
 import { dedupeProposals } from "./dedupe"
+import { expireStaleRecommendations } from "./expire"
 import { fetchEvaluatorContext } from "./fetch-data"
 import { rule01CampaignCacOverTarget } from "./rules/01-campaign-cac-over-target"
 import { rule02CampaignBumpBudget } from "./rules/02-campaign-bump-budget"
@@ -13,7 +15,8 @@ import { rule05PhaseAdvancement } from "./rules/05-phase-advancement"
 import { rule06AbTestWinner } from "./rules/06-ab-test-winner"
 import { rule07StaleDataCheck } from "./rules/07-stale-data-check"
 import { rule08Through10CreativePerformance } from "./rules/08-creative-from-performance"
-import type { EvaluatorRunResult, RuleResult } from "./types"
+import { rule09AdSetWastedSpend } from "./rules/09-ad-set-wasted-spend"
+import type { EvaluatorContext, EvaluatorRunResult, RuleResult } from "./types"
 import { ruleNumber } from "./types"
 
 const LOG_KIND = "AGENT_RUN" as RecKindT
@@ -28,6 +31,7 @@ const ALL_RULES = [
   rule06AbTestWinner,
   rule07StaleDataCheck,
   rule08Through10CreativePerformance,
+  rule09AdSetWastedSpend,
 ]
 
 function applyFloorAndCap(ctx: { rules: Record<string, unknown> }, proposals: RuleResult[]): RuleResult[] {
@@ -38,28 +42,49 @@ function applyFloorAndCap(ctx: { rules: Record<string, unknown> }, proposals: Ru
   return filtered.slice(0, maxRecs)
 }
 
-async function insertRecommendations(admin: SupabaseClient, proposals: RuleResult[]): Promise<number> {
-  let n = 0
-  const chunk = 20
-  for (let i = 0; i < proposals.length; i += chunk) {
-    const slice = proposals.slice(i, i + chunk).map((p) => ({
+async function insertRecommendations(
+  admin: SupabaseClient,
+  ctx: EvaluatorContext,
+  proposals: RuleResult[]
+): Promise<{ written: number; autoApproved: number }> {
+  const autoMode = isAutoApproveMode(ctx)
+  const autoCap = maxAutoActionsPerRun(ctx)
+  const expiryHours = ruleNumber(ctx.rules, "global", "rec_expiry_hours", 72)
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + expiryHours * 3_600_000).toISOString()
+
+  let autoApproved = 0
+  const rows = proposals.map((p) => {
+    const decision = autoApprovalDecision(ctx, p)
+    const approve = autoMode && decision.eligible && autoApproved < autoCap
+    if (approve) autoApproved++
+    return {
       kind: p.kind,
-      status: "PENDING" as const,
+      status: approve ? ("APPROVED" as const) : ("PENDING" as const),
       proposed_by: EXECUTOR,
       target_campaign_id: p.target.campaignId ?? null,
       target_ad_set_id: p.target.adSetId ?? null,
       target_ad_id: p.target.adId ?? null,
       payload: p.payload,
-      evidence: p.evidence,
+      evidence: { ...p.evidence, auto_approval: decision },
       rationale: p.rationale,
       confidence: Math.round(Math.min(1, Math.max(0, p.confidence)) * 100) / 100,
-      auto_approve_eligible: false,
-    }))
+      auto_approve_eligible: decision.eligible,
+      approved_by: approve ? "auto:evaluator" : null,
+      approved_at: approve ? now.toISOString() : null,
+      expires_at: expiresAt,
+    }
+  })
+
+  let written = 0
+  const chunk = 20
+  for (let i = 0; i < rows.length; i += chunk) {
+    const slice = rows.slice(i, i + chunk)
     const { error } = await admin.from("recommendations").insert(slice)
     if (error) throw new Error(`recommendations insert: ${error.message}`)
-    n += slice.length
+    written += slice.length
   }
-  return n
+  return { written, autoApproved }
 }
 
 export async function runEvaluator(opts: { dryRun?: boolean }): Promise<EvaluatorRunResult> {
@@ -104,6 +129,9 @@ export async function runEvaluator(opts: { dryRun?: boolean }): Promise<Evaluato
 
   try {
     const ctx = await fetchEvaluatorContext()
+    const expired = dryRun
+      ? 0
+      : await expireStaleRecommendations(admin, ruleNumber(ctx.rules, "global", "rec_expiry_hours", 72))
     const raw: RuleResult[] = []
     for (const rule of ALL_RULES) {
       raw.push(...rule(ctx))
@@ -112,8 +140,9 @@ export async function runEvaluator(opts: { dryRun?: boolean }): Promise<Evaluato
     const capped = applyFloorAndCap(ctx, afterDedupe)
 
     let written = 0
+    let autoApproved = 0
     if (!dryRun && capped.length) {
-      written = await insertRecommendations(admin, capped)
+      ;({ written, autoApproved } = await insertRecommendations(admin, ctx, capped))
     }
 
     const duration_ms = Date.now() - t0
@@ -129,6 +158,9 @@ export async function runEvaluator(opts: { dryRun?: boolean }): Promise<Evaluato
           proposals_after_dedupe: afterDedupe.length,
           proposals_after_floor_cap: capped.length,
           proposals_written: written,
+          auto_approved: autoApproved,
+          expired,
+          approval_mode: isAutoApproveMode(ctx) ? "AUTO_APPROVE_LOW_STAKES" : "ALL_REQUIRE_APPROVAL",
           duration_ms,
         },
       })

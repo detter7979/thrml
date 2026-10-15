@@ -77,6 +77,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="overflow-x-hidden">
+      <head>
+        {/* Listing photos and avatars are served from Supabase Storage; open the connection early. */}
+        {process.env.NEXT_PUBLIC_SUPABASE_URL ? (
+          <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
+        ) : null}
+      </head>
       <body
         className={`${dmSans.variable} ${dmSerifDisplay.variable} min-w-0 overflow-x-hidden antialiased`}
       >

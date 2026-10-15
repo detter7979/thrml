@@ -1040,7 +1040,8 @@ export function HostNewListingClient({
 
       const { error: uploadError } = await supabase.storage
         .from("listing-photos")
-        .upload(filePath, photo.file, { upsert: false })
+        // Paths are unique per upload, so photos can be cached for a year (default is 1 hour).
+        .upload(filePath, photo.file, { upsert: false, cacheControl: "31536000" })
 
       if (uploadError) {
         setPhotoError(uploadError.message)

@@ -48,7 +48,11 @@ import {
 } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { listingPhotoThumbnailUrl } from "@/lib/listings/thumbnail-url"
+import {
+  LISTING_DETAIL_PHOTO_QUALITY,
+  LISTING_MOBILE_HERO_WIDTH,
+  listingPhotoThumbnailUrl,
+} from "@/lib/listings/thumbnail-url"
 import { DurationSelector } from "@/components/booking/DurationSelector"
 import { RatingSummary } from "@/components/reviews/RatingSummary"
 import { ReviewCard } from "@/components/reviews/ReviewCard"
@@ -79,7 +83,7 @@ import { CASCADE_TRANSITION, listingCascadeDelay } from "@/lib/motion-system"
 
 /** Resized via Supabase image transforms; full-size uploads are 300-600 KB each. */
 function sizedPhoto(url: string | null | undefined, width: number) {
-  return listingPhotoThumbnailUrl(url, { width }) ?? url ?? undefined
+  return listingPhotoThumbnailUrl(url, { width, quality: LISTING_DETAIL_PHOTO_QUALITY }) ?? url ?? undefined
 }
 
 /** Host avatars are shown at 56-98 px but uploaded at full size (one was 518 KB). */
@@ -1277,7 +1281,9 @@ export function ListingDetailClient({
   const heroMotionProps =
     photos.length > 0
       ? {
-          initial: reduceMotion ? false : { opacity: 0 },
+          // No fade-in: the hero is the LCP element, and starting at opacity 0 kept it from
+          // painting until after hydration (3.9 s mobile LCP on PageSpeed).
+          initial: false,
           animate: { opacity: 1 },
           transition: {
             opacity: { duration: reduceMotion ? 0 : 0.18 },
@@ -1338,7 +1344,7 @@ export function ListingDetailClient({
                   {index === 0 && heroMotionProps ? (
                     <motion.div {...heroMotionProps} className="aspect-[16/9] w-full overflow-hidden">
                       <img
-                        src={sizedPhoto(photo.url, 828)}
+                        src={sizedPhoto(photo.url, LISTING_MOBILE_HERO_WIDTH)}
                         alt={`${title} — photo ${index + 1}`}
                         className="h-full w-full object-cover object-center"
                         fetchPriority="high"
@@ -1347,7 +1353,7 @@ export function ListingDetailClient({
                   ) : (
                     <div className="aspect-[16/9] w-full overflow-hidden">
                       <img
-                        src={sizedPhoto(photo.url, 828)}
+                        src={sizedPhoto(photo.url, LISTING_MOBILE_HERO_WIDTH)}
                         alt={`${title} — photo ${index + 1}`}
                         className="h-full w-full object-cover object-center"
                         loading={index === 0 ? undefined : "lazy"}

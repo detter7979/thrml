@@ -83,6 +83,8 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
+    // Inline the CSS into the HTML so it is not a render-blocking request (~510 ms on mobile PageSpeed).
+    inlineCss: true,
     optimizePackageImports: [
       "lucide-react",
       "framer-motion",

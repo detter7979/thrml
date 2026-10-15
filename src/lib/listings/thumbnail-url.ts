@@ -12,6 +12,10 @@ const DEFAULT_QUALITY = 76
 export const LISTING_CARD_COVER_WIDTH = 720
 export const LISTING_CARD_COVER_ASPECT = 4 / 3
 
+/** Listing detail page photos. The mobile hero URL is also preloaded by the server page, so both must match. */
+export const LISTING_DETAIL_PHOTO_QUALITY = 68
+export const LISTING_MOBILE_HERO_WIDTH = 828
+
 export type ListingPhotoThumbnailOptions = {
   width?: number
   height?: number

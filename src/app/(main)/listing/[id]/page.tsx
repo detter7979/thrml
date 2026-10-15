@@ -13,6 +13,12 @@ import { roundUpTo30 } from "@/lib/slots"
 import { getServiceTypes } from "@/lib/supabase/queries"
 import { createClient } from "@/lib/supabase/server"
 
+import {
+  LISTING_DETAIL_PHOTO_QUALITY,
+  LISTING_MOBILE_HERO_WIDTH,
+  listingPhotoThumbnailUrl,
+} from "@/lib/listings/thumbnail-url"
+
 import { ListingDetailClient } from "./listing-detail-client"
 
 export const revalidate = 60
@@ -576,8 +582,18 @@ export default async function ListingDetailPage({
     ],
   }
 
+  // Start the mobile hero download from the HTML head instead of waiting for CSS/JS.
+  // URL must match the <img> in the mobile carousel exactly.
+  const mobileHeroUrl = listingPhotoThumbnailUrl(safePhotos[0]?.url, {
+    width: LISTING_MOBILE_HERO_WIDTH,
+    quality: LISTING_DETAIL_PHOTO_QUALITY,
+  })
+
   return (
     <>
+      {mobileHeroUrl ? (
+        <link rel="preload" as="image" href={mobileHeroUrl} media="(max-width: 767px)" fetchPriority="high" />
+      ) : null}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema) }}

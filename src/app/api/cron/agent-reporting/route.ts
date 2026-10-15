@@ -4,7 +4,12 @@ import type { GoogleAuth } from "google-auth-library"
 
 import { fetchMetaInsights } from "@/lib/agent/meta-api"
 import { fetchGoogleInsights } from "@/lib/agent/google-ads-api"
-import { parseNamingConvention } from "@/lib/agent/naming-parser"
+import {
+  CLEANED_HEADERS,
+  cleanRow,
+  type RawRow,
+  upsertPlatformData,
+} from "@/lib/finance/platform-data-sheet"
 import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -41,128 +46,6 @@ function yesterday(): string {
   return d.toISOString().slice(0, 10)
 }
 
-function fmt(n: number, dec = 2) { return n.toFixed(dec) }
-function fmtPct(n: number) { return n.toFixed(2) + "%" }
-
-// ── Cleaned report columns ─────────────────────────────────────────────────
-const CLEANED_HEADERS = [
-  "Date", "Year", "Month", "Week",
-  "Platform",
-  "Campaign ID", "Ad Set ID", "Ad ID",
-  // Names
-  "Campaign Name", "Ad Set Name", "Ad Name",
-  // Campaign-level parsed
-  "Phase", "Campaign Objective", "Funnel Stage",
-  // Audience
-  "Audience Group",   // Host | Guest
-  "Targeting Name",   // User-controlled via Targeting Lookup tab (e.g. Sauna Interest)
-  "Geo",
-  // Ad Set-level
-  "Space Type",
-  "Targeting Tactic", // Interest | LAL 1% | LAL 2% | Retargeting - Checkout | etc.
-  "Placement",
-  // Ad-level
-  "Angle",
-  "Format Type", "Length", "Aspect Ratio", "CTA",
-  // Creative
-  "Hook Copy", "Opt. Event",
-  // Metrics
-  "Spend ($)", "Impressions", "Reach", "Link Clicks",
-  "become_host_click", "host_onboarding_started", "listing_created", "Purchase",
-  "Video Views 100%",
-] as const
-
-// ── Raw row type ───────────────────────────────────────────────────────────
-type RawRow = {
-  date: string
-  campaign_id: string; campaign_name: string
-  adset_id: string;    adset_name: string
-  ad_id: string;       ad_name: string
-  spend: number; impressions: number; clicks: number
-  purchases: number; revenue: number
-  video_views_100pct?: number
-  become_host_click?: number
-  host_onboarding_started?: number
-  listing_created?: number
-  reach?: number
-  hook_copy?: string
-}
-
-// ── Clean row builder ──────────────────────────────────────────────────────
-function cleanRow(raw: RawRow, platformFallback: string): string[] {
-  const parsed = parseNamingConvention(raw.ad_name || raw.adset_name || raw.campaign_name)
-  const platform = parsed.platform || platformFallback
-
-  const na  = (v: string | undefined) => (!v || v === "-" || v === "—" ? "NA" : v)
-  const tc  = (s: string | undefined) => {
-    if (!s || s === "NA") return "NA"
-    if (/^[CP]\d{3}$/.test(s) || /^(AS|AD)\d{3}$/.test(s) || /^P\d$/.test(s)) return s
-    return s.replace(/_/g," ").replace(/\w\S*/g, (w: string) => w[0].toUpperCase() + w.slice(1).toLowerCase())
-  }
-
-  // Targeting Tactic: combines audienceSource + audienceTier into LAL 1% / Interest / etc.
-  const tactic = (() => {
-    const src  = parsed.audienceSource
-    const tier = parsed.audienceTier
-    if (src === "LAL" && tier && tier !== "—") return `LAL ${tier}`
-    if (src === "Retargeting" && tier && tier !== "—") return `Retargeting - ${tc(tier)}`
-    return na(src)
-  })()
-
-  // Date dimensions
-  const d       = new Date(raw.date + "T12:00:00Z")
-  const year    = String(d.getUTCFullYear())
-  const month   = d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })
-  const tmp     = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-  const dow     = tmp.getUTCDay() || 7
-  tmp.setUTCDate(tmp.getUTCDate() + 4 - dow)
-  const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(), 0, 1))
-  const weekNum = Math.ceil((((tmp.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-  const mon     = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-  mon.setUTCDate(mon.getUTCDate() - ((mon.getUTCDay() || 7) - 1))
-  const sun     = new Date(mon); sun.setUTCDate(mon.getUTCDate() + 6)
-  const pad     = (n: number) => String(n).padStart(2, "0")
-  const yy      = String(d.getUTCFullYear()).slice(2)
-  const week    = `Week ${weekNum} (${pad(mon.getUTCMonth()+1)}/${pad(mon.getUTCDate())} - ${pad(sun.getUTCMonth()+1)}/${pad(sun.getUTCDate())}/${yy})`
-
-  return [
-    raw.date, year, month, week,
-    na(platform),
-    na(raw.campaign_id ?? ""), na(raw.adset_id ?? ""), na(raw.ad_id ?? ""),
-    na(raw.campaign_name), na(raw.adset_name), na(raw.ad_name),
-    na(parsed.phase), na(tc(parsed.campaignObjective)), na(tc(parsed.funnelStage)),
-    na(tc(parsed.audienceGroup)),
-    "NA",  // Targeting Name: filled by reporting agent via Targeting Lookup post-process
-    na(tc(parsed.geo)),
-    na(tc(parsed.spaceType)), na(tactic), na(tc(parsed.placement)),
-    na(tc(parsed.angle)),
-    na(tc(parsed.formatType)), na(parsed.formatLength), na(parsed.formatRatio), na(tc(parsed.cta?.replace(/_/g," "))),
-    na(raw.hook_copy ?? ""), na(parsed.optEvent),
-    fmt(raw.spend), String(raw.impressions),
-    String(raw.reach ?? raw.impressions), String(raw.clicks),
-    String(raw.become_host_click ?? 0),
-    String(raw.host_onboarding_started ?? 0),
-    String(raw.listing_created ?? 0),
-    String(raw.purchases ?? 0),
-    String(raw.video_views_100pct ?? 0),
-  ]
-}
-
-// ── OpEx defaults ──────────────────────────────────────────────────────────
-const OPEX_DEFAULTS = [
-  ["Redis (RedisLabs)",   "7.00",    "Infrastructure", "Cache/rate limiting"],
-  ["Resend (Starter)",   "20.00",   "Infrastructure", "Email API"],
-  ["Zoho Mail (Basic)",   "1.00",   "Infrastructure", "hello@usethrml.com"],
-  ["Domain / DNS",        "1.67",   "Infrastructure", "$20/yr"],
-  ["Vercel (Hobby)",      "0.00",   "Infrastructure", "Free tier"],
-  ["Supabase (Free)",     "0.00",   "Infrastructure", "Free tier"],
-  ["Business Insurance", "50.00",   "Operations",     "General liability"],
-  ["Stripe Fees",       "variable", "Payment",        "2.9% + $0.30/txn"],
-  ["Anthropic API",     "variable", "AI",             "Check usage dashboard"],
-  ["Midjourney",         "10.00",   "Creative",       "Basic plan"],
-  ["Cursor",             "20.00",   "Development",    "Pro plan"],
-  ["Google Cloud",        "0.00",   "Infrastructure", "Service account — free"],
-] as const
 
 // ── Drive helpers ──────────────────────────────────────────────────────────
 async function getOrCreateFolder(
@@ -237,104 +120,19 @@ async function deleteOldFiles(
 }
 
 // ── Master Report helpers ──────────────────────────────────────────────────
+// ── Master Report helpers ──────────────────────────────────────────────────
 async function ensureMasterReportTabs(
   sheets: ReturnType<typeof google.sheets>, masterId: string
 ): Promise<void> {
   const meta = await sheets.spreadsheets.get({ spreadsheetId: masterId })
   const existing = new Set(meta.data.sheets?.map(s => s.properties?.title ?? "") ?? [])
-  const required = ["Platform Data", "P&L Dashboard", "OpEx"]
+  const required = ["Platform Data"]
   const requests = required.filter(t => !existing.has(t)).map(title => ({ addSheet: { properties: { title } } }))
   if (requests.length > 0) {
     await sheets.spreadsheets.batchUpdate({ spreadsheetId: masterId, requestBody: { requests } })
   }
 }
 
-async function upsertPlatformData(
-  sheets: ReturnType<typeof google.sheets>,
-  masterId: string, date: string, platform: string, newRows: string[][]
-): Promise<void> {
-  const existing = await sheets.spreadsheets.values.get({
-    spreadsheetId: masterId, range: "Platform Data!A1:AZ50000",
-  })
-  const rows = existing.data.values ?? []
-  const kept = rows.filter((r, i) => i === 0 || !(r[0] === date && r[1] === platform))
-  const updated = kept.length > 0 ? [...kept, ...newRows] : [[...CLEANED_HEADERS], ...newRows]
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: masterId, range: "Platform Data!A1",
-    valueInputOption: "RAW", requestBody: { values: updated },
-  })
-}
-
-async function updateOpExTab(
-  sheets: ReturnType<typeof google.sheets>, masterId: string
-): Promise<void> {
-  const existing = await sheets.spreadsheets.values.get({
-    spreadsheetId: masterId, range: "OpEx!A1:A2",
-  })
-  if ((existing.data.values ?? []).length > 0) return
-  const headers = ["Item", "Monthly ($)", "Category", "Notes", "Annual ($)"]
-  const rows = OPEX_DEFAULTS.map(([item, amount, cat, notes]) => {
-    const annual = isNaN(Number(amount)) ? "variable" : (Number(amount) * 12).toFixed(2)
-    return [item, amount, cat, notes, annual]
-  })
-  const totalFixed = OPEX_DEFAULTS.filter(([, a]) => !isNaN(Number(a))).reduce((s, [, a]) => s + Number(a), 0)
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: masterId, range: "OpEx!A1", valueInputOption: "RAW",
-    requestBody: { values: [headers, ...rows, [], ["Total Fixed Monthly", totalFixed.toFixed(2), "", "", (totalFixed * 12).toFixed(2)]] },
-  })
-}
-
-async function updatePnLDashboard(
-  sheets: ReturnType<typeof google.sheets>,
-  admin: ReturnType<typeof createAdminClient>, masterId: string
-): Promise<void> {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: masterId, range: "Platform Data!A1:AZ50000",
-  })
-  const rows = res.data.values ?? []
-  if (rows.length < 2) return
-
-  const h = rows[0] as string[]
-  const iDate = 0
-  const iSpend = h.indexOf("Spend ($)")
-
-  const byDate = new Map<string, { spend: number }>()
-  for (const row of rows.slice(1)) {
-    const date = row[iDate] ?? ""; if (!date) continue
-    const spend = parseFloat(row[iSpend] ?? "0") || 0
-    const prev = byDate.get(date) ?? { spend: 0 }
-    byDate.set(date, { spend: prev.spend + spend })
-  }
-
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 45)
-  const { data: finRows } = await admin
-    .from("finance_snapshots")
-    .select("snapshot_date, net_platform_revenue, gross_booking_value, booking_count")
-    .gte("snapshot_date", cutoff.toISOString().slice(0, 10))
-    .order("snapshot_date", { ascending: true })
-
-  const finMap = new Map((finRows ?? []).map(r => [r.snapshot_date, r]))
-  const fixedMonthly = OPEX_DEFAULTS.filter(([, a]) => !isNaN(Number(a))).reduce((s, [, a]) => s + Number(a), 0)
-  const fixedDaily = fixedMonthly / 30
-
-  const pnlHeaders = ["Date","Ad Spend","Platform Revenue (Net)","Gross Booking Value","Bookings","Daily OpEx (est.)","Gross Profit","Profit Margin %","ROAS","CPB"]
-  const pnlRows = Array.from(byDate.entries()).sort(([a],[b]) => a.localeCompare(b)).map(([date, ads]) => {
-    const fin = finMap.get(date)
-    const netRev = Number(fin?.net_platform_revenue ?? 0)
-    const grossBook = Number(fin?.gross_booking_value ?? 0)
-    const bookings = Number(fin?.booking_count ?? 0)
-    const profit = netRev - ads.spend - fixedDaily
-    return [date, fmt(ads.spend), fmt(netRev), fmt(grossBook), String(bookings), fmt(fixedDaily),
-      fmt(profit), fmtPct(netRev > 0 ? profit / netRev * 100 : 0),
-      fmt(ads.spend > 0 ? netRev / ads.spend : 0), fmt(bookings > 0 ? ads.spend / bookings : 0)]
-  })
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: masterId, range: "P&L Dashboard!A1", valueInputOption: "RAW",
-    requestBody: { values: [pnlHeaders, ...pnlRows] },
-  })
-}
-
-/** Runs one step and prefixes its name onto any error, so agent_runs.error_message says where it failed. */
 async function step<T>(name: string, fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
@@ -381,7 +179,6 @@ export async function GET(req: NextRequest) {
     const masterId = getSetting(settings, "gdrive_master_report_id")
     if (masterId) {
       await step("master report tabs", () => ensureMasterReportTabs(sheets, masterId))
-      await step("OpEx tab", () => updateOpExTab(sheets, masterId))
     }
 
     const date = yesterday()
@@ -429,11 +226,8 @@ export async function GET(req: NextRequest) {
       }
     } catch (e) { console.error("[agent-reporting] Google Ads error", e) }
 
-    // ── P&L Dashboard ─────────────────────────────────────────────────────
-    if (masterId) {
-      try { await updatePnLDashboard(sheets, admin, masterId) }
-      catch (e) { console.error("[agent-reporting] P&L error", e) }
-    }
+    // P&L Dashboard is a formula tab rebuilt with the Executive Summary (rebuild-finance-tracker);
+    // this job used to overwrite it with a daily table, which broke the Executive Summary.
 
     // ── 45-day retention ──────────────────────────────────────────────────
     results.oldDeleted = await step("old file cleanup", async () =>

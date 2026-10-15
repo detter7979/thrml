@@ -317,7 +317,7 @@ export async function buildFinanceDashboard(
 
   const costs = costsResult.costs
   const fixedOpEx = costs?.fixedOpEx ?? 0
-  const adHoc = costs?.adHoc ?? 0
+  const adHoc = (costs?.adHoc ?? 0) + (costs?.other ?? 0)
   const adSpend = costs?.adSpend ?? 0
   const totalExpenses = fixedOpEx + adHoc + adSpend
   const netContribution = netRevenue - promoCredits - totalExpenses

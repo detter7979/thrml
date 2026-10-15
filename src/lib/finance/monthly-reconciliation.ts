@@ -42,11 +42,19 @@ export type ReconciliationResult = {
     available: boolean
     error?: string
     fixedOpEx: number
+    fixedSource: "logged" | "plan"
+    fixedPlan: number
     adHoc: number
+    other: number
     adSpend: number
+    adSpendSource: "invoices" | "platform_api"
+    adSpendApi: number
+    adSpendInvoiced: number
+    adSpendByPlatform: Record<string, number>
     total: number
     lineItems: TrackerCostLine[]
   }
+  budget: { adSpend: number; recurring: number; total: number }
   stripe: {
     available: boolean
     error?: string
@@ -183,10 +191,37 @@ export async function buildMonthlyReconciliation(admin: SupabaseClient, month: s
   let costs: ReconciliationResult["costs"]
   try {
     const c = await readFinanceTrackerCosts(start, end)
-    costs = { available: true, fixedOpEx: c.fixedOpEx, adHoc: c.adHoc, adSpend: c.adSpend, total: c.total, lineItems: c.lineItems }
+    costs = {
+      available: true,
+      fixedOpEx: c.fixedOpEx,
+      fixedSource: c.fixedSource,
+      fixedPlan: c.fixedPlan,
+      adHoc: c.adHoc,
+      other: c.other,
+      adSpend: c.adSpend,
+      adSpendSource: c.adSpendSource,
+      adSpendApi: c.adSpendApi,
+      adSpendInvoiced: c.adSpendInvoiced,
+      adSpendByPlatform: c.adSpendByPlatform,
+      total: c.total,
+      lineItems: c.lineItems,
+    }
   } catch (e) {
-    costs = { available: false, error: e instanceof Error ? e.message : String(e), fixedOpEx: 0, adHoc: 0, adSpend: 0, total: 0, lineItems: [] }
+    costs = {
+      available: false,
+      error: e instanceof Error ? e.message : String(e),
+      fixedOpEx: 0, fixedSource: "plan", fixedPlan: 0, adHoc: 0, other: 0, adSpend: 0,
+      adSpendSource: "platform_api", adSpendApi: 0, adSpendInvoiced: 0, adSpendByPlatform: {}, total: 0, lineItems: [],
+    }
   }
+
+  const { data: budgetRow } = await admin
+    .from("platform_settings")
+    .select("value")
+    .eq("key", "finance_ad_budget_monthly_usd")
+    .maybeSingle()
+  const adBudget = Number(String(budgetRow?.value ?? "3000").replace(/"/g, "")) || 0
+  const budget = { adSpend: adBudget, recurring: round2(costs.fixedPlan), total: round2(adBudget + costs.fixedPlan) }
 
   const revenue = marketplace.netPlatformRevenue
   const expenses = round2(costs.total)
@@ -220,6 +255,14 @@ export async function buildMonthlyReconciliation(admin: SupabaseClient, month: s
   } else {
     checks.push({ label: "Stripe cross-check", ok: false, detail: `Could not read Stripe: ${stripeSummary.error}` })
   }
+  if (costs.available && costs.adSpendInvoiced > 0 && costs.adSpendApi > 0) {
+    const d = round2(costs.adSpendInvoiced - costs.adSpendApi)
+    checks.push({
+      label: "Ad invoices match platform spend",
+      ok: Math.abs(d) <= Math.max(1, costs.adSpendApi * 0.02),
+      detail: `Invoices $${costs.adSpendInvoiced.toFixed(2)} vs platform API $${costs.adSpendApi.toFixed(2)} (diff $${d.toFixed(2)})`,
+    })
+  }
   checks.push({
     label: "Costs read from Finance Tracker",
     ok: costs.available,
@@ -235,19 +278,24 @@ export async function buildMonthlyReconciliation(admin: SupabaseClient, month: s
     bookingStatuses,
     costs,
     stripe: stripeSummary,
+    budget,
     bottomLine: { revenue, expenses, stripeFees, net },
     checks,
   }
 }
 
-// ── Google Sheets output ─────────────────────────────────────────────────────
+// ── Google Sheets output: Close_<Month>_<Year> tab + Close Index row ────────────
 
-const SUMMARY_TAB = "Monthly Summary"
-const SUMMARY_HEADERS = [
-  "Month", "Bookings", "Booking value", "Platform take", "Host payouts", "Refunds", "Credits",
-  "Chargebacks", "Net platform revenue", "Fixed costs", "Ad hoc costs", "Ad spend", "Stripe fees",
-  "Net (in − out)", "New users", "New listings", "Checks passing", "Generated",
-]
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"]
+
+export function closeTabName(month: string) {
+  const [y, m] = month.split("-").map(Number)
+  return `Close_${MONTHS[m - 1]}_${y}`
+}
+function monthLabel(month: string) {
+  const [y, m] = month.split("-").map(Number)
+  return `${MONTHS[m - 1]} ${y}`
+}
 
 export async function resolveReconciliationSheetId(admin: SupabaseClient): Promise<string> {
   const { data } = await admin
@@ -261,54 +309,116 @@ export async function resolveReconciliationSheetId(admin: SupabaseClient): Promi
   return get("gdrive_reconciliation_sheet_id") ?? get("gdrive_finance_tracker_sheet_id") ?? resolveFinanceTrackerSheetId()
 }
 
-function money(n: number) {
-  return round2(n)
-}
+type Cell = string | number
+type RowKind = "title" | "subtitle" | "section" | "total" | "money" | "plain" | "blank"
+type CloseRow = { kind: RowKind; cells: Cell[]; pctCol?: boolean }
 
-export function reconciliationRows(r: ReconciliationResult): (string | number)[][] {
-  const rows: (string | number)[][] = [
-    [`thrml monthly reconciliation — ${r.month}`],
-    [`${r.start} to ${r.end} (UTC) · generated ${r.generatedAt.slice(0, 16).replace("T", " ")} UTC`],
-    [],
-    ["BOTTOM LINE", "USD"],
-    ["Net platform revenue (in)", money(r.bottomLine.revenue)],
-    ["Expenses: fixed + ad hoc + ad spend (out)", money(r.bottomLine.expenses)],
-    ["Stripe fees (out)", money(r.bottomLine.stripeFees)],
-    ["Net (in − out)", money(r.bottomLine.net)],
-    [],
-    ["MARKETPLACE", "USD / count"],
-    ["Bookings", r.marketplace.bookings],
-    ["Booking value (what guests paid)", money(r.marketplace.grossBookingValue)],
-    ["Platform take (guest + host fees)", money(r.marketplace.grossPlatformTake)],
-    ["Cash platform revenue", money(r.marketplace.platformRevenue)],
-    ["Host payouts", money(r.marketplace.hostPayouts)],
-    ["Refunds", money(r.marketplace.refunds)],
-    ["Credits applied", money(r.marketplace.creditsApplied)],
-    ["Chargebacks", money(r.marketplace.chargebacks)],
-    ["Net platform revenue", money(r.marketplace.netPlatformRevenue)],
-    ["New users", r.marketplace.newUsers],
-    ["New listings", r.marketplace.newListings],
-    [],
-    ["BOOKINGS BY STATUS (session date in month)", "count"],
-    ...Object.entries(r.bookingStatuses).map(([k, v]) => [k, v]),
-    ...(Object.keys(r.bookingStatuses).length ? [] : [["(none)", 0]]),
-    [],
-    ["COSTS (from Finance Tracker)", "USD"],
-    ["Fixed costs", money(r.costs.fixedOpEx)],
-    ["Ad hoc costs", money(r.costs.adHoc)],
-    ["Ad spend", money(r.costs.adSpend)],
-    ["Total", money(r.costs.total)],
-    ...r.costs.lineItems.map((l) => [`  ${l.label} (${l.source})`, money(l.amount)]),
-    [],
-    [`STRIPE (${r.stripe.mode} mode)`, "gross", "fees", "net", "count"],
-    ...Object.entries(r.stripe.byType).map(([type, v]) => [type, v.grossUsd, v.feesUsd, v.netUsd, v.count]),
-    ...(r.stripe.available ? [] : [["unavailable", r.stripe.error ?? ""]]),
-    [],
-    ["CHECKS", "status", "detail"],
-    ...r.checks.map((c) => [c.label, c.ok ? "OK" : "CHECK", c.detail]),
-  ]
+const pct = (actual: number, plan: number): Cell => (plan > 0 ? round2(((actual - plan) / plan) * 100) / 100 : "—")
+
+export function buildCloseRows(r: ReconciliationResult): CloseRow[] {
+  const rows: CloseRow[] = []
+  const push = (kind: RowKind, cells: Cell[], pctCol = false) => rows.push({ kind, cells, pctCol })
+  const c = r.costs
+  const out = round2(c.total + r.stripe.stripeFeesUsd)
+  const budgetOut = r.budget.total
+
+  push("title", [`thrml — Monthly Close: ${monthLabel(r.month)}`])
+  push("subtitle", [`Period: ${r.start} → ${r.end}   |   Generated: ${r.generatedAt.slice(0, 16).replace("T", " ")} UTC   |   Stripe: ${r.stripe.mode} mode`])
+  push("blank", [])
+
+  push("section", ["SPENDING", "BUDGET ($)", "ACTUAL ($)", "VARIANCE ($)", "VAR %", "NOTES"])
+  push("money", ["Ad Spend", r.budget.adSpend, c.adSpend, round2(c.adSpend - r.budget.adSpend), pct(c.adSpend, r.budget.adSpend),
+    c.adSpendSource === "invoices" ? "From ad platform invoices (Expenses tab)" : "From platform API (no invoices logged yet)"], true)
+  push("money", ["Recurring (Fixed)", r.budget.recurring, c.fixedOpEx, round2(c.fixedOpEx - r.budget.recurring), pct(c.fixedOpEx, r.budget.recurring),
+    c.fixedSource === "logged" ? "Logged recurring charges (Expenses tab)" : "Estimated from Fixed Costs plan (no charges logged)"], true)
+  push("money", ["Ad Hoc", "—", c.adHoc, "—", "—", "One-time / variable (Expenses tab)"])
+  push("money", ["Other", "—", c.other, "—", "—", "Expenses tab, type Other"])
+  push("money", ["Stripe Fees", "—", r.stripe.stripeFeesUsd, "—", "—", "From Stripe balance transactions"])
+  push("total", ["TOTAL OUT", budgetOut, out, round2(out - budgetOut), pct(out, budgetOut), out > budgetOut ? "🔴 OVER BUDGET" : "🟢 UNDER BUDGET"], true)
+  push("blank", [])
+
+  push("section", ["MONEY IN", "", "AMOUNT ($)", "", "", "NOTES"])
+  const m = r.marketplace
+  push("money", ["Booking value (what guests paid)", "", m.grossBookingValue, "", "", `${m.bookings} bookings`])
+  push("money", ["Platform take (guest + host fees)", "", m.grossPlatformTake, "", "", ""])
+  push("money", ["Host payouts (passed through)", "", m.hostPayouts, "", "", "Not revenue — paid out to hosts"])
+  push("money", ["Refunds", "", -m.refunds, "", "", ""])
+  push("money", ["Credits applied", "", -m.creditsApplied, "", "", "Promo / referral credits"])
+  push("money", ["Chargebacks", "", -m.chargebacks, "", "", ""])
+  push("total", ["NET PLATFORM REVENUE", "", m.netPlatformRevenue, "", "", ""])
+  push("blank", [])
+
+  push("section", ["BOTTOM LINE", "", "AMOUNT ($)", "", "", ""])
+  push("money", ["Money in (net platform revenue)", "", r.bottomLine.revenue, "", "", ""])
+  push("money", ["Money out (total out)", "", -out, "", "", ""])
+  push("total", ["NET (IN − OUT)", "", round2(r.bottomLine.revenue - out), "", "", r.bottomLine.revenue - out >= 0 ? "🟢 PROFIT" : "🔴 LOSS"])
+  push("blank", [])
+
+  push("section", ["AD SPEND BY PLATFORM", "", "API ($)", "", "", ""])
+  const plats = Object.entries(c.adSpendByPlatform).filter(([, v]) => v > 0)
+  if (plats.length) plats.forEach(([k, v]) => push("money", [k, "", round2(v), "", "", ""]))
+  else push("plain", ["(no platform spend this month)"])
+  push("money", ["Ad platform invoices logged", "", c.adSpendInvoiced, "", "", c.adSpendInvoiced ? "Used as actual ad spend" : "None yet"])
+  push("blank", [])
+
+  push("section", ["RECURRING COSTS", "", "AMOUNT ($)", "CATEGORY", "", "SOURCE"])
+  const recurring = c.lineItems.filter((l) => l.source === "fixed")
+  if (recurring.length) recurring.forEach((l) => push("money", [l.label, "", round2(l.amount), l.category, "", l.type === "Recurring" ? `${l.entrySource ?? "Manual"}${l.date ? " · " + l.date : ""}` : "Fixed Costs plan"]))
+  else push("plain", ["(none)"])
+  push("blank", [])
+
+  push("section", ["AD HOC / OTHER / INVOICES", "DATE", "AMOUNT ($)", "CATEGORY", "TYPE", "SOURCE / RECEIPT"])
+  const logged = c.lineItems.filter((l) => l.type && l.type !== "Recurring")
+  if (logged.length) logged.forEach((l) => push("money", [l.label, l.date ?? "", round2(l.amount), l.category, l.type ?? "", [l.entrySource, l.receipt].filter(Boolean).join(" · ")]))
+  else push("plain", ["(none logged)"])
+  push("blank", [])
+
+  push("section", ["CHECKS", "STATUS", "", "", "", "DETAIL"])
+  r.checks.forEach((ch) => push("plain", [ch.label, ch.ok ? "✅ OK" : "⚠️ CHECK", "", "", "", ch.detail]))
+  push("blank", [])
+
+  push("section", ["BOOKINGS BY STATUS", "COUNT", "", "", "", "Session date in month"])
+  const st = Object.entries(r.bookingStatuses)
+  if (st.length) st.forEach(([k, v]) => push("plain", [k, v]))
+  else push("plain", ["(none)", 0])
   return rows
 }
+
+const NAVY = { red: 0.078, green: 0.133, blue: 0.216 }
+const LIGHT = { red: 0.937, green: 0.945, blue: 0.957 }
+const WHITE = { red: 1, green: 1, blue: 1 }
+
+type Sheets = ReturnType<typeof google.sheets>
+
+/** Tab order: summary → closes (newest first) → inputs → data → everything else. */
+export async function reorderTrackerTabs(sheets: Sheets, spreadsheetId: string) {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" })
+  const props = (meta.data.sheets ?? []).map((s) => s.properties!).filter(Boolean)
+  const closeKey = (t: string) => {
+    const [, name, year] = t.split("_")
+    return Number(year) * 100 + (MONTHS.indexOf(name) + 1)
+  }
+  const fixedOrder = ["Executive Summary", "Close Index"]
+  const after = ["Fixed Costs", "Expenses", "Marketplace Data", "Platform Data", "P&L Dashboard", "Targeting Lookup"]
+  const titles = props.map((p) => p.title ?? "")
+  const closes = titles.filter((t) => /^Close_[A-Za-z]+_\d{4}$/.test(t)).sort((a, b) => closeKey(b) - closeKey(a))
+  const ordered = [
+    ...fixedOrder.filter((t) => titles.includes(t)),
+    ...closes,
+    ...after.filter((t) => titles.includes(t)),
+    ...titles.filter((t) => !fixedOrder.includes(t) && !after.includes(t) && !closes.includes(t)),
+  ]
+  const requests = ordered.map((title, index) => ({
+    updateSheetProperties: {
+      properties: { sheetId: props.find((p) => p.title === title)!.sheetId, index },
+      fields: "index",
+    },
+  }))
+  if (requests.length) await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests } })
+}
+
+const INDEX_TAB = "Close Index"
+const INDEX_HEADERS = ["Month", "Period", "Actual Out ($)", "Budget ($)", "Variance ($)", "Status", "Tab", "Ad Spend ($)", "Net Revenue ($)", "Net In − Out ($)", "Checks"]
 
 export async function writeReconciliationToSheet(
   r: ReconciliationResult,
@@ -319,55 +429,74 @@ export async function writeReconciliationToSheet(
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   })
   const sheets = google.sheets({ version: "v4", auth })
-  const tab = `Recon ${r.month}`
+  const tab = closeTabName(r.month)
 
-  const meta = await sheets.spreadsheets.get({ spreadsheetId })
-  const titles = new Set(meta.data.sheets?.map((s) => s.properties?.title ?? "") ?? [])
-  const add = [tab, SUMMARY_TAB].filter((t) => !titles.has(t)).map((title) => ({ addSheet: { properties: { title } } }))
-  if (add.length) await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: add } })
+  // Recreate the close tab each run so formatting from a previous layout can't linger.
+  const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties" })
+  const existing = meta.data.sheets?.find((s) => s.properties?.title === tab)?.properties?.sheetId
+  const pre: object[] = []
+  if (existing != null) pre.push({ deleteSheet: { sheetId: existing } })
+  pre.push({ addSheet: { properties: { title: tab, gridProperties: { rowCount: 200, columnCount: 6 } } } })
+  if (!meta.data.sheets?.some((s) => s.properties?.title === INDEX_TAB)) pre.push({ addSheet: { properties: { title: INDEX_TAB } } })
+  const created = await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: pre } })
+  const sheetId = created.data.replies?.find((x) => x.addSheet?.properties?.title === tab)?.addSheet?.properties?.sheetId ?? 0
 
-  await sheets.spreadsheets.values.clear({ spreadsheetId, range: `'${tab}'!A1:F500` })
-  const rows = reconciliationRows(r)
+  const rows = buildCloseRows(r)
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `'${tab}'!A1`,
     valueInputOption: "RAW",
-    requestBody: { values: rows },
+    requestBody: { values: rows.map((x) => x.cells) },
   })
 
-  // One row per month on the summary tab, replaced in place if the month is re-run.
-  const existing = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${SUMMARY_TAB}'!A1:A500` })
-  const col = (existing.data.values ?? []).map((v) => String(v[0] ?? ""))
-  if (col[0] !== "Month") {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: `'${SUMMARY_TAB}'!A1`,
-      valueInputOption: "RAW",
-      requestBody: { values: [SUMMARY_HEADERS] },
-    })
-  }
-  const passing = r.checks.filter((c) => c.ok).length
-  const summaryRow = [
-    r.month, r.marketplace.bookings, money(r.marketplace.grossBookingValue), money(r.marketplace.grossPlatformTake),
-    money(r.marketplace.hostPayouts), money(r.marketplace.refunds), money(r.marketplace.creditsApplied),
-    money(r.marketplace.chargebacks), money(r.marketplace.netPlatformRevenue), money(r.costs.fixedOpEx),
-    money(r.costs.adHoc), money(r.costs.adSpend), money(r.bottomLine.stripeFees), money(r.bottomLine.net),
-    r.marketplace.newUsers, r.marketplace.newListings, `${passing}/${r.checks.length}`, r.generatedAt.slice(0, 10),
+  const fmt: object[] = [
+    { updateDimensionProperties: { range: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 300 }, fields: "pixelSize" } },
+    { updateDimensionProperties: { range: { sheetId, dimension: "COLUMNS", startIndex: 1, endIndex: 5 }, properties: { pixelSize: 120 }, fields: "pixelSize" } },
+    { updateDimensionProperties: { range: { sheetId, dimension: "COLUMNS", startIndex: 5, endIndex: 6 }, properties: { pixelSize: 360 }, fields: "pixelSize" } },
+    { updateSheetProperties: { properties: { sheetId, gridProperties: { hideGridlines: true } }, fields: "gridProperties.hideGridlines" } },
   ]
-  const idx = col.indexOf(r.month)
-  const rowNumber = idx >= 1 ? idx + 1 : Math.max(col.length, 1) + 1
+  rows.forEach((row, i) => {
+    const range = { sheetId, startRowIndex: i, endRowIndex: i + 1, startColumnIndex: 0, endColumnIndex: 6 }
+    if (row.kind === "title") fmt.push({ repeatCell: { range, cell: { userEnteredFormat: { textFormat: { bold: true, fontSize: 15 } } }, fields: "userEnteredFormat.textFormat" } })
+    if (row.kind === "subtitle") fmt.push({ repeatCell: { range, cell: { userEnteredFormat: { textFormat: { italic: true, foregroundColor: { red: 0.4, green: 0.4, blue: 0.4 } } } }, fields: "userEnteredFormat.textFormat" } })
+    if (row.kind === "section") fmt.push({ repeatCell: { range, cell: { userEnteredFormat: { backgroundColor: NAVY, textFormat: { bold: true, foregroundColor: WHITE } } }, fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat" } })
+    if (row.kind === "total") fmt.push({ repeatCell: { range, cell: { userEnteredFormat: { backgroundColor: LIGHT, textFormat: { bold: true } } }, fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat" } })
+    if (row.kind === "money" || row.kind === "total") {
+      fmt.push({ repeatCell: { range: { ...range, startColumnIndex: 1, endColumnIndex: 4 }, cell: { userEnteredFormat: { numberFormat: { type: "CURRENCY", pattern: '"$"#,##0.00;-"$"#,##0.00' } } }, fields: "userEnteredFormat.numberFormat" } })
+      if (row.pctCol) fmt.push({ repeatCell: { range: { ...range, startColumnIndex: 4, endColumnIndex: 5 }, cell: { userEnteredFormat: { numberFormat: { type: "PERCENT", pattern: "0.0%" } } }, fields: "userEnteredFormat.numberFormat" } })
+    }
+  })
+  await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: fmt } })
+
+  // Close Index: one row per month, newest first.
+  const idx = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${INDEX_TAB}'!A1:K500` })
+  const current = (idx.data.values ?? []).slice(1).filter((row) => row[0] && row[0] !== monthLabel(r.month))
+  const out = round2(r.costs.total + r.stripe.stripeFeesUsd)
+  const passing = r.checks.filter((ch) => ch.ok).length
+  current.push([
+    monthLabel(r.month), `${r.start} → ${r.end}`, out, r.budget.total, round2(out - r.budget.total),
+    out > r.budget.total ? "🔴 OVER" : "🟢 OK", tab, round2(r.costs.adSpend), round2(r.bottomLine.revenue),
+    round2(r.bottomLine.revenue - out), `${passing}/${r.checks.length}`,
+  ])
+  const toKey = (label: string) => {
+    const [name, year] = String(label).split(" ")
+    return Number(year) * 100 + (MONTHS.indexOf(name) + 1)
+  }
+  current.sort((a, b) => toKey(String(b[0])) - toKey(String(a[0])))
+  await sheets.spreadsheets.values.clear({ spreadsheetId, range: `'${INDEX_TAB}'!A1:K500` })
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${SUMMARY_TAB}'!A${rowNumber}`,
+    range: `'${INDEX_TAB}'!A1`,
     valueInputOption: "RAW",
-    requestBody: { values: [summaryRow] },
+    requestBody: { values: [INDEX_HEADERS, ...current] },
   })
 
-  const sheetGid = (await sheets.spreadsheets.get({ spreadsheetId })).data.sheets?.find((s) => s.properties?.title === tab)?.properties?.sheetId
+  await reorderTrackerTabs(sheets, spreadsheetId)
+
   return {
     spreadsheetId,
     tab,
-    url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit${sheetGid != null ? `#gid=${sheetGid}` : ""}`,
+    url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}`,
   }
 }
 

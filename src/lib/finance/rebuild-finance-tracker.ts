@@ -84,10 +84,10 @@ function buildPnLDashboardRows() {
     periodRow("  Promo Credits Applied", "H", "Platform subsidy", { negate: true }),
     [""],
     ["▌ EXPENSES", "", "", "", "", "", ""],
-    periodRow("  Fixed OpEx", "", "Fixed Costs tab", { isFixed: true, negate: true }),
-    periodRow("  Ad Hoc / Variable", "", "Ad Hoc Costs tab", { isAdHoc: true, negate: true }),
-    periodRow("  Paid Media (Ad Spend)", "AB", "Platform Data · Spend ($)", {
-      isPlatform: true,
+    periodRow("  Recurring (Fixed)", "", "Expenses · Recurring (or Fixed Costs plan if none logged)", { isFixed: true, negate: true }),
+    periodRow("  Ad Hoc / Other", "", "Expenses · Ad hoc + Other", { isAdHoc: true, negate: true }),
+    periodRow("  Paid Media (Ad Spend)", "AB", "Expenses · Ad platform invoices, else Platform Data", {
+      isAdSpend: true,
       negate: true,
     }),
     [
@@ -252,21 +252,21 @@ function buildExecutiveSummaryRows() {
       fx(`${p}B16`),
       runRateMonthly("B21"),
       runRateAnnual("B21"),
-      "Fixed Costs tab",
+      "Logged recurring, else Fixed Costs plan",
     ],
     [
       "  Ad Hoc / Variable",
       fx(`${p}B17`),
       runRateMonthly("B22"),
       runRateAnnual("B22"),
-      "Ad Hoc Costs tab",
+      "Expenses · Ad hoc + Other",
     ],
     [
       "  Paid Media",
       fx(`${p}B18`),
       runRateMonthly("B23"),
       runRateAnnual("B23"),
-      "Platform Data · MTD filtered",
+      "Ad platform invoices, else Platform Data",
     ],
     [
       "  Total Expenses",
@@ -403,8 +403,10 @@ export async function rebuildFinanceTrackerFromAdmin(
 
   const masterRaw = settings?.find((s) => s.key === "gdrive_master_report_id")?.value
   let platformRows = 0
-  if (masterRaw) {
-    const masterId = String(masterRaw).replace(/^"|"$/g, "")
+  const masterId = masterRaw ? String(masterRaw).replace(/^"|"$/g, "") : null
+  // The master report and the Finance Tracker are the same file today; copying a tab onto
+  // itself is a no-op that briefly empties Platform Data, so skip it.
+  if (masterId && masterId !== sheetId) {
     try {
       platformRows = await syncPlatformDataFromMasterReport(sheets, sheetId, masterId)
     } catch (err) {

@@ -53,7 +53,7 @@ export function ReconciliationPanel() {
         <div>
           <h2 className="font-serif text-xl text-[#2A2118]">Monthly reconciliation</h2>
           <p className="mt-1 text-sm text-[#5B4A3A]">
-            Money in vs out for a month, cross-checked against Stripe, written to a &ldquo;Recon YYYY-MM&rdquo; tab in the Finance
+            Money in vs out for a month, budget vs actual and Stripe checks, written to a &ldquo;Close_Month_Year&rdquo; tab in the Finance
             Tracker. Runs automatically on the 1st for the previous month and emails you.
           </p>
         </div>

@@ -286,3 +286,27 @@ export async function fetchActiveAdSets(): Promise<
   }
   return data.filter((a) => a.effective_status === "ACTIVE")
 }
+
+/** Daily account-level spend between two dates (inclusive), only days with spend > 0. */
+export async function fetchAccountDailySpend(since: string, until: string): Promise<{ date: string; spend: number }[]> {
+  const timeRange = encodeURIComponent(JSON.stringify({ since, until }))
+  let url: string | null =
+    `${META_GRAPH_BASE}/${adAccount()}/insights?fields=spend&level=account&time_increment=1` +
+    `&time_range=${timeRange}&access_token=${encodeURIComponent(token())}&limit=500`
+  const out: { date: string; spend: number }[] = []
+  while (url) {
+    const res = await fetch(url)
+    const json = (await res.json().catch(() => ({}))) as {
+      data?: { date_start?: string; spend?: string }[]
+      paging?: { next?: string }
+      error?: { message?: string }
+    }
+    if (!res.ok || json.error) throw new Error(`Meta account insights: ${json.error?.message ?? `HTTP ${res.status}`}`)
+    for (const d of json.data ?? []) {
+      const spend = Number(d.spend ?? 0)
+      if (d.date_start && spend > 0) out.push({ date: d.date_start, spend })
+    }
+    url = json.paging?.next ?? null
+  }
+  return out
+}

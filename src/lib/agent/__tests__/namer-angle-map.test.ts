@@ -4,7 +4,8 @@ import { normalizeAngleForDb } from "../namer-angle-map"
 
 describe("normalizeAngleForDb", () => {
   it("maps pipeline aliases to Postgres angle_t", () => {
-    expect(normalizeAngleForDb("pov_earnings")).toBe("income")
+    expect(normalizeAngleForDb("pov_earnings")).toBe("pov_earnings")
+    expect(normalizeAngleForDb("pov-earnings")).toBe("pov_earnings")
     expect(normalizeAngleForDb("POV-Earnings")).toBe("income")
     expect(normalizeAngleForDb("idle")).toBe("idle_space")
     expect(normalizeAngleForDb("socialproof")).toBe("social_proof")

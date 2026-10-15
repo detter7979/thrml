@@ -2,8 +2,6 @@ import type { AngleT } from "@/types/paid-media"
 
 /** Pipeline / folder slugs that map to Postgres angle_t values. */
 const ANGLE_ALIASES: Record<string, AngleT> = {
-  pov_earnings: "income",
-  "pov-earnings": "income",
   earnings: "income",
   idle: "idle_space",
   socialproof: "social_proof",
@@ -23,6 +21,7 @@ export function normalizeAngleForDb(raw: string): AngleT {
     "urgency",
     "sensory",
     "ease",
+    "pov_earnings",
   ]
   if (allowed.includes(key as AngleT)) return key as AngleT
 

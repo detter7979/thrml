@@ -9,6 +9,8 @@ export type AdminAuditAction =
   | "listing_status"
   | "dispute_resolve"
   | "settings_update"
+  | "namer_sheet.write"
+  | "namer_sheet.batch_update"
 
 /**
  * Record an admin action in admin_audit_log. Never throws: a logging failure must not

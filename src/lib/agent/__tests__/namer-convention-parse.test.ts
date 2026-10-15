@@ -60,7 +60,7 @@ describe("normalizeAdFormatToken", () => {
     expect(normalizeAdFormatToken("Static_9x16")).toBe("Static_9x16")
     expect(normalizeAdFormatToken("static_1x1")).toBe("Static_1x1")
     expect(normalizeAdFormatToken("Video_15s")).toBe("Video_15s")
-    expect(normalizeAdFormatToken("Video_5s")).toBe("Video_15s")
+    expect(normalizeAdFormatToken("Video_5s")).toBe("Video_5s")
   })
 
   it("falls back to Static_1x1 for unknown tokens", () => {

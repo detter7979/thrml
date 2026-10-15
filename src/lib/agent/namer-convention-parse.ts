@@ -15,7 +15,7 @@ const PERSONAS = new Set<PersonaT>(["host", "guest"])
 const SERVICES = new Set<ServiceT>(["sauna", "hottub", "coldplunge", "multi", "all"])
 const PHASES = new Set<PhaseT>(["P1", "P2", "P3"])
 const FUNNELS = new Set<FunnelT>(["PROSP", "LAL", "RT", "CRM"])
-const EVENTS = new Set<EventT>(["BH", "HO", "NL", "ACT", "VC", "IC", "PUR"])
+const EVENTS = new Set<EventT>(["BH", "HO", "NL", "ACT", "VC", "IC", "PUR", "LEAD"])
 
 const PLACEMENT_SUFFIXES: PlacementT[] = [
   "DEMAND-GEN",
@@ -161,7 +161,7 @@ export function normalizeAdFormatToken(raw: string): AdFormatT {
     const dur = videoMatch[1].toLowerCase()
     if (dur === "15s") return "Video_15s"
     if (dur === "30s") return "Video_30s"
-    if (dur === "5s" || dur === "6s") return "Video_15s"
+    if (dur === "5s" || dur === "6s") return "Video_5s"
   }
   if (/^carousel$/i.test(v)) return "Carousel"
   if (/^ugc$/i.test(v)) return "UGC"

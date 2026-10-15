@@ -76,7 +76,7 @@ export function buildAdBuilderAutoNameFormula(headers: string[], row1Based: numb
  * Campaign Builder — live layout:
  * Camp ID | PLATFORM | PERSONA | SERVICE | GEO | PHASE | FUNNEL | EVENT | LAUNCH | ... | Campaign Name (auto)
  *
- * e.g. C001_META_host_sauna_SEA_P1_PROSP_BH_2026W19
+ * e.g. C001_META_host_sauna_SEA_P1_PROSP_BH_2026W46 (plus _v2 when VER is set)
  */
 export function buildCampaignAutoNameFormula(headers: string[], row1Based: number): string | null {
   const campId = colRef(headers, CAMP_ID, row1Based)
@@ -88,6 +88,7 @@ export function buildCampaignAutoNameFormula(headers: string[], row1Based: numbe
   const funnel = colRef(headers, [/^funnel$/i], row1Based)
   const event = colRef(headers, [/^event$/i, /^opt\.?\s*event$/i], row1Based)
   const launch = colRef(headers, [/^launch$/i], row1Based)
+  const ver = colRef(headers, [/^ver$/i, /^version$/i], row1Based)
 
   if (!campId || !platform) return null
 
@@ -103,7 +104,8 @@ export function buildCampaignAutoNameFormula(headers: string[], row1Based: numbe
     launch ?? null,
   ].filter(Boolean)
 
-  return `=IF(${campId}="","",${parts.join('&"_"&')})`
+  const verSuffix = ver ? `&IF(${ver}="","","_"&LOWER(${ver}))` : ""
+  return `=IF(${campId}="","",${parts.join('&"_"&')}${verSuffix})`
 }
 
 /**

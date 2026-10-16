@@ -449,12 +449,9 @@ export function HostNewListingClient({
     const eventId = crypto.randomUUID()
     const { fbp, fbc } = getFacebookPixelCookies()
 
-    trackMetaEvent(
-      "host_onboarding_started",
-      { content_name: "Host Onboarding", event_id: eventId },
-      { eventId, sendServer: false, custom: true }
-    )
-
+    // The server decides whether this is the host's first time (once per host). Only then does
+    // the browser fire its copy, with the same event_id so Meta deduplicates the pair. Without
+    // this, every visit to listing setup (second listing, refresh) added another HO.
     void fetch("/api/events/host-onboarding-started", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -465,7 +462,17 @@ export function HostNewListingClient({
         ...(fbp ? { fbp } : {}),
         ...(fbc ? { fbc } : {}),
       }),
-    }).catch(() => undefined)
+    })
+      .then((res) => res.json().catch(() => null))
+      .then((json: { capi?: { fired?: boolean } } | null) => {
+        if (!json?.capi?.fired) return
+        trackMetaEvent(
+          "host_onboarding_started",
+          { content_name: "Host Onboarding", event_id: eventId },
+          { eventId, sendServer: false, custom: true }
+        )
+      })
+      .catch(() => undefined)
 
     trackGaEvent("host_onboarding_started", {
       event_category: "host_funnel",

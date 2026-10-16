@@ -128,16 +128,15 @@ export async function maybeFireHostOnboardingStarted(
     eventSourceUrl: ctx.eventSourceUrl,
   })
 
-  void fireCapiEvent(
+  // Awaited so the send finishes before the serverless function freezes.
+  await fireCapiEvent(
     META_EVENT_HOST_ONBOARDING_STARTED,
     capiOptions(userData, {
       eventId: ctx.eventId,
       eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
       customData: { content_name: "Host Onboarding" },
     }, admin, ctx.headers, user.id)
-  ).catch((err) => {
-    console.error("[CAPI] host_onboarding_started async failed", err)
-  })
+  )
 
   return { fired: true }
 }
@@ -166,30 +165,15 @@ export async function fireHostListingCapiEvents(
     listing_id: ctx.listingId,
   }
 
-  void fireCapiEvent(
-    META_EVENT_HOST_LISTING_CREATED,
-    capiOptions(
-      userData,
-      {
-        eventId: ctx.hostListingCreatedEventId,
-        eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
-        customData: listingCustom,
-      },
-      admin,
-      ctx.headers,
-      user.id
-    )
-  ).catch((err) => {
-    console.error("[CAPI] host_listing_created async failed", err)
-  })
-
-  if (ctx.isFirstListing && ctx.hostFirstListingCreatedEventId) {
-    void fireCapiEvent(
-      META_EVENT_HOST_FIRST_LISTING_CREATED,
+  // Awaited (not fire-and-forget): callers run this inside after(), and a detached promise is
+  // dropped when the serverless function freezes after the response.
+  const sends: Promise<unknown>[] = [
+    fireCapiEvent(
+      META_EVENT_HOST_LISTING_CREATED,
       capiOptions(
         userData,
         {
-          eventId: ctx.hostFirstListingCreatedEventId,
+          eventId: ctx.hostListingCreatedEventId,
           eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
           customData: listingCustom,
         },
@@ -197,10 +181,27 @@ export async function fireHostListingCapiEvents(
         ctx.headers,
         user.id
       )
-    ).catch((err) => {
-      console.error("[CAPI] host_first_listing_created async failed", err)
-    })
+    ),
+  ]
+  if (ctx.isFirstListing && ctx.hostFirstListingCreatedEventId) {
+    sends.push(
+      fireCapiEvent(
+        META_EVENT_HOST_FIRST_LISTING_CREATED,
+        capiOptions(
+          userData,
+          {
+            eventId: ctx.hostFirstListingCreatedEventId,
+            eventSourceUrl: ctx.eventSourceUrl ?? "https://usethrml.com/dashboard/host/new",
+            customData: listingCustom,
+          },
+          admin,
+          ctx.headers,
+          user.id
+        )
+      )
+    )
   }
+  await Promise.all(sends)
 }
 
 export function newListingMetaEventIds(isFirstListing: boolean) {

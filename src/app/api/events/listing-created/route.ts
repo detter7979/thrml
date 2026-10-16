@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { after, NextRequest, NextResponse } from "next/server"
 
 import { sendGA4Event } from "@/lib/analytics/measurement-protocol"
 import {
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       ? body.first_listing_event_id.trim()
       : ids.host_first_listing_created_event_id
 
-  void fireHostListingCapiEvents(admin, user, {
+  after(() => fireHostListingCapiEvents(admin, user, {
     listingId,
     headers: req.headers,
     eventSourceUrl:
@@ -93,12 +93,12 @@ export async function POST(req: NextRequest) {
     fbclid: typeof body.fbclid === "string" ? body.fbclid : undefined,
   }).catch((err) => {
     console.error("[CAPI] listing-created route async failed", err)
-  })
+  }))
 
   const clientId =
     typeof body.client_id === "string" && body.client_id.length > 0 ? body.client_id : user.id
 
-  void sendGA4Event({
+  after(() => sendGA4Event({
     clientId,
     events: [
       {
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
           ]
         : []),
     ],
-  })
+  }))
 
   return NextResponse.json({
     ok: true,

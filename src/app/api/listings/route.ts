@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { after, NextRequest, NextResponse } from "next/server"
 
 import { assertHostInsuranceAttested } from "@/lib/host/insurance-attestation"
 import { promoteProfileToHost } from "@/lib/host/promote-host-profile"
@@ -112,19 +112,24 @@ export async function POST(request: NextRequest) {
     const eventSourceUrl =
       request.headers.get("referer") ?? "https://usethrml.com/dashboard/host/new"
 
-    void promoteProfileToHost(admin, user.id).catch((err) => {
-      console.error("[POST /api/listings] promote host profile failed", err)
-    })
-
-    void fireHostListingCapiEvents(admin, user, {
-      listingId: data.id,
-      headers: request.headers,
-      eventSourceUrl,
-      hostListingCreatedEventId: metaIds.host_listing_created_event_id,
-      hostFirstListingCreatedEventId: metaIds.host_first_listing_created_event_id,
-      isFirstListing,
-    }).catch((err) => {
-      console.error("[POST /api/listings] host listing CAPI failed", err)
+    // Run after the response, but tracked by the platform so they aren't dropped mid-flight.
+    const headers = request.headers
+    after(async () => {
+      await promoteProfileToHost(admin, user.id).catch((err) => {
+        console.error("[POST /api/listings] promote host profile failed", err)
+      })
+      await fireHostListingCapiEvents(admin, user, {
+        listingId: data.id,
+        headers,
+        eventSourceUrl,
+        fbp: request.cookies.get("_fbp")?.value,
+        fbc: request.cookies.get("_fbc")?.value,
+        hostListingCreatedEventId: metaIds.host_listing_created_event_id,
+        hostFirstListingCreatedEventId: metaIds.host_first_listing_created_event_id,
+        isFirstListing,
+      }).catch((err) => {
+        console.error("[POST /api/listings] host listing CAPI failed", err)
+      })
     })
 
     return NextResponse.json({

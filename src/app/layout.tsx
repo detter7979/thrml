@@ -68,6 +68,10 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://usethrml.com",
   },
+  // Meta Business domain verification for usethrml.com (Business Settings → Brand safety → Domains).
+  other: {
+    "facebook-domain-verification": "k8pl67ncjyplwap4wljs90q9ka9vmm",
+  },
 };
 
 export default function RootLayout({

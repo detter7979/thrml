@@ -1301,11 +1301,11 @@ export function ListingDetailClient({
       value: pricing.price_solo ?? 0,
       currency: "USD",
     })
+    // No title or category: listing titles usually name the wellness service ("Cedar Sauna…"),
+    // which the privacy policy says is never shared with ad platforms. The listing ID is enough.
     trackMetaEvent("ViewContent", {
       content_ids: [id],
       content_type: "product",
-      content_name: title,
-      content_category: serviceTypeId,
       value: pricing.price_solo ?? 0,
       currency: "USD",
     }, {

@@ -6,6 +6,6 @@
 export const LEGAL_VERSIONS = {
   // Must match the active rows in legal_documents (the published text).
   TERMS: "v1.1",
-  PRIVACY: "v1.1",
+  PRIVACY: "v1.2",
   HOST_AGREEMENT: "host-v1.1-2026-10",
 } as const

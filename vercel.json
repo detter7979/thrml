@@ -24,6 +24,7 @@
     { "path": "/api/cron/newsletter-biweekly", "schedule": "0 16 * * 3" },
     { "path": "/api/cron/sync-ga4",         "schedule": "0 2 * * *" },
     { "path": "/api/cron/sync-meta",        "schedule": "0 2 * * *" },
+    { "path": "/api/cron/sync-google-ads",  "schedule": "5 2 * * *" },
     { "path": "/api/cron/sync-bookings",    "schedule": "0 2 * * *" },
     { "path": "/api/cron/anonymize-deleted-accounts", "schedule": "0 1 * * *" },
     { "path": "/api/cron/monthly-reconciliation", "schedule": "15 8 1 * *" }

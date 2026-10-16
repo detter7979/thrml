@@ -4,7 +4,6 @@ import { useEffect } from "react"
 
 import { trackMetaEvent } from "@/components/meta-pixel"
 import { trackGaEvent } from "@/lib/analytics/ga"
-import { gtagIfConsented } from "@/lib/analytics/gtag"
 import { isAnalyticsConsented } from "@/lib/cookie-consent"
 
 type BookingConfirmationTrackerProps = {
@@ -32,10 +31,6 @@ export function BookingConfirmationTracker({
     if (!isAnalyticsConsented()) return
 
     const purchaseEventId = `purchase_${bookingId}`
-    const googleAdsIdRaw = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID?.trim()
-    if (!googleAdsIdRaw) return
-    const googleAdsId = /^AW-\d+$/.test(googleAdsIdRaw) ? googleAdsIdRaw : null
-    if (!googleAdsId) return
 
     // GA4 purchase (client-side — deduplicates against server-side MP event).
     trackGaEvent("purchase", {
@@ -63,24 +58,8 @@ export function BookingConfirmationTracker({
       },
     })
 
-    // Google Ads Enhanced Conversions.
-    if (googleAdsId) {
-      gtagIfConsented("event", "conversion", {
-        send_to: googleAdsId,
-        transaction_id: bookingId,
-        value: totalAmount,
-        currency: "USD",
-        ...(userEmail || userFirstName
-          ? {
-              user_data: {
-                ...(userEmail ? { email_address: userEmail } : {}),
-                ...(userFirstName ? { first_name: userFirstName } : {}),
-                ...(userLastName ? { last_name: userLastName } : {}),
-              },
-            }
-          : {}),
-      })
-    }
+    // Google Ads counts purchases through the GA4 "purchase" import (Goals → Conversions), so
+    // no separate Ads conversion is sent here — that would count each booking twice.
   }, [bookingId, city, listingId, serviceType, totalAmount, userEmail, userFirstName, userLastName])
 
   return null

@@ -20,6 +20,9 @@ function mapAnalyticsRow(row: Record<string, unknown>): AnalyticsRow {
     purchases: Number(row.purchases ?? 0),
     revenue: Number(row.revenue ?? 0),
     bookings_count: Number(row.bookings_count ?? 0),
+    become_host_click: Number(row.become_host_click ?? 0),
+    host_onboarding_started: Number(row.host_onboarding_started ?? 0),
+    host_first_listing_created: Number(row.host_first_listing_created ?? 0),
     ctr: Number(row.ctr ?? 0),
     cvr_session_to_purchase: Number(row.cvr_session_to_purchase ?? 0),
     cvr_checkout_to_purchase: Number(row.cvr_checkout_to_purchase ?? 0),
@@ -35,7 +38,7 @@ export default async function AdminAnalyticsPage() {
     .from("analytics_daily")
     .select("*")
     .order("date", { ascending: false })
-    .limit(500)
+    .limit(3000)
 
   const initialRows = (rows ?? []).map((row) => mapAnalyticsRow(row as Record<string, unknown>))
 

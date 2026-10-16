@@ -17,6 +17,9 @@ export type AnalyticsRow = {
   purchases: number
   revenue: number
   bookings_count: number
+  become_host_click: number
+  host_onboarding_started: number
+  host_first_listing_created: number
   ctr: number
   cvr_session_to_purchase: number
   cvr_checkout_to_purchase: number
@@ -95,6 +98,9 @@ type Totals = {
   purchases: number
   revenue: number
   bookings_count: number
+  become_host_click: number
+  host_onboarding_started: number
+  host_first_listing_created: number
 }
 
 const emptyTotals: Totals = {
@@ -107,6 +113,40 @@ const emptyTotals: Totals = {
   purchases: 0,
   revenue: 0,
   bookings_count: 0,
+  become_host_click: 0,
+  host_onboarding_started: 0,
+  host_first_listing_created: 0,
+}
+
+/**
+ * analytics_daily mixes three kinds of rows:
+ * - site rows (campaign_id ""): GA4 funnel counts per channel, plus a channel "all" total; bookings sync writes "all"
+ * - ad rows (campaign_id = platform campaign id): spend / impressions / clicks per campaign
+ * - Meta "__total__" rows: a precomputed sum of the ad rows — skipped here so spend isn't counted twice
+ */
+const SITE_KEYS = [
+  "sessions",
+  "view_listing",
+  "begin_checkout",
+  "purchases",
+  "revenue",
+  "bookings_count",
+  "become_host_click",
+  "host_onboarding_started",
+  "host_first_listing_created",
+] as const
+const AD_KEYS = ["impressions", "clicks", "spend"] as const
+
+function isSiteRow(row: AnalyticsRow) {
+  return row.campaign_id === ""
+}
+function isAdRow(row: AnalyticsRow) {
+  return row.campaign_id !== "" && row.campaign_id !== "__total__"
+}
+
+function addRow(acc: Totals, row: AnalyticsRow, site: boolean, ad: boolean) {
+  if (site) for (const k of SITE_KEYS) acc[k] += row[k]
+  if (ad) for (const k of AD_KEYS) acc[k] += row[k]
 }
 
 export function AdminAnalyticsClient({ initialRows }: { initialRows: AnalyticsRow[] }) {
@@ -117,31 +157,22 @@ export function AdminAnalyticsClient({ initialRows }: { initialRows: AnalyticsRo
 
   const filtered = useMemo(() => {
     return initialRows.filter((row) => {
-      if (channelFilter !== "all" && row.channel !== channelFilter) return false
       if (start && row.date < start) return false
       if (end && row.date > end) return false
       return true
     })
-  }, [initialRows, channelFilter, start, end])
+  }, [initialRows, start, end])
 
-  const totals = useMemo(
-    () =>
-      filtered.reduce(
-        (acc, row) => ({
-          impressions: acc.impressions + row.impressions,
-          clicks: acc.clicks + row.clicks,
-          spend: acc.spend + row.spend,
-          sessions: acc.sessions + row.sessions,
-          view_listing: acc.view_listing + row.view_listing,
-          begin_checkout: acc.begin_checkout + row.begin_checkout,
-          purchases: acc.purchases + row.purchases,
-          revenue: acc.revenue + row.revenue,
-          bookings_count: acc.bookings_count + row.bookings_count,
-        }),
-        { ...emptyTotals }
-      ),
-    [filtered]
-  )
+  const totals = useMemo(() => {
+    const acc = { ...emptyTotals }
+    for (const row of filtered) {
+      // Site funnel: the "all" rollup for All channels, otherwise that channel's GA4 row.
+      const site = isSiteRow(row) && (channelFilter === "all" ? row.channel === "all" : row.channel === channelFilter)
+      const ad = isAdRow(row) && (channelFilter === "all" || row.channel === channelFilter)
+      addRow(acc, row, site, ad)
+    }
+    return acc
+  }, [filtered, channelFilter])
 
   const ctr = totals.impressions > 0 ? totals.clicks / totals.impressions : 0
   const cvrSession = totals.sessions > 0 ? totals.purchases / totals.sessions : 0
@@ -174,28 +205,38 @@ export function AdminAnalyticsClient({ initialRows }: { initialRows: AnalyticsRo
     const map = new Map<string, Totals & { channel: string }>()
     for (const row of filtered) {
       if (row.channel === "all") continue
-      if (!map.has(row.channel)) {
-        map.set(row.channel, { channel: row.channel, ...emptyTotals })
-      }
-      const entry = map.get(row.channel)!
-      entry.impressions += row.impressions
-      entry.clicks += row.clicks
-      entry.spend += row.spend
-      entry.sessions += row.sessions
-      entry.view_listing += row.view_listing
-      entry.begin_checkout += row.begin_checkout
-      entry.purchases += row.purchases
-      entry.revenue += row.revenue
-      entry.bookings_count += row.bookings_count
+      if (!map.has(row.channel)) map.set(row.channel, { channel: row.channel, ...emptyTotals })
+      addRow(map.get(row.channel)!, row, isSiteRow(row), isAdRow(row))
     }
     return Array.from(map.values())
   }, [filtered])
+
+  const hostSteps = [
+    { label: "Become a host click", value: totals.become_host_click, sub: null as string | null },
+    {
+      label: "Onboarding started",
+      value: totals.host_onboarding_started,
+      sub:
+        totals.become_host_click > 0
+          ? `${pct(totals.host_onboarding_started / totals.become_host_click)} of clicks`
+          : null,
+    },
+    {
+      label: "First listing",
+      value: totals.host_first_listing_created,
+      sub:
+        totals.host_onboarding_started > 0
+          ? `${pct(totals.host_first_listing_created / totals.host_onboarding_started)} of onboarded`
+          : null,
+    },
+  ]
+  const costPer = (n: number) => (n > 0 && totals.spend > 0 ? fmt(totals.spend / n) : "—")
 
   return (
     <div className="space-y-6 px-6 py-8">
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-serif text-3xl text-[#2A2118]">Analytics</h1>
-        <span className="text-xs text-[#6E5B49]">Updated daily at 2am UTC</span>
+        <span className="text-xs text-[#6E5B49]">Updated daily at 2am UTC (7pm Pacific)</span>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -242,6 +283,8 @@ export function AdminAnalyticsClient({ initialRows }: { initialRows: AnalyticsRo
           { label: "Checkout CVR", value: pct(cvrCheckout) },
           { label: "Session CVR", value: pct(cvrSession) },
           { label: "Bookings", value: String(totals.bookings_count) },
+          { label: "Host clicks", value: num(totals.become_host_click) },
+          { label: "First listings", value: num(totals.host_first_listing_created) },
         ].map((tile) => (
           <div key={tile.label} className="rounded-xl border border-[#D9CBB8] bg-[#FCF8F3] p-3">
             <p className="font-serif text-xl text-[#2A2118]">{tile.value}</p>
@@ -251,7 +294,36 @@ export function AdminAnalyticsClient({ initialRows }: { initialRows: AnalyticsRo
       </div>
 
       <div className="rounded-2xl border border-[#D9CBB8] bg-[#FCF8F3] p-5">
-        <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-[#6E5B49]">Conversion funnel</h2>
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-[#6E5B49]">Host funnel</h2>
+          <p className="text-xs text-[#6E5B49]">
+            Cost per click {costPer(totals.become_host_click)} · per onboarding{" "}
+            {costPer(totals.host_onboarding_started)} · per first listing {costPer(totals.host_first_listing_created)}
+          </p>
+        </div>
+        <div className="space-y-2">
+          {hostSteps.map((step, i) => {
+            const maxVal = hostSteps[0].value || 1
+            const width = Math.max(4, (step.value / maxVal) * 100)
+            return (
+              <div key={step.label} className="flex items-center gap-3">
+                <span className="w-28 shrink-0 text-right text-xs text-[#6E5B49]">{step.label}</span>
+                <div className="relative h-7 flex-1 overflow-hidden rounded-full bg-[#EDE3D4]">
+                  <div
+                    className="h-full rounded-full bg-[#2A2118] transition-all duration-500"
+                    style={{ width: `${width}%`, opacity: 1 - i * 0.15 }}
+                  />
+                </div>
+                <span className="w-20 text-xs font-medium text-[#2A2118]">{num(step.value)}</span>
+                {step.sub ? <span className="w-28 text-xs text-[#8A7A6A]">{step.sub}</span> : <span className="w-28" />}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#D9CBB8] bg-[#FCF8F3] p-5">
+        <h2 className="mb-4 text-sm font-medium uppercase tracking-wide text-[#6E5B49]">Guest funnel</h2>
         <div className="space-y-2">
           {funnelSteps.map((step, i) => {
             const maxVal = funnelSteps[0].value || 1
@@ -287,6 +359,8 @@ export function AdminAnalyticsClient({ initialRows }: { initialRows: AnalyticsRo
                 "Clicks",
                 "CTR",
                 "Sessions",
+                "Host clicks",
+                "First listings",
                 "Checkout",
                 "Purchases",
                 "Revenue",
@@ -303,7 +377,7 @@ export function AdminAnalyticsClient({ initialRows }: { initialRows: AnalyticsRo
           <tbody>
             {channelBreakdown.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-[#6E5B49]">
+                <td colSpan={13} className="px-4 py-8 text-center text-[#6E5B49]">
                   No data yet — crons will populate this after first run
                 </td>
               </tr>
@@ -322,6 +396,8 @@ export function AdminAnalyticsClient({ initialRows }: { initialRows: AnalyticsRo
                     <td className="px-3 py-2 text-[#6E5B49]">{num(row.clicks)}</td>
                     <td className="px-3 py-2 text-[#6E5B49]">{pct(rowCtr)}</td>
                     <td className="px-3 py-2 text-[#6E5B49]">{num(row.sessions)}</td>
+                    <td className="px-3 py-2 text-[#6E5B49]">{num(row.become_host_click)}</td>
+                    <td className="px-3 py-2 text-[#6E5B49]">{num(row.host_first_listing_created)}</td>
                     <td className="px-3 py-2 text-[#6E5B49]">{num(row.begin_checkout)}</td>
                     <td className="px-3 py-2 font-medium text-[#2A2118]">{num(row.purchases)}</td>
                     <td className="px-3 py-2 text-[#2A2118]">{fmt(row.revenue)}</td>

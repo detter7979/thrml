@@ -4,6 +4,38 @@ import { getGA4AccessToken } from "@/lib/analytics/ga4-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { envClean } from "@/lib/env"
 
+// view_item is what the listing page sends; view_listing is kept for older data.
+const GA_EVENTS = [
+  "session_start",
+  "view_item",
+  "view_listing",
+  "begin_checkout",
+  "purchase",
+  "become_host_click",
+  "host_onboarding_started",
+  "host_first_listing_created",
+] as const
+
+type ChannelMetrics = {
+  sessions: number
+  view_listing: number
+  begin_checkout: number
+  purchases: number
+  become_host_click: number
+  host_onboarding_started: number
+  host_first_listing_created: number
+}
+
+const emptyMetrics = (): ChannelMetrics => ({
+  sessions: 0,
+  view_listing: 0,
+  begin_checkout: 0,
+  purchases: 0,
+  become_host_click: 0,
+  host_onboarding_started: 0,
+  host_first_listing_created: 0,
+})
+
 function yesterday() {
   const d = new Date()
   d.setDate(d.getDate() - 1)
@@ -42,7 +74,7 @@ export async function GET(req: NextRequest) {
       filter: {
         fieldName: "eventName",
         inListFilter: {
-          values: ["session_start", "view_listing", "begin_checkout", "purchase"],
+          values: [...GA_EVENTS],
         },
       },
     },
@@ -73,10 +105,7 @@ export async function GET(req: NextRequest) {
     }>
   }
 
-  const channelMap = new Map<
-    string,
-    { sessions: number; view_listing: number; begin_checkout: number; purchases: number }
-  >()
+  const channelMap = new Map<string, ChannelMetrics>()
 
   const normalizeChannel = (raw: string): string => {
     const lower = raw.toLowerCase()
@@ -94,22 +123,22 @@ export async function GET(req: NextRequest) {
     const count = parseInt(row.metricValues[0].value, 10)
 
     if (!channelMap.has(channel)) {
-      channelMap.set(channel, { sessions: 0, view_listing: 0, begin_checkout: 0, purchases: 0 })
+      channelMap.set(channel, emptyMetrics())
     }
     const entry = channelMap.get(channel)!
 
     if (eventName === "session_start") entry.sessions += count
-    else if (eventName === "view_listing") entry.view_listing += count
+    else if (eventName === "view_item" || eventName === "view_listing") entry.view_listing += count
     else if (eventName === "begin_checkout") entry.begin_checkout += count
     else if (eventName === "purchase") entry.purchases += count
+    else if (eventName === "become_host_click") entry.become_host_click += count
+    else if (eventName === "host_onboarding_started") entry.host_onboarding_started += count
+    else if (eventName === "host_first_listing_created") entry.host_first_listing_created += count
   }
 
-  const allEntry = { sessions: 0, view_listing: 0, begin_checkout: 0, purchases: 0 }
+  const allEntry = emptyMetrics()
   for (const v of channelMap.values()) {
-    allEntry.sessions += v.sessions
-    allEntry.view_listing += v.view_listing
-    allEntry.begin_checkout += v.begin_checkout
-    allEntry.purchases += v.purchases
+    for (const k of Object.keys(allEntry) as (keyof ChannelMetrics)[]) allEntry[k] += v[k]
   }
   channelMap.set("all", allEntry)
 
@@ -123,10 +152,7 @@ export async function GET(req: NextRequest) {
         channel,
         campaign_id: "",
         campaign_name: "",
-        sessions: metrics.sessions,
-        view_listing: metrics.view_listing,
-        begin_checkout: metrics.begin_checkout,
-        purchases: metrics.purchases,
+        ...metrics,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "date,channel,campaign_id" }

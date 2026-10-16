@@ -471,13 +471,13 @@ export function HostNewListingClient({
           { content_name: "Host Onboarding", event_id: eventId },
           { eventId, sendServer: false, custom: true }
         )
+        // Same once-per-host rule for GA4 (it's an imported Google Ads conversion).
+        trackGaEvent("host_onboarding_started", {
+          event_category: "host_funnel",
+          event_label: "step_1",
+        })
       })
       .catch(() => undefined)
-
-    trackGaEvent("host_onboarding_started", {
-      event_category: "host_funnel",
-      event_label: "step_1",
-    })
 
     const w = window as { gtag?: (...args: unknown[]) => void }
     if (w.gtag) {

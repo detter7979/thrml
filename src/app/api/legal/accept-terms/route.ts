@@ -53,17 +53,16 @@ export async function POST(req: NextRequest) {
     profileUpdate.terms_accepted = true
     profileUpdate.terms_accepted_at = now
     profileUpdate.terms_version = version
-    profileUpdate.privacy_version = LEGAL_VERSIONS.PRIVACY
+    // Privacy acceptance lives in legal_acceptances; profiles has no privacy_version column.
   } else if (docType === "host_terms") {
     profileUpdate.host_terms_accepted = true
     profileUpdate.host_terms_accepted_at = now
     profileUpdate.host_terms_version = version
     if (parsed.data.ui_intent) profileUpdate.ui_intent = parsed.data.ui_intent
     if (parsed.data.is_host === true) profileUpdate.is_host = true
-  } else if (docType === "privacy_policy") {
-    profileUpdate.privacy_version = version
   }
 
+  if (Object.keys(profileUpdate).length === 0) return NextResponse.json({ success: true })
   const { error } = await admin.from("profiles").update(profileUpdate).eq("id", user.id)
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })

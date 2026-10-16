@@ -209,7 +209,7 @@ export function BecomeAHostClient() {
         const nextIntent = nextHostUiIntent(
           typeof profile?.ui_intent === "string" ? profile.ui_intent : null
         )
-        await fetch("/api/legal/accept-terms", {
+        const acceptRes = await fetch("/api/legal/accept-terms", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -219,6 +219,10 @@ export function BecomeAHostClient() {
             is_host: true,
           }),
         })
+        if (!acceptRes.ok) {
+          const payload = (await acceptRes.json().catch(() => null)) as { error?: string } | null
+          throw new Error(payload?.error ?? "Couldn't save your host agreement. Please try again.")
+        }
       }
 
       trackGaEvent("host_onboarding_complete", {

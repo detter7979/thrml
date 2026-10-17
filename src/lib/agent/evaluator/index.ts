@@ -44,11 +44,22 @@ function applyFloorAndCap(ctx: { rules: Record<string, unknown> }, proposals: Ru
   return filtered.slice(0, maxRecs)
 }
 
+/** If a campaign is being killed or paused, drop the ad set / ad / budget / creative proposals inside it. */
+export function suppressUnderStoppedCampaigns(raw: RuleResult[]): RuleResult[] {
+  const stopped = new Set(
+    raw.filter((p) => (p.kind === "KILL_CAMPAIGN" || p.kind === "PAUSE_CAMPAIGN") && p.target.campaignId).map((p) => p.target.campaignId!)
+  )
+  if (!stopped.size) return raw
+  return raw.filter(
+    (p) => p.kind === "KILL_CAMPAIGN" || p.kind === "PAUSE_CAMPAIGN" || !p.target.campaignId || !stopped.has(p.target.campaignId)
+  )
+}
+
 /** Run every rule on a context (no DB). Used by the evaluator and the admin test scenario. */
 export function proposeFromContext(ctx: EvaluatorContext): { raw: RuleResult[]; proposals: RuleResult[] } {
   const raw: RuleResult[] = []
   for (const rule of ALL_RULES) raw.push(...rule(ctx))
-  return { raw, proposals: applyFloorAndCap(ctx, dedupeProposals(raw, ctx.recentRecs)) }
+  return { raw, proposals: applyFloorAndCap(ctx, dedupeProposals(suppressUnderStoppedCampaigns(raw), ctx.recentRecs)) }
 }
 
 async function insertRecommendations(
@@ -145,7 +156,7 @@ export async function runEvaluator(opts: { dryRun?: boolean }): Promise<Evaluato
     for (const rule of ALL_RULES) {
       raw.push(...rule(ctx))
     }
-    const afterDedupe = dedupeProposals(raw, ctx.recentRecs)
+    const afterDedupe = dedupeProposals(suppressUnderStoppedCampaigns(raw), ctx.recentRecs)
     const capped = applyFloorAndCap(ctx, afterDedupe)
 
     let written = 0

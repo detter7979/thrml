@@ -93,3 +93,21 @@ describe("build actions map to Meta executions", () => {
     expect(mapRecKindToExecutionKind(rec("LAUNCH_TEST"))).toBeNull()
   })
 })
+
+describe("campaign kill suppresses child proposals", () => {
+  it("drops ad set pauses and creative under a campaign being killed", async () => {
+    const { suppressUnderStoppedCampaigns } = await import("../index")
+    const p = (kind: string, campaignId: string, adSetId?: string) =>
+      ({ kind, target: { campaignId, adSetId }, payload: {}, evidence: {}, rationale: "", confidence: 0.9 }) as never
+    const out = suppressUnderStoppedCampaigns([
+      p("KILL_CAMPAIGN", "c2"),
+      p("PAUSE_AD_SET", "c2", "s4"),
+      p("GENERATE_CREATIVE", "c2", "s5"),
+      p("PAUSE_AD_SET", "c1", "s1"),
+    ])
+    expect(out.map((x: { kind: string; target: { campaignId: string } }) => `${x.kind}:${x.target.campaignId}`)).toEqual([
+      "KILL_CAMPAIGN:c2",
+      "PAUSE_AD_SET:c1",
+    ])
+  })
+})

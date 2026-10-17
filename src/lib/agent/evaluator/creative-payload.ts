@@ -99,7 +99,9 @@ export function aggregateAdMaster(
   rows: PerformanceMasterRow[],
   adId: string,
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
+  /** Count conversions only for this event (the ad's optimization event). Spend counts every row. */
+  event?: string
 ): { spend: number; impressions: number; clicks: number; conversions: number } {
   let spend = 0
   let impressions = 0
@@ -111,7 +113,7 @@ export function aggregateAdMaster(
     spend += Number(r.spend_usd ?? 0)
     impressions += Number(r.impressions ?? 0)
     clicks += Number(r.clicks ?? 0)
-    conversions += Number(r.conversions ?? 0)
+    if (!event || r.conv_event === event) conversions += Number(r.conversions ?? 0)
   }
   return { spend, impressions, clicks, conversions }
 }

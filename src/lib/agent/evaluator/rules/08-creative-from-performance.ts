@@ -6,6 +6,7 @@ import {
   variantsForAd,
 } from "../creative-payload"
 import type { EvaluatorContext, RuleResult } from "../types"
+import { resultEvent, targetCacUsd } from "./_cac-helpers"
 import { isoDateUtcDaysAgo, ruleNumber } from "../types"
 
 function dateRangeLast(daysBack: number, span: number): { from: string; to: string } {
@@ -43,10 +44,15 @@ export function rule08TopPerformerCreatives(ctx: EvaluatorContext): RuleResult[]
     type Cand = { ad: (typeof ads)[0]; cpa: number; spend: number; conv: number }
     const candidates: Cand[] = []
     for (const ad of ads) {
-      const agg = aggregateAdMaster(ctx.performance, ad.id, dFrom, dTo)
+      const camp = campById.get(ad.campaign_id)
+      if (!camp) continue
+      // Judge on the ad's own optimization event, and only iterate on ads at or under target.
+      const set = ctx.adSets.find((s) => s.id === ad.ad_set_id)
+      const ev = (ad as { conv_event?: string | null }).conv_event || set?.conv_event || resultEvent(camp)
+      const agg = aggregateAdMaster(ctx.performance, ad.id, dFrom, dTo, ev)
       if (agg.spend < minSpend || agg.conversions < minConv) continue
       const cpa = cpaFromAgg(agg)
-      if (cpa == null) continue
+      if (cpa == null || cpa > targetCacUsd(ctx, camp)) continue
       candidates.push({ ad, cpa, spend: agg.spend, conv: agg.conversions })
     }
     if (!candidates.length) continue

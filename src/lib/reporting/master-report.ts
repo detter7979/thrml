@@ -183,9 +183,11 @@ function pivotRequests(def: PivotDef, sheetId: number, sourceSheetId: number): o
         : { summarizeFunction: "SUM", name: v.name, sourceColumnOffset: col(v.sum!) }
     ),
     valueLayout: "HORIZONTAL",
-    ...(def.filter
-      ? { filterSpecs: [{ columnOffsetIndex: col(def.filter.column), filterCriteria: { visibleValues: def.filter.values } }] }
-      : {}),
+    // Source rows are open-ended (Master Data grows), so skip the empty rows under the data.
+    filterSpecs: [
+      { columnOffsetIndex: col("Date"), filterCriteria: { condition: { type: "NOT_BLANK" } } },
+      ...(def.filter ? [{ columnOffsetIndex: col(def.filter.column), filterCriteria: { visibleValues: def.filter.values } }] : []),
+    ],
   }
   const firstValueCol = def.rows.length
   return [

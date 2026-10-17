@@ -76,6 +76,14 @@ export function TestScenarioClient() {
         <a href={TEST_SHEET} target="_blank" rel="noreferrer" className="self-center text-sm font-medium text-[#9A4A33] hover:underline">
           Open test report →
         </a>
+        <a
+          href="https://docs.google.com/spreadsheets/d/1DF5lEs8rUYyHge8MtJtNnFOW7V33bSbQwXVFzFxEBd0/edit"
+          target="_blank"
+          rel="noreferrer"
+          className="self-center text-sm font-medium text-[#9A4A33] hover:underline"
+        >
+          Open test Master Report →
+        </a>
       </div>
 
       {res && !res.ok ? (

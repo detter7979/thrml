@@ -48,3 +48,16 @@ describe("utm cookie", () => {
     expect(parseUtmCookie("not json")).toEqual({})
   })
 })
+
+describe("master report pivots", () => {
+  it("only reference real Master Data columns", async () => {
+    const { PIVOTS } = await import("../master-report")
+    for (const p of PIVOTS) {
+      for (const r of p.rows) expect(UNIFIED_HEADERS).toContain(r)
+      for (const v of p.values) {
+        if (v.sum) expect(UNIFIED_HEADERS).toContain(v.sum)
+        for (const m of v.formula?.matchAll(/SUM\('([^']+)'\)/g) ?? []) expect(UNIFIED_HEADERS).toContain(m[1])
+      }
+    }
+  })
+})

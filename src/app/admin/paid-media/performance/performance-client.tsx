@@ -185,6 +185,14 @@ export function PerformanceClient() {
           <a href={exportHref("lookup")} className="rounded-lg border border-[#DCCDBA] px-3 py-1.5 text-sm text-[#2A2118] hover:bg-[#F3EADD]">
             Lookup CSV
           </a>
+          <a
+            href={test ? "https://docs.google.com/spreadsheets/d/1DF5lEs8rUYyHge8MtJtNnFOW7V33bSbQwXVFzFxEBd0/edit" : "https://docs.google.com/spreadsheets/d/17wVL2MIf_EuHIA4Wm1ShjgUbyrKthYR2KvvTdeL16qw/edit"}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-[#DCCDBA] px-3 py-1.5 text-sm text-[#2A2118] hover:bg-[#F3EADD]"
+          >
+            Master Report ↗
+          </a>
           <a href={exportHref("ga4")} className="rounded-lg border border-[#DCCDBA] px-3 py-1.5 text-sm text-[#2A2118] hover:bg-[#F3EADD]">
             GA4 CSV
           </a>

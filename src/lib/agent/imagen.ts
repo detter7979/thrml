@@ -36,6 +36,11 @@ function loadCredentials() {
 type Target = { model: string; location: string }
 let workingTarget: Target | null = null
 
+/** The model/location that last answered (for diagnostics). */
+export function currentImageModel(): Target | null {
+  return workingTarget
+}
+
 function candidateTargets(): Target[] {
   const pinned = process.env.VERTEX_IMAGE_MODEL?.trim()
   const models = pinned ? [pinned] : DEFAULT_MODELS

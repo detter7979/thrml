@@ -126,7 +126,25 @@ export async function fetchEvaluatorContext(): Promise<EvaluatorContext> {
     if (id) bumpSet.add(id)
   }
 
+  const { data: poolRows } = await admin
+    .from("ad_sets")
+    .select("id, legacy_id, campaign_id, audience_src, placement, status, campaigns!inner(persona)")
+    .not("platform_adset_id", "is", null)
+    .not("status", "in", "(KILLED,ARCHIVED)")
+  const audiencePool = (poolRows ?? []).map((r) => {
+    const c = (r as { campaigns: { persona: string } | { persona: string }[] }).campaigns
+    return {
+      id: r.id as string,
+      legacy_id: (r.legacy_id as string | null) ?? null,
+      campaign_id: r.campaign_id as string,
+      audience_src: r.audience_src as string,
+      placement: r.placement as string,
+      persona: (Array.isArray(c) ? c[0]?.persona : c?.persona) ?? "",
+    }
+  })
+
   return {
+    audiencePool,
     campaigns: campList,
     adSets: (adSets ?? []) as AdSet[],
     ads: (ads ?? []) as Ad[],

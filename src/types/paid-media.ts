@@ -194,6 +194,8 @@ export type MetaExecutionKindT =
   | "kill_ad"
   | "adjust_campaign_budget"
   | "adjust_ad_set_budget"
+  /** Build actions (audience-test ad set, next-phase draft) — always created PAUSED. */
+  | "duplicate_ad_set"
 
 export type MetaExecutionSourceT = "approved_recommendation" | "launch_creative" | "manual"
 

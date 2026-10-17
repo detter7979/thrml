@@ -31,6 +31,8 @@ const APPROVED_META_KINDS = [
   "KILL_AD_SET",
   "KILL_AD",
   "ADJUST_BUDGET",
+  "CREATE_AD_SET",
+  "ADVANCE_PHASE",
 ] as const
 
 const ACTIVE_EXECUTION_STATUSES: MetaExecutionStatusT[] = [
@@ -353,7 +355,8 @@ export async function runMetaAdsAgent(
         const prevFails = exec.attempt ?? 0
         const failCount = prevFails + 1
 
-        if (failCount >= 4) {
+        // Build actions create objects in Meta — a retry could duplicate them, so fail once and surface it.
+        if (failCount >= 4 || exec.kind === "duplicate_ad_set") {
           await admin
             .from("meta_executions")
             .update({

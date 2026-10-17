@@ -67,8 +67,23 @@ export async function approveRecommendation(id: string): Promise<ActionResult> {
   if (updateError) return { ok: false, error: updateError.message }
 
   try {
-    if (rec.kind === "GENERATE_CREATIVE") {
-      const briefRes = await insertCreativeBriefFromGenerateCreativeRecommendation(admin, rec, effectivePayload)
+    if (rec.kind === "GENERATE_CREATIVE" || rec.kind === "LAUNCH_TEST") {
+      // LAUNCH_TEST (rule 06): the next test is a challenger brief built off the winning ad. You still
+      // approve the brief and the generated assets before anything goes to Meta.
+      const briefRec =
+        rec.kind === "LAUNCH_TEST"
+          ? { ...rec, target_ad_id: (effectivePayload.carry_forward_winner_ad_id as string | undefined) ?? rec.target_ad_id }
+          : rec
+      const briefPayload =
+        rec.kind === "LAUNCH_TEST"
+          ? {
+              creative_strategy: "iterate_top_performer",
+              messaging_direction: `Challenger for ${String(effectivePayload.suggested_next_test_id ?? "the next test")}: keep what won, change one variable (hook, angle or format).`,
+              variations: 2,
+              ...effectivePayload,
+            }
+          : effectivePayload
+      const briefRes = await insertCreativeBriefFromGenerateCreativeRecommendation(admin, briefRec, briefPayload)
       if (!briefRes.ok) {
         await admin
           .from("recommendations")

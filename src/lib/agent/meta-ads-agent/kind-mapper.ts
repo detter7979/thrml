@@ -20,6 +20,13 @@ export function mapRecKindToExecutionKind(rec: Recommendation): MetaExecutionKin
       if (rec.target_ad_set_id) return "adjust_ad_set_budget"
       if (rec.target_campaign_id) return "adjust_campaign_budget"
       return null
+    // Build actions: never auto-approved, always created paused (see build-actions.ts).
+    case "CREATE_AD_SET":
+      return "duplicate_ad_set"
+    case "ADVANCE_PHASE": {
+      const p = (rec.modified_payload ?? rec.payload) as Record<string, unknown> | null
+      return p && p.warning ? null : "duplicate_ad_set"
+    }
     default:
       return null
   }

@@ -3,7 +3,7 @@ import type { Campaign } from "@/types/paid-media"
 import type { EvaluatorContext, RuleResult } from "../types"
 import { ruleNumber } from "../types"
 
-import { hostGuestCac, targetCacUsd } from "./_cac-helpers"
+import { hostGuestCac, resultEvent, targetCacUsd } from "./_cac-helpers"
 
 export function rule01CampaignCacOverTarget(ctx: EvaluatorContext): RuleResult[] {
   const mult = ruleNumber(ctx.rules, "underperformance.campaign_level", "cac_multiplier_vs_target", 2.5)
@@ -55,7 +55,7 @@ export function rule01CampaignCacOverTarget(ctx: EvaluatorContext): RuleResult[]
       },
       evidence: {
         dates_with_data: dates.size,
-        conv_event_focus: c.persona === "host" ? "BH" : "IC+PUR",
+        conv_event_focus: resultEvent(c),
         cac_vs_target_ratio: ratio,
       },
       rationale,

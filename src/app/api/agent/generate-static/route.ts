@@ -6,6 +6,8 @@ import {
   type StaticFormat,
 } from "@/lib/agent/static-generator"
 import { requireAdminApi } from "@/lib/admin-guard"
+import { statusAfterStaticGeneration } from "@/lib/agent/creative-brief-status"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -59,6 +61,20 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown static generation error"
     console.error("[agent/generate-static] failed", err)
+    // Don't leave the brief stuck in "generating" — put it back so it can be retried.
+    try {
+      const admin = createAdminClient()
+      const { data: brief } = await admin.from("creative_briefs").select("status, approved_at").eq("id", briefId).maybeSingle()
+      if (brief?.status === "generating") {
+        await admin
+          .from("creative_briefs")
+          .update({ status: statusAfterStaticGeneration(brief.approved_at as string | null) })
+          .eq("id", briefId)
+          .eq("status", "generating")
+      }
+    } catch (resetErr) {
+      console.error("[agent/generate-static] could not reset brief status", resetErr)
+    }
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

@@ -27,6 +27,27 @@ function kindBadgeClass(kind: RecKindT): string {
   return "border-[#DCCDBA] bg-[#EDE8E0] text-[#5B4A3A]"
 }
 
+/** What approving actually does, so there's no guessing. */
+function onApproveText(kind: RecKindT, payload: Record<string, unknown>): string | null {
+  switch (kind) {
+    case "CREATE_AD_SET":
+      return "Creates a PAUSED copy of the winning ad set (same ads) with the new audience in Meta, plus its namer row. You turn it on in Ads Manager."
+    case "ADVANCE_PHASE":
+      return payload.warning
+        ? "Watchlist only. Nothing is built."
+        : "Creates the next-phase campaign from the namer in Meta (PAUSED), copies the best ad set into it and switches it to the next event. You turn it on."
+    case "LAUNCH_TEST":
+      return "Creates a challenger creative brief from the winning ad. You approve the brief and the concepts before anything goes to Meta."
+    case "GENERATE_CREATIVE":
+      return "Creates a creative brief. You approve the brief and the concepts before anything goes to Meta."
+    case "ADJUST_BUDGET":
+      return "Changes the budget in Meta on the next agent run (11:00 UTC)."
+    default:
+      if (kind.startsWith("PAUSE_") || kind.startsWith("KILL_")) return "Pauses it in Meta on the next agent run (11:00 UTC)."
+      return null
+  }
+}
+
 function formatRelativeAgo(iso: string): string {
   const t = new Date(iso).getTime()
   const diffSec = Math.max(0, Math.floor((Date.now() - t) / 1000))
@@ -275,6 +296,13 @@ export function ApprovalQueueClient({
                 ) : (
                   <p className="mt-3 text-sm italic text-[#7A6553]">No rationale provided.</p>
                 )}
+
+                {onApproveText(row.kind, row.payload) ? (
+                  <p className="mt-2 text-xs text-[#6E5B49]">
+                    <span className="font-medium text-[#2A2118]">On approve: </span>
+                    {onApproveText(row.kind, row.payload)}
+                  </p>
+                ) : null}
 
                 {targetBits.length ? (
                   <div className="mt-3 text-xs text-[#6E5B49]">

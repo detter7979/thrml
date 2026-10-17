@@ -411,7 +411,61 @@ export async function fetchLaunchableAdsets(adAccountId: string): Promise<MetaAd
  * When host_verified is firing, ACT means verified-and-listing-created in practice; until then ACT
  * may be sparse — NL remains the usual proxy for host_first_listing_created volume in reports.
  */
-export function mapMetaActionsToEvents(actions: MetaAction[]): { event_t: string; conversions: number }[] {
+/**
+ * Custom conversion id → event_t, from the conversion's name prefix (BH_, HO_, NL_, ACT_, LEAD_, VC_,
+ * IC_, PUR_ — the naming used in Events Manager) or, failing that, the custom event it's built on.
+ * Meta reports custom conversions in insights as `offsite_conversion.custom.<id>`, and plain custom
+ * pixel events only as one aggregate `offsite_conversion.fb_pixel_custom`, so without this map BH /
+ * HO / NL results on optimized ad sets read as zero.
+ */
+export type CustomConversionEventMap = Map<string, string>
+
+const CC_PREFIXES = ["BH", "HO", "NL", "ACT", "LEAD", "VC", "IC", "PUR"]
+const CC_EVENT_NAMES: Record<string, string> = {
+  become_host_click: "BH",
+  host_onboarding_started: "HO",
+  host_first_listing_created: "NL",
+  host_verified: "ACT",
+}
+
+export function customConversionEvent(name: string, ruleText = ""): string | null {
+  const prefix = /^([A-Za-z]+)[_\s-]/.exec(name.trim())?.[1]?.toUpperCase()
+  if (prefix && CC_PREFIXES.includes(prefix)) return prefix
+  const hay = `${name} ${ruleText}`.toLowerCase()
+  for (const [ev, code] of Object.entries(CC_EVENT_NAMES)) if (hay.includes(ev)) return code
+  return null
+}
+
+export async function fetchCustomConversionEventMap(adAccountId: string): Promise<CustomConversionEventMap> {
+  const acct = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`
+  const token = encodeURIComponent(getMetaAccessToken())
+  const out: CustomConversionEventMap = new Map()
+  let url: string | null =
+    `${graphBase()}/${acct}/customconversions?fields=id,name,rule,is_archived&limit=200&access_token=${token}`
+  while (url) {
+    const res = await fetchWithRetry(url)
+    if (!res.ok) {
+      console.error("[meta-ads-api] customconversions", await res.text())
+      break
+    }
+    const json = (await res.json()) as {
+      data?: { id: string; name?: string; rule?: string; is_archived?: boolean }[]
+      paging?: { next?: string }
+    }
+    for (const cc of json.data ?? []) {
+      if (cc.is_archived) continue
+      const ev = customConversionEvent(cc.name ?? "", cc.rule ?? "")
+      if (ev) out.set(String(cc.id), ev)
+    }
+    url = json.paging?.next ?? null
+  }
+  return out
+}
+
+export function mapMetaActionsToEvents(
+  actions: MetaAction[],
+  customConversions?: CustomConversionEventMap
+): { event_t: string; conversions: number }[] {
   const byEvent = new Map<string, number>()
 
   const add = (key: string, n: number) => {
@@ -422,6 +476,13 @@ export function mapMetaActionsToEvents(actions: MetaAction[]): { event_t: string
   for (const a of actions) {
     const t = a.action_type ?? ""
     const v = Math.round(num(a.value))
+
+    const ccId = /^offsite_conversion\.custom\.(\d+)$/.exec(t)?.[1]
+    if (ccId) {
+      const ev = customConversions?.get(ccId)
+      if (ev) add(ev, v)
+      continue
+    }
 
     if (
       t === "offsite_conversion.fb_pixel_custom.become_host_click" ||
@@ -463,7 +524,7 @@ export function mapMetaActionsToEvents(actions: MetaAction[]): { event_t: string
       t === "offsite_conversion.custom.host_listing_created" ||
       t === "host_listing_created"
     ) {
-      add("HLC", v)
+      // Every listing (not just a host's first) — not an event_t; NL covers the first listing.
       continue
     }
     if (
@@ -473,6 +534,10 @@ export function mapMetaActionsToEvents(actions: MetaAction[]): { event_t: string
       t === "omni_activate"
     ) {
       add("ACT", v)
+      continue
+    }
+    if (t === "offsite_conversion.fb_pixel_lead" || t === "lead") {
+      add("LEAD", v)
       continue
     }
     if (t === "offsite_conversion.fb_pixel_view_content" || t === "view_content") {

@@ -9,6 +9,7 @@ import {
 } from "@/lib/agent/meta-api"
 import type { Recommendation } from "@/types/paid-media"
 
+import { executeAdvancePhase, executeAudienceTest } from "./build-actions"
 import type { ExecutorResult, MetaExecutionKind } from "./types"
 
 function effectivePayload(rec: Recommendation): Record<string, unknown> {
@@ -269,6 +270,8 @@ export async function dispatchExecution(
       return executeAdjustCampaignBudget(rec, admin)
     case "adjust_ad_set_budget":
       return executeAdjustAdSetBudget(rec, admin)
+    case "duplicate_ad_set":
+      return rec.kind === "ADVANCE_PHASE" ? executeAdvancePhase(rec, admin) : executeAudienceTest(rec, admin)
     default:
       return { success: false, error: `Unsupported execution kind: ${String(kind)}` }
   }

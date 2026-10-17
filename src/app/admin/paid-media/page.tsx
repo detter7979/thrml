@@ -1,7 +1,10 @@
 import { requireAdmin } from "@/lib/admin-guard"
+import { loadApprovalInbox } from "@/lib/agent/approval-inbox"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import type { PendingRecViewRow } from "@/types/paid-media"
 
+import { ApprovalInboxPanel } from "./approval-inbox-panel"
 import { ApprovalQueueClient } from "./approval-queue-client"
 
 export const dynamic = "force-dynamic"
@@ -18,6 +21,8 @@ export default async function AdminPaidMediaPage() {
     .from("v_pending_recs")
     .select("*")
     .order("created_at", { ascending: false })
+
+  const inbox = await loadApprovalInbox(createAdminClient())
 
   const initialRecs: PendingRecViewRow[] = (rawRows ?? [])
     .filter((r): r is Record<string, unknown> => r !== null && typeof r === "object")
@@ -50,8 +55,10 @@ export default async function AdminPaidMediaPage() {
     <div className="space-y-6 px-6 py-8">
       <div>
         <h1 className="font-serif text-3xl text-[#2A2118]">Paid media</h1>
-        <p className="text-sm text-[#6E5B49]">Approval queue and campaign system of record.</p>
+        <p className="text-sm text-[#6E5B49]">Approvals and campaign system of record.</p>
       </div>
+
+      <ApprovalInboxPanel inbox={inbox} />
 
       {error ? (
         <div className="rounded-2xl border border-[#C75B3A]/40 bg-[#F9E5DD] px-4 py-3 text-sm text-[#2A2118]">
@@ -60,6 +67,7 @@ export default async function AdminPaidMediaPage() {
         </div>
       ) : null}
 
+      <div id="queue" />
       <ApprovalQueueClient initialRecs={initialRecs} initialFetchError={error?.message ?? null} />
     </div>
   )

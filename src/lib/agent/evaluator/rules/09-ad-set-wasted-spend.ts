@@ -1,7 +1,7 @@
 import type { EvaluatorContext, PerformanceDailyRow, RuleResult } from "../types"
 import { isoDateUtcDaysAgo, ruleNumber } from "../types"
 
-import { targetCacUsd } from "./_cac-helpers"
+import { resultEvent, targetCacUsd } from "./_cac-helpers"
 
 /**
  * Rule 09 — pause ad sets that are burning budget.
@@ -16,7 +16,8 @@ import { targetCacUsd } from "./_cac-helpers"
 
 const WINDOW_DAYS = 7
 
-function adSetWindow(rows: PerformanceDailyRow[], adSetId: string) {
+/** Spend from every row; conversions only for the ad set's optimization event (e.g. BH, VC). */
+function adSetWindow(rows: PerformanceDailyRow[], adSetId: string, resultEvent: string) {
   const from = isoDateUtcDaysAgo(WINDOW_DAYS)
   let spend = 0
   let conv = 0
@@ -25,7 +26,7 @@ function adSetWindow(rows: PerformanceDailyRow[], adSetId: string) {
     if (r.level !== "ad_set" || r.entity_id !== adSetId || r.date < from) continue
     const s = Number(r.spend_usd) || 0
     spend += s
-    conv += Number(r.conversions) || 0
+    if (r.conv_event === resultEvent) conv += Number(r.conversions) || 0
     if (s > 0) days.add(r.date)
   }
   return { spend, conv, activeDays: days.size }
@@ -49,7 +50,8 @@ export function rule09AdSetWastedSpend(ctx: EvaluatorContext): RuleResult[] {
 
     const target = targetCacUsd(ctx, campaign)
     if (!(target > 0)) continue
-    const { spend, conv, activeDays } = adSetWindow(ctx.performanceDaily, set.id)
+    const ev = (set as { conv_event?: string | null }).conv_event || resultEvent(campaign)
+    const { spend, conv, activeDays } = adSetWindow(ctx.performanceDaily, set.id, ev)
     if (activeDays < minActiveDays) continue
 
     const label = set.legacy_id ?? set.name

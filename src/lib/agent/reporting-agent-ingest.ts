@@ -6,6 +6,8 @@ import {
   fetchInsights,
   getMetaAdAccountId,
   mapMetaActionsToEvents,
+  fetchCustomConversionEventMap,
+  type CustomConversionEventMap,
   purchaseRevenueUsd,
   type MetaInsightRow,
 } from "@/lib/agent/meta-ads-api"
@@ -93,10 +95,11 @@ function insightToDailyRows(
   insight: MetaInsightRow,
   dbLevel: "campaign" | "ad_set" | "ad",
   entityUuid: string,
-  campaignEventFallback: string
+  campaignEventFallback: string,
+  customConversions?: CustomConversionEventMap
 ): DailyInsert[] {
   const d = insight.date
-  const mapped = mapMetaActionsToEvents(insight.actions)
+  const mapped = mapMetaActionsToEvents(insight.actions, customConversions)
   const revenuePur = purchaseRevenueUsd(insight.action_values)
   const spend = insight.spend_usd
   const baseMetrics = {
@@ -382,6 +385,11 @@ export async function runReportingIngest(
     let resume_token: string | null = null
     let dailyRowsWritten = 0
 
+    const ccMap = await fetchCustomConversionEventMap(getMetaAdAccountId()).catch((e) => {
+      console.warn("[reporting-agent] custom conversion map unavailable", e)
+      return new Map() as CustomConversionEventMap
+    })
+
     for (let i = startIdx; i < list.length; i++) {
       const camp = list[i]
       if (!camp.platform_campaign_id) continue
@@ -415,7 +423,7 @@ export async function runReportingIngest(
       }
       const campInsights = campFetch.insights
       for (const ins of campInsights.filter((x) => x.date >= dateStart && x.date <= dateEnd)) {
-        const chunk = insightToDailyRows(ins, "campaign", camp.id, camp.event)
+        const chunk = insightToDailyRows(ins, "campaign", camp.id, camp.event, ccMap)
         dailyBuffer.push(...chunk)
         dailyRowsWritten += chunk.length
       }
@@ -426,7 +434,7 @@ export async function runReportingIngest(
         for (const ins of setFetch.insights.filter((x) => x.date >= dateStart && x.date <= dateEnd)) {
           const row = setRows.find((s) => s.platform_adset_id === ins.platform_entity_id)
           if (row) {
-            const chunk = insightToDailyRows(ins, "ad_set", row.id, camp.event)
+            const chunk = insightToDailyRows(ins, "ad_set", row.id, camp.event, ccMap)
             dailyBuffer.push(...chunk)
             dailyRowsWritten += chunk.length
           }
@@ -439,7 +447,7 @@ export async function runReportingIngest(
         for (const ins of adFetch.insights.filter((x) => x.date >= dateStart && x.date <= dateEnd)) {
           const row = adRows.find((a) => a.platform_ad_id === ins.platform_entity_id)
           if (row) {
-            const chunk = insightToDailyRows(ins, "ad", row.id, camp.event)
+            const chunk = insightToDailyRows(ins, "ad", row.id, camp.event, ccMap)
             dailyBuffer.push(...chunk)
             dailyRowsWritten += chunk.length
           }

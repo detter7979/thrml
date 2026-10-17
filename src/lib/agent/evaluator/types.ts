@@ -71,6 +71,17 @@ export type EvaluatorContext = {
   recentRecs: Recommendation[]
   /** Campaign IDs with an ADJUST_BUDGET actions_log row in the last 30d (first bump cap). */
   campaignsWithRecentBudgetAction: Set<string>
+  /** Every Meta-linked ad set (any campaign, not killed/archived) with its campaign's persona — audience-test candidates (rule 10). */
+  audiencePool?: AudiencePoolEntry[]
+}
+
+export type AudiencePoolEntry = {
+  id: string
+  legacy_id: string | null
+  campaign_id: string
+  audience_src: string
+  placement: string
+  persona: string
 }
 
 export type RuleTarget = {

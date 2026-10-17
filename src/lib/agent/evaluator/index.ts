@@ -16,6 +16,7 @@ import { rule06AbTestWinner } from "./rules/06-ab-test-winner"
 import { rule07StaleDataCheck } from "./rules/07-stale-data-check"
 import { rule08Through10CreativePerformance } from "./rules/08-creative-from-performance"
 import { rule09AdSetWastedSpend } from "./rules/09-ad-set-wasted-spend"
+import { rule10AudienceTest } from "./rules/10-audience-test"
 import type { EvaluatorContext, EvaluatorRunResult, RuleResult } from "./types"
 import { ruleNumber } from "./types"
 
@@ -32,6 +33,7 @@ const ALL_RULES = [
   rule07StaleDataCheck,
   rule08Through10CreativePerformance,
   rule09AdSetWastedSpend,
+  rule10AudienceTest,
 ]
 
 function applyFloorAndCap(ctx: { rules: Record<string, unknown> }, proposals: RuleResult[]): RuleResult[] {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { loadApprovalInbox } from "@/lib/agent/approval-inbox"
 import { renderThrmlEmail } from "@/lib/emails/render-layout"
 import { sendEmail } from "@/lib/emails/send"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -84,6 +85,19 @@ export async function GET(req: NextRequest) {
       .eq("trigger_type", "social")
       .eq("status", "social_draft")
 
+    // ── Paid media + creative approvals waiting on Dom ─────────────────────
+    const inbox = await loadApprovalInbox(admin).catch(() => null)
+    const approvalsUrl = `${appUrl}/admin/paid-media`
+    const approvalLines = inbox
+      ? [
+          inbox.recommendations ? `${inbox.recommendations} paid media recommendation(s)${inbox.buildRecommendations ? ` (${inbox.buildRecommendations} tests / builds / briefs)` : ""}` : "",
+          inbox.briefs.length ? `${inbox.briefs.length} creative brief(s) to approve` : "",
+          inbox.assetsToReview ? `${inbox.assetsToReview} concept(s) to review` : "",
+          inbox.assetsReadyToLaunch ? `${inbox.assetsReadyToLaunch} approved concept(s) ready to launch` : "",
+          ...inbox.pausedDrafts.slice(0, 3).map((d) => `${d.label} — ${d.detail}`),
+        ].filter(Boolean)
+      : []
+
     // ── Build email ────────────────────────────────────────────────────────
     // Agent failures used to appear only as a row in the table while the subject said "all clear".
     const failedRuns = (agentRuns ?? []).filter((r) => r.status === "error")
@@ -150,6 +164,14 @@ ${bookingsHtml}
   ${agentHtml || '<tr><td colspan="3" style="padding:8px;font-size:13px;color:#796A5E">No agent runs found for yesterday.</td></tr>'}
 </table>
 
+<!-- Approvals -->
+${approvalLines.length ? `
+<div style="margin-top:20px;background:#F5F0EA;border-radius:8px;padding:12px 16px">
+  <p style="margin:0;font-size:13px;font-weight:600;color:#1A1410">Waiting on your approval</p>
+  ${approvalLines.map((l) => `<p style="margin:4px 0 0;font-size:13px">· ${escapeHtml(l)}</p>`).join("")}
+  <p style="margin:8px 0 0;font-size:13px"><a href="${approvalsUrl}" style="color:#C4623A">Open approvals</a></p>
+</div>` : ""}
+
 <!-- Action items -->
 ${(pendingTickets ?? 0) > 0 || criticals.length > 0 || failedRuns.length > 0 ? `
 <div style="margin-top:20px;background:#FEF3F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px">
@@ -185,7 +207,7 @@ ${(pendingTickets ?? 0) > 0 || criticals.length > 0 || failedRuns.length > 0 ? `
       to: "etter.dom@gmail.com",
       subject: `${subjectPrefix}thrml Digest${subjectRevenue}${alertSummary}`,
       html,
-      text: `thrml Agent Digest — ${today}\n\nAlerts: ${criticals.length} critical, ${warnings.length} warnings\nFailing agents: ${failedAgentNames.join(", ") || "none"}\nBookings: ${(newBookings ?? []).length} (${fmt(bookingRevenue)})\nOpen tickets: ${pendingTickets ?? 0}\nContent queued: ${pendingSocial ?? 0}`,
+      text: `thrml Agent Digest — ${today}\n\nAlerts: ${criticals.length} critical, ${warnings.length} warnings\nFailing agents: ${failedAgentNames.join(", ") || "none"}\nBookings: ${(newBookings ?? []).length} (${fmt(bookingRevenue)})\nOpen tickets: ${pendingTickets ?? 0}\nContent queued: ${pendingSocial ?? 0}${approvalLines.length ? `\n\nWaiting on your approval:\n${approvalLines.map((l) => `- ${l}`).join("\n")}\n${approvalsUrl}` : ""}`,
     })
 
     await admin.from("agent_runs").insert({

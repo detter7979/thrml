@@ -142,3 +142,29 @@ describe("auto-approval", () => {
     expect(autoApprovalDecision(c, pauseAd(40)).eligible).toBe(false)
   })
 })
+
+describe("event-aware cost per result", () => {
+  // Ingest puts the day's spend on the first event row only; results must count the campaign's own event.
+  function row(entity: string, daysAgo: number, spend: number, conversions: number, ev: string): PerformanceDailyRow {
+    return { ...perf(entity, daysAgo, spend, conversions), conv_event: ev as PerformanceDailyRow["conv_event"] }
+  }
+  const hostCtx = (performanceDaily: PerformanceDailyRow[]) =>
+    ctx({
+      campaigns: [
+        { id: "c1", legacy_id: "C001", name: "Host BH", persona: "host", event: "BH", status: "TEST", daily_budget_usd: 20 },
+      ] as unknown as EvaluatorContext["campaigns"],
+      rules: { "host.*::target_cac_signup_usd": 5 },
+      performanceDaily,
+    })
+
+  it("keeps an ad set whose BH results arrive on a zero-spend row", () => {
+    const rows = [1, 2, 3, 4].flatMap((d) => [row("s1", d, 20, 3, "VC"), row("s1", d, 0, 6, "BH")]) // $80 / 24 BH = $3.33
+    expect(rule09AdSetWastedSpend(hostCtx(rows))).toHaveLength(0)
+  })
+
+  it("pauses when spend has no BH results even if other events fired", () => {
+    const rows = [1, 2, 3, 4].map((d) => row("s1", d, 20, 30, "VC")) // $80, 0 BH
+    const out = rule09AdSetWastedSpend(hostCtx(rows))
+    expect(out.map((r) => r.target.adSetId)).toEqual(["s1"])
+  })
+})

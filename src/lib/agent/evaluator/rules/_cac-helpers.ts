@@ -46,13 +46,13 @@ export function hostGuestCac(
 
 /** rules_config key + default per optimization event. Edit the values on the admin Rules tab. */
 export const TARGET_COST_KEYS: Record<string, { scope: string; key: string; fallback: number }> = {
-  BH: { scope: "host.*", key: "target_cac_signup_usd", fallback: 5 },
+  BH: { scope: "host.*", key: "target_cost_bh_usd", fallback: 5 },
   HO: { scope: "host.*", key: "target_cost_ho_usd", fallback: 40 },
   NL: { scope: "host.*", key: "target_cost_nl_usd", fallback: 150 },
-  ACT: { scope: "host.*", key: "target_cac_activation_usd", fallback: 150 },
+  ACT: { scope: "host.*", key: "target_cost_act_usd", fallback: 150 },
   VC: { scope: "guest.*", key: "target_cost_vc_usd", fallback: 1.5 },
   IC: { scope: "guest.*", key: "target_cost_ic_usd", fallback: 15 },
-  PUR: { scope: "guest.*", key: "target_cac_purchase_usd", fallback: 35 },
+  PUR: { scope: "guest.*", key: "target_cost_pur_usd", fallback: 35 },
   LEAD: { scope: "guest.*", key: "target_cost_lead_usd", fallback: 5 },
 }
 

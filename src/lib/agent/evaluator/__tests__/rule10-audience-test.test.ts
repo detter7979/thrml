@@ -48,7 +48,7 @@ function ctx(overrides: Partial<EvaluatorContext> = {}): EvaluatorContext {
     ads: [],
     performance: [],
     performanceDaily: [1, 2, 3, 4, 5].map((d) => perf("s1", d, 20, 3)), // 15 results at $6.67
-    rules: { "guest.*::target_cac_purchase_usd": 35 },
+    rules: { "guest.*::target_cost_pur_usd": 35 },
     recentRecs: [],
     campaignsWithRecentBudgetAction: new Set(),
     audiencePool: [
@@ -105,7 +105,7 @@ describe("campaign kill suppresses child proposals", () => {
       p("GENERATE_CREATIVE", "c2", "s5"),
       p("PAUSE_AD_SET", "c1", "s1"),
     ])
-    expect(out.map((x: { kind: string; target: { campaignId: string } }) => `${x.kind}:${x.target.campaignId}`)).toEqual([
+    expect(out.map((x) => `${x.kind}:${x.target.campaignId}`)).toEqual([
       "KILL_CAMPAIGN:c2",
       "PAUSE_AD_SET:c1",
     ])

@@ -42,7 +42,7 @@ function ctx(overrides: Partial<EvaluatorContext> = {}): EvaluatorContext {
     ads: [],
     performance: [],
     performanceDaily: [],
-    rules: { "guest.*::target_cac_purchase_usd": 35 },
+    rules: { "guest.*::target_cost_pur_usd": 35 },
     recentRecs: [],
     campaignsWithRecentBudgetAction: new Set(),
     ...overrides,
@@ -153,7 +153,7 @@ describe("event-aware cost per result", () => {
       campaigns: [
         { id: "c1", legacy_id: "C001", name: "Host BH", persona: "host", event: "BH", status: "TEST", daily_budget_usd: 20 },
       ] as unknown as EvaluatorContext["campaigns"],
-      rules: { "host.*::target_cac_signup_usd": 5 },
+      rules: { "host.*::target_cost_bh_usd": 5 },
       performanceDaily,
     })
 

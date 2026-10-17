@@ -1,16 +1,7 @@
 import type { EvaluatorContext, RuleResult } from "../types"
 import { ruleNumber } from "../types"
 
-import { hostGuestCac } from "./_cac-helpers"
-
-function targetCacPersona(ctx: EvaluatorContext, persona: "host" | "guest"): number {
-  if (persona === "host") {
-    const signup = ruleNumber(ctx.rules, "host.*", "target_cac_signup_usd", NaN)
-    if (Number.isFinite(signup) && signup > 0) return signup
-    return ruleNumber(ctx.rules, "host.*", "target_cac_activation_usd", 150)
-  }
-  return ruleNumber(ctx.rules, "guest.*", "target_cac_purchase_usd", 35)
-}
+import { hostGuestCac, targetCacUsd } from "./_cac-helpers"
 
 function bumpPct(currentDaily: number): number {
   if (currentDaily <= 25) return 0.4
@@ -34,7 +25,7 @@ export function rule02CampaignBumpBudget(ctx: EvaluatorContext): RuleResult[] {
     if (daily <= 0) continue
 
     const { cac, spend, conv, dates } = hostGuestCac(ctx.performance, c, days)
-    const target = targetCacPersona(ctx, c.persona)
+    const target = targetCacUsd(ctx, c)
     if (cac === null || conv <= 0) continue
     if (dates.size < 7) continue
     if (cac > target) continue

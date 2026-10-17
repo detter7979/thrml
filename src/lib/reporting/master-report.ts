@@ -185,7 +185,7 @@ function pivotRequests(def: PivotDef, sheetId: number, sourceSheetId: number): o
     valueLayout: "HORIZONTAL",
     // Source rows are open-ended (Master Data grows), so skip the empty rows under the data.
     filterSpecs: [
-      { columnOffsetIndex: col("Date"), filterCriteria: { condition: { type: "NOT_BLANK" } } },
+      { columnOffsetIndex: col("Date"), filterCriteria: { condition: { type: "NOT_BLANK" }, visibleByDefault: true } },
       ...(def.filter ? [{ columnOffsetIndex: col(def.filter.column), filterCriteria: { visibleValues: def.filter.values } }] : []),
     ],
   }

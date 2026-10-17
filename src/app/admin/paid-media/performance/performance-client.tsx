@@ -125,9 +125,10 @@ export function PerformanceClient() {
     ["Cost / result", div(totals["Spend ($)"]!, totals["Results (Opt. Event)"]!)],
     ["Sessions (GA4)", int(totals["Sessions (GA4)"]!)],
     ["Cost / session", div(totals["Spend ($)"]!, totals["Sessions (GA4)"]!)],
+    ["Revenue (GA4)", money(totals["Revenue (GA4)"]!)],
+    ["ROAS (GA4)", div(totals["Revenue (GA4)"]!, totals["Spend ($)"]!)],
     ["Bookings (thrml)", int(totals["Bookings (thrml)"]!)],
     ["ROAS (thrml)", div(totals["Booking Revenue (thrml)"]!, totals["Spend ($)"]!)],
-    ["ROAS (GA4)", div(totals["Revenue (GA4)"]!, totals["Spend ($)"]!)],
   ] as const
 
   return (
@@ -198,7 +199,7 @@ export function PerformanceClient() {
       {refreshing ? <p className="text-xs text-[#6E5B49]">{refreshing}</p> : null}
       {error ? <div className="rounded-xl border border-[#C75B3A]/40 bg-[#F9E5DD] px-4 py-3 text-sm">{error}</div> : null}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-9">
         {kpis.map(([label, v]) => (
           <div key={label} className="rounded-xl border border-[#E7DACA] bg-white px-3 py-2.5">
             <p className="text-[11px] uppercase tracking-wide text-[#6E5B49]">{label}</p>
@@ -218,7 +219,7 @@ export function PerformanceClient() {
                   {k}
                 </th>
               ))}
-              {["Spend", "Impr.", "CTR", "Results", "Cost/result", "Sessions", "Cost/session", "Views", "Checkouts", "Bookings", "ROAS thrml", "ROAS GA4"].map((h) => (
+              {["Spend", "Impr.", "CTR", "Results", "Cost/result", "Sessions", "Cost/session", "Views", "Checkouts", "Purchases GA4", "Revenue GA4", "ROAS GA4", "Bookings", "ROAS thrml"].map((h) => (
                 <th key={h} className="whitespace-nowrap px-3 py-2 text-right font-medium">
                   {h}
                 </th>
@@ -262,9 +263,11 @@ export function PerformanceClient() {
                     <td className="px-3 py-2 text-right tabular-nums">{cps === null ? "—" : money(cps)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{int(s["View Listing (GA4)"]!)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{int(s["Begin Checkout (GA4)"]!)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{int(s["Purchases (GA4)"]!)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{money(s["Revenue (GA4)"]!)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{roasG === null ? "—" : `${roasG.toFixed(2)}×`}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{int(s["Bookings (thrml)"]!)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{roasT === null ? "—" : `${roasT.toFixed(2)}×`}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{roasG === null ? "—" : `${roasG.toFixed(2)}×`}</td>
                   </tr>
                 )
               })

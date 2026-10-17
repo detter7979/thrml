@@ -16,6 +16,7 @@ import { stripe } from "@/lib/stripe"
 import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { UTM_COOKIE, parseUtmCookie, utmBookingColumns } from "@/lib/attribution/utm-cookie"
 import { LISTING_PUBLIC_COLUMNS } from "@/lib/listings/private-fields"
 
 const checkoutSchema = z.object({
@@ -608,6 +609,7 @@ export async function POST(req: NextRequest) {
         waiver_version: waiver_version.trim(),
         waiver_accepted: true,
         waiver_accepted_at: new Date().toISOString(),
+        ...utmBookingColumns(parseUtmCookie(req.cookies.get(UTM_COOKIE)?.value)),
       })
       .select()
       .single()

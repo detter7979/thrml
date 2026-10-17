@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 const TABS = [
   { href: "/admin/paid-media", label: "Approvals", match: (p: string) => p === "/admin/paid-media" },
   { href: "/admin/paid-media/campaigns", label: "Campaigns", match: (p: string) => p.startsWith("/admin/paid-media/campaigns") },
+  { href: "/admin/paid-media/performance", label: "Performance", match: (p: string) => p.startsWith("/admin/paid-media/performance") },
   { href: "/admin/paid-media/executions", label: "Executions", match: (p: string) => p.startsWith("/admin/paid-media/executions") },
   { href: "/admin/paid-media/runs", label: "Reporting", match: (p: string) => p.startsWith("/admin/paid-media/runs") },
   { href: "/admin/paid-media/evaluator", label: "Evaluator", match: (p: string) => p.startsWith("/admin/paid-media/evaluator") },

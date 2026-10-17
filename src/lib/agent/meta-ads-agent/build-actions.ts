@@ -174,19 +174,19 @@ async function appendAdSetBuilderRow(row: {
   if (cStatus >= 0) out[cStatus] = row.status
   if (cNotes >= 0) out[cNotes] = row.notes
 
-  const lastCol = columnToLetter(width)
+  const lastCol = columnToLetter(width - 1)
   await batchWriteCells(sheets, sheetId, [{ range: `'${esc}'!A${newRow}:${lastCol}${newRow}`, values: [out] }], {
     userEntered: true,
   })
   // Platform ID as plain text (USER_ENTERED would round an 18-digit number).
   if (cPlatform >= 0) {
     await batchWriteCells(sheets, sheetId, [
-      { range: `'${esc}'!${columnToLetter(cPlatform + 1)}${newRow}`, values: [[row.platformAdSetId]] },
+      { range: `'${esc}'!${columnToLetter(cPlatform)}${newRow}`, values: [[row.platformAdSetId]] },
     ])
   }
   let name: string | null = null
   if (cName >= 0) {
-    const back = await readSheetValues(sheets, sheetId, tab, `${columnToLetter(cName + 1)}${newRow}`)
+    const back = await readSheetValues(sheets, sheetId, tab, `${columnToLetter(cName)}${newRow}`)
     name = (back[0]?.[0] ?? "").trim() || null
   }
   return { legacyId, name }

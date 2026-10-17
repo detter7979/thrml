@@ -70,6 +70,34 @@ function metricsNum(m: Record<string, unknown> | undefined, camel: string, snake
   return Number(v ?? 0)
 }
 
+/** Run a GAQL query and return every result row (follows nextPageToken). Throws on API errors. */
+export async function googleAdsSearch(query: string): Promise<Record<string, unknown>[]> {
+  const token = await getGoogleAccessToken()
+  const out: Record<string, unknown>[] = []
+  let pageToken: string | undefined
+  do {
+    const res = await fetch(`${baseUrl()}/googleAds:search`, {
+      method: "POST",
+      headers: gadsHeaders(token),
+      body: JSON.stringify(pageToken ? { query, pageToken } : { query }),
+    })
+    if (!res.ok) throw new Error(`Google Ads query failed: ${res.status} ${(await res.text()).slice(0, 400)}`)
+    const json = (await res.json()) as { results?: Record<string, unknown>[]; nextPageToken?: string }
+    out.push(...(json.results ?? []))
+    pageToken = json.nextPageToken
+  } while (pageToken)
+  return out
+}
+
+/** True when Google Ads credentials are configured (developer token + customer + OAuth). */
+export function googleAdsConfigured(): boolean {
+  try {
+    return Boolean(customerIdRaw() && devToken())
+  } catch {
+    return false
+  }
+}
+
 export type GoogleInsightRow = {
   campaign_id: string
   campaign_name: string

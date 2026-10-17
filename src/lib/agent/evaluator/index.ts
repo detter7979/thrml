@@ -44,6 +44,13 @@ function applyFloorAndCap(ctx: { rules: Record<string, unknown> }, proposals: Ru
   return filtered.slice(0, maxRecs)
 }
 
+/** Run every rule on a context (no DB). Used by the evaluator and the admin test scenario. */
+export function proposeFromContext(ctx: EvaluatorContext): { raw: RuleResult[]; proposals: RuleResult[] } {
+  const raw: RuleResult[] = []
+  for (const rule of ALL_RULES) raw.push(...rule(ctx))
+  return { raw, proposals: applyFloorAndCap(ctx, dedupeProposals(raw, ctx.recentRecs)) }
+}
+
 async function insertRecommendations(
   admin: SupabaseClient,
   ctx: EvaluatorContext,

@@ -67,7 +67,7 @@ export async function approveRecommendation(id: string): Promise<ActionResult> {
   if (updateError) return { ok: false, error: updateError.message }
 
   try {
-    if (rec.kind === "GENERATE_CREATIVE" || rec.kind === "LAUNCH_TEST") {
+    if ((rec.kind === "GENERATE_CREATIVE" || rec.kind === "LAUNCH_TEST") && !effectivePayload.is_test) {
       // LAUNCH_TEST (rule 06): the next test is a challenger brief built off the winning ad. You still
       // approve the brief and the generated assets before anything goes to Meta.
       const briefRec =

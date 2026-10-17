@@ -3,6 +3,7 @@ import Link from "next/link"
 import { requireAdmin } from "@/lib/admin-guard"
 
 import { EvaluatorDryRunClient } from "./evaluator-dry-run-client"
+import { TestScenarioClient } from "./test-scenario-client"
 
 export const dynamic = "force-dynamic"
 
@@ -52,6 +53,19 @@ export default async function PaidMediaEvaluatorPage() {
         </p>
         <div className="mt-4">
           <EvaluatorDryRunClient />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-[#D9CBB8] bg-[#FCF8F3] p-6">
+        <h2 className="font-serif text-xl text-[#2A2118]">Test scenario</h2>
+        <p className="mt-2 text-sm text-[#6E5B49]">
+          45 days of fake performance on your real namer campaigns: a winning ad set, one burning spend, ad fatigue, an
+          expensive campaign, a declining creative, and enough volume to advance a phase. Shows what the agents would
+          recommend and writes the TEST report in Drive. Nothing touches real data or Meta. Sending to Approvals marks
+          them [TEST]; approving one only logs what would have happened.
+        </p>
+        <div className="mt-4">
+          <TestScenarioClient />
         </div>
       </section>
 

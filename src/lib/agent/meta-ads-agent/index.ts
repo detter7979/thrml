@@ -227,6 +227,14 @@ export async function runMetaAdsAgent(
     for (const rec of freshRecs) {
       const mapped = mapRecKindToExecutionKind(rec)
       if (!mapped) continue
+      // Test-scenario recommendations: record what would have happened, never call Meta.
+      if (effectivePayload(rec).is_test) {
+        await insertPerRecLog(admin, rec, true, { test_scenario: true, would_execute: mapped }, null)
+        await markRecExecuted(admin, rec.id, null)
+        processed++
+        succeeded++
+        continue
+      }
       const metaIds = await resolveMetaIds(admin, rec)
       const { data: inserted, error: insErr } = await admin
         .from("meta_executions")

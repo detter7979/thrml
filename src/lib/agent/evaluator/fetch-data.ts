@@ -22,7 +22,7 @@ function parseJsonValue(raw: unknown): unknown {
   return raw
 }
 
-function buildRulesIndex(rows: { scope: string; rule_key: string; rule_value: unknown }[]): Record<string, unknown> {
+export function buildRulesIndex(rows: { scope: string; rule_key: string; rule_value: unknown }[]): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const r of rows) {
     const key = ruleKey(r.scope, r.rule_key)

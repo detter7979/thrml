@@ -168,3 +168,15 @@ describe("event-aware cost per result", () => {
     expect(out.map((r) => r.target.adSetId)).toEqual(["s1"])
   })
 })
+
+describe("rule 09 keeps one ad set running", () => {
+  it("never proposes pausing every live ad set in a campaign", () => {
+    const rows = [
+      ...[1, 2, 3, 4].map((d) => perf("s1", d, 20, 0)),
+      ...[1, 2, 3, 4].map((d) => perf("s2", d, 25, 0)),
+    ]
+    const out = rule09AdSetWastedSpend(ctx({ performanceDaily: rows }))
+    expect(out).toHaveLength(1)
+    expect(out[0].target.adSetId).toBe("s2") // more spend, same zero conversions → paused first
+  })
+})

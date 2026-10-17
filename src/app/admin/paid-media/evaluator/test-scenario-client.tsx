@@ -20,6 +20,7 @@ type Result = {
   days?: number
   spend?: number
   rawProposals?: number
+  scenarios?: string[]
   proposals?: Proposal[]
   sentToApprovals?: number
   report?: { rows: number; sheets: string[]; errors: string[] } | null
@@ -93,6 +94,16 @@ export function TestScenarioClient() {
             {res.sentToApprovals ? ` Sent ${res.sentToApprovals} to Approvals, marked [TEST].` : ""}
             {res.report ? ` Test report: ${res.report.rows} rows → ${res.report.sheets.join(", ") || "not written"}.` : ""}
           </p>
+          {res.scenarios?.length ? (
+            <details className="text-xs text-[#6E5B49]">
+              <summary className="cursor-pointer">What each ad set was set up to do</summary>
+              <ul className="mt-1 list-disc pl-5">
+                {res.scenarios.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
           {res.report?.errors?.length ? (
             <p className="text-xs text-[#9A4A33]">Report errors: {res.report.errors.join(" | ")}</p>
           ) : null}

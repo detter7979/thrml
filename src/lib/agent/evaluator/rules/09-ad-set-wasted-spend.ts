@@ -82,5 +82,26 @@ export function rule09AdSetWastedSpend(ctx: EvaluatorContext): RuleResult[] {
       }
     }
   }
-  return out
+  // Never pause every ad set in a campaign in one run: keep the best one (most conversions,
+  // then lowest spend) — pausing the whole campaign is rule 01's call.
+  const byCampaign = new Map<string, RuleResult[]>()
+  for (const r of out) {
+    const k = r.target.campaignId ?? ""
+    byCampaign.set(k, [...(byCampaign.get(k) ?? []), r])
+  }
+  const keep: RuleResult[] = []
+  for (const [cid, recs] of byCampaign) {
+    const live = liveCountByCampaign.get(cid) ?? 0
+    if (recs.length < live) {
+      keep.push(...recs)
+      continue
+    }
+    const ranked = [...recs].sort((a, b) => {
+      const ca = Number(a.evidence.conversions) || 0
+      const cb = Number(b.evidence.conversions) || 0
+      return ca !== cb ? ca - cb : (Number(b.evidence.spend_usd) || 0) - (Number(a.evidence.spend_usd) || 0)
+    })
+    keep.push(...ranked.slice(0, Math.max(0, live - 1)))
+  }
+  return keep
 }

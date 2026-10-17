@@ -44,6 +44,8 @@ export type ScenarioResult = {
   spend: number
   proposals: (RuleResult & { campaign?: string; ad_set?: string; ad?: string })[]
   rawProposals: number
+  /** Which situation each ad set was given. */
+  scenarios: string[]
   report: ReportRunResult | null
   sentToApprovals: number
 }
@@ -65,20 +67,27 @@ function pid(real: string | null | undefined, legacy: string | null) {
   return real && real.trim() ? real : `TEST_${legacy ?? "X"}`
 }
 
+const roles: string[] = []
+
 function generateFacts(campaigns: Campaign[], sets: AdSet[], ads: Ad[], from: string, to: string): Fact[] {
   const rand = rng(46)
   const days = datesBetween(from, to)
   const facts: Fact[] = []
+  roles.length = 0
   const hostP1 = campaigns.filter((c) => c.persona === "host" && c.phase === "P1")
   const winnerCampaign = hostP1.find((c) => sets.filter((s) => s.campaign_id === c.id).length >= 2) ?? hostP1[0]
   const expensiveCampaign = hostP1.find((c) => c.id !== winnerCampaign?.id)
   let declinedOne = false
 
   for (const c of campaigns) {
-    const cSets = sets.filter((s) => s.campaign_id === c.id)
-    const cAds = ads.filter((a) => a.campaign_id === c.id)
+    const byId = (a: { legacy_id: string | null }, b: { legacy_id: string | null }) =>
+      String(a.legacy_id).localeCompare(String(b.legacy_id))
+    const cAds = ads.filter((a) => a.campaign_id === c.id).sort(byId)
+    const cSets = sets.filter((s) => s.campaign_id === c.id && cAds.some((a) => a.ad_set_id === s.id)).sort(byId)
     if (!cAds.length) continue
-    const budget = Number(c.daily_budget_usd) || 20
+    // The winner and the expensive campaign run hotter so phase-advance and kill thresholds are reachable.
+    const boost = c.id === winnerCampaign?.id || c.id === expensiveCampaign?.id ? 1.8 : 1
+    const budget = (Number(c.daily_budget_usd) || 20) * boost
     const isHost = c.persona === "host"
     const declineAd = !isHost && !declinedOne && cAds.length >= 2 ? cAds[0] : null
     if (declineAd) declinedOne = true
@@ -86,8 +95,9 @@ function generateFacts(campaigns: Campaign[], sets: AdSet[], ads: Ad[], from: st
     cSets.forEach((set, si) => {
       const setAds = cAds.filter((a) => a.ad_set_id === set.id)
       if (!setAds.length) return
-      const role =
+      const role: string =
         c.id === winnerCampaign?.id ? (["winner", "burner", "fatigue"][si] ?? "steady") : c.id === expensiveCampaign?.id ? "expensive" : "steady"
+      roles.push(`${c.legacy_id} › ${set.legacy_id}: ${role}${declineAd && declineAd.ad_set_id === set.id ? ` (${declineAd.legacy_id} CTR drops last 7 days)` : ""}`)
       const setShare = 1 / cSets.length
       days.forEach((date, di) => {
         const recent = di >= days.length - 7
@@ -105,7 +115,7 @@ function generateFacts(campaigns: Campaign[], sets: AdSet[], ads: Ad[], from: st
           const conv: Record<string, number> = {}
           let revenue = 0
           if (isHost) {
-            const bhRate = role === "winner" ? 0.5 : role === "burner" ? 0 : role === "expensive" ? 0.05 : 0.18
+            const bhRate = role === "winner" ? 0.9 : role === "burner" ? 0 : role === "expensive" ? 0.05 : 0.18
             const bh = Math.round(link * bhRate * (0.8 + rand() * 0.4))
             conv.BH = bh
             conv.HO = Math.round(bh * 0.25 * (0.6 + rand() * 0.8))
@@ -385,6 +395,7 @@ export async function runTestScenario(
     spend: Math.round(facts.reduce((s, f) => s + f.spend, 0) * 100) / 100,
     proposals: labelled,
     rawProposals: raw.length,
+    scenarios: [...roles],
     report,
     sentToApprovals: sent,
   }

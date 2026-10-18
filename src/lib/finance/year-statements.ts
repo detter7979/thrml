@@ -16,7 +16,15 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { loadGoogleServiceAccountCredentials } from "@/lib/google-service-account"
 
-import { type ReconciliationResult, monthRange } from "./monthly-reconciliation"
+import type { ReconciliationResult } from "./monthly-reconciliation"
+
+/** Calendar month bounds (UTC). Kept local so this module doesn't load the Stripe client. */
+function monthRange(month: string): { start: string; end: string } {
+  const [y, m] = month.split("-").map(Number)
+  const start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10)
+  const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
+  return { start, end }
+}
 
 type Sheets = ReturnType<typeof google.sheets>
 type Cell = string | number

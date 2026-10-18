@@ -21,7 +21,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </aside>
       <main className="overflow-auto">
         <div className="mx-auto w-full max-w-[1400px]">
-          {children}
+          {/* At least one screen tall, so the footer always starts just below the fold. */}
+          <div className="min-h-[100svh]">{children}</div>
           <SiteFooter />
         </div>
       </main>

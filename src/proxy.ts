@@ -6,6 +6,15 @@ function isProtectedPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  // Supabase sends people to the Site URL (/?code=…) when our redirect URL isn't on its allowlist.
+  // Hand that code to /auth/callback so the session is set server-side and the saved return path is used.
+  if (request.nextUrl.pathname === "/") {
+    if (!request.nextUrl.searchParams.has("code")) return NextResponse.next()
+    const callback = request.nextUrl.clone()
+    callback.pathname = "/auth/callback"
+    return NextResponse.redirect(callback)
+  }
+
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -42,5 +51,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/book/:path*", "/review/:path*"],
+  matcher: ["/", "/dashboard/:path*", "/book/:path*", "/review/:path*"],
 }

@@ -13,6 +13,7 @@ import { AuthShell } from "@/components/auth/AuthShell"
 import { GoogleIcon } from "@/components/auth/GoogleIcon"
 import { Button } from "@/components/ui/button"
 import { trackGaEvent } from "@/lib/analytics/ga"
+import { rememberReturnTo } from "@/lib/auth/return-to"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -184,8 +185,9 @@ function LoginForm() {
     trackGaEvent("login", {
       method: "email",
     })
-    router.push(resolveNextPath())
-    router.refresh()
+    // Full navigation so the server (and the /book guard) sees the fresh session cookie.
+    rememberReturnTo(null)
+    window.location.assign(resolveNextPath())
   }
 
   async function handleMagicLinkLogin(event: FormEvent<HTMLFormElement>) {
@@ -199,6 +201,7 @@ function LoginForm() {
     setIsMagicLinkLoading(true)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") || window.location.origin
     const magicLinkNext = requestedNext ?? "/dashboard"
+    rememberReturnTo(requestedNext)
     const { error: magicLinkError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
@@ -234,6 +237,7 @@ function LoginForm() {
     setIsGoogleLoading(true)
 
     const next = resolveNextPath()
+    rememberReturnTo(next)
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
     const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { sendGuestWelcomeEmail, markOnboardingEmailSent } from "@/lib/emails/onboarding"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
+import { RETURN_TO_COOKIE, readReturnToCookie } from "@/lib/auth/return-to"
 import { recordReferral } from "@/lib/referral"
 import { sanitizeNextPath } from "@/lib/security"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -20,6 +21,7 @@ function loginFallbackUrl(requestUrl: URL, next: string | null) {
 function clearOAuthSignupCookies(response: NextResponse) {
   response.cookies.delete("thrml_signup_terms")
   response.cookies.delete("thrml_signup_newsletter")
+  response.cookies.delete(RETURN_TO_COOKIE)
   return response
 }
 
@@ -114,7 +116,11 @@ export async function GET(request: NextRequest) {
   const type = requestUrl.searchParams.get("type")
   const code = requestUrl.searchParams.get("code")
   const recoveryNext = sanitizeNextPath(requestUrl.searchParams.get("next"), "/auth/reset-password")
-  const next = sanitizeNextPath(requestUrl.searchParams.get("next"), null)
+  // Prefer the explicit ?next=; fall back to the cookie set before sign-in, which survives Supabase
+  // replacing our redirect URL with the Site URL.
+  const next =
+    sanitizeNextPath(requestUrl.searchParams.get("next"), null) ??
+    readReturnToCookie(request.cookies.get(RETURN_TO_COOKIE)?.value)
 
   if (tokenHash && type === "recovery") {
     const supabase = await createClient()

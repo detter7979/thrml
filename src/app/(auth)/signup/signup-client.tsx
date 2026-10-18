@@ -21,6 +21,7 @@ import { trackGaEvent } from "@/lib/analytics/ga"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { MIN_PASSWORD_LENGTH } from "@/lib/security/password-policy"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
+import { rememberReturnTo } from "@/lib/auth/return-to"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -115,8 +116,8 @@ function SignupForm() {
         data: { user },
       } = await supabase.auth.getUser()
       if (user?.email_confirmed_at) {
-        router.push(getPostSignupDestination())
-        router.refresh()
+        rememberReturnTo(null)
+        window.location.assign(getPostSignupDestination())
       }
     }, 3000)
     return () => window.clearInterval(id)
@@ -164,6 +165,7 @@ function SignupForm() {
     }
 
     const next = getPostSignupDestination()
+    rememberReturnTo(next)
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
     const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -211,6 +213,7 @@ function SignupForm() {
     setError(null)
     setLoading(true)
 
+    rememberReturnTo(requestedNext)
     const redirectTo = `${window.location.origin}/auth/callback${
       requestedNext ? `?next=${encodeURIComponent(requestedNext)}` : ""
     }`
@@ -320,8 +323,8 @@ function SignupForm() {
       data: { user },
     } = await supabase.auth.getUser()
     if (user?.email_confirmed_at) {
-      router.push(getPostSignupDestination())
-      router.refresh()
+      rememberReturnTo(null)
+      window.location.assign(getPostSignupDestination())
       return
     }
     setError("Email is not verified yet. Please click the link in your inbox.")

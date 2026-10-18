@@ -62,12 +62,10 @@ begin
 end;
 $$;
 
-drop trigger if exists creative_assets_fill_tags on public.creative_assets;
-create trigger creative_assets_fill_tags
+create or replace trigger creative_assets_fill_tags
   before insert or update of convention_name, brief_id on public.creative_assets
   for each row execute function public.fill_creative_asset_tags();
 
 revoke execute on function public.fill_creative_asset_tags() from public, anon, authenticated;
 
--- Backfill existing rows (the trigger fires on this no-op update).
-update public.creative_assets set convention_name = convention_name;
+-- Existing rows were backfilled once after applying (no-op update of convention_name / gcs_path).

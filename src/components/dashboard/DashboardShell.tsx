@@ -376,7 +376,9 @@ export function DashboardShell({
 
   return (
     <div className="min-h-[100svh] bg-[#F7F3EE] md:grid md:grid-cols-[260px_1fr]">
-      <aside className="hidden border-r border-[#E7DED3] bg-white md:flex md:flex-col">
+      <aside className="hidden border-r border-[#E7DED3] bg-white md:block">
+        {/* Sticky, viewport-tall column so "Host a space" stays pinned near the bottom of the screen. */}
+        <div className="sticky top-0 flex h-[100svh] flex-col overflow-y-auto">
         <div className="space-y-4 border-b border-[#F1E7DC] p-5">
           <Link href="/" className="mb-4 block font-serif text-3xl lowercase text-[#1A1410]">
             thrml
@@ -504,6 +506,7 @@ export function DashboardShell({
               </Link>
             </Button>
           </div>
+        </div>
         </div>
       </aside>
 

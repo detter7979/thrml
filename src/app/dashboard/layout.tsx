@@ -65,7 +65,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       hasListings={Boolean((totalListingCount ?? 0) > 0)}
       activeListingsCount={Number(activeListingCount ?? 0)}
     >
-      {children}
+      {/* At least one screen tall, so the footer always starts just below the fold. */}
+      <div className="min-h-[100svh]">{children}</div>
       <SiteFooter />
     </DashboardShell>
   )

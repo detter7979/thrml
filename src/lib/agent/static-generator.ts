@@ -526,6 +526,7 @@ async function processStaticBriefInner(
           variant: variationLabel,
           format,
           templateSlug,
+          name: conventionName ?? undefined,
         })
         const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
           campaignShortName: brief.campaign_short_name ?? brief.id,
@@ -592,6 +593,7 @@ async function processStaticBriefInner(
         variant: variationLabel,
         format,
         templateSlug,
+        name: conventionName ?? undefined,
       })
       const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {
         campaignShortName: brief.campaign_short_name ?? brief.id,

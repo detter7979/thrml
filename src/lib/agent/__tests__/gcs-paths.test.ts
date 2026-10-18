@@ -4,6 +4,8 @@ import {
   renderedVideoPath,
   unifiedStaticPath,
   unifiedVideoRenderPath,
+  parseUnifiedPath,
+  versionedPath,
 } from "../gcs-paths"
 
 describe("gcs-paths", () => {
@@ -64,7 +66,7 @@ describe("gcs-paths", () => {
         variant: "A",
         format: "9x16",
       })
-    ).toBe("2026/05/hosts/pov_earnings/Static/composite/A_9x16.png")
+    ).toBe("2026/hosts/pov_earnings/Static/composite/A_9x16.png")
   })
 
   it("builds unified static path with template slug", () => {
@@ -77,7 +79,7 @@ describe("gcs-paths", () => {
         format: "1x1",
         templateSlug: "block_split",
       })
-    ).toBe("2026/05/hosts/pov_earnings/Static/composite/block_split/A_1x1.png")
+    ).toBe("2026/hosts/pov_earnings/Static/composite/block_split_A_1x1.png")
   })
 
   it("builds unified video paths when category set", () => {
@@ -90,7 +92,7 @@ describe("gcs-paths", () => {
         category: "Hosts",
         angleSlug: "pov_earnings",
       })
-    ).toBe("2026/05/hosts/pov_earnings/Video/base/base_sauna_v1.mp4")
+    ).toBe("2026/hosts/pov_earnings/Video/base/base_sauna_v1.mp4")
 
     expect(
       unifiedVideoRenderPath({
@@ -100,6 +102,49 @@ describe("gcs-paths", () => {
         variantSlug: "pov-earn-1000",
         templateVersion: 1,
       })
-    ).toBe("2026/05/hosts/pov_earnings/Video/composite/pov-earn-1000_9x16_v1.mp4")
+    ).toBe("2026/hosts/pov_earnings/Video/composite/pov-earn-1000_9x16_v1.mp4")
+  })
+})
+
+describe("creative library paths", () => {
+  const oct2026 = new Date("2026-10-18T00:00:00Z")
+
+  it("names composites after the ad", () => {
+    expect(
+      unifiedStaticPath({
+        date: oct2026,
+        category: "Hosts",
+        angleSlug: "pov_earnings",
+        variant: "A",
+        format: "9x16",
+        templateSlug: "split_header",
+        name: "AD007_T05_A_pov_earnings_Static_9x16_list_now",
+      })
+    ).toBe("2026/hosts/pov_earnings/Static/composite/AD007_T05_A_pov_earnings_Static_9x16_list_now.png")
+  })
+
+  it("adds and bumps versions", () => {
+    expect(versionedPath("2026/hosts/a/Static/composite/X.png", 1)).toBe("2026/hosts/a/Static/composite/X_v1.png")
+    expect(versionedPath("2026/hosts/a/Video/base/base_sauna_v1.mp4", 2)).toBe("2026/hosts/a/Video/base/base_sauna_v2.mp4")
+  })
+
+  it("parses old and new layouts", () => {
+    expect(parseUnifiedPath("gs://thrml/2026/06/hosts/pov_earnings/Static/composite/split_header/A_1x1.png")).toMatchObject({
+      year: "2026",
+      month: "06",
+      category: "hosts",
+      angle: "pov_earnings",
+      mediaType: "Static",
+      assetStage: "composite",
+      filename: "A_1x1.png",
+    })
+    expect(parseUnifiedPath("2026/hosts/pov_earnings/Static/composite/AD007_x_v2.png")).toMatchObject({
+      year: "2026",
+      month: undefined,
+      category: "hosts",
+      angle: "pov_earnings",
+      assetStage: "composite",
+      filename: "AD007_x_v2.png",
+    })
   })
 })

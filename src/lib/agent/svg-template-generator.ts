@@ -443,6 +443,7 @@ export async function generateFromSvgTemplate(
     variant: variationLabel,
     format,
     templateSlug: svgTemplateStaticPathSlug(templateId),
+    name: conventionName ?? undefined,
   })
 
   const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(pngBuffer, {

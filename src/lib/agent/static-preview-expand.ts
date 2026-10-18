@@ -1,6 +1,6 @@
 import { downloadCreativeAsset, uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
 import { resolveNamingFromBrief } from "@/lib/agent/creative-templates"
-import { resolveCreativeBucketName, unifiedStaticBasePath, unifiedStaticPath } from "@/lib/agent/gcs-paths"
+import { resolveCreativeBucketName, unifiedStaticBasePath, unifiedStaticPath, versionedPath } from "@/lib/agent/gcs-paths"
 import {
   HOST_PROOF_SUBTEXT,
   finalizeHostStaticImagePrompt,
@@ -122,7 +122,8 @@ export function inferredStaticBaseGcsPath(sourceAsset: AssetRow, brief: BriefRow
     format,
     templateSlug,
   })
-  return `gs://${resolveCreativeBucketName()}/${objectPath}`
+  // Uploads add a version, so the first render of this base lands at _v1.
+  return `gs://${resolveCreativeBucketName()}/${versionedPath(objectPath, 1)}`
 }
 
 async function resolveExpandBasePhotoBuffer(
@@ -231,6 +232,7 @@ async function persistExpandedPhotoAsset(opts: {
     variant: opts.variationLabel,
     format: opts.format,
     templateSlug,
+    name: conventionNameForStatic(opts.brief, opts.format, opts.variationLabel) ?? undefined,
   })
 
   const sourcePerf = performanceData(opts.sourceAsset)
@@ -533,6 +535,7 @@ export async function generateStaticVariationPreview(opts: {
     variant: variationLabel,
     format,
     templateSlug,
+    name: conventionNameForStatic(brief, format, variationLabel) ?? undefined,
   })
 
   const { gcsPath, gcsUrl } = await uploadGcsCreativeAsset(composite, {

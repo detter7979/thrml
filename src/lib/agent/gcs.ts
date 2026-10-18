@@ -1,5 +1,7 @@
 import { Storage } from "@google-cloud/storage"
 
+import { splitVersionedPath, versionedPath } from "@/lib/agent/gcs-paths"
+
 const SIGNED_URL_EXPIRES_MS = 7 * 24 * 60 * 60 * 1000
 const ARCHIVE_PREFIX = "_archive/"
 const GENERATED_BY = "thrml-agent"
@@ -12,8 +14,10 @@ export type UploadCreativeAssetOptions = {
   kind: CreativeAssetKind
   filename: string
   contentType: string
-  /** When set, writes to this exact object path instead of legacy month/campaign/brief layout. */
+  /** When set, writes to this object path (plus a _v{n} version) instead of the legacy month/campaign/brief layout. */
   unifiedObjectPath?: string
+  /** Replace the object at unifiedObjectPath as-is instead of writing the next free version. */
+  overwrite?: boolean
 }
 
 export type UploadedCreativeAsset = {
@@ -231,6 +235,20 @@ function isBriefAsset(objectPath: string, briefId: string) {
   return monthIndex >= 0 && parts[monthIndex + 2] === briefId && parts.length >= monthIndex + 5
 }
 
+/**
+ * First unused "{stem}_v{n}" for a path, so a re-render never overwrites an earlier file.
+ * Starts from the version already in the name (videos carry their own) or 1.
+ */
+async function nextFreeVersionPath(bucket: ReturnType<typeof getBucket>, objectPath: string) {
+  const start = splitVersionedPath(objectPath).version ?? 1
+  for (let v = start; v < start + 200; v += 1) {
+    const candidate = versionedPath(objectPath, v)
+    const [exists] = await bucket.file(candidate).exists()
+    if (!exists) return candidate
+  }
+  return versionedPath(objectPath, Date.now())
+}
+
 export async function uploadCreativeAsset(
   buffer: Buffer,
   opts: UploadCreativeAssetOptions
@@ -239,7 +257,9 @@ export async function uploadCreativeAsset(
   const bucketName = bucket.name
   const prefix = pathPrefix()
   const objectPath = opts.unifiedObjectPath
-    ? opts.unifiedObjectPath
+    ? opts.overwrite
+      ? opts.unifiedObjectPath
+      : await nextFreeVersionPath(bucket, opts.unifiedObjectPath)
     : (() => {
         const objectParts = [
           monthPath(),
@@ -269,6 +289,26 @@ export async function uploadCreativeAsset(
     gcsPath: `gs://${bucketName}/${objectPath}`,
     gcsUrl: await signedReadUrl(file),
     publicUrl: publicUrl(bucketName, objectPath),
+  }
+}
+
+/**
+ * Copies a stored creative to a new library path (next free _v{n}) without touching the original,
+ * so anything still pointing at the old path keeps working.
+ */
+export async function copyCreativeObjectToVersionedPath(
+  sourceGcsPath: string,
+  destinationObjectPath: string
+): Promise<UploadedCreativeAsset> {
+  const { bucketName, objectPath } = parseGcsPath(normalizeCreativeAssetGcsPath(sourceGcsPath))
+  const source = fileForStoredGcsPath(bucketName, objectPath)
+  const bucket = getBucket()
+  const target = await nextFreeVersionPath(bucket, destinationObjectPath)
+  await source.copy(bucket.file(target))
+  return {
+    gcsPath: `gs://${bucket.name}/${target}`,
+    gcsUrl: await signedReadUrl(bucket.file(target)),
+    publicUrl: publicUrl(bucket.name, target),
   }
 }
 

@@ -258,6 +258,7 @@ export async function editStaticPhotoAsset(opts: EditStaticPhotoOptions): Promis
           variant: variationLabel,
           format,
           templateSlug,
+          name: asset.convention_name ?? undefined,
         })
 
   const { gcsPath: compositeGcsPath, gcsUrl: compositeGcsUrl } = await uploadGcsCreativeAsset(composite, {
@@ -267,6 +268,7 @@ export async function editStaticPhotoAsset(opts: EditStaticPhotoOptions): Promis
     filename: `static_${format}_${variationLabel}_edited.png`,
     contentType: "image/png",
     unifiedObjectPath: compositeObjectPath,
+    overwrite: Boolean(opts.replaceInPlace && existingObjectPath),
   })
 
   const naming = resolveNamingFromBrief(brief as BriefRow)

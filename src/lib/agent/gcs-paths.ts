@@ -1,10 +1,12 @@
 // Path builder utilities for thrml creative GCS buckets.
-// Unified taxonomy:
-//   Static base:      {year}/{month}/{category}/{angle}/Static/base/[{templateSlug}/]base_{variant}_{format}.{ext}
-//   Static composite: {year}/{month}/{category}/{angle}/Static/composite/[{templateSlug}/]{variant}_{format}.{ext}
-//   Video base:       {year}/{month}/{category}/{angle}/Video/base/base_{asset}_v{n}.mp4
-//   Video composite:  {year}/{month}/{category}/{angle}/Video/composite/{variant}_9x16_v{n}.mp4
-// Legacy bases/renders paths remain readable via asset library.
+// Creative library taxonomy (Oct 2026):
+//   Static base:      {year}/{category}/{angle}/Static/base/base_{name}.{ext}
+//   Static composite: {year}/{category}/{angle}/Static/composite/{name}.{ext}
+//   Video base:       {year}/{category}/{angle}/Video/base/base_{asset}_v{n}.mp4
+//   Video composite:  {year}/{category}/{angle}/Video/composite/{variant}_9x16_v{n}.mp4
+// {name} is the ad name when known (e.g. AD007_T05_A_pov_earnings_Static_9x16_list_now), otherwise
+// {template}_{variant}_{format}. uploadCreativeAsset adds _v{n} so a new render never overwrites an old one.
+// Older {year}/{month}/... and bases/ / renders/ paths stay readable (parseUnifiedPath handles both).
 
 /** Legacy default when env is unset; prefer resolveCreativeBucketName() for writes/URLs. */
 export const BUCKET_NAME = process.env.GCS_CREATIVE_BUCKET ?? "thrml-creative"
@@ -43,8 +45,10 @@ export interface UnifiedStaticPathArgs {
   variant: string
   format: "1x1" | "9x16" | "4x5"
   ext?: string
-  /** When set (e.g. SVG template id slug), isolates paths per template under Static/. */
+  /** Template id slug (e.g. split_header); goes into the file name when no ad name is given. */
   templateSlug?: string
+  /** Ad / convention name; becomes the file name so files read like the namer. */
+  name?: string
 }
 
 export interface UnifiedVideoBasePathArgs {
@@ -73,28 +77,37 @@ function mm(d: Date): string {
   return (d.getUTCMonth() + 1).toString().padStart(2, "0")
 }
 
+/** Keeps case (ad names are mixed case); drops anything unsafe for an object name. */
+function fileStem(value: string): string {
+  return value.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "")
+}
+
+function staticFileStem(args: UnifiedStaticPathArgs): string {
+  if (args.name && fileStem(args.name)) return fileStem(args.name)
+  const parts = [args.templateSlug ? slug(args.templateSlug) : "", args.variant, args.format].filter(Boolean)
+  return parts.join("_")
+}
+
 function slug(value: string): string {
   return value.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase()
 }
 
-/** Unified static base photo path (pre-overlay) on main bucket. */
+/** Unified static base photo path (pre-overlay). */
 export function unifiedStaticBasePath(args: UnifiedStaticPathArgs): string {
   const ext = args.ext ?? "png"
-  const templateSegment = args.templateSlug ? `${slug(args.templateSlug)}/` : ""
-  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/base/${templateSegment}base_${args.variant}_${args.format}.${ext}`
+  return `${yyyy(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/base/base_${staticFileStem(args)}.${ext}`
 }
 
-/** Unified static output path on main bucket. */
+/** Unified static output path. */
 export function unifiedStaticPath(args: UnifiedStaticPathArgs): string {
   const ext = args.ext ?? "png"
-  const templateSegment = args.templateSlug ? `${slug(args.templateSlug)}/` : ""
-  return `${yyyy(args.date)}/${mm(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/composite/${templateSegment}${args.variant}_${args.format}.${ext}`
+  return `${yyyy(args.date)}/${slug(args.category)}/${slug(args.angleSlug)}/Static/composite/${staticFileStem(args)}.${ext}`
 }
 
 /** Unified video base path on creative bucket. */
 export function unifiedVideoBasePath(args: UnifiedVideoBasePathArgs): string {
   const { date, category, angleSlug, assetSlug, source, version = 1, taskId } = args
-  const prefix = `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/base`
+  const prefix = `${yyyy(date)}/${slug(category)}/${slug(angleSlug)}/Video/base`
   if (source === "runway") {
     if (!taskId) throw new Error("taskId required for runway source")
     return `${prefix}/base_${slug(assetSlug)}_runway_${taskId}.mp4`
@@ -105,7 +118,7 @@ export function unifiedVideoBasePath(args: UnifiedVideoBasePathArgs): string {
 /** Unified composited video render path on creative bucket. */
 export function unifiedVideoRenderPath(args: UnifiedVideoRenderPathArgs): string {
   const { date, category, angleSlug, variantSlug, templateVersion } = args
-  return `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/composite/${slug(variantSlug)}_9x16_v${templateVersion}.mp4`
+  return `${yyyy(date)}/${slug(category)}/${slug(angleSlug)}/Video/composite/${slug(variantSlug)}_9x16_v${templateVersion}.mp4`
 }
 
 /**
@@ -165,6 +178,7 @@ export const ASSET_LIBRARY_PREFIXES = ["bases/", "renders/", "20"] as const
 
 export function parseUnifiedPath(objectPath: string): {
   year?: string
+  /** Only on older {year}/{month}/... paths. */
   month?: string
   category?: string
   angle?: string
@@ -173,22 +187,46 @@ export function parseUnifiedPath(objectPath: string): {
   assetStage?: "base" | "composite"
   filename?: string
 } | null {
-  const parts = objectPath.split("/")
-  if (parts.length < 6) return null
-  if (!/^\d{4}$/.test(parts[0]) || !/^\d{2}$/.test(parts[1])) return null
-  const mediaType = parts[4] === "Static" || parts[4] === "Video" ? parts[4] : undefined
+  const parts = objectPath.replace(/^gs:\/\/[^/]+\//, "").split("/")
+  if (!/^\d{4}$/.test(parts[0] ?? "")) return null
+  const hasMonth = /^\d{2}$/.test(parts[1] ?? "")
+  const o = hasMonth ? 1 : 0
+  if (parts.length < 5 + o) return null
+  const mediaType = parts[3 + o] === "Static" || parts[3 + o] === "Video" ? (parts[3 + o] as "Static" | "Video") : undefined
   if (!mediaType) return null
 
-  const stage = parts[5] === "base" || parts[5] === "composite" ? parts[5] : undefined
-  const filename = stage ? parts[parts.length - 1] : parts[5]
+  const stageRaw = parts[4 + o]
+  const stage = stageRaw === "base" || stageRaw === "composite" ? stageRaw : undefined
 
   return {
     year: parts[0],
-    month: parts[1],
-    category: parts[2],
-    angle: parts[3],
+    month: hasMonth ? parts[1] : undefined,
+    category: parts[1 + o],
+    angle: parts[2 + o],
     mediaType,
     assetStage: stage,
-    filename,
+    filename: parts[parts.length - 1],
   }
+}
+
+/** Splits "dir/stem_v3.png" into its parts; version is null when the stem has no _v{n}. */
+export function splitVersionedPath(objectPath: string) {
+  const slash = objectPath.lastIndexOf("/")
+  const dir = slash >= 0 ? objectPath.slice(0, slash + 1) : ""
+  const file = objectPath.slice(slash + 1)
+  const dot = file.lastIndexOf(".")
+  const ext = dot > 0 ? file.slice(dot) : ""
+  const stemWithVersion = dot > 0 ? file.slice(0, dot) : file
+  const m = stemWithVersion.match(/^(.*)_v(\d+)$/)
+  return {
+    dir,
+    stem: m ? m[1]! : stemWithVersion,
+    version: m ? Number(m[2]) : null,
+    ext,
+  }
+}
+
+export function versionedPath(objectPath: string, version: number) {
+  const { dir, stem, ext } = splitVersionedPath(objectPath)
+  return `${dir}${stem}_v${version}${ext}`
 }

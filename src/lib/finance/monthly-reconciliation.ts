@@ -503,9 +503,27 @@ export async function writeReconciliationToSheet(
 export async function runMonthlyReconciliation(
   admin: SupabaseClient,
   month: string
-): Promise<{ result: ReconciliationResult; sheet: { spreadsheetId: string; tab: string; url: string } }> {
+): Promise<{
+  result: ReconciliationResult
+  sheet: { spreadsheetId: string; tab: string; url: string }
+  statement: { tab: string; url: string } | null
+}> {
   const result = await buildMonthlyReconciliation(admin, month)
   const sheetId = await resolveReconciliationSheetId(admin)
   const sheet = await writeReconciliationToSheet(result, sheetId)
-  return { result, sheet }
+
+  // Year workbook in Finance › FSS › <year> (one tab per month). Created once per year by hand.
+  const { fssStatementsId, loadMonthDetail, writeMonthStatement } = await import("./year-statements")
+  const fssId = await fssStatementsId(admin, month.slice(0, 4))
+  let statement: { tab: string; url: string } | null = null
+  if (fssId) {
+    statement = await writeMonthStatement(fssId, result, await loadMonthDetail(admin, month))
+  } else {
+    result.checks.push({
+      label: "FSS year workbook",
+      ok: false,
+      detail: `No "thrml — ${month.slice(0, 4)} Financial Statements" file set (platform_settings.fss_statements_${month.slice(0, 4)}). Create it in Finance › FSS › ${month.slice(0, 4)} and share it with the thrml-agent service account.`,
+    })
+  }
+  return { result, sheet, statement }
 }

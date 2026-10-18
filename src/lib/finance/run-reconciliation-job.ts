@@ -17,7 +17,7 @@ export async function runReconciliationJob(admin: SupabaseClient, month: string,
   const runId = runRow?.id ?? null
 
   try {
-    const { result, sheet } = await runMonthlyReconciliation(admin, month)
+    const { result, sheet, statement } = await runMonthlyReconciliation(admin, month)
     const failing = result.checks.filter((c) => !c.ok)
 
     if (opts.email) {
@@ -37,7 +37,7 @@ ${failing.length ? `<p style="font-size:13px;color:#C0392B;margin-top:12px"><b>N
         title: `Monthly reconciliation — ${month}`,
         greeting: "Hi Dom,",
         contentHtml,
-        cta: { label: "Open reconciliation sheet", href: sheet.url },
+        cta: { label: statement ? "Open monthly statement" : "Open reconciliation sheet", href: statement?.url ?? sheet.url },
         footnote: "Generated automatically on the 1st of each month.",
       })
       await sendEmail({
@@ -56,7 +56,7 @@ ${failing.length ? `<p style="font-size:13px;color:#C0392B;margin-top:12px"><b>N
         results: { month, net: result.bottomLine.net, failing_checks: failing.map((c) => c.label), sheet_tab: sheet.tab },
       }).eq("id", runId)
     }
-    return { ok: true as const, month, sheet, bottomLine: result.bottomLine, checks: result.checks }
+    return { ok: true as const, month, sheet, statement, bottomLine: result.bottomLine, checks: result.checks }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (runId) {

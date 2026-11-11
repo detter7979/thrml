@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { columnToLetter } from "@/lib/agent/google-sheets-client"
+import { GOOGLE_FINAL_URL_SUFFIX, META_URL_TAGS } from "@/lib/attribution/url-params"
 import { parseUtmCookie, utmBookingColumns, utmFromSearchParams } from "@/lib/attribution/utm-cookie"
 
 import { googleConversionEvent } from "../fetch-platforms"
@@ -38,6 +39,22 @@ describe("utm cookie", () => {
     const u = utmFromSearchParams(new URLSearchParams("utm_source=meta&utm_content=1201&fbclid=abc&x=1"))
     expect(u).toEqual({ utm_source: "meta", utm_content: "1201", click_id: "fbclid:abc" })
     expect(utmFromSearchParams(new URLSearchParams("ref=friend"))).toBeNull()
+  })
+  it("ad URL templates put the IDs where the report joins on them", () => {
+    const meta = new URLSearchParams(META_URL_TAGS)
+    expect(meta.get("utm_source")).toBe("meta")
+    expect(meta.get("utm_content")).toBe("{{ad.id}}")
+    expect(meta.get("utm_term")).toBe("{{adset.id}}")
+    expect(meta.get("utm_id")).toBe("{{campaign.id}}")
+    const google = new URLSearchParams(GOOGLE_FINAL_URL_SUFFIX)
+    expect(google.get("utm_source")).toBe("google")
+    expect(google.get("utm_content")).toBe("{creative}")
+    expect(google.get("utm_term")).toBe("{adgroupid}")
+    // A clicked Meta ad lands with every key the cookie and the report read.
+    const landed = utmFromSearchParams(
+      new URLSearchParams(META_URL_TAGS.replace("{{campaign.name}}", "C001_test").replace(/\{\{[a-z.]+\}\}/g, "120"))
+    )
+    expect(Object.keys(landed ?? {}).sort()).toEqual(["utm_campaign", "utm_content", "utm_id", "utm_medium", "utm_source", "utm_term"])
   })
   it("round-trips the cookie into booking columns", () => {
     const raw = encodeURIComponent(JSON.stringify({ utm_content: "1201", utm_term: "99", evil: "x" }))

@@ -70,6 +70,11 @@ export function SiteFooter() {
                   Terms of Service
                 </Link>
               </li>
+              <li>
+                <Link href="/copyright" className="transition-colors hover:text-white">
+                  Copyright &amp; DMCA
+                </Link>
+              </li>
             </ul>
           </div>
 

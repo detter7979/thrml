@@ -1,6 +1,6 @@
 /**
  * Full Terms of Service text — shared by /terms and the /legal/terms fallback.
- * The published copy is the active `terms_of_service` row in legal_documents (v1.1).
+ * The published copy is the active `terms_of_service` row in legal_documents (v1.2).
  * To change the Terms: edit this text, insert a new legal_documents row with a new
  * version, and bump LEGAL_VERSIONS.TERMS so acceptances record the right version.
  */
@@ -131,6 +131,7 @@ thrml reserves the right to remove reviews that violate these terms or our commu
 12. Intellectual Property
 The thrml name, logo, platform design, and proprietary technology are owned by thrml and protected by applicable intellectual property laws. You may not use our brand assets, copy our platform design, or reproduce our content without prior written permission.
 Host-submitted content (photos, descriptions) remains owned by the Host. Hosts grant thrml a license to use this content as described in Section 10.
+Copyright. You may only post content you own or have permission to use. We respond to notices of alleged copyright infringement as described in our Copyright and DMCA Policy at usethrml.com/copyright, and we may suspend or terminate the accounts of users who repeatedly infringe the copyrights of others.
 
 13. Prohibited Conduct
 Users of the thrml platform may not:

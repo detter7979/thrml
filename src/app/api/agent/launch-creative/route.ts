@@ -30,6 +30,7 @@ import {
 } from "@/lib/agent/meta-instagram-account"
 import { uploadVideo } from "@/lib/agent/meta-video-upload"
 import { requireAdminApi } from "@/lib/admin-guard"
+import { META_URL_TAGS } from "@/lib/attribution/url-params"
 import { syncNamerPlatformIdsForAssets } from "@/lib/agent/namer-creative-append"
 import { syncPaidMediaFromCreativeLaunch } from "@/lib/agent/namer-supabase-sync"
 
@@ -254,6 +255,7 @@ async function createMetaPlacementCreative(params: {
     name: params.name,
     object_story_spec: objectStorySpec,
     asset_feed_spec: params.assetFeedSpec,
+    url_tags: META_URL_TAGS,
   }
 
   const res = await fetch(metaUrl(`${params.adAccountId}/adcreatives`, params.token), {
@@ -297,6 +299,7 @@ async function createMetaStaticCreative(params: {
         },
       },
     },
+    url_tags: META_URL_TAGS,
   }
 
   const res = await fetch(metaUrl(`${params.adAccountId}/adcreatives`, params.token), {
@@ -342,6 +345,7 @@ async function createMetaVideoCreative(params: {
       page_id: params.pageId,
       video_data: videoData,
     },
+    url_tags: META_URL_TAGS,
   }
 
   const res = await fetch(metaUrl(`${params.adAccountId}/adcreatives`, params.token), {

@@ -15,7 +15,7 @@ import { formatHostKeepPercent } from "@/lib/fees"
 import { hasCompletedHostOnboarding, hostLoginHref, hostSignupHref } from "@/lib/host/host-funnel"
 import { HOST_NEW_LISTING_PATH } from "@/lib/host/is-host-user"
 import { nextHostUiIntent } from "@/lib/host/promote-host-profile"
-import { trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
+import { trackBecomeHostClick, trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { createClient } from "@/lib/supabase/client"
 
@@ -200,6 +200,14 @@ export function BecomeAHostClient({
   }, [router, resumingAfterSignup])
 
   function handleStep1Continue(placement: "hero" | "footer" = "hero") {
+    // Phase 1 host conversion for paid traffic: ads land here directly, so the on-page CTA is
+    // the "become a host" click (the nav/dashboard links fire the same event elsewhere).
+    trackBecomeHostClick("/become-a-host", `landing_${placement}`)
+    trackMetaEvent(
+      "become_host_click",
+      { content_name: "become_a_host", source: `landing_${placement}` },
+      { custom: true }
+    )
     if (signedIn === false) {
       trackGaEvent("host_onboarding_signup_redirect", { step: 1, placement })
       router.push(hostSignupHref())

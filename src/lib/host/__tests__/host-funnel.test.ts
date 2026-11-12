@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import {
   draftProgressPercent,
   guestBookingsOpen,
+  hostProgressUpdatePeriod,
   hostSetupSteps,
   hostSpaceTypesSentence,
   pickDraftReminder,
@@ -159,5 +160,18 @@ describe("hostSpaceTypesSentence", () => {
   it("doesn't promise other space types during the saunas-only launch", () => {
     expect(hostSpaceTypesSentence(true)).toContain("starting with private saunas")
     expect(hostSpaceTypesSentence(false)).toContain("all welcome")
+  })
+})
+
+describe("hostProgressUpdatePeriod", () => {
+  it("is null before the first update", () => {
+    expect(hostProgressUpdatePeriod(new Date("2026-11-16T20:00:00Z"))).toBeNull()
+  })
+
+  it("sends during the first 3 days of each 14-day period", () => {
+    expect(hostProgressUpdatePeriod(new Date("2026-11-17T15:00:00Z"))).toBe("2026-11-17")
+    expect(hostProgressUpdatePeriod(new Date("2026-11-19T15:00:00Z"))).toBe("2026-11-17")
+    expect(hostProgressUpdatePeriod(new Date("2026-11-20T15:00:00Z"))).toBeNull()
+    expect(hostProgressUpdatePeriod(new Date("2026-12-01T15:00:00Z"))).toBe("2026-12-01")
   })
 })

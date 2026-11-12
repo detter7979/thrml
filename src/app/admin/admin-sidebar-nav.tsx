@@ -12,6 +12,7 @@ import {
   LineChart,
   Megaphone,
   PieChart,
+  Rocket,
   Settings,
   Shield,
   Sparkles,
@@ -41,7 +42,10 @@ const SECTIONS: NavSection[] = [
   },
   {
     label: "Growth",
-    items: [{ href: "/admin/paid-media", label: "Paid media", icon: Megaphone }],
+    items: [
+      { href: "/admin/launch-readiness", label: "Launch readiness", icon: Rocket },
+      { href: "/admin/paid-media", label: "Paid media", icon: Megaphone },
+    ],
   },
   {
     label: "Creative & automation",

@@ -7,8 +7,11 @@ import { DEFAULT_HOST_HEADLINE } from "@/lib/agent/svg-template-shared"
 
 export const HOST_MONETIZATION_PLAYBOOK_ID = "host_monetization_v3" as const
 
-/** Locked proof line for Meta host monetization tests (control variable). */
-export const HOST_PROOF_SUBTEXT = "Hosts on thrml earn an average of $1,200 / month."
+/**
+ * Locked proof line for Meta host monetization tests (control variable).
+ * Must stay factual: no earnings averages or income claims until real host data supports them.
+ */
+export const HOST_PROOF_SUBTEXT = "Free to list. You set the price and the hours."
 
 export type HostMonetizationVariation = {
   variation_label: "A" | "B" | "C"

@@ -40,9 +40,9 @@ describe("buildBlockSplitFilterComplex", () => {
       },
     })
 
-    expect(filter).toContain("scale=1080:1280")
+    expect(filter).toContain("scale=1080:1040")
     expect(filter).toContain("format=rgb24")
-    expect(filter).toContain(`pad=1080:1920:0:640:color=0x${BRAND_RUST_HEX}`)
+    expect(filter).toContain(`pad=1080:1920:0:880:color=0x${BRAND_RUST_HEX}`)
     expect(filter).toContain("colorspace=all=bt709")
     expect(filter).not.toContain("color=c=0xC75B3A:s=")
     expect(filter).not.toContain("drawbox")

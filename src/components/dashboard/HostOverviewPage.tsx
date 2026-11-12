@@ -3,6 +3,7 @@ import Image from "next/image"
 import { cache, Suspense } from "react"
 import { LayoutGrid, Plus, Settings } from "lucide-react"
 
+import { HostSetupChecklist } from "@/components/host/HostSetupChecklist"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   PUBLIC_PROFILE_NAME_AVATAR_COLUMNS,
@@ -607,7 +608,7 @@ async function ListingStatusSection({ userId }: { userId: string }) {
       <section className="rounded-2xl border border-[#EADFD4] bg-white p-4">
         <p className="text-lg">🏠 List your first space</p>
         <p className="mt-1 text-sm text-[#6D5E51]">
-          Start earning from your sauna, cold plunge, or wellness space.
+          Start earning from your private sauna.
         </p>
         <div className="mt-3">
           <Link href="/dashboard/listings/new" className="text-sm font-medium text-[#8B4513]">
@@ -648,6 +649,10 @@ async function ListingStatusSection({ userId }: { userId: string }) {
 export function HostOverviewPage({ userId }: { userId: string }) {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 md:px-8 md:py-8">
+      <Suspense fallback={null}>
+        <HostSetupChecklist userId={userId} />
+      </Suspense>
+
       <Suspense fallback={<SectionSkeleton heightClass="h-28" />}>
         <IdentityCardSection userId={userId} />
       </Suspense>

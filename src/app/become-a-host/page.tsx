@@ -5,7 +5,9 @@ import { redirect } from "next/navigation"
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { formatHostKeepPercent } from "@/lib/fees"
 import { getPlatformFeePercentsCached } from "@/lib/fees-server"
-import { HOST_NEW_LISTING_PATH, isHostUser } from "@/lib/host/is-host-user"
+import { guestBookingsOpen, hasCompletedHostOnboarding } from "@/lib/host/host-funnel"
+import { isSaunasOnlyLaunch } from "@/lib/launch-config"
+import { HOST_NEW_LISTING_PATH } from "@/lib/host/is-host-user"
 import { createClient } from "@/lib/supabase/server"
 
 import { BecomeAHostClient } from "./become-a-host-client"
@@ -42,13 +44,13 @@ export default async function BecomeAHostPage() {
         .select("id", { count: "exact", head: true })
         .eq("host_id", user.id)
         .eq("is_active", true),
-      supabase.from("profiles").select("ui_intent").eq("id", user.id).maybeSingle(),
+      supabase.from("profiles").select("host_terms_accepted").eq("id", user.id).maybeSingle(),
     ])
 
     if (
-      isHostUser({
+      hasCompletedHostOnboarding({
         activeListingCount: listingCount ?? 0,
-        uiIntent: profile?.ui_intent,
+        hostTermsAccepted: profile?.host_terms_accepted,
       })
     ) {
       redirect(HOST_NEW_LISTING_PATH)
@@ -66,7 +68,7 @@ export default async function BecomeAHostPage() {
       }
     >
       <PlatformFeesProvider initialPercents={feePercents}>
-        <BecomeAHostClient />
+        <BecomeAHostClient guestBookingsOpen={guestBookingsOpen()} saunasOnly={isSaunasOnlyLaunch()} />
       </PlatformFeesProvider>
     </Suspense>
   )

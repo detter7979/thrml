@@ -20,6 +20,7 @@ import { signUpWithPassword } from "@/app/(auth)/signup/actions"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { MIN_PASSWORD_LENGTH } from "@/lib/security/password-policy"
+import { isHostFunnelPath } from "@/lib/host/host-funnel"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { rememberReturnTo } from "@/lib/auth/return-to"
 import { createClient } from "@/lib/supabase/client"
@@ -74,7 +75,9 @@ function SignupForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [phone, setPhone] = useState("")
-  const [intent, setIntent] = useState<IntentOption>("guest")
+  const [intent, setIntent] = useState<IntentOption>(() =>
+    searchParams.get("intent") === "host" || isHostFunnelPath(requestedNext) ? "host" : "guest"
+  )
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [resendCooldown, setResendCooldown] = useState(0)

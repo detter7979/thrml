@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { sendGuestWelcomeEmail, markOnboardingEmailSent } from "@/lib/emails/onboarding"
+import { sendGuestWelcomeEmail, sendHostWelcomeEmail, markOnboardingEmailSent } from "@/lib/emails/onboarding"
+import { isHostFunnelPath } from "@/lib/host/host-funnel"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { recordLegalAcceptance } from "@/lib/legal/record-acceptance"
 import { RETURN_TO_COOKIE, readReturnToCookie } from "@/lib/auth/return-to"
@@ -78,35 +79,41 @@ async function resolvePostAuthRedirect(request: NextRequest, requestUrl: URL, ne
     await recordReferral(user.id, decodeURIComponent(refRaw))
   }
 
-  // Fire welcome email for first-time users (covers OAuth + email/OTP flows).
-  // Non-blocking — redirect is not held up if this fails.
-  if (user.email) {
-    const admin = createAdminClient()
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("full_name, onboarding_email_sent")
-      .eq("id", user.id)
-      .maybeSingle()
+  // Host prospects arrive with a host-funnel `next` (e.g. /become-a-host). Tag them as hosts
+  // so lifecycle reminders reach them even before they publish a listing (Google sign-ups
+  // never pick an intent on the form).
+  const admin = createAdminClient()
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("full_name, onboarding_email_sent, ui_intent")
+    .eq("id", user.id)
+    .maybeSingle()
 
-    if (!profile?.onboarding_email_sent) {
-      const firstName = (profile?.full_name as string | null)?.split(" ")[0] ?? null
-      sendGuestWelcomeEmail({ userId: user.id, email: user.email, firstName })
-        .then((result) => { if (result.sent) markOnboardingEmailSent(user.id) })
-        .catch(() => {})
-    }
+  const currentIntent = typeof profile?.ui_intent === "string" ? profile.ui_intent : null
+  const hostProspect =
+    isHostFunnelPath(next) || currentIntent === "host" || currentIntent === "both"
+  if (isHostFunnelPath(next) && currentIntent !== "host" && currentIntent !== "both") {
+    await admin
+      .from("profiles")
+      .update({ ui_intent: currentIntent === "guest" ? "both" : "host" })
+      .eq("id", user.id)
+  }
+
+  // Fire welcome email for first-time users (covers OAuth + email/OTP flows).
+  // Hosts get the host welcome; everyone else the guest one. Non-blocking.
+  if (user.email && !profile?.onboarding_email_sent) {
+    const firstName = (profile?.full_name as string | null)?.split(" ")[0] ?? null
+    const send = hostProspect ? sendHostWelcomeEmail : sendGuestWelcomeEmail
+    send({ userId: user.id, email: user.email, firstName })
+      .then((result) => { if (result.sent) markOnboardingEmailSent(user.id) })
+      .catch(() => {})
   }
 
   if (next) {
     return clearOAuthSignupCookies(NextResponse.redirect(new URL(next, requestUrl.origin)))
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("ui_intent")
-    .eq("id", user.id)
-    .maybeSingle()
-
-  const destination = profile?.ui_intent === "host" ? "/dashboard" : "/explore"
+  const destination = currentIntent === "host" ? "/dashboard" : "/explore"
   return clearOAuthSignupCookies(NextResponse.redirect(new URL(destination, requestUrl.origin)))
 }
 

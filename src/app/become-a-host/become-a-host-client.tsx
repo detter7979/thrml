@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import { trackMetaEvent } from "@/components/meta-pixel"
 import { Button } from "@/components/ui/button"
@@ -11,11 +11,14 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { usePlatformFeePercents } from "@/contexts/platform-fees-context"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { formatHostKeepPercent } from "@/lib/fees"
-import { HOST_NEW_LISTING_PATH, isHostUser } from "@/lib/host/is-host-user"
+import { hasCompletedHostOnboarding, hostLoginHref, hostSignupHref } from "@/lib/host/host-funnel"
+import { HOST_NEW_LISTING_PATH } from "@/lib/host/is-host-user"
 import { nextHostUiIntent } from "@/lib/host/promote-host-profile"
 import { trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { createClient } from "@/lib/supabase/client"
+
+import { HostLandingIntro } from "./host-landing-intro"
 const TOTAL_STEPS = 3
 
 function ProgressBar({ step }: { step: number }) {
@@ -116,8 +119,16 @@ const GROUND_RULES = [
   },
 ]
 
-export function BecomeAHostClient() {
+export function BecomeAHostClient({
+  guestBookingsOpen = false,
+  saunasOnly = true,
+}: {
+  guestBookingsOpen?: boolean
+  saunasOnly?: boolean
+}) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const resumingAfterSignup = searchParams.get("resume") === "1"
   const { hostFeePercent } = usePlatformFeePercents()
   const hostKeepLabel = formatHostKeepPercent(hostFeePercent)
   const [step, setStep] = useState(1)
@@ -125,6 +136,9 @@ export function BecomeAHostClient() {
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // null = still checking. Signed-out visitors create an account right after the pitch so we
+  // capture their email (and can remind them) before the ground rules and host terms.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
 
   useEffect(() => {
     trackGaEvent("host_onboarding_start", { step: 1 })
@@ -144,7 +158,9 @@ export function BecomeAHostClient() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      if (!user || cancelled) return
+      if (cancelled) return
+      setSignedIn(Boolean(user))
+      if (!user) return
 
       const [{ count: listingCount }, { data: profile }] = await Promise.all([
         supabase
@@ -152,17 +168,23 @@ export function BecomeAHostClient() {
           .select("id", { count: "exact", head: true })
           .eq("host_id", user.id)
           .eq("is_active", true),
-        supabase.from("profiles").select("ui_intent").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("host_terms_accepted").eq("id", user.id).maybeSingle(),
       ])
 
       if (
         !cancelled &&
-        isHostUser({
+        hasCompletedHostOnboarding({
           activeListingCount: listingCount ?? 0,
-          uiIntent: profile?.ui_intent,
+          hostTermsAccepted: profile?.host_terms_accepted,
         })
       ) {
         router.replace(HOST_NEW_LISTING_PATH)
+        return
+      }
+
+      if (!cancelled && resumingAfterSignup) {
+        setStep(2)
+        trackGaEvent("host_onboarding_step", { step: 2, resumed_after_signup: true })
       }
     }
 
@@ -170,9 +192,14 @@ export function BecomeAHostClient() {
     return () => {
       cancelled = true
     }
-  }, [router])
+  }, [router, resumingAfterSignup])
 
-  function handleStep1Continue() {
+  function handleStep1Continue(placement: "hero" | "footer" = "hero") {
+    if (signedIn === false) {
+      trackGaEvent("host_onboarding_signup_redirect", { step: 1, placement })
+      router.push(hostSignupHref())
+      return
+    }
     setStep(2)
     trackGaEvent("host_onboarding_step", { step: 2 })
   }
@@ -199,7 +226,12 @@ export function BecomeAHostClient() {
         data: { user },
       } = await supabase.auth.getUser()
 
-      if (user) {
+      if (!user) {
+        setSaving(false)
+        router.push(hostSignupHref())
+        return
+      }
+      {
         const { data: profile } = await supabase
           .from("profiles")
           .select("ui_intent")
@@ -257,7 +289,7 @@ export function BecomeAHostClient() {
 
       <main className="flex flex-1 flex-col items-center justify-start px-6 pt-4 pb-12">
         <div className="w-full max-w-lg space-y-6">
-          <ProgressBar step={step} />
+          {step > 1 ? <ProgressBar step={step} /> : null}
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -267,43 +299,16 @@ export function BecomeAHostClient() {
               transition={{ type: "spring", stiffness: 380, damping: 32 }}
             >
               {step === 1 ? (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <h1 className="font-serif text-3xl leading-tight text-[#1A1410]">
-                      Earn from your space.
-                      <br />
-                      We handle the rest.
-                    </h1>
-                    <p className="text-sm leading-relaxed text-neutral-500">
-                      Thrml connects you with guests looking for private wellness experiences. Set your
-                      price, your hours, and your rules - we take care of bookings and payments.
-                    </p>
-                  </div>
-
-                  <HowItWorksAnimation />
-
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                      <p className="text-lg font-semibold text-[#1A1410]">{hostKeepLabel}</p>
-                      <p className="text-xs text-neutral-400">You keep per booking</p>
-                    </div>
-                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                      <p className="text-lg font-semibold text-[#1A1410]">2 days</p>
-                      <p className="text-xs text-neutral-400">Stripe payout time</p>
-                    </div>
-                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                      <p className="text-lg font-semibold text-[#1A1410]">Free</p>
-                      <p className="text-xs text-neutral-400">To list your space</p>
-                    </div>
-                  </div>
-
-                  <Button
-                    className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530]"
-                    onClick={handleStep1Continue}
-                  >
-                    Get started →
-                  </Button>
-                </div>
+                <HostLandingIntro
+                  hostKeepLabel={hostKeepLabel}
+                  hostFeePercent={hostFeePercent}
+                  guestBookingsOpen={guestBookingsOpen}
+                  saunasOnly={saunasOnly}
+                  signedOut={signedIn === false}
+                  loginHref={hostLoginHref()}
+                  onStart={handleStep1Continue}
+                  howItWorks={<HowItWorksAnimation />}
+                />
               ) : null}
 
               {step === 2 ? (

@@ -1,4 +1,6 @@
 import { sendThrmlLayoutEmail, THRML_APP_URL } from "@/lib/emails/transactional-send"
+import { guestBookingsOpen, hostSpaceTypesSentence } from "@/lib/host/host-funnel"
+import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const APP_URL = THRML_APP_URL
@@ -9,26 +11,31 @@ export async function sendHostWelcomeEmail(args: {
   firstName: string | null
 }): Promise<{ sent: boolean; error?: string }> {
   const name = args.firstName ?? "there"
-  const stripeUrl = `${APP_URL}/dashboard/account#house-rules`
-  const listingUrl = `${APP_URL}/dashboard/listings/new`
+  const listingUrl = `${APP_URL}/become-a-host?resume=1`
+  const payoutsUrl = `${APP_URL}/dashboard/account#payout-settings`
+  const open = guestBookingsOpen()
 
   return sendThrmlLayoutEmail({
     to: args.email,
-    subject: `Welcome to Thrml — let's get your space live`,
+    subject: `Welcome to thrml — let's get your space live`,
     userId: args.userId,
     preferenceKey: "new_booking",
     layout: {
-      preview: "Welcome to Thrml — let's get your space live",
+      preview: "Welcome to thrml — let's get your space live",
       kicker: "Welcome",
-      title: `Welcome to Thrml, ${name}.`,
-      paragraphs: ["You're now set up as a host. Here's how to get your first booking in 3 steps:"],
-      listItems: [
-        "Connect Stripe — so you can receive payouts the moment a booking confirms.",
-        "Create your first listing — add photos, set your price, and pick your access type.",
-        "Go live — publish and start accepting bookings instantly or by request.",
+      title: `Welcome to thrml, ${name}.`,
+      paragraphs: [
+        open
+          ? "You're set up as a host. Here's how to get your first booking:"
+          : "You're joining as one of our founding hosts in the Seattle area. Here's how to get ready before we open guest bookings:",
       ],
-      cta: { label: "Connect Stripe & create your listing", href: stripeUrl },
-      footnote: `Or create your listing first at ${listingUrl} — you can connect Stripe any time before your first payout.`,
+      listItems: [
+        `List your space — a few photos (3+), your price per session and your hours. ${hostSpaceTypesSentence(isSaunasOnlyLaunch())}`,
+        "Verify your identity — it earns the Verified Host badge guests look for.",
+        "Connect Stripe payouts — so you're paid automatically after every session.",
+      ],
+      cta: { label: "List my space", href: listingUrl },
+      footnote: `Already listed? Connect payouts anytime at ${payoutsUrl}. Questions? Just reply to this email.`,
     },
   })
 }

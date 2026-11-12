@@ -7,20 +7,12 @@ import {
 } from "../creative-templates"
 
 describe("creative-templates", () => {
-  it("loads eight active templates (T1–T5, T9–T11)", () => {
+  it("loads five active templates (T1–T5)", () => {
     const templates = loadCreativeTemplates()
-    expect(templates.length).toBe(8)
-    expect(templates.map((t) => t.id)).toEqual(["T1", "T2", "T3", "T4", "T5", "T9", "T10", "T11"])
+    expect(templates.length).toBe(5)
+    expect(templates.map((t) => t.id)).toEqual(["T1", "T2", "T3", "T4", "T5"])
   })
 
-  it("T06 presets map to the launch test angles and CTAs", () => {
-    const expected = { T9: ["idle_space", "list_now"], T10: ["urgency", "list_now"], T11: ["income", "learn_more"] }
-    for (const [id, [angle, cta]] of Object.entries(expected)) {
-      const t = getCreativeTemplate(id)!
-      expect(t.angle).toBe(angle)
-      expect(t.naming).toMatchObject({ test_id: "T06", cta })
-    }
-  })
 
   it("no template carries an earnings-average claim", () => {
     for (const t of loadCreativeTemplates()) {

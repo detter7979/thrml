@@ -161,7 +161,7 @@ export function hostSetupSteps(input: {
     {
       id: "payouts",
       label: "Connect payouts",
-      detail: "Stripe pays you automatically after every session.",
+      detail: "Get paid out to your bank through Stripe.",
       done: input.payoutsEnabled,
       href: "/dashboard/account#payout-settings",
       cta: "Connect",
@@ -176,6 +176,6 @@ export function hostSetupSteps(input: {
  */
 export function hostSpaceTypesSentence(saunasOnly: boolean): string {
   return saunasOnly
-    ? "We're starting with saunas — cold plunges, hot tubs and float tanks are coming soon, and you can sign up now to be first in line."
+    ? "We're starting with private saunas, indoor and outdoor. We're planning to add cold plunges, hot tubs and float tanks next."
     : "Saunas, cold plunges, hot tubs, float tanks and other private wellness spaces are all welcome."
 }

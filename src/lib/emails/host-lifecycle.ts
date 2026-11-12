@@ -170,7 +170,7 @@ async function sendFirstListingLiveEmail(args: {
             "Verify your identity for the Verified Host badge — verified listings convert meaningfully better.",
           ]
         : [
-            "Connect Stripe payouts so you're paid automatically after every session.",
+            "Connect Stripe payouts so your earnings go straight to your bank account.",
             "Verify your identity for the Verified Host badge — verified listings convert meaningfully better.",
             "Keep your calendar open a few weeks out so your space is bookable the day we launch.",
             "Know someone with a home sauna? Send them our way — more spaces means a faster launch.",
@@ -208,7 +208,7 @@ async function sendStripeConnectReminder(args: {
       paragraphs: second
         ? [
             "Your space is bookable, but without Stripe connected we can't pay you when sessions complete.",
-            "It takes about 3 minutes — bank details, a quick identity check, done. Payouts then arrive automatically after each session.",
+            "It takes about 3 minutes — bank details, a quick identity check, done. Your earnings are then paid out to your bank on Stripe's payout schedule.",
           ]
         : [
             "Your listing is live — the last step is connecting Stripe so payouts have somewhere to go.",

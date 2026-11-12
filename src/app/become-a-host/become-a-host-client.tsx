@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import Link from "next/link"
+import { CalendarCheck, Camera, Wallet } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { trackMetaEvent } from "@/components/meta-pixel"
@@ -45,7 +46,7 @@ function HowItWorksAnimation() {
     <div className="flex select-none items-center justify-center gap-0 py-8">
       <div className="animate-[fadeSlideIn_0.5s_ease_0.1s_both] flex flex-col items-center gap-2">
         <div className="flex size-16 items-center justify-center rounded-2xl border border-[#F5D5C8] bg-[#FFF5F0]">
-          <span className="text-3xl">📸</span>
+          <Camera className="size-7 text-[#C4623A]" strokeWidth={1.5} aria-hidden />
         </div>
         <span className="w-16 text-center text-xs font-medium text-neutral-600">List your space</span>
       </div>
@@ -64,7 +65,7 @@ function HowItWorksAnimation() {
 
       <div className="animate-[fadeSlideIn_0.5s_ease_0.4s_both] flex flex-col items-center gap-2">
         <div className="flex size-16 items-center justify-center rounded-2xl border border-[#F5D5C8] bg-[#FFF5F0]">
-          <span className="text-3xl">📅</span>
+          <CalendarCheck className="size-7 text-[#C4623A]" strokeWidth={1.5} aria-hidden />
         </div>
         <span className="w-16 text-center text-xs font-medium text-neutral-600">Guest books</span>
       </div>
@@ -83,7 +84,7 @@ function HowItWorksAnimation() {
 
       <div className="animate-[fadeSlideIn_0.5s_ease_0.7s_both] flex flex-col items-center gap-2">
         <div className="flex size-16 items-center justify-center rounded-2xl border border-[#F5D5C8] bg-[#FFF5F0]">
-          <span className="text-3xl">💰</span>
+          <Wallet className="size-7 text-[#C4623A]" strokeWidth={1.5} aria-hidden />
         </div>
         <span className="w-16 text-center text-xs font-medium text-neutral-600">You earn</span>
       </div>

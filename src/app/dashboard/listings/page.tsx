@@ -453,7 +453,7 @@ export default async function DashboardListingsPage({
           <p className="mx-auto mt-2 max-w-xl text-sm text-[#6D5E51]">
             {guestOnly
               ? "When you are ready, create your first space and we will tailor this area to your host activity."
-              : "Set your own price and hours, and get paid automatically after every session."}
+              : "Set your own price and hours, and get paid out through Stripe."}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-4 text-xs text-[#6D5E51]">
             <span>🔒 You control availability</span>

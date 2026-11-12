@@ -266,19 +266,19 @@ templates:
       trigger_type: manual
       hypothesis: "Scarcity plus a concrete founding offer drives faster host signups."
       target_audience: "Seattle-area homeowners with a private sauna"
-      hook: "25 founding host spots in Seattle."
-      copy_primary: "We're opening thrml in Seattle with 25 founding hosts. Founding hosts pay a 10% host fee for their first 90 days of bookings. Free to list."
-      copy_headline: "25 founding host spots in Seattle."
-      copy_subtext: "10% host fee for your first 90 days of bookings."
+      hook: "Rent out your sauna. First 25 hosts get a lower fee."
+      copy_primary: "Rent your sauna to vetted guests by the session on thrml. The first 25 Seattle hosts pay a 10% host fee for their first 90 days. Free to list."
+      copy_headline: "Rent out your sauna. First 25 hosts get a lower fee."
+      copy_subtext: "10% host fee for your first 90 days. Free to list."
       cta: "Sign Up"
       campaign_short_name: host-launch-t06
     svg_tokens:
       TAGLINE_EYEBROW: "FOUNDING HOSTS · SEATTLE"
-      SUBHEAD: "10% host fee for your first 90 days of bookings."
+      SUBHEAD: "10% host fee for your first 90 days. Free to list."
     svg_variations:
       - variation_label: A
         tokens:
-          HEADLINE: "25 founding host spots in Seattle."
+          HEADLINE: "Rent out your sauna. First 25 hosts get a lower fee."
 
   - id: T11
     label: "T06 Earnings Estimate — Block Split"

@@ -1,6 +1,7 @@
 import { after, NextRequest, NextResponse } from "next/server"
 
 import { assertHostInsuranceAttested } from "@/lib/host/insurance-attestation"
+import { guestBookingsOpen } from "@/lib/host/host-funnel"
 import { promoteProfileToHost } from "@/lib/host/promote-host-profile"
 import {
   fireHostListingCapiEvents,
@@ -118,6 +119,13 @@ export async function POST(request: NextRequest) {
       await promoteProfileToHost(admin, user.id).catch((err) => {
         console.error("[POST /api/listings] promote host profile failed", err)
       })
+      // Founding host program: hosts who publish before guest launch claim a spot while any remain.
+      if (!guestBookingsOpen()) {
+        const { error: claimError } = await admin.rpc("claim_founding_host", { p_host: user.id })
+        if (claimError) {
+          console.error("[POST /api/listings] claim_founding_host failed", claimError.message)
+        }
+      }
       await fireHostListingCapiEvents(admin, user, {
         listingId: data.id,
         headers,

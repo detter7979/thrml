@@ -77,12 +77,12 @@ function EarningsEstimator({ hostFeePercent }: { hostFeePercent: number }) {
       </label>
 
       <div className="rounded-xl bg-[#FFF5F0] px-4 py-3">
-        <p className="text-xs text-neutral-500">Estimated monthly earnings, after thrml&apos;s fee</p>
+        <p className="text-xs text-neutral-500">Estimated monthly revenue, after thrml&apos;s fee</p>
         <p className="font-serif text-3xl text-[#1A1410]">{formatUsd(monthly)}</p>
       </div>
       <p className="text-[11px] leading-relaxed text-neutral-400">
-        Illustrative only — not a guarantee. Actual earnings depend on your price, availability and demand in your
-        area.
+        Estimates are illustrative, not guaranteed, and show revenue after thrml&apos;s fee. Actual earnings depend on
+        bookings and pricing. Excludes operating expenses, insurance and taxes.
       </p>
     </section>
   )
@@ -90,41 +90,55 @@ function EarningsEstimator({ hostFeePercent }: { hostFeePercent: number }) {
 
 type Faq = { question: string; answer: string }
 
-function buildFaqs(input: { hostKeepLabel: string; guestBookingsOpen: boolean; saunasOnly: boolean }): Faq[] {
+type FoundingOffer = { feePercent: number; windowDays: number; spotsLeft: number; cap: number }
+
+function buildFaqs(input: {
+  hostKeepLabel: string
+  guestBookingsOpen: boolean
+  saunasOnly: boolean
+  foundingOffer: FoundingOffer | null
+}): Faq[] {
   return [
     {
       question: "Do I need insurance?",
       answer:
-        "Yes. thrml doesn't provide insurance for hosts or guests, so you'll confirm you carry liability coverage appropriate for hosting paid guests before your listing goes live. Many homeowner's policies don't cover paid guests — check with your insurance agent about adding coverage.",
+        "Yes. thrml doesn't provide insurance for hosts or guests. Before your listing goes live, you'll confirm that you carry liability coverage appropriate for hosting paid guests. Standard homeowners insurance often doesn't cover this kind of use, so check with your insurance provider about the right coverage.",
     },
     {
       question: "What does it cost?",
-      answer: `Listing is free. When a session is booked, thrml keeps a service fee and you keep ${input.hostKeepLabel} of your price. There are no monthly fees.`,
+      answer: input.foundingOffer
+        ? `Listing is free and there are no monthly fees. When a session is booked, thrml keeps a service fee and you keep ${input.hostKeepLabel} of your price. Founding hosts pay just ${input.foundingOffer.feePercent}% for their first ${input.foundingOffer.windowDays} days of bookings — the clock starts at your first booking.`
+        : `Listing is free. When a session is booked, thrml keeps a service fee and you keep ${input.hostKeepLabel} of your price. There are no monthly fees.`,
     },
     {
       question: "How do guests get in?",
       answer:
-        "You choose: greet guests in person, or use a lockbox, keypad or smart lock. Access details are sent to the guest shortly before their session, and every guest agrees to your house rules at checkout.",
+        "You decide. Welcome guests in person, or set up self check-in with a lockbox, keypad or smart lock. Guests receive access instructions before their session and agree to your house rules when they book.",
     },
     {
       question: "How and when do I get paid?",
       answer:
-        "Payouts go through Stripe straight to your bank after each completed session. thrml never sees or stores your bank details.",
+        "Payments are processed securely through Stripe. You connect your bank account through Stripe, and your earnings are paid out to it on Stripe's payout schedule. thrml never sees or stores your bank details.",
     },
     {
       question: "Am I in control of my schedule?",
       answer:
-        "Completely. You set your hours, price and house rules, choose instant booking or approve each request, block dates whenever you need them, and can pause your listing anytime.",
+        "Absolutely. You set your prices, availability and house rules. Choose instant booking or approve each request, block dates whenever you need to, and deactivate your listing anytime.",
     },
     {
       question: "What kinds of spaces can I list?",
       answer: `${hostSpaceTypesSentence(input.saunasOnly)} One space is plenty to start.`,
     },
     {
+      question: "What if a guest damages my sauna or property?",
+      answer:
+        "Guests are responsible for damage they cause during a booking. Contact us through Support as soon as possible and document the damage with photos — we'll review the report and, where it's documented, can charge the guest's payment method on file under our Terms. thrml doesn't provide property damage coverage, so keep appropriate insurance in place.",
+    },
+    {
       question: "When will I get bookings?",
       answer: input.guestBookingsOpen
-        ? "Guests can book now. Hosts who keep their calendar open and share their listing usually see bookings soonest."
-        : "We're onboarding founding hosts across the Seattle area first, and we'll open bookings to guests once there's a strong mix of spaces. We'll email you before the first guests arrive, so you're live from day one.",
+        ? "Guests can book now. Demand varies with location, availability and pricing — hosts who keep their calendar open and share their listing tend to see bookings soonest."
+        : "We're welcoming founding hosts across the Seattle area first, and we'll open bookings to guests once there's a strong mix of spaces. We'll email you before guests can book. After launch, demand will vary with your location, availability and pricing.",
     },
   ]
 }
@@ -134,6 +148,7 @@ export function HostLandingIntro({
   hostFeePercent,
   guestBookingsOpen,
   saunasOnly,
+  foundingOffer = null,
   signedOut,
   loginHref,
   onStart,
@@ -143,12 +158,13 @@ export function HostLandingIntro({
   hostFeePercent: number
   guestBookingsOpen: boolean
   saunasOnly: boolean
+  foundingOffer?: FoundingOffer | null
   signedOut: boolean
   loginHref: string
   onStart: (placement: "hero" | "footer") => void
   howItWorks: React.ReactNode
 }) {
-  const faqs = buildFaqs({ hostKeepLabel, guestBookingsOpen, saunasOnly })
+  const faqs = buildFaqs({ hostKeepLabel, guestBookingsOpen, saunasOnly, foundingOffer })
   const spaceNoun = saunasOnly ? "sauna" : "space"
 
   const startButton = (placement: "hero" | "footer") => (
@@ -165,13 +181,14 @@ export function HostLandingIntro({
       <div className="space-y-3">
         {!guestBookingsOpen ? (
           <p className="inline-flex rounded-full bg-[#FFF0E8] px-3 py-1 text-xs font-medium text-[#A04A2A]">
-            Now onboarding founding hosts in Seattle
+            {foundingOffer
+              ? `${foundingOffer.spotsLeft} of ${foundingOffer.cap} founding host spots left in Seattle`
+              : "Now onboarding founding hosts in Seattle"}
           </p>
         ) : null}
         <h1 className="font-serif text-3xl leading-tight text-[#1A1410]">
-          Your {spaceNoun} sits empty most of the week.
-          <br />
-          Let it earn.
+          Your {spaceNoun} sits empty most of the week.{" "}
+          <span className="mt-1 block text-[#C4623A]">Let it earn.</span>
         </h1>
         <p className="text-sm leading-relaxed text-neutral-500">
           thrml lets people book private time in your {spaceNoun} by the session. You set the price, the hours and the
@@ -222,7 +239,9 @@ export function HostLandingIntro({
           </li>
           <li>
             <span className="font-medium">3. You get paid.</span>{" "}
-            <span className="text-neutral-500">Stripe pays you automatically after each session.</span>
+            <span className="text-neutral-500">
+              Payments are processed through Stripe and paid out to your connected bank account.
+            </span>
           </li>
         </ol>
       </section>
@@ -231,10 +250,34 @@ export function HostLandingIntro({
         <section className="space-y-2 rounded-2xl border border-[#F0E3D8] bg-[#FFFAF6] p-5">
           <h2 className="font-serif text-xl text-[#1A1410]">Be a founding host</h2>
           <p className="text-sm leading-relaxed text-neutral-600">
-            We&apos;re bringing on a small group of hosts across the Seattle area before we open bookings to guests.
-            Founding hosts are live from day one, get a direct line to the people building thrml, and help shape how it
-            works.
+            We&apos;re welcoming a small group of sauna owners across Seattle to help launch thrml, before we open to
+            guests.
           </p>
+          <ul className="space-y-1 text-sm text-[#2F241E]">
+            <li>
+              <span className="font-medium">Live on day one</span>{" "}
+              <span className="text-neutral-500">— your listing is ready when guest bookings open.</span>
+            </li>
+            <li>
+              <span className="font-medium">Direct support</span>{" "}
+              <span className="text-neutral-500">from the people building thrml, and a say in how hosting works.</span>
+            </li>
+            {foundingOffer ? (
+              <>
+                <li>
+                  <span className="font-medium">{foundingOffer.feePercent}% host fee</span>{" "}
+                  <span className="text-neutral-500">
+                    instead of the standard rate for your first {foundingOffer.windowDays} days of bookings — the clock
+                    starts at your first booking.
+                  </span>
+                </li>
+                <li>
+                  <span className="font-medium">First {foundingOffer.cap} hosts only</span>{" "}
+                  <span className="text-neutral-500">— publish your listing before guest launch to claim a spot.</span>
+                </li>
+              </>
+            ) : null}
+          </ul>
         </section>
       ) : null}
 

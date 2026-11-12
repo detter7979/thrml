@@ -3,6 +3,7 @@ import Image from "next/image"
 import { cache, Suspense } from "react"
 import { LayoutGrid, Plus, Settings } from "lucide-react"
 
+import { FoundingHostStatus } from "@/components/host/FoundingHostStatus"
 import { HostSetupChecklist } from "@/components/host/HostSetupChecklist"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -651,6 +652,10 @@ export function HostOverviewPage({ userId }: { userId: string }) {
     <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 md:px-8 md:py-8">
       <Suspense fallback={null}>
         <HostSetupChecklist userId={userId} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <FoundingHostStatus userId={userId} />
       </Suspense>
 
       <Suspense fallback={<SectionSkeleton heightClass="h-28" />}>

@@ -8,6 +8,7 @@ import {
   fetchPlatformFeePercents,
   STRIPE_MIN_CHARGE_CENTS,
 } from "@/lib/fees"
+import { fetchFoundingHostSettings, resolveHostFeePercent } from "@/lib/host/founding-host"
 import { calculateBookingSubtotal } from "@/lib/pricing"
 import { getFallbackServiceType } from "@/lib/service-types"
 import { applyMemoryRateLimit, requestIp } from "@/lib/security"
@@ -327,7 +328,7 @@ export async function POST(req: NextRequest) {
     const { data: hostProfile } = await admin
       .from("profiles")
       .select(
-        "stripe_account_id, stripe_payouts_enabled, stripe_charges_enabled, stripe_onboarding_complete"
+        "stripe_account_id, stripe_payouts_enabled, stripe_charges_enabled, stripe_onboarding_complete, founding_host, founding_fee_expires_at"
       )
       .eq("id", listing.host_id)
       .single()
@@ -447,10 +448,17 @@ export async function POST(req: NextRequest) {
     const chargeDurationHours = bookingModel === "fixed_session" ? 1 : durationHours
     const subtotalRow = calculateBookingSubtotal(listing, guestCount, chargeDurationHours)
     const feePercents = await fetchPlatformFeePercents(admin)
+    // Founding hosts pay a reduced host fee during their window; guests pay the same either way.
+    const foundingSettings = host?.founding_host ? await fetchFoundingHostSettings(admin) : null
+    const resolvedHostFee = resolveHostFeePercent({
+      globalHostFeePercent: feePercents.hostFeePercent,
+      profile: host,
+      foundingFeePercent: foundingSettings?.feePercent ?? feePercents.hostFeePercent,
+    })
     const fees = calculateFees(
       subtotalRow.subtotal,
       feePercents.guestFeePercent,
-      feePercents.hostFeePercent
+      resolvedHostFee.hostFeePercent
     )
     let referralCreditAppliedCents = 0
     let userCreditAppliedCents = 0

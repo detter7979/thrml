@@ -157,7 +157,7 @@ describe("hostSetupSteps", () => {
 
 describe("hostSpaceTypesSentence", () => {
   it("doesn't promise other space types during the saunas-only launch", () => {
-    expect(hostSpaceTypesSentence(true)).toContain("coming soon")
+    expect(hostSpaceTypesSentence(true)).toContain("starting with private saunas")
     expect(hostSpaceTypesSentence(false)).toContain("all welcome")
   })
 })

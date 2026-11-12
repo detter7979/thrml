@@ -32,7 +32,7 @@ export async function sendHostWelcomeEmail(args: {
       listItems: [
         `List your space — a few photos (3+), your price per session and your hours. ${hostSpaceTypesSentence(isSaunasOnlyLaunch())}`,
         "Verify your identity — it earns the Verified Host badge guests look for.",
-        "Connect Stripe payouts — so you're paid automatically after every session.",
+        "Connect Stripe payouts — so your earnings go straight to your bank account.",
       ],
       cta: { label: "List my space", href: listingUrl },
       footnote: `Already listed? Connect payouts anytime at ${payoutsUrl}. Questions? Just reply to this email.`,

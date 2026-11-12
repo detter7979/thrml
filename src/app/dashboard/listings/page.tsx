@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { HostListingNextSteps } from "@/components/host/host-listing-next-steps"
+import { HostSetupChecklist } from "@/components/host/HostSetupChecklist"
 import { Button } from "@/components/ui/button"
 import { guestCompletedTabBooking } from "@/lib/booking-session"
 import { getHostInsuranceAttestationStatus } from "@/lib/host/insurance-attestation"
@@ -441,6 +442,8 @@ export default async function DashboardListingsPage({
         />
       ) : null}
 
+      {currentListings.length === 0 && !guestOnly && user ? <HostSetupChecklist userId={user.id} /> : null}
+
       {currentListings.length === 0 ? (
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
           <p className="text-4xl">🔥</p>
@@ -450,11 +453,11 @@ export default async function DashboardListingsPage({
           <p className="mx-auto mt-2 max-w-xl text-sm text-[#6D5E51]">
             {guestOnly
               ? "When you are ready, create your first space and we will tailor this area to your host activity."
-              : "Join Seattle hosts earning an average of $480/month renting their wellness spaces."}
+              : "Set your own price and hours, and get paid automatically after every session."}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-4 text-xs text-[#6D5E51]">
             <span>🔒 You control availability</span>
-            <span>💰 Paid weekly to your bank</span>
+            <span>💰 Paid out through Stripe</span>
             <span>📋 Cancel anytime</span>
           </div>
           <Button asChild className="btn-primary mt-6">

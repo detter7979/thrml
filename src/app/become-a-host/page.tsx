@@ -5,7 +5,8 @@ import { redirect } from "next/navigation"
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { formatHostKeepPercent } from "@/lib/fees"
 import { getPlatformFeePercentsCached } from "@/lib/fees-server"
-import { hasCompletedHostOnboarding } from "@/lib/host/host-funnel"
+import { guestBookingsOpen, hasCompletedHostOnboarding } from "@/lib/host/host-funnel"
+import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { HOST_NEW_LISTING_PATH } from "@/lib/host/is-host-user"
 import { createClient } from "@/lib/supabase/server"
 
@@ -67,7 +68,7 @@ export default async function BecomeAHostPage() {
       }
     >
       <PlatformFeesProvider initialPercents={feePercents}>
-        <BecomeAHostClient />
+        <BecomeAHostClient guestBookingsOpen={guestBookingsOpen()} saunasOnly={isSaunasOnlyLaunch()} />
       </PlatformFeesProvider>
     </Suspense>
   )

@@ -66,3 +66,116 @@ export function hasCompletedHostOnboarding(input: {
 }): boolean {
   return input.activeListingCount > 0 || input.hostTermsAccepted === true
 }
+
+/** Share of the listing wizard a draft has completed (steps finished before the current one). */
+export function draftProgressPercent(step: number, totalSteps: number, firstStep = 1): number {
+  const span = Math.max(1, totalSteps - firstStep + 1)
+  const done = Math.min(Math.max(step - firstStep, 0), span)
+  return Math.round((done / span) * 100)
+}
+
+/** Draft reminders: day 1 and day 4 after the host last touched their draft. */
+export const DRAFT_REMINDERS = [
+  { tag: "host_draft_reminder_1", minIdleDays: 1 },
+  { tag: "host_draft_reminder_2", minIdleDays: 4 },
+] as const
+
+export type DraftReminderTag = (typeof DRAFT_REMINDERS)[number]["tag"]
+
+export function pickDraftReminder(
+  idleDays: number,
+  alreadySent: ReadonlySet<string>
+): DraftReminderTag | null {
+  const reached = DRAFT_REMINDERS.filter((r) => idleDays >= r.minIdleDays)
+  const latest = reached[reached.length - 1]
+  if (!latest || alreadySent.has(latest.tag)) return null
+  return latest.tag
+}
+
+/** Identity reminders for live hosts who never started verification: day 2 and 7 after listing. */
+export const IDENTITY_START_REMINDERS = [
+  { tag: "host_identity_start_reminder_1", minAgeDays: 2 },
+  { tag: "host_identity_start_reminder_2", minAgeDays: 7 },
+] as const
+
+export type IdentityStartReminderTag = (typeof IDENTITY_START_REMINDERS)[number]["tag"]
+
+export function pickIdentityStartReminder(
+  listingAgeDays: number,
+  alreadySent: ReadonlySet<string>
+): IdentityStartReminderTag | null {
+  const reached = IDENTITY_START_REMINDERS.filter((r) => listingAgeDays >= r.minAgeDays)
+  const latest = reached[reached.length - 1]
+  if (!latest || alreadySent.has(latest.tag)) return null
+  return latest.tag
+}
+
+export type HostSetupStepId = "agreement" | "listing" | "identity" | "payouts"
+
+export type HostSetupStep = {
+  id: HostSetupStepId
+  label: string
+  detail: string
+  done: boolean
+  href: string
+  cta: string
+}
+
+/** The host setup checklist shown on the dashboard. Order is the order we want hosts to go. */
+export function hostSetupSteps(input: {
+  hostTermsAccepted: boolean
+  hasLiveListing: boolean
+  draftPercent: number | null
+  idVerified: boolean
+  payoutsEnabled: boolean
+}): { steps: HostSetupStep[]; completed: number; total: number } {
+  const steps: HostSetupStep[] = [
+    {
+      id: "agreement",
+      label: "Accept the host agreement",
+      detail: "Ground rules and host terms — takes a minute.",
+      done: input.hostTermsAccepted || input.hasLiveListing,
+      href: HOST_SIGNUP_RETURN_PATH,
+      cta: "Review",
+    },
+    {
+      id: "listing",
+      label: "List your space",
+      detail: input.hasLiveListing
+        ? "Your space is live."
+        : input.draftPercent !== null
+          ? `Your draft is ${input.draftPercent}% done — pick up where you left off.`
+          : "Photos (3+), a price per session and your hours. About 10 minutes.",
+      done: input.hasLiveListing,
+      href: "/dashboard/host/new",
+      cta: input.draftPercent !== null ? "Continue" : "Start",
+    },
+    {
+      id: "identity",
+      label: "Verify your identity",
+      detail: "Earns the Verified Host badge guests look for.",
+      done: input.idVerified,
+      href: "/dashboard/account#identity",
+      cta: "Verify",
+    },
+    {
+      id: "payouts",
+      label: "Connect payouts",
+      detail: "Stripe pays you automatically after every session.",
+      done: input.payoutsEnabled,
+      href: "/dashboard/account#payout-settings",
+      cta: "Connect",
+    },
+  ]
+  return { steps, completed: steps.filter((s) => s.done).length, total: steps.length }
+}
+
+/**
+ * How to describe which spaces can be listed. While NEXT_PUBLIC_SAUNAS_ONLY_LAUNCH is on (the
+ * default) the listing wizard only accepts saunas, so copy must not promise other types yet.
+ */
+export function hostSpaceTypesSentence(saunasOnly: boolean): string {
+  return saunasOnly
+    ? "We're starting with saunas — cold plunges, hot tubs and float tanks are coming soon, and you can sign up now to be first in line."
+    : "Saunas, cold plunges, hot tubs, float tanks and other private wellness spaces are all welcome."
+}

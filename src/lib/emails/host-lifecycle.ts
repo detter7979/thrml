@@ -1,9 +1,16 @@
 import { sendThrmlLayoutEmail, THRML_APP_URL } from "@/lib/emails/transactional-send"
 import {
+  draftProgressPercent,
   guestBookingsOpen,
+  hostSpaceTypesSentence,
+  pickDraftReminder,
+  pickIdentityStartReminder,
   pickNoListingNudge,
+  type DraftReminderTag,
+  type IdentityStartReminderTag,
   type NoListingNudgeTag,
 } from "@/lib/host/host-funnel"
+import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 import { emailAlreadySent, logEmailSent } from "./email-log"
@@ -26,6 +33,16 @@ type HostProfileRow = {
   created_at: string
   stripe_account_id?: string | null
   stripe_payouts_enabled?: boolean | null
+  id_verified?: boolean | null
+  id_verification_status?: string | null
+}
+
+type DraftRow = {
+  host_id: string
+  step: number
+  total_steps: number
+  photo_urls: string[] | null
+  updated_at: string
 }
 
 function firstName(fullName: string | null | undefined): string {
@@ -151,7 +168,7 @@ async function sendFirstListingLiveEmail(args: {
             "Connect Stripe payouts so you're paid automatically after every session.",
             "Verify your identity for the Verified Host badge — verified listings convert meaningfully better.",
             "Keep your calendar open a few weeks out so your space is bookable the day we launch.",
-            "Know someone with a sauna, cold plunge or hot tub? Send them our way — more spaces means a faster launch.",
+            "Know someone with a home sauna? Send them our way — more spaces means a faster launch.",
           ],
       cta: { label: "View your live listing", href: `${APP_URL}/listings/${args.listingId}` },
     },
@@ -211,7 +228,7 @@ const NO_LISTING_COPY: Record<
     title: "Let's get your space listed.",
     paragraphs: [
       "You signed up to host on thrml but haven't listed your space yet. It takes about 10 minutes: a few photos, a price per session and the hours you're open.",
-      "Saunas, cold plunges, hot tubs, float tanks and other private wellness spaces are all welcome — one space is plenty to start.",
+      `${hostSpaceTypesSentence(isSaunasOnlyLaunch())} One space is plenty to start.`,
     ],
     cta: "List my space",
   },
@@ -237,14 +254,88 @@ const NO_LISTING_COPY: Record<
   },
 }
 
-async function sentNoListingTags(profileId: string): Promise<Set<string>> {
+async function sentTagsWithPrefix(profileId: string, prefix: string): Promise<Set<string>> {
   const admin = createAdminClient()
   const { data } = await admin
     .from("email_log")
     .select("email_type")
     .eq("user_id", profileId)
-    .like("email_type", "host_no_listing_nudge_%")
+    .like("email_type", `${prefix}%`)
   return new Set((data ?? []).map((row) => String(row.email_type)))
+}
+
+/** Draft started but not published — day 1 and 4 after the host last touched it. */
+async function sendDraftReminder(args: {
+  profile: HostProfileRow
+  draft: DraftRow
+  tag: DraftReminderTag
+}): Promise<boolean> {
+  if (await emailAlreadySent(args.profile.id, args.tag)) return false
+  const email = await emailForProfile(args.profile.id)
+  if (!email) return false
+
+  // The saunas-only wizard skips the service-type step, so it starts at step 2.
+  const firstStep = isSaunasOnlyLaunch() ? 2 : 1
+  const percent = draftProgressPercent(args.draft.step, args.draft.total_steps, firstStep)
+  const photoCount = (args.draft.photo_urls ?? []).length
+  const second = args.tag === "host_draft_reminder_2"
+
+  const result = await sendThrmlLayoutEmail({
+    to: email,
+    userId: args.profile.id,
+    preferenceKey: "new_booking",
+    subject: second ? "Your listing draft is still saved" : `Your listing is ${percent}% done`,
+    layout: {
+      preview: "Everything you entered is saved — pick up where you left off",
+      kicker: "Finish your listing",
+      title: second ? "Your draft is right where you left it." : `You're ${percent}% of the way there.`,
+      greeting: `Hi ${firstName(args.profile.full_name)},`,
+      paragraphs: [
+        photoCount > 0
+          ? `Your details and ${photoCount} photo${photoCount === 1 ? "" : "s"} are saved. Finish the remaining steps and your space goes live.`
+          : "Everything you entered is saved. Finish the remaining steps and your space goes live.",
+        second
+          ? "Stuck on pricing, photos or access details? Reply to this email and we'll help you finish it."
+          : "Most hosts finish in under 10 minutes once they're back in.",
+      ],
+      cta: { label: "Finish my listing", href: `${APP_URL}/dashboard/host/new` },
+    },
+  })
+
+  if (result.sent) await logEmailSent(args.profile.id, args.tag)
+  return result.sent
+}
+
+/** Live listing, identity verification never started — day 2 and 7 after the listing. */
+async function sendIdentityStartReminder(args: {
+  profile: HostProfileRow
+  tag: IdentityStartReminderTag
+}): Promise<boolean> {
+  if (await emailAlreadySent(args.profile.id, args.tag)) return false
+  const email = await emailForProfile(args.profile.id)
+  if (!email) return false
+
+  const second = args.tag === "host_identity_start_reminder_2"
+  const result = await sendThrmlLayoutEmail({
+    to: email,
+    userId: args.profile.id,
+    preferenceKey: "new_booking",
+    subject: second ? "Guests look for the Verified Host badge" : "Get your Verified Host badge",
+    layout: {
+      preview: "A quick ID check through Stripe — about 2 minutes",
+      kicker: "Verify your identity",
+      title: "Show guests they're booking with a real person.",
+      greeting: `Hi ${firstName(args.profile.full_name)},`,
+      paragraphs: [
+        "Guests are booking time in your private space, so trust matters. Verifying your identity adds the Verified Host badge to your profile and listing.",
+        "It's a quick ID check through Stripe — about 2 minutes. thrml never sees or stores your ID document.",
+      ],
+      cta: { label: "Verify my identity", href: `${APP_URL}/dashboard/account#identity` },
+    },
+  })
+
+  if (result.sent) await logEmailSent(args.profile.id, args.tag)
+  return result.sent
 }
 
 /** Hosts who signed up but haven't published a listing — day 3, 7 and 14. */
@@ -336,7 +427,9 @@ export async function processHostLifecycle(): Promise<{ sent: number }> {
 
   const { data: hostsRaw } = await admin
     .from("profiles")
-    .select("id, full_name, created_at, stripe_account_id, stripe_payouts_enabled")
+    .select(
+      "id, full_name, created_at, stripe_account_id, stripe_payouts_enabled, id_verified, id_verification_status"
+    )
     // Include hosts who signed up with host intent but haven't published yet — `is_host` is only
     // set once a listing is created, and those are exactly the hosts who need reminders.
     .or("is_host.eq.true,ui_intent.in.(host,both)")
@@ -351,6 +444,14 @@ export async function processHostLifecycle(): Promise<{ sent: number }> {
     .select("id, host_id, title, created_at, is_active")
     .in("host_id", hostIds)
     .order("created_at", { ascending: true })
+
+  const { data: draftsRaw } = await admin
+    .from("host_listing_drafts")
+    .select("host_id, step, total_steps, photo_urls, updated_at")
+    .in("host_id", hostIds)
+  const draftByHost = new Map<string, DraftRow>(
+    ((draftsRaw ?? []) as DraftRow[]).map((draft) => [draft.host_id, draft])
+  )
 
   const firstListingByHost = new Map<string, { id: string; title: string | null; created_at: string; is_active: boolean }>()
   for (const row of listingsRaw ?? []) {
@@ -383,11 +484,23 @@ export async function processHostLifecycle(): Promise<{ sent: number }> {
       }
 
       if (!listing) {
-        const sentTags = await sentNoListingTags(host.id)
-        const nudge = pickNoListingNudge(age, sentTags)
-        if (nudge && (await sendNoListingNudge({ profile: host, tag: nudge }))) {
-          sent++
-          continue
+        const draft = draftByHost.get(host.id)
+        if (draft) {
+          // Started a draft: remind them to finish it instead of the generic "list your space".
+          const reminder = pickDraftReminder(
+            daysSince(draft.updated_at, now),
+            await sentTagsWithPrefix(host.id, "host_draft_reminder_")
+          )
+          if (reminder && (await sendDraftReminder({ profile: host, draft, tag: reminder }))) {
+            sent++
+            continue
+          }
+        } else {
+          const nudge = pickNoListingNudge(age, await sentTagsWithPrefix(host.id, "host_no_listing_nudge_"))
+          if (nudge && (await sendNoListingNudge({ profile: host, tag: nudge }))) {
+            sent++
+            continue
+          }
         }
       }
 
@@ -402,6 +515,19 @@ export async function processHostLifecycle(): Promise<{ sent: number }> {
           const stripeTag =
             listingAge >= 9 ? EMAIL_STRIPE_REMINDER_2 : listingAge >= 2 ? EMAIL_STRIPE_REMINDER_1 : null
           if (stripeTag && (await sendStripeConnectReminder({ profile: host, reminderTag: stripeTag }))) {
+            sent++
+            continue
+          }
+        }
+
+        const verificationNeverStarted =
+          !host.id_verified && (host.id_verification_status == null || host.id_verification_status === "")
+        if (verificationNeverStarted) {
+          const identityTag = pickIdentityStartReminder(
+            listingAge,
+            await sentTagsWithPrefix(host.id, "host_identity_start_reminder_")
+          )
+          if (identityTag && (await sendIdentityStartReminder({ profile: host, tag: identityTag }))) {
             sent++
             continue
           }

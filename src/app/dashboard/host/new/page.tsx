@@ -4,7 +4,7 @@ import { hasCompletedHostOnboarding, HOST_SIGNUP_RETURN_PATH } from "@/lib/host/
 import { getHostInsuranceAttestationStatus } from "@/lib/host/insurance-attestation"
 import { createClient } from "@/lib/supabase/server"
 
-import { HostNewListingClient } from "./host-new-listing-client"
+import { HostNewListingClient, type ListingDraft } from "./host-new-listing-client"
 
 export default async function NewHostListingPage() {
   const supabase = await createClient()
@@ -16,7 +16,7 @@ export default async function NewHostListingPage() {
     redirect("/")
   }
 
-  const [{ data: profile }, insuranceAttestation, { count: activeListingCount }] = await Promise.all([
+  const [{ data: profile }, insuranceAttestation, { count: activeListingCount }, { data: draftRow }] = await Promise.all([
     supabase.from("profiles").select("house_rules, host_terms_accepted").eq("id", user.id).maybeSingle(),
     getHostInsuranceAttestationStatus(supabase, user.id),
     supabase
@@ -24,6 +24,11 @@ export default async function NewHostListingPage() {
       .select("id", { count: "exact", head: true })
       .eq("host_id", user.id)
       .eq("is_active", true),
+    supabase
+      .from("host_listing_drafts")
+      .select("step, form, photo_urls")
+      .eq("host_id", user.id)
+      .maybeSingle(),
   ])
 
   // New hosts accept the ground rules + host agreement on /become-a-host before listing.
@@ -39,8 +44,22 @@ export default async function NewHostListingPage() {
     ? profile.house_rules.filter((rule): rule is string => typeof rule === "string")
     : []
 
+  const initialDraft: ListingDraft | null = draftRow
+    ? {
+        step: typeof draftRow.step === "number" ? draftRow.step : 1,
+        form:
+          draftRow.form && typeof draftRow.form === "object"
+            ? (draftRow.form as ListingDraft["form"])
+            : {},
+        photoUrls: Array.isArray(draftRow.photo_urls)
+          ? draftRow.photo_urls.filter((url: unknown): url is string => typeof url === "string")
+          : [],
+      }
+    : null
+
   return (
     <HostNewListingClient
+      initialDraft={initialDraft}
       userId={user.id}
       defaultHouseRules={defaultHouseRules}
       insuranceAttested={insuranceAttestation.attested}

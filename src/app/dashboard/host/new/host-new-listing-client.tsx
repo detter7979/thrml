@@ -284,9 +284,20 @@ type ListingFormValues = z.output<typeof listingFormSchema>
 
 type PhotoItem = {
   id: string
-  file: File
+  /** Local file, until (or if) the background upload to the draft folder finishes. */
+  file?: File
   preview: string
+  /** Public URL once uploaded — survives in the saved draft and is reused at publish. */
+  url?: string
 }
+
+export type ListingDraft = {
+  step: number
+  form: Partial<ListingFormInput>
+  photoUrls: string[]
+}
+
+type DraftSaveState = "idle" | "pending" | "saving" | "saved" | "error"
 
 type GeocodeSuggestion = {
   id: string
@@ -389,15 +400,24 @@ export function HostNewListingClient({
   defaultHouseRules,
   insuranceAttested: initialInsuranceAttested,
   insuranceAttestedAt: insuranceAttestedAtProp,
+  initialDraft = null,
 }: {
   userId: string
   defaultHouseRules: string[]
   insuranceAttested: boolean
   insuranceAttestedAt: string | null
+  initialDraft?: ListingDraft | null
 }) {
   const router = useRouter()
-  const [step, setStep] = useState(FIRST_STEP)
-  const [photos, setPhotos] = useState<PhotoItem[]>([])
+  const [step, setStep] = useState(() =>
+    initialDraft ? Math.min(TOTAL_STEPS, Math.max(FIRST_STEP, initialDraft.step)) : FIRST_STEP
+  )
+  const [photos, setPhotos] = useState<PhotoItem[]>(() =>
+    (initialDraft?.photoUrls ?? []).map((url) => ({ id: crypto.randomUUID(), preview: url, url }))
+  )
+  const [draftSaveState, setDraftSaveState] = useState<DraftSaveState>(initialDraft ? "saved" : "idle")
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draftStartedRef = useRef(Boolean(initialDraft))
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [draggingPhotoId, setDraggingPhotoId] = useState<string | null>(null)
   const [mapSuggestions, setMapSuggestions] = useState<GeocodeSuggestion[]>([])
@@ -539,6 +559,8 @@ export function HostNewListingClient({
       serviceAttributes: {},
       instantBook: true,
       cancellationPolicy: "moderate",
+      // Resume a saved draft on top of the defaults.
+      ...(initialDraft?.form ?? {}),
     },
   })
 
@@ -574,19 +596,93 @@ export function HostNewListingClient({
   const commonAmenities = amenityOptions.slice(0, 5)
   const additionalAmenities = amenityOptions.slice(5)
   const canBuildGroupPricing = bookingModel !== "fixed_session" && Number(capacity ?? 1) > 1
-  const hasPendingDraft = (isDirty || photos.length > 0 || step > 1) && !allowNavigationRef.current
+  // Progress autosaves to a draft, so only warn when a save is still in flight or failed.
+  const hasUnsavedWork =
+    (draftSaveState === "pending" || draftSaveState === "saving" || draftSaveState === "error") &&
+    (isDirty || photos.length > 0 || step > FIRST_STEP)
+  const hasPendingDraft = hasUnsavedWork && !allowNavigationRef.current
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    setPhotoError(null)
-    setPhotos((current) => {
-      const newItems = acceptedFiles.map((file) => ({
+  const saveDraft = useCallback(async () => {
+    if (allowNavigationRef.current) return
+    setDraftSaveState("saving")
+    const supabase = createClient()
+    const { error } = await supabase.from("host_listing_drafts").upsert(
+      {
+        host_id: userId,
+        step,
+        total_steps: TOTAL_STEPS,
+        form: getValues(),
+        photo_urls: photos.map((photo) => photo.url).filter((url): url is string => Boolean(url)),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "host_id" }
+    )
+    setDraftSaveState(error ? "error" : "saved")
+  }, [getValues, photos, step, userId])
+
+  const scheduleDraftSave = useCallback(() => {
+    // Don't create a draft row until the host has actually started.
+    if (!draftStartedRef.current) return
+    setDraftSaveState("pending")
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    draftTimerRef.current = setTimeout(() => void saveDraft(), 1200)
+  }, [saveDraft])
+
+  // Form edits.
+  useEffect(() => {
+    const subscription = watch(() => {
+      draftStartedRef.current = true
+      scheduleDraftSave()
+    })
+    return () => subscription.unsubscribe()
+  }, [watch, scheduleDraftSave])
+
+  // Step changes and photo uploads.
+  useEffect(() => {
+    if (step > FIRST_STEP || photos.length > 0) draftStartedRef.current = true
+    scheduleDraftSave()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, photos])
+
+  useEffect(
+    () => () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    },
+    []
+  )
+
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      setPhotoError(null)
+      const newItems: PhotoItem[] = acceptedFiles.map((file) => ({
         id: crypto.randomUUID(),
         file,
         preview: URL.createObjectURL(file),
       }))
-      return [...current, ...newItems].slice(0, 12)
-    })
-  }, [])
+      setPhotos((current) => [...current, ...newItems].slice(0, 12))
+
+      // Upload in the background so photos are part of the saved draft. If an upload fails the
+      // local file is kept and uploaded at publish as before.
+      const supabase = createClient()
+      for (const item of newItems) {
+        const file = item.file
+        if (!file) continue
+        const ext = file.name.split(".").pop() || "jpg"
+        const filePath = `${userId}/drafts/${item.id}.${ext}`
+        void supabase.storage
+          .from("listing-photos")
+          .upload(filePath, file, { upsert: false, cacheControl: "31536000" })
+          .then(({ error }) => {
+            if (error) return
+            const { data } = supabase.storage.from("listing-photos").getPublicUrl(filePath)
+            setPhotos((current) =>
+              current.map((photo) => (photo.id === item.id ? { ...photo, url: data.publicUrl } : photo))
+            )
+          })
+      }
+    },
+    [userId]
+  )
 
   const dropzone = useDropzone({
     onDrop,
@@ -835,7 +931,7 @@ export function HostNewListingClient({
   function removePhoto(photoId: string) {
     setPhotos((current) => {
       const found = current.find((photo) => photo.id === photoId)
-      if (found) URL.revokeObjectURL(found.preview)
+      if (found?.preview.startsWith("blob:")) URL.revokeObjectURL(found.preview)
       return current.filter((photo) => photo.id !== photoId)
     })
   }
@@ -1042,6 +1138,12 @@ export function HostNewListingClient({
     const photoRows: { listing_id: string; url: string; order_index: number }[] = []
 
     for (const [index, photo] of photos.entries()) {
+      if (photo.url) {
+        // Already uploaded while drafting.
+        photoRows.push({ listing_id: listing.id, url: photo.url, order_index: index })
+        continue
+      }
+      if (!photo.file) continue
       const ext = photo.file.name.split(".").pop() || "jpg"
       const filePath = `${userId}/${listing.id}/${Date.now()}-${index}.${ext}`
 
@@ -1085,6 +1187,8 @@ export function HostNewListingClient({
     }
 
     allowNavigationRef.current = true
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+    await supabase.from("host_listing_drafts").delete().eq("host_id", userId)
     router.push("/dashboard/listings?created=1")
     router.refresh()
   }
@@ -1095,6 +1199,15 @@ export function HostNewListingClient({
         <CardHeader className="space-y-3">
           <CardTitle className="type-h2">Create your thrml listing</CardTitle>
           <ProgressBar step={getWizardDisplayStep(step)} totalSteps={WIZARD_STEP_COUNT} />
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {draftSaveState === "saving" || draftSaveState === "pending"
+              ? "Saving draft…"
+              : draftSaveState === "saved"
+                ? "Draft saved — you can leave and finish later."
+                : draftSaveState === "error"
+                  ? "Couldn't save your draft. Check your connection."
+                  : null}
+          </p>
         </CardHeader>
 
         <CardContent>

@@ -17,6 +17,8 @@ import { nextHostUiIntent } from "@/lib/host/promote-host-profile"
 import { trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { createClient } from "@/lib/supabase/client"
+
+import { HostLandingIntro } from "./host-landing-intro"
 const TOTAL_STEPS = 3
 
 function ProgressBar({ step }: { step: number }) {
@@ -117,7 +119,13 @@ const GROUND_RULES = [
   },
 ]
 
-export function BecomeAHostClient() {
+export function BecomeAHostClient({
+  guestBookingsOpen = false,
+  saunasOnly = true,
+}: {
+  guestBookingsOpen?: boolean
+  saunasOnly?: boolean
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const resumingAfterSignup = searchParams.get("resume") === "1"
@@ -186,9 +194,9 @@ export function BecomeAHostClient() {
     }
   }, [router, resumingAfterSignup])
 
-  function handleStep1Continue() {
+  function handleStep1Continue(placement: "hero" | "footer" = "hero") {
     if (signedIn === false) {
-      trackGaEvent("host_onboarding_signup_redirect", { step: 1 })
+      trackGaEvent("host_onboarding_signup_redirect", { step: 1, placement })
       router.push(hostSignupHref())
       return
     }
@@ -281,7 +289,7 @@ export function BecomeAHostClient() {
 
       <main className="flex flex-1 flex-col items-center justify-start px-6 pt-4 pb-12">
         <div className="w-full max-w-lg space-y-6">
-          <ProgressBar step={step} />
+          {step > 1 ? <ProgressBar step={step} /> : null}
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -291,51 +299,16 @@ export function BecomeAHostClient() {
               transition={{ type: "spring", stiffness: 380, damping: 32 }}
             >
               {step === 1 ? (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <h1 className="font-serif text-3xl leading-tight text-[#1A1410]">
-                      Earn from your space.
-                      <br />
-                      We handle the rest.
-                    </h1>
-                    <p className="text-sm leading-relaxed text-neutral-500">
-                      Thrml connects you with guests looking for private wellness experiences. Set your
-                      price, your hours, and your rules - we take care of bookings and payments.
-                    </p>
-                  </div>
-
-                  <HowItWorksAnimation />
-
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                      <p className="text-lg font-semibold text-[#1A1410]">{hostKeepLabel}</p>
-                      <p className="text-xs text-neutral-400">You keep per booking</p>
-                    </div>
-                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                      <p className="text-lg font-semibold text-[#1A1410]">2 days</p>
-                      <p className="text-xs text-neutral-400">Stripe payout time</p>
-                    </div>
-                    <div className="space-y-1 rounded-xl border border-neutral-100 bg-white p-3">
-                      <p className="text-lg font-semibold text-[#1A1410]">Free</p>
-                      <p className="text-xs text-neutral-400">To list your space</p>
-                    </div>
-                  </div>
-
-                  <Button
-                    className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530]"
-                    onClick={handleStep1Continue}
-                  >
-                    Get started →
-                  </Button>
-                  {signedIn === false ? (
-                    <p className="text-center text-xs text-neutral-400">
-                      Already have an account?{" "}
-                      <Link href={hostLoginHref()} className="underline hover:text-neutral-600">
-                        Log in
-                      </Link>
-                    </p>
-                  ) : null}
-                </div>
+                <HostLandingIntro
+                  hostKeepLabel={hostKeepLabel}
+                  hostFeePercent={hostFeePercent}
+                  guestBookingsOpen={guestBookingsOpen}
+                  saunasOnly={saunasOnly}
+                  signedOut={signedIn === false}
+                  loginHref={hostLoginHref()}
+                  onStart={handleStep1Continue}
+                  howItWorks={<HowItWorksAnimation />}
+                />
               ) : null}
 
               {step === 2 ? (

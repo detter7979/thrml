@@ -1,5 +1,6 @@
 import { sendThrmlLayoutEmail, THRML_APP_URL } from "@/lib/emails/transactional-send"
-import { guestBookingsOpen } from "@/lib/host/host-funnel"
+import { guestBookingsOpen, hostSpaceTypesSentence } from "@/lib/host/host-funnel"
+import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const APP_URL = THRML_APP_URL
@@ -29,7 +30,7 @@ export async function sendHostWelcomeEmail(args: {
           : "You're joining as one of our founding hosts in the Seattle area. Here's how to get ready before we open guest bookings:",
       ],
       listItems: [
-        "List your space — a few photos (3+), your price per session and your hours. Saunas, cold plunges, hot tubs and float tanks are all welcome.",
+        `List your space — a few photos (3+), your price per session and your hours. ${hostSpaceTypesSentence(isSaunasOnlyLaunch())}`,
         "Verify your identity — it earns the Verified Host badge guests look for.",
         "Connect Stripe payouts — so you're paid automatically after every session.",
       ],

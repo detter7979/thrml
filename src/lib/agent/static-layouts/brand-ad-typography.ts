@@ -28,7 +28,7 @@ export const BRAND_AD_TOP_SCRIM = {
   bottomOpacity: 0,
   /** Scrim rect height per format (from thrml_split_header_static_*.svg). */
   heightByFormat: {
-    "9x16": 1056,
+    "9x16": 1200,
     "1x1": 594,
     "4x5": 743,
   } satisfies Record<BrandAdFormat, number>,
@@ -90,7 +90,8 @@ export const BRAND_AD_BLOCK_SPLIT_Y: Record<
   BrandAdFormat,
   { wordmarkY: number; eyebrowY: number; headlineY: number; subheadY: number }
 > = {
-  "9x16": { wordmarkY: 96, eyebrowY: 232, headlineY: 304, subheadY: 560 },
+  // 9:16 stack starts below the top 14% (~269px) Stories/Reels UI overlay.
+  "9x16": { wordmarkY: 336, eyebrowY: 472, headlineY: 544, subheadY: 800 },
   "1x1": { wordmarkY: 88, eyebrowY: 214, headlineY: 274, subheadY: 490 },
   "4x5": { wordmarkY: 96, eyebrowY: 243, headlineY: 315, subheadY: 525 },
 }

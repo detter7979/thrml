@@ -1,4 +1,9 @@
 import { sendThrmlLayoutEmail, THRML_APP_URL } from "@/lib/emails/transactional-send"
+import {
+  guestBookingsOpen,
+  pickNoListingNudge,
+  type NoListingNudgeTag,
+} from "@/lib/host/host-funnel"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 import { emailAlreadySent, logEmailSent } from "./email-log"
@@ -116,6 +121,7 @@ async function sendFirstListingLiveEmail(args: {
   if (!email) return false
 
   const title = args.listingTitle ?? "Your space"
+  const open = guestBookingsOpen()
   const result = await sendThrmlLayoutEmail({
     to: email,
     userId: args.profile.id,
@@ -126,15 +132,27 @@ async function sendFirstListingLiveEmail(args: {
       kicker: "Listing live",
       title: "Your space is officially bookable.",
       greeting: `Hi ${firstName(args.profile.full_name)},`,
-      paragraphs: [
-        `${title} is now live and visible to guests near you. Nice work.`,
-        "Three things that help new listings get their first booking fast:",
-      ],
-      listItems: [
-        "Share your listing link — hosts who share to their network usually get their first booking within days.",
-        "Keep availability open for the next two weekends — that's when most first bookings land.",
-        "Verify your identity for the Verified Host badge — verified listings convert meaningfully better.",
-      ],
+      paragraphs: open
+        ? [
+            `${title} is now live and visible to guests near you. Nice work.`,
+            "Three things that help new listings get their first booking fast:",
+          ]
+        : [
+            `${title} is live — you're one of our founding hosts. Nice work.`,
+            "We're opening guest bookings once there's a strong mix of spaces across the Seattle area, and we'll email you before the first guests arrive. To be ready on day one:",
+          ],
+      listItems: open
+        ? [
+            "Share your listing link — hosts who share to their network usually get their first booking within days.",
+            "Keep availability open for the next two weekends — that's when most first bookings land.",
+            "Verify your identity for the Verified Host badge — verified listings convert meaningfully better.",
+          ]
+        : [
+            "Connect Stripe payouts so you're paid automatically after every session.",
+            "Verify your identity for the Verified Host badge — verified listings convert meaningfully better.",
+            "Keep your calendar open a few weeks out so your space is bookable the day we launch.",
+            "Know someone with a sauna, cold plunge or hot tub? Send them our way — more spaces means a faster launch.",
+          ],
       cta: { label: "View your live listing", href: `${APP_URL}/listings/${args.listingId}` },
     },
   })
@@ -172,14 +190,86 @@ async function sendStripeConnectReminder(args: {
           ]
         : [
             "Your listing is live — the last step is connecting Stripe so payouts have somewhere to go.",
-            "Guests can book either way, but connecting now means your first payout arrives right on time.",
+            "Connecting now means you're ready the moment bookings come in, and your first payout arrives right on time.",
           ],
-      cta: { label: "Connect Stripe payouts", href: `${APP_URL}/dashboard/account#payouts` },
+      cta: { label: "Connect Stripe payouts", href: `${APP_URL}/dashboard/account#payout-settings` },
       footnote: "Stripe is our payments partner. Thrml never sees or stores your bank credentials.",
     },
   })
 
   if (result.sent) await logEmailSent(args.profile.id, args.reminderTag)
+  return result.sent
+}
+
+const NO_LISTING_COPY: Record<
+  NoListingNudgeTag,
+  { subject: string; preview: string; title: string; paragraphs: string[]; cta: string }
+> = {
+  host_no_listing_nudge_1: {
+    subject: "Your space is about 10 minutes from live",
+    preview: "Photos, a price and your hours — that's all it takes to list",
+    title: "Let's get your space listed.",
+    paragraphs: [
+      "You signed up to host on thrml but haven't listed your space yet. It takes about 10 minutes: a few photos, a price per session and the hours you're open.",
+      "Saunas, cold plunges, hot tubs, float tanks and other private wellness spaces are all welcome — one space is plenty to start.",
+    ],
+    cta: "List my space",
+  },
+  host_no_listing_nudge_2: {
+    subject: "Want a hand setting up your listing?",
+    preview: "Reply and we'll walk through it with you",
+    title: "We're happy to help you list.",
+    paragraphs: [
+      "Not sure what to charge, what to photograph or how guests get in? Just reply to this email — we'll answer directly, or set up a quick 15-minute call and get your space live together.",
+      "We're onboarding a small group of founding hosts in the Seattle area before opening guest bookings, and we'd love yours to be one of them.",
+    ],
+    cta: "Finish my listing",
+  },
+  host_no_listing_nudge_3: {
+    subject: "Still thinking about hosting?",
+    preview: "Your account is ready whenever you are",
+    title: "Your host account is ready when you are.",
+    paragraphs: [
+      "This is our last reminder about listing your space. Listing is free, you set your own price and hours, and you can pause anytime.",
+      "If hosting isn't for you right now, no problem — we won't keep nudging. If something stopped you, reply and let us know; it genuinely helps.",
+    ],
+    cta: "List my space",
+  },
+}
+
+async function sentNoListingTags(profileId: string): Promise<Set<string>> {
+  const admin = createAdminClient()
+  const { data } = await admin
+    .from("email_log")
+    .select("email_type")
+    .eq("user_id", profileId)
+    .like("email_type", "host_no_listing_nudge_%")
+  return new Set((data ?? []).map((row) => String(row.email_type)))
+}
+
+/** Hosts who signed up but haven't published a listing — day 3, 7 and 14. */
+async function sendNoListingNudge(args: { profile: HostProfileRow; tag: NoListingNudgeTag }): Promise<boolean> {
+  if (await emailAlreadySent(args.profile.id, args.tag)) return false
+  const email = await emailForProfile(args.profile.id)
+  if (!email) return false
+
+  const copy = NO_LISTING_COPY[args.tag]
+  const result = await sendThrmlLayoutEmail({
+    to: email,
+    userId: args.profile.id,
+    preferenceKey: "new_booking",
+    subject: copy.subject,
+    layout: {
+      preview: copy.preview,
+      kicker: "Finish setting up",
+      title: copy.title,
+      greeting: `Hi ${firstName(args.profile.full_name)},`,
+      paragraphs: copy.paragraphs,
+      cta: { label: copy.cta, href: `${APP_URL}/become-a-host?resume=1` },
+    },
+  })
+
+  if (result.sent) await logEmailSent(args.profile.id, args.tag)
   return result.sent
 }
 
@@ -247,7 +337,9 @@ export async function processHostLifecycle(): Promise<{ sent: number }> {
   const { data: hostsRaw } = await admin
     .from("profiles")
     .select("id, full_name, created_at, stripe_account_id, stripe_payouts_enabled")
-    .eq("is_host", true)
+    // Include hosts who signed up with host intent but haven't published yet — `is_host` is only
+    // set once a listing is created, and those are exactly the hosts who need reminders.
+    .or("is_host.eq.true,ui_intent.in.(host,both)")
     .gte("created_at", lookback)
 
   const hosts = (hostsRaw ?? []) as HostProfileRow[]
@@ -288,6 +380,15 @@ export async function processHostLifecycle(): Promise<{ sent: number }> {
       if (age >= 2 && (await sendListingBestPracticesEmail(host))) {
         sent++
         continue
+      }
+
+      if (!listing) {
+        const sentTags = await sentNoListingTags(host.id)
+        const nudge = pickNoListingNudge(age, sentTags)
+        if (nudge && (await sendNoListingNudge({ profile: host, tag: nudge }))) {
+          sent++
+          continue
+        }
       }
 
       if (listing?.is_active) {

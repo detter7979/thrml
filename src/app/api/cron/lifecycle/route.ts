@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { processGuestLifecycle } from "@/lib/emails/guest-lifecycle"
-import { processHostLifecycle } from "@/lib/emails/host-lifecycle"
+import { processHostLifecycle, processHostProgressUpdates } from "@/lib/emails/host-lifecycle"
 import { processSupportFollowUps } from "@/lib/emails/support-followups"
 
 export const maxDuration = 300
@@ -20,16 +20,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const [hostResult, guestResult, supportResult] = await Promise.allSettled([
+  const [hostResult, guestResult, supportResult, progressResult] = await Promise.allSettled([
     processHostLifecycle(),
     processGuestLifecycle(),
     processSupportFollowUps(),
+    processHostProgressUpdates(),
   ])
 
   return NextResponse.json({
     ok: true,
     host_lifecycle: hostResult.status === "fulfilled" ? hostResult.value : { error: String(hostResult.reason) },
     guest_lifecycle: guestResult.status === "fulfilled" ? guestResult.value : { error: String(guestResult.reason) },
+    host_progress_updates:
+      progressResult.status === "fulfilled" ? progressResult.value : { error: String(progressResult.reason) },
     support_followups:
       supportResult.status === "fulfilled" ? supportResult.value : { error: String(supportResult.reason) },
   })

@@ -179,3 +179,20 @@ export function hostSpaceTypesSentence(saunasOnly: boolean): string {
     ? "We're starting with private saunas, indoor and outdoor. We're planning to add cold plunges, hot tubs and float tanks next."
     : "Saunas, cold plunges, hot tubs, float tanks and other private wellness spaces are all welcome."
 }
+
+/** Host progress updates go out every 14 days, anchored to Tuesday 2026-11-17. */
+const PROGRESS_ANCHOR_MS = Date.UTC(2026, 10, 17)
+const PROGRESS_PERIOD_DAYS = 14
+/** Only send in the first few days of a period so new hosts don't get one mid-cycle. */
+const PROGRESS_SEND_WINDOW_DAYS = 3
+
+/** The current update period's start date (YYYY-MM-DD) if we're inside its send window. */
+export function hostProgressUpdatePeriod(now: Date): string | null {
+  const elapsedDays = Math.floor((now.getTime() - PROGRESS_ANCHOR_MS) / 86_400_000)
+  if (elapsedDays < 0) return null
+  const periodIndex = Math.floor(elapsedDays / PROGRESS_PERIOD_DAYS)
+  const dayInPeriod = elapsedDays - periodIndex * PROGRESS_PERIOD_DAYS
+  if (dayInPeriod >= PROGRESS_SEND_WINDOW_DAYS) return null
+  const start = new Date(PROGRESS_ANCHOR_MS + periodIndex * PROGRESS_PERIOD_DAYS * 86_400_000)
+  return start.toISOString().slice(0, 10)
+}

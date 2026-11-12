@@ -2,6 +2,8 @@ import { sendThrmlLayoutEmail, THRML_APP_URL } from "@/lib/emails/transactional-
 import {
   draftProgressPercent,
   guestBookingsOpen,
+  hostProgressUpdatePeriod,
+  hostSetupSteps,
   hostSpaceTypesSentence,
   pickDraftReminder,
   pickIdentityStartReminder,
@@ -10,7 +12,9 @@ import {
   type IdentityStartReminderTag,
   type NoListingNudgeTag,
 } from "@/lib/host/host-funnel"
-import { fetchFoundingHostSettings } from "@/lib/host/founding-host"
+import { fetchFoundingHostSettings, foundingSpotsRemaining } from "@/lib/host/founding-host"
+import { loadLaunchReadiness } from "@/lib/launch/load-readiness"
+import { LAUNCH_CRITERIA } from "@/lib/launch/readiness"
 import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -556,4 +560,98 @@ export async function processHostLifecycle(): Promise<{ sent: number }> {
   }
 
   return { sent }
+}
+
+
+/**
+ * Pre-launch progress update to every host every 14 days: how many spaces are live, the
+ * host's own setup status, and a referral ask. Stops once guest bookings open.
+ */
+export async function processHostProgressUpdates(now = new Date()): Promise<{ sent: number; period: string | null }> {
+  if (guestBookingsOpen()) return { sent: 0, period: null }
+  const period = hostProgressUpdatePeriod(now)
+  if (!period) return { sent: 0, period: null }
+
+  const admin = createAdminClient()
+  const [report, foundingSettings] = await Promise.all([
+    loadLaunchReadiness(admin, now),
+    fetchFoundingHostSettings(admin),
+  ])
+  const spotsLeft = await foundingSpotsRemaining(admin, foundingSettings.cap)
+
+  const { data: hostRows } = await admin
+    .from("profiles")
+    .select("id, full_name, host_terms_accepted, id_verified, stripe_payouts_enabled")
+    .or("is_host.eq.true,ui_intent.in.(host,both)")
+  const hosts = (hostRows ?? []) as {
+    id: string
+    full_name: string | null
+    host_terms_accepted: boolean | null
+    id_verified: boolean | null
+    stripe_payouts_enabled: boolean | null
+  }[]
+  if (!hosts.length) return { sent: 0, period }
+
+  const hostIds = hosts.map((host) => host.id)
+  const [{ data: liveRows }, { data: draftRows }] = await Promise.all([
+    admin.from("listings").select("host_id").eq("is_active", true).in("host_id", hostIds),
+    admin.from("host_listing_drafts").select("host_id, step, total_steps").in("host_id", hostIds),
+  ])
+  const liveHosts = new Set((liveRows ?? []).map((row) => String(row.host_id)))
+  const drafts = new Map((draftRows ?? []).map((row) => [String(row.host_id), row]))
+  const firstStep = isSaunasOnlyLaunch() ? 2 : 1
+
+  const tag = `host_progress_update_${period}`
+  const target = LAUNCH_CRITERIA.hostFacingTarget
+  const live = Math.min(report.liveCount, target)
+  let sent = 0
+
+  for (const host of hosts) {
+    if (await emailAlreadySent(host.id, tag)) continue
+    const email = await emailForProfile(host.id)
+    if (!email) continue
+
+    const draft = drafts.get(host.id)
+    const { steps, completed, total } = hostSetupSteps({
+      hostTermsAccepted: host.host_terms_accepted === true,
+      hasLiveListing: liveHosts.has(host.id),
+      draftPercent: draft ? draftProgressPercent(Number(draft.step), Number(draft.total_steps ?? 5), firstStep) : null,
+      idVerified: host.id_verified === true,
+      payoutsEnabled: host.stripe_payouts_enabled === true,
+    })
+    const next = steps.find((step) => !step.done)
+
+    const result = await sendThrmlLayoutEmail({
+      to: email,
+      userId: host.id,
+      preferenceKey: "new_booking",
+      subject: `thrml update: ${live} of ${target} spaces live`,
+      layout: {
+        preview: "Where founding host onboarding stands, and what's next",
+        kicker: "Founding host update",
+        title: `${live} of ${target} spaces are live.`,
+        greeting: `Hi ${firstName(host.full_name)},`,
+        paragraphs: [
+          `Here's where things stand: ${report.liveCount} space${report.liveCount === 1 ? " is" : "s are"} live across ${report.areaCount} area${report.areaCount === 1 ? "" : "s"} of Seattle. We open bookings to guests once there's a strong mix of spaces across the city — we'll email you before the first guests can book.`,
+          completed === total
+            ? "Your setup is complete, so you're ready for day one. Thank you!"
+            : `Your setup: ${completed} of ${total} steps done.${next ? ` Next up: ${next.label.toLowerCase()}.` : ""}`,
+          spotsLeft > 0
+            ? `Know someone with a home sauna? Send them to usethrml.com/become-a-host — ${spotsLeft} founding host spot${spotsLeft === 1 ? " is" : "s are"} left, with a ${foundingSettings.feePercent}% host fee for their first ${foundingSettings.windowDays} days of bookings.`
+            : "Know someone with a home sauna? Send them to usethrml.com/become-a-host — more spaces means a faster launch.",
+        ],
+        cta: next
+          ? { label: next.cta === "Start" ? "List my space" : `${next.cta} now`, href: `${APP_URL}${next.href}` }
+          : { label: "View my dashboard", href: `${APP_URL}/dashboard` },
+        footnote: "Questions or feedback? Just reply — this goes straight to the people building thrml.",
+      },
+    })
+
+    if (result.sent) {
+      await logEmailSent(host.id, tag)
+      sent++
+    }
+  }
+
+  return { sent, period }
 }

@@ -5,7 +5,9 @@ import { redirect } from "next/navigation"
 import { PlatformFeesProvider } from "@/contexts/platform-fees-context"
 import { formatHostKeepPercent } from "@/lib/fees"
 import { getPlatformFeePercentsCached } from "@/lib/fees-server"
+import { fetchFoundingHostSettings, foundingSpotsRemaining } from "@/lib/host/founding-host"
 import { guestBookingsOpen, hasCompletedHostOnboarding } from "@/lib/host/host-funnel"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { HOST_NEW_LISTING_PATH } from "@/lib/host/is-host-user"
 import { createClient } from "@/lib/supabase/server"
@@ -59,6 +61,21 @@ export default async function BecomeAHostPage() {
 
   const feePercents = await getPlatformFeePercentsCached()
 
+  // Founding host offer (pre-launch only, while spots remain).
+  let foundingOffer: { feePercent: number; windowDays: number; spotsLeft: number; cap: number } | null = null
+  if (!guestBookingsOpen()) {
+    try {
+      const admin = createAdminClient()
+      const settings = await fetchFoundingHostSettings(admin)
+      const spotsLeft = await foundingSpotsRemaining(admin, settings.cap)
+      if (spotsLeft > 0 && settings.feePercent < feePercents.hostFeePercent) {
+        foundingOffer = { ...settings, spotsLeft }
+      }
+    } catch {
+      foundingOffer = null
+    }
+  }
+
   return (
     <Suspense
       fallback={
@@ -68,7 +85,11 @@ export default async function BecomeAHostPage() {
       }
     >
       <PlatformFeesProvider initialPercents={feePercents}>
-        <BecomeAHostClient guestBookingsOpen={guestBookingsOpen()} saunasOnly={isSaunasOnlyLaunch()} />
+        <BecomeAHostClient
+        guestBookingsOpen={guestBookingsOpen()}
+        saunasOnly={isSaunasOnlyLaunch()}
+        foundingOffer={foundingOffer}
+      />
       </PlatformFeesProvider>
     </Suspense>
   )

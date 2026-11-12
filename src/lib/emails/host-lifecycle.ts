@@ -10,6 +10,7 @@ import {
   type IdentityStartReminderTag,
   type NoListingNudgeTag,
 } from "@/lib/host/host-funnel"
+import { fetchFoundingHostSettings } from "@/lib/host/founding-host"
 import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -35,6 +36,7 @@ type HostProfileRow = {
   stripe_payouts_enabled?: boolean | null
   id_verified?: boolean | null
   id_verification_status?: string | null
+  founding_host?: boolean | null
 }
 
 type DraftRow = {
@@ -139,6 +141,7 @@ async function sendFirstListingLiveEmail(args: {
 
   const title = args.listingTitle ?? "Your space"
   const open = guestBookingsOpen()
+  const founding = args.profile.founding_host === true ? await fetchFoundingHostSettings(createAdminClient()) : null
   const result = await sendThrmlLayoutEmail({
     to: email,
     userId: args.profile.id,
@@ -155,7 +158,9 @@ async function sendFirstListingLiveEmail(args: {
             "Three things that help new listings get their first booking fast:",
           ]
         : [
-            `${title} is live — you're one of our founding hosts. Nice work.`,
+            founding
+              ? `${title} is live — you're one of our founding hosts. Nice work. As a thank-you, your host fee is ${founding.feePercent}% instead of the usual rate for your first ${founding.windowDays} days of bookings (the clock starts at your first booking).`
+              : `${title} is live. Nice work.`,
             "We're opening guest bookings once there's a strong mix of spaces across the Seattle area, and we'll email you before the first guests arrive. To be ready on day one:",
           ],
       listItems: open
@@ -428,7 +433,7 @@ export async function processHostLifecycle(): Promise<{ sent: number }> {
   const { data: hostsRaw } = await admin
     .from("profiles")
     .select(
-      "id, full_name, created_at, stripe_account_id, stripe_payouts_enabled, id_verified, id_verification_status"
+      "id, full_name, created_at, stripe_account_id, stripe_payouts_enabled, id_verified, id_verification_status, founding_host"
     )
     // Include hosts who signed up with host intent but haven't published yet — `is_host` is only
     // set once a listing is created, and those are exactly the hosts who need reminders.

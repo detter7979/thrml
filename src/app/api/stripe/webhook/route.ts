@@ -245,6 +245,21 @@ export async function POST(req: NextRequest) {
           stripePaymentIntentId: pi.id,
         })
 
+        // Founding hosts: their reduced-fee window starts at their first paid booking.
+        // No-op for regular hosts and once the window has started.
+        if (typeof booking.host_id === "string" && booking.host_id !== booking.guest_id) {
+          void supabase
+            .rpc("start_founding_fee_window", { p_host: booking.host_id })
+            .then(({ error: windowError }) => {
+              if (windowError) {
+                console.error("[stripe/webhook] start_founding_fee_window failed", {
+                  hostId: booking.host_id,
+                  error: windowError.message,
+                })
+              }
+            })
+        }
+
         void processReferralConversion(booking.guest_id, booking.id)
         const appliedCredit = Number(booking.referral_credit_applied_cents ?? 0)
         if (appliedCredit > 0) {

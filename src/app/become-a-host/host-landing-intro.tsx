@@ -90,7 +90,14 @@ function EarningsEstimator({ hostFeePercent }: { hostFeePercent: number }) {
 
 type Faq = { question: string; answer: string }
 
-function buildFaqs(input: { hostKeepLabel: string; guestBookingsOpen: boolean; saunasOnly: boolean }): Faq[] {
+type FoundingOffer = { feePercent: number; windowDays: number; spotsLeft: number; cap: number }
+
+function buildFaqs(input: {
+  hostKeepLabel: string
+  guestBookingsOpen: boolean
+  saunasOnly: boolean
+  foundingOffer: FoundingOffer | null
+}): Faq[] {
   return [
     {
       question: "Do I need insurance?",
@@ -99,7 +106,9 @@ function buildFaqs(input: { hostKeepLabel: string; guestBookingsOpen: boolean; s
     },
     {
       question: "What does it cost?",
-      answer: `Listing is free. When a session is booked, thrml keeps a service fee and you keep ${input.hostKeepLabel} of your price. There are no monthly fees.`,
+      answer: input.foundingOffer
+        ? `Listing is free and there are no monthly fees. When a session is booked, thrml keeps a service fee and you keep ${input.hostKeepLabel} of your price. Founding hosts pay just ${input.foundingOffer.feePercent}% for their first ${input.foundingOffer.windowDays} days of bookings — the clock starts at your first booking.`
+        : `Listing is free. When a session is booked, thrml keeps a service fee and you keep ${input.hostKeepLabel} of your price. There are no monthly fees.`,
     },
     {
       question: "How do guests get in?",
@@ -134,6 +143,7 @@ export function HostLandingIntro({
   hostFeePercent,
   guestBookingsOpen,
   saunasOnly,
+  foundingOffer = null,
   signedOut,
   loginHref,
   onStart,
@@ -143,12 +153,13 @@ export function HostLandingIntro({
   hostFeePercent: number
   guestBookingsOpen: boolean
   saunasOnly: boolean
+  foundingOffer?: FoundingOffer | null
   signedOut: boolean
   loginHref: string
   onStart: (placement: "hero" | "footer") => void
   howItWorks: React.ReactNode
 }) {
-  const faqs = buildFaqs({ hostKeepLabel, guestBookingsOpen, saunasOnly })
+  const faqs = buildFaqs({ hostKeepLabel, guestBookingsOpen, saunasOnly, foundingOffer })
   const spaceNoun = saunasOnly ? "sauna" : "space"
 
   const startButton = (placement: "hero" | "footer") => (
@@ -165,7 +176,9 @@ export function HostLandingIntro({
       <div className="space-y-3">
         {!guestBookingsOpen ? (
           <p className="inline-flex rounded-full bg-[#FFF0E8] px-3 py-1 text-xs font-medium text-[#A04A2A]">
-            Now onboarding founding hosts in Seattle
+            {foundingOffer
+              ? `${foundingOffer.spotsLeft} of ${foundingOffer.cap} founding host spots left in Seattle`
+              : "Now onboarding founding hosts in Seattle"}
           </p>
         ) : null}
         <h1 className="font-serif text-3xl leading-tight text-[#1A1410]">
@@ -235,6 +248,21 @@ export function HostLandingIntro({
             Founding hosts are live from day one, get a direct line to the people building thrml, and help shape how it
             works.
           </p>
+          {foundingOffer ? (
+            <ul className="space-y-1 text-sm text-[#2F241E]">
+              <li>
+                <span className="font-medium">{foundingOffer.feePercent}% host fee</span>{" "}
+                <span className="text-neutral-500">
+                  instead of the standard rate for your first {foundingOffer.windowDays} days of bookings — the clock
+                  starts at your first booking.
+                </span>
+              </li>
+              <li>
+                <span className="font-medium">First {foundingOffer.cap} hosts only</span>{" "}
+                <span className="text-neutral-500">— publish your listing before guest launch to claim a spot.</span>
+              </li>
+            </ul>
+          ) : null}
         </section>
       ) : null}
 

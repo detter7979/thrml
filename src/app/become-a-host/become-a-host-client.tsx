@@ -119,12 +119,16 @@ const GROUND_RULES = [
   },
 ]
 
+export type FoundingOffer = { feePercent: number; windowDays: number; spotsLeft: number; cap: number }
+
 export function BecomeAHostClient({
   guestBookingsOpen = false,
   saunasOnly = true,
+  foundingOffer = null,
 }: {
   guestBookingsOpen?: boolean
   saunasOnly?: boolean
+  foundingOffer?: FoundingOffer | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -304,6 +308,7 @@ export function BecomeAHostClient({
                   hostFeePercent={hostFeePercent}
                   guestBookingsOpen={guestBookingsOpen}
                   saunasOnly={saunasOnly}
+                  foundingOffer={foundingOffer}
                   signedOut={signedIn === false}
                   loginHref={hostLoginHref()}
                   onStart={handleStep1Continue}

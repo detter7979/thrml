@@ -1,4 +1,6 @@
-# thrml creative concept presets (T1–T5)
+# thrml creative concept presets (T1–T5, T9–T11; T6–T8 retired, do not reuse)
+# T9–T11 = T06 host launch test (one template per angle; brief: claude.ai/artifact/SzgPeXUtykjz3RvBAMkx3n).
+# Copy rule: no earnings averages or income claims until we have real host data.
 # Used by admin Creative Pipeline "New from template" intake.
 
 version: 1
@@ -25,11 +27,11 @@ templates:
     defaults:
       trigger_type: manual
       hypothesis: "Host POV earnings angle converts idle sauna owners."
-      target_audience: "Homeowners with private sauna or cold plunge in PNW metros"
+      target_audience: "Seattle-area homeowners with a private sauna"
       hook: "Turn your idle sauna into income."
       copy_primary: "List your private sauna on thrml and earn when you're not using it."
       copy_headline: "Turn your idle sauna into income."
-      copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
+      copy_subtext: "Free to list. You set the price and the hours."
       cta: "List Your Space"
       visual_direction: "Close exterior detail of a cedar barrel sauna on a Pacific Northwest deck, natural grain and stainless hardware, soft overcast light, 85mm shallow depth of field, editorial residential photography, no text, no logos, no people"
       campaign_short_name: pov-earnings
@@ -105,7 +107,7 @@ templates:
       hook: "Host earnings split header"
       copy_primary: "List your private sauna on thrml and earn when you're not using it."
       copy_headline: "Turn your idle sauna into income."
-      copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
+      copy_subtext: "Free to list. You set the price and the hours."
       cta: "List Your Space"
       campaign_short_name: pov-earnings
     svg_tokens:
@@ -147,7 +149,7 @@ templates:
       hook: "Host earnings block split"
       copy_primary: "List your private sauna on thrml and earn when you're not using it."
       copy_headline: "Turn your idle sauna into income."
-      copy_subtext: "Hosts on thrml earn an average of $1,200 / month."
+      copy_subtext: "Free to list. You set the price and the hours."
       cta: "List Your Space"
       campaign_short_name: pov-earnings
     svg_tokens:
@@ -203,6 +205,117 @@ templates:
         - slug: block-sauna-bill
           variant: B
           headline: "Let your sauna pay its own electric bill."
+
+  - id: T9
+    label: "T06 Idle Space — Block Split"
+    short_label: "T06 Idle Space"
+    description: "T06 host launch test, idle_space angle. Block Split layout; use a real host photo (photo_gcs_path) where possible."
+    group: static_svg
+    type: static
+    category: Hosts
+    angle: idle_space
+    formats: ["4x5", "9x16"]
+    default_variations: 1
+    concept_verify_default: true
+    full_batch_variations: 1
+    generation_tool: svg_template
+    svg_template_id: thrml_block_split_static
+    naming:
+      test_id: T06
+      format: Static_4x5
+      cta: list_now
+      template_slug: t06_idle_block
+    defaults:
+      trigger_type: manual
+      hypothesis: "Naming the idle-asset problem gets sauna owners to start a listing."
+      target_audience: "Seattle-area homeowners with a private sauna"
+      hook: "Your sauna sits empty most of the week."
+      copy_primary: "Your sauna sits unused most days. List it on thrml and rent it to vetted guests by the session. You set the price and the hours."
+      copy_headline: "Your sauna sits empty most of the week."
+      copy_subtext: "Let it earn. Free to list on thrml."
+      cta: "Sign Up"
+      campaign_short_name: host-launch-t06
+    svg_tokens:
+      TAGLINE_EYEBROW: "SEATTLE SAUNA OWNERS"
+      SUBHEAD: "Let it earn. Free to list on thrml."
+    svg_variations:
+      - variation_label: A
+        tokens:
+          HEADLINE: "Your sauna sits empty most of the week."
+
+  - id: T10
+    label: "T06 Founding Hosts — Block Split"
+    short_label: "T06 Founding Hosts"
+    description: "T06 host launch test, urgency angle. Block Split layout; use a real host photo (photo_gcs_path) where possible."
+    group: static_svg
+    type: static
+    category: Hosts
+    angle: urgency
+    formats: ["4x5", "9x16"]
+    default_variations: 1
+    concept_verify_default: true
+    full_batch_variations: 1
+    generation_tool: svg_template
+    svg_template_id: thrml_block_split_static
+    naming:
+      test_id: T06
+      format: Static_4x5
+      cta: list_now
+      template_slug: t06_urgency_block
+    defaults:
+      trigger_type: manual
+      hypothesis: "Scarcity plus a concrete founding offer drives faster host signups."
+      target_audience: "Seattle-area homeowners with a private sauna"
+      hook: "25 founding host spots in Seattle."
+      copy_primary: "We're opening thrml in Seattle with 25 founding hosts. Founding hosts pay a 10% host fee for their first 90 days of bookings. Free to list."
+      copy_headline: "25 founding host spots in Seattle."
+      copy_subtext: "10% host fee for your first 90 days of bookings."
+      cta: "Sign Up"
+      campaign_short_name: host-launch-t06
+    svg_tokens:
+      TAGLINE_EYEBROW: "FOUNDING HOSTS · SEATTLE"
+      SUBHEAD: "10% host fee for your first 90 days of bookings."
+    svg_variations:
+      - variation_label: A
+        tokens:
+          HEADLINE: "25 founding host spots in Seattle."
+
+  - id: T11
+    label: "T06 Earnings Estimate — Block Split"
+    short_label: "T06 Earnings Estimate"
+    description: "T06 host launch test, income angle. Block Split layout; use a real host photo (photo_gcs_path) where possible."
+    group: static_svg
+    type: static
+    category: Hosts
+    angle: income
+    formats: ["4x5", "9x16"]
+    default_variations: 1
+    concept_verify_default: true
+    full_batch_variations: 1
+    generation_tool: svg_template
+    svg_template_id: thrml_block_split_static
+    naming:
+      test_id: T06
+      format: Static_4x5
+      cta: learn_more
+      template_slug: t06_income_block
+    defaults:
+      trigger_type: manual
+      hypothesis: "An earnings-estimate hook (no claimed averages) pulls curious owners into the funnel."
+      target_audience: "Seattle-area homeowners with a private sauna"
+      hook: "What could your sauna earn?"
+      copy_primary: "See what your sauna could earn on thrml. Pick your price and hours and get an estimate in about 30 seconds."
+      copy_headline: "What could your sauna earn?"
+      copy_subtext: "Get an estimate in 30 seconds. Free to list."
+      cta: "Learn More"
+      campaign_short_name: host-launch-t06
+    svg_tokens:
+      TAGLINE_EYEBROW: "PRIVATE SAUNA, BY THE SESSION"
+      SUBHEAD: "Get an estimate in 30 seconds. Free to list."
+    svg_variations:
+      - variation_label: A
+        tokens:
+          HEADLINE: "What could your sauna earn?"
 
 svg_templates:
   - id: thrml_split_header_static

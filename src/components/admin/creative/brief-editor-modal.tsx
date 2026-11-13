@@ -61,6 +61,8 @@ export type StructuredBriefEditorState = {
   variations: 1 | 2 | 3
   concept_verify: boolean
   formats: string[]
+  /** Size the first-pass preview renders in (SVG briefs preview every copy version at this size). */
+  preview_format: string
   naming_test_id: string
   naming_format: string
   naming_cta: string
@@ -178,10 +180,14 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
     svgTokens.TAGLINE_EYEBROW ?? svgTokens.EYEBROW ?? SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW,
   )
   const sharedSubhead = String(svgTokens.SUBHEAD ?? svgTokens.FINEPRINT ?? SPLIT_HEADER_DEFAULTS.SUBHEAD)
-  const svg_variations = parseSvgVariations(td.svg_variations, {
+  const parsedSvgVariations = parseSvgVariations(td.svg_variations, {
     eyebrow: sharedEyebrow,
     subhead: sharedSubhead,
   })
+  // SVG briefs always show A/B/C; a blank headline means that version is skipped.
+  const svg_variations = isSplitHeaderSvgTemplate(typeof td.svg_template_id === "string" ? td.svg_template_id : "")
+    ? padSvgCopyRows(parsedSvgVariations)
+    : parsedSvgVariations
   const formatsFromSc = Array.isArray(sc.formats) ? sc.formats.map(String) : []
   const formatsFromBrief = (brief.format ?? "1x1,9x16").split(/[,/+\s]+/).filter(Boolean)
   const resolvedCopy = resolveBriefCopyForMeta(brief)
@@ -204,6 +210,7 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
     variations: clampVariations(Number(sc.variations ?? td.variations ?? 1)),
     concept_verify: Boolean(sc.concept_verify ?? td.concept_verify),
     formats: formatsFromSc.length ? formatsFromSc : formatsFromBrief,
+    preview_format: typeof sc.preview_format === "string" ? sc.preview_format : "",
     naming_test_id: String(naming.test_id ?? "T05"),
     naming_format: String(naming.format ?? "Static_9x16"),
     naming_cta: String(naming.cta ?? "list_now"),
@@ -231,11 +238,30 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
   }
 }
 
+function padSvgCopyRows(rows: SvgVariationRow[]): SvgVariationRow[] {
+  return (["A", "B", "C"] as const).map(
+    (label, i) =>
+      rows.find((row) => row.variation_label.toUpperCase() === label) ??
+      rows[i] ?? { variation_label: label, headline: "", eyebrow: "", subhead: "" },
+  )
+}
+
+/** Copy versions that will render: rows with a headline, in A/B/C order. */
+export function activeSvgCopyRows(rows: SvgVariationRow[]): SvgVariationRow[] {
+  return rows.filter((row) => row.headline.trim())
+}
+
 export function structuredEditorToPatch(state: StructuredBriefEditorState) {
-  const effectiveVariations = state.concept_verify ? 1 : state.variations
+  const svgCopyRows = isSplitHeaderSvgTemplate(state.svg_template_id) ? activeSvgCopyRows(state.svg_variations) : null
+  // SVG renders are cheap: every filled copy version renders, so the count follows the rows.
+  const effectiveVariations = svgCopyRows
+    ? clampVariations(Math.max(svgCopyRows.length, 1))
+    : state.concept_verify
+      ? 1
+      : state.variations
   const trigger_data: Record<string, unknown> = {
     variations: effectiveVariations,
-    concept_verify: state.concept_verify,
+    concept_verify: svgCopyRows ? false : state.concept_verify,
     angle: state.naming_angle,
     naming: {
       test_id: state.naming_test_id,
@@ -253,8 +279,9 @@ export function structuredEditorToPatch(state: StructuredBriefEditorState) {
       TAGLINE_EYEBROW: state.tagline_eyebrow.trim(),
       SUBHEAD: state.subhead.trim(),
     }
-    if (state.svg_variations.length) {
-      trigger_data.svg_variations = state.svg_variations.slice(0, effectiveVariations).map((row) => ({
+    const rowsToRender = svgCopyRows ?? state.svg_variations.slice(0, effectiveVariations)
+    if (rowsToRender.length) {
+      trigger_data.svg_variations = rowsToRender.map((row) => ({
         variation_label: row.variation_label,
         tokens: svgTokensForCopyRow(row, { eyebrow: state.tagline_eyebrow, subhead: state.subhead }),
       }))
@@ -286,8 +313,9 @@ export function structuredEditorToPatch(state: StructuredBriefEditorState) {
     trigger_data,
     success_criteria: {
       variations: effectiveVariations,
-      concept_verify: state.concept_verify,
+      concept_verify: svgCopyRows ? false : state.concept_verify,
       formats: state.formats,
+      ...(state.formats.includes(state.preview_format) ? { preview_format: state.preview_format } : {}),
     },
   }
 
@@ -337,6 +365,8 @@ export function BriefEditorModal({
   isVideo,
 }: Props) {
   const isSplitHeaderSvg = isSplitHeaderSvgTemplate(state.svg_template_id)
+  const svgPreviewCount = isSplitHeaderSvg ? activeSvgCopyRows(state.svg_variations).length : 0
+  const svgPreviewSize = state.formats.includes(state.preview_format) ? state.preview_format : (state.formats[0] ?? "1x1")
 
   const namingPreview = useMemo(() => {
     try {
@@ -482,15 +512,12 @@ export function BriefEditorModal({
               <div className="space-y-3 border-t pt-3">
                 <p className="text-xs font-semibold uppercase text-muted-foreground">Copy versions (A/B/C)</p>
                 <p className="text-xs text-muted-foreground">
-                  Each version renders as its own ad (VAR in the ad name). Leave eyebrow or subhead blank to use the
-                  shared lines above. Turn off concept verify to render every version.
+                  Each version renders as its own ad (VAR in the ad name). Leave a headline blank to skip that
+                  version; leave eyebrow or subhead blank to use the shared lines above.
                 </p>
-                {(state.svg_variations.length
-                  ? state.svg_variations
-                  : [{ variation_label: "A", headline: "", eyebrow: "", subhead: "" }]
-                ).map((row, i) => {
+                {padSvgCopyRows(state.svg_variations).map((row, i) => {
                   const update = (patch: Partial<SvgVariationRow>) => {
-                    const next = [...(state.svg_variations.length ? state.svg_variations : [row])]
+                    const next = padSvgCopyRows(state.svg_variations)
                     next[i] = { ...row, ...patch }
                     set("svg_variations", next)
                   }
@@ -501,7 +528,7 @@ export function BriefEditorModal({
                         value={row.headline}
                         onChange={(e) => update({ headline: e.target.value })}
                         className="rounded-md border px-2 py-1.5 text-sm"
-                        placeholder="Headline"
+                        placeholder={row.variation_label === "A" ? "Headline" : "Headline (blank = skip this version)"}
                       />
                       <input
                         value={row.eyebrow}
@@ -643,37 +670,59 @@ export function BriefEditorModal({
           )}
 
           <div className="grid gap-3 md:grid-cols-3 border-t pt-3">
-            <label className="space-y-1 text-xs font-medium text-muted-foreground">
-              Variations (1–3)
-              <select
-                value={state.variations}
-                onChange={(e) => {
-                  const next = clampVariations(Number(e.target.value))
-                  set("variations", next)
-                  if (isSplitHeaderSvg) ensureSvgVariationRows(next)
-                  if (showVideoFields) ensureVideoCopyVariantRows(next)
-                }}
-                className="w-full rounded-md border px-2 py-1.5 text-sm"
-                disabled={state.concept_verify}
-              >
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
-              </select>
-            </label>
-            <label className="flex items-end gap-2 text-sm pb-1">
-              <input
-                type="checkbox"
-                checked={state.concept_verify}
-                onChange={(e) => {
-                  const checked = e.target.checked
-                  set("concept_verify", checked)
-                  const count = checked ? 1 : state.variations
-                  if (showVideoFields) ensureVideoCopyVariantRows(count)
-                }}
-              />
-              Concept verify (1 preview first)
-            </label>
+            {isSplitHeaderSvg ? (
+              <label className="space-y-1 text-xs font-medium text-muted-foreground md:col-span-2">
+                Preview size
+                <select
+                  value={state.formats.includes(state.preview_format) ? state.preview_format : state.formats[0] ?? ""}
+                  onChange={(e) => set("preview_format", e.target.value)}
+                  className="w-full rounded-md border px-2 py-1.5 text-sm"
+                >
+                  {state.formats.map((fmt) => (
+                    <option key={fmt} value={fmt}>
+                      {fmt}
+                    </option>
+                  ))}
+                </select>
+                <span className="block font-normal">
+                  Previews render every copy version at this size. Build the other checked sizes once you like them.
+                </span>
+              </label>
+            ) : (
+              <>
+              <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                Variations (1–3)
+                <select
+                  value={state.variations}
+                  onChange={(e) => {
+                    const next = clampVariations(Number(e.target.value))
+                    set("variations", next)
+                    if (isSplitHeaderSvg) ensureSvgVariationRows(next)
+                    if (showVideoFields) ensureVideoCopyVariantRows(next)
+                  }}
+                  className="w-full rounded-md border px-2 py-1.5 text-sm"
+                  disabled={state.concept_verify}
+                >
+                  <option value={1}>1</option>
+                  <option value={2}>2</option>
+                  <option value={3}>3</option>
+                </select>
+              </label>
+              <label className="flex items-end gap-2 text-sm pb-1">
+                <input
+                  type="checkbox"
+                  checked={state.concept_verify}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    set("concept_verify", checked)
+                    const count = checked ? 1 : state.variations
+                    if (showVideoFields) ensureVideoCopyVariantRows(count)
+                  }}
+                />
+                Concept verify (1 preview first)
+              </label>
+              </>
+            )}
             {!showVideoFields ? (
               <div className="space-y-1 text-xs">
                 <span className="font-medium text-muted-foreground">Formats</span>
@@ -763,10 +812,12 @@ export function BriefEditorModal({
             <button
               type="button"
               onClick={onGeneratePreview}
-              disabled={busy}
+              disabled={busy || (isSplitHeaderSvg && svgPreviewCount === 0)}
               className="text-sm px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
             >
-              Generate 1 preview
+              {isSplitHeaderSvg
+                ? `Save & preview ${svgPreviewCount} version${svgPreviewCount === 1 ? "" : "s"} (${svgPreviewSize})`
+                : "Generate 1 preview"}
             </button>
           ) : null}
           <button

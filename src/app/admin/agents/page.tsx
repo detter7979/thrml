@@ -586,12 +586,20 @@ export default function AgentsDashboard() {
     setBusyAction(`preview-${briefId}`)
     setPipelineMessage(null)
     try {
+      // Preview what's in the editor, not the last saved copy.
+      if (editBrief?.id === briefId) {
+        await patchPipeline({ action: "update_brief", brief_id: briefId, brief: structuredEditorToPatch(editBrief) })
+      }
       const json = (await patchPipeline({ action: "generate_preview", brief_id: briefId })) as {
         preview_format?: string
+        generated?: { generated?: number }
       }
       await mutatePipeline()
       const fmt = json.preview_format ?? "1x1"
-      setPipelineMessage(`Preview generated (1× ${fmt}). Edit via prompt if needed, then Build out sizes.`)
+      const count = Math.max(json.generated?.generated ?? 1, 1)
+      setPipelineMessage(
+        `Preview generated (${count}× ${fmt}). Happy with the copy? Use "Build remaining sizes" to render the other sizes for every version.`,
+      )
       setEditBrief(null)
     } catch (err) {
       setPipelineMessage(err instanceof Error ? err.message : "Preview generation failed.")
@@ -642,31 +650,30 @@ export default function AgentsDashboard() {
     }
   }
 
-  const buildAllMissingSizes = async (
-    brief: CreativeBrief,
-    assets: CreativeAsset[],
-    variationLabel = "A"
-  ) => {
-    const anchor =
-      assets.find(
-        (asset) =>
-          (asset.variation_label ?? "A").toUpperCase().slice(0, 1) ===
-          variationLabel.toUpperCase().slice(0, 1)
-      ) ?? assets[0]
-    if (!anchor) {
-      setPipelineMessage("Generate a preview asset first.")
-      return
+  /** Build every missing size for every copy version in the brief (one click after reviewing previews). */
+  const buildAllMissingSizes = async (briefId: string) => {
+    setBusyAction(`expand-brief-${briefId}`)
+    setPipelineMessage(null)
+    try {
+      const json = (await patchPipeline({ action: "expand_brief_sizes", brief_id: briefId })) as {
+        generated?: number
+        variations?: number
+        errors?: Array<{ variation_label: string; error: string }>
+      }
+      await mutatePipeline()
+      const errs = json.errors ?? []
+      setPipelineMessage(
+        errs.length
+          ? `Built ${json.generated ?? 0} sizes; failed for ${errs.map((e) => `${e.variation_label} (${e.error})`).join(", ")}.`
+          : json.generated
+            ? `Built ${json.generated} size${json.generated === 1 ? "" : "s"} across ${json.variations ?? 1} version${json.variations === 1 ? "" : "s"}.`
+            : "All target sizes already exist.",
+      )
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Size build-out failed.")
+    } finally {
+      setBusyAction(null)
     }
-    const missing = missingFormatsForVariation(
-      targetFormatsForBrief(brief),
-      assets,
-      variationLabel
-    )
-    if (!missing.length) {
-      setPipelineMessage("All target sizes already exist for this variation.")
-      return
-    }
-    await expandStaticSizes(anchor.id, missing)
   }
 
   const openPlacementBundleLaunch = (assets: CreativeAsset[]) => {
@@ -1518,13 +1525,20 @@ export default function AgentsDashboard() {
                   const bundleAssets = selectPlacementBundleAssets(
                     group.assets.map(toLaunchableAssetRow)
                   )
-                  const missingSizes =
-                    group.brief &&
-                    missingFormatsForVariation(
-                      targetFormatsForBrief(group.brief),
-                      group.assets,
-                      group.assets[0]?.variation_label ?? "A"
-                    )
+                  const groupLabels = [
+                    ...new Set(group.assets.map((a) => (a.variation_label ?? "A").toUpperCase().slice(0, 1))),
+                  ].sort()
+                  const missingByLabel = group.brief
+                    ? groupLabels
+                        .map((label) => ({
+                          label,
+                          formats: missingFormatsForVariation(targetFormatsForBrief(group.brief!), group.assets, label),
+                        }))
+                        .filter((row) => row.formats.length > 0)
+                    : []
+                  const missingSizes = missingByLabel.length
+                    ? [...new Set(missingByLabel.flatMap((row) => row.formats))]
+                    : null
                   const planLabels = group.brief
                     ? parseStoredStaticVariations(group.brief.trigger_data)?.map((row) => row.variation_label)
                     : undefined
@@ -1550,8 +1564,9 @@ export default function AgentsDashboard() {
                         <p className="text-xs text-muted-foreground">{shortText(group.brief?.hypothesis, 140)}</p>
                         {missingSizes && missingSizes.length > 0 ? (
                           <p className="mt-1 text-xs text-amber-800">
-                            Missing sizes for variation A: {missingSizes.join(", ")}. Build them before a
-                            multi-placement launch.
+                            Missing {missingSizes.join(", ")} for version
+                            {missingByLabel.length === 1 ? "" : "s"} {missingByLabel.map((row) => row.label).join(", ")}.
+                            Build them before a multi-placement launch.
                           </p>
                         ) : null}
                         {bundleAssets.length >= 2 ? (
@@ -1714,16 +1729,13 @@ export default function AgentsDashboard() {
                         {group.brief && missingSizes && missingSizes.length > 0 ? (
                           <button
                             type="button"
-                            onClick={() =>
-                              void buildAllMissingSizes(group.brief!, group.assets, "A")
-                            }
-                            disabled={
-                              busyAction === `expand-${group.assets[0]?.id}` ||
-                              busyAction?.startsWith(`expand-${group.assets[0]?.id}-`) === true
-                            }
+                            onClick={() => void buildAllMissingSizes(group.briefId)}
+                            disabled={busyAction === `expand-brief-${group.briefId}`}
                             className="text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
                           >
-                            Build all missing sizes
+                            {busyAction === `expand-brief-${group.briefId}`
+                              ? "Building sizes…"
+                              : `Build remaining sizes (${missingByLabel.length} version${missingByLabel.length === 1 ? "" : "s"})`}
                           </button>
                         ) : null}
                         <button

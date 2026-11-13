@@ -94,3 +94,32 @@ describe("per-version copy", () => {
     expect(td.photo_gcs_path).toBeNull()
   })
 })
+
+describe("SVG copy versions drive the preview", () => {
+  it("renders every filled headline and skips blank ones, regardless of the old variation count", () => {
+    const state = structuredEditorFromBrief({
+      ...svgBrief,
+      success_criteria: { variations: 1, concept_verify: true, formats: ["4x5", "9x16"], preview_format: "9x16" },
+    })
+    expect(state.svg_variations.map((row) => row.variation_label)).toEqual(["A", "B", "C"])
+    const withC = {
+      ...state,
+      svg_variations: state.svg_variations.map((row) =>
+        row.variation_label === "C" ? { ...row, headline: "Headline C" } : row,
+      ),
+    }
+    const patch = structuredEditorToPatch(withC)
+    const td = patch.trigger_data as Record<string, unknown>
+    expect((td.svg_variations as unknown[]).length).toBe(3)
+    expect(patch.success_criteria).toMatchObject({ variations: 3, concept_verify: false, preview_format: "9x16" })
+
+    const onlyA = {
+      ...state,
+      svg_variations: state.svg_variations.map((row, i) => (i === 0 ? row : { ...row, headline: "" })),
+    }
+    const patchA = structuredEditorToPatch(onlyA)
+    expect(((patchA.trigger_data as Record<string, unknown>).svg_variations as unknown[]).length).toBe(1)
+    expect(patchA.success_criteria).toMatchObject({ variations: 1 })
+  })
+})
+

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { duplicateBriefRow, mergeBriefTriggerData } from "@/lib/agent/brief-copy-sets"
+
 import { appendApprovedCreativeToNamer, cloneNamerAdToAdSet } from "@/lib/agent/namer-creative-append"
 import { deleteCreativeBrief, purgeCreativePipeline } from "@/lib/agent/creative-pipeline-purge"
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
@@ -34,6 +36,7 @@ const PIPELINE_ACTIONS = new Set([
   "reject_brief",
   "delete_brief",
   "update_brief",
+  "duplicate_brief",
   "approve_asset",
   "reject_asset",
   "create_video_brief",
@@ -944,11 +947,44 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  if (body.action === "duplicate_brief") {
+    if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
+    const { data: source, error: sourceError } = await admin!
+      .from("creative_briefs")
+      .select("*")
+      .eq("id", body.brief_id)
+      .maybeSingle()
+    if (sourceError) return NextResponse.json({ error: sourceError.message }, { status: 500 })
+    if (!source) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
+
+    const { data, error: insertError } = await admin!
+      .from("creative_briefs")
+      .insert(duplicateBriefRow(source as Record<string, unknown>))
+      .select("*")
+      .maybeSingle()
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
+    return NextResponse.json({ brief: data })
+  }
+
   if (body.action === "update_brief") {
     if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
     const updates: Record<string, unknown> = {}
     for (const field of BRIEF_FIELDS) {
       if (body.brief && Object.hasOwn(body.brief, field)) updates[field] = body.brief[field]
+    }
+
+    // The editor only sends the trigger_data keys it manages. Merge so keys it doesn't know
+    // about (template_id, category, svg tokens' source, etc.) survive a save.
+    if (updates.trigger_data && typeof updates.trigger_data === "object" && !Array.isArray(updates.trigger_data)) {
+      const { data: existing } = await admin!
+        .from("creative_briefs")
+        .select("trigger_data")
+        .eq("id", body.brief_id)
+        .maybeSingle()
+      updates.trigger_data = mergeBriefTriggerData(
+        (existing?.trigger_data as Record<string, unknown> | null) ?? null,
+        updates.trigger_data as Record<string, unknown>,
+      )
     }
 
     const { data, error: updateError } = await admin!

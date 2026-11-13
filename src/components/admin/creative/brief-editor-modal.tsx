@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 
 import { resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
+import { svgTokensForCopyRow } from "@/lib/agent/brief-copy-sets"
 import { buildAdName } from "@/lib/agent/naming-builder"
 import { DEFAULT_HOST_HEADLINE, SPLIT_HEADER_DEFAULTS, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
 import type { VideoConfig } from "@/lib/agent/types"
@@ -19,6 +20,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+import { AssetLibraryPanel } from "./asset-library-panel"
+
 export type BriefVariationRow = {
   variation_label: string
   headline: string
@@ -28,6 +31,10 @@ export type BriefVariationRow = {
 export type SvgVariationRow = {
   variation_label: string
   headline: string
+  /** Blank = shared eyebrow. */
+  eyebrow: string
+  /** Blank = shared subhead. */
+  subhead: string
 }
 
 export type VideoCopyVariantRow = {
@@ -65,6 +72,8 @@ export type StructuredBriefEditorState = {
   tagline_eyebrow: string
   subhead: string
   svg_variations: SvgVariationRow[]
+  /** Photo shared by every copy version in this brief (GCS object path). Blank = bundled hero. */
+  photo_gcs_path: string
   reference_image_urls: string
   is_video_brief: boolean
   video_source: "runway" | "uploaded"
@@ -107,7 +116,10 @@ function clampVariations(n: number): 1 | 2 | 3 {
   return 1
 }
 
-function parseSvgVariations(raw: unknown): SvgVariationRow[] {
+function parseSvgVariations(
+  raw: unknown,
+  shared: { eyebrow: string; subhead: string },
+): SvgVariationRow[] {
   if (!Array.isArray(raw)) return []
   return raw.map((item, i) => {
     const row = item as Record<string, unknown>
@@ -118,6 +130,13 @@ function parseSvgVariations(raw: unknown): SvgVariationRow[] {
     return {
       variation_label: String(row.variation_label ?? ["A", "B", "C"][i] ?? "A"),
       headline: String(tokens.HEADLINE ?? row.headline ?? ""),
+      // Only surface as an override when it differs from the shared value.
+      eyebrow:
+        typeof tokens.TAGLINE_EYEBROW === "string" && tokens.TAGLINE_EYEBROW !== shared.eyebrow
+          ? tokens.TAGLINE_EYEBROW
+          : "",
+      subhead:
+        typeof tokens.SUBHEAD === "string" && tokens.SUBHEAD !== shared.subhead ? tokens.SUBHEAD : "",
     }
   })
 }
@@ -155,7 +174,14 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
     }
   })
 
-  const svg_variations = parseSvgVariations(td.svg_variations)
+  const sharedEyebrow = String(
+    svgTokens.TAGLINE_EYEBROW ?? svgTokens.EYEBROW ?? SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW,
+  )
+  const sharedSubhead = String(svgTokens.SUBHEAD ?? svgTokens.FINEPRINT ?? SPLIT_HEADER_DEFAULTS.SUBHEAD)
+  const svg_variations = parseSvgVariations(td.svg_variations, {
+    eyebrow: sharedEyebrow,
+    subhead: sharedSubhead,
+  })
   const formatsFromSc = Array.isArray(sc.formats) ? sc.formats.map(String) : []
   const formatsFromBrief = (brief.format ?? "1x1,9x16").split(/[,/+\s]+/).filter(Boolean)
   const resolvedCopy = resolveBriefCopyForMeta(brief)
@@ -186,11 +212,10 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
     svg_template_id: typeof td.svg_template_id === "string" ? td.svg_template_id : "",
     generation_tool: typeof td.generation_tool === "string" ? td.generation_tool : "",
     static_playbook: typeof td.static_playbook === "string" ? td.static_playbook : "",
-    tagline_eyebrow: String(
-      svgTokens.TAGLINE_EYEBROW ?? svgTokens.EYEBROW ?? SPLIT_HEADER_DEFAULTS.TAGLINE_EYEBROW,
-    ),
-    subhead: String(svgTokens.SUBHEAD ?? svgTokens.FINEPRINT ?? SPLIT_HEADER_DEFAULTS.SUBHEAD),
+    tagline_eyebrow: sharedEyebrow,
+    subhead: sharedSubhead,
     svg_variations,
+    photo_gcs_path: typeof td.photo_gcs_path === "string" ? td.photo_gcs_path : "",
     reference_image_urls: (brief.reference_image_urls ?? []).join("\n"),
     is_video_brief: isVideoBrief,
     video_source: vc?.source === "runway" ? "uploaded" : (vc?.source ?? "uploaded"),
@@ -231,13 +256,11 @@ export function structuredEditorToPatch(state: StructuredBriefEditorState) {
     if (state.svg_variations.length) {
       trigger_data.svg_variations = state.svg_variations.slice(0, effectiveVariations).map((row) => ({
         variation_label: row.variation_label,
-        tokens: {
-          TAGLINE_EYEBROW: state.tagline_eyebrow.trim(),
-          SUBHEAD: state.subhead.trim(),
-          HEADLINE: row.headline.trim(),
-        },
+        tokens: svgTokensForCopyRow(row, { eyebrow: state.tagline_eyebrow, subhead: state.subhead }),
       }))
     }
+    // null clears it (server merges trigger_data and drops null keys).
+    trigger_data.photo_gcs_path = state.photo_gcs_path.trim() || null
   } else if (state.static_variations.length) {
     trigger_data.static_variations = state.static_variations.slice(0, effectiveVariations)
   }
@@ -345,6 +368,8 @@ export function BriefEditorModal({
     const next = labels.slice(0, count).map((label, i) => ({
       variation_label: label,
       headline: state.svg_variations[i]?.headline ?? defaults[i] ?? "",
+      eyebrow: state.svg_variations[i]?.eyebrow ?? "",
+      subhead: state.svg_variations[i]?.subhead ?? "",
     }))
     set("svg_variations", next)
   }
@@ -425,24 +450,74 @@ export function BriefEditorModal({
               </div>
 
               <div className="space-y-2 border-t pt-3">
-                <p className="text-xs font-semibold uppercase text-muted-foreground">Headline variants</p>
-                {(state.svg_variations.length ? state.svg_variations : [{ variation_label: "A", headline: "" }]).map(
-                  (row, i) => (
-                    <div key={row.variation_label} className="grid gap-2 md:grid-cols-[auto_1fr]">
-                      <span className="text-sm font-mono pt-2">{row.variation_label}</span>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Photo</p>
+                <p className="text-xs text-muted-foreground">
+                  Every copy version in this brief uses this photo. Pick an uploaded or generated image, or
+                  leave blank for the bundled hero sauna.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={state.photo_gcs_path}
+                    onChange={(e) => set("photo_gcs_path", e.target.value)}
+                    className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 font-mono text-xs"
+                    placeholder="creative/2026/hosts/… (GCS object path)"
+                  />
+                  {state.photo_gcs_path ? (
+                    <button
+                      type="button"
+                      onClick={() => set("photo_gcs_path", "")}
+                      className="rounded-md border px-3 text-xs hover:bg-muted"
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </div>
+                <AssetLibraryPanel
+                  mediaType="static"
+                  selectedPath={state.photo_gcs_path}
+                  onSelect={(entry) => set("photo_gcs_path", entry.gcsPath.replace(/^gs:\/\/[^/]+\//, ""))}
+                />
+              </div>
+
+              <div className="space-y-3 border-t pt-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Copy versions (A/B/C)</p>
+                <p className="text-xs text-muted-foreground">
+                  Each version renders as its own ad (VAR in the ad name). Leave eyebrow or subhead blank to use the
+                  shared lines above. Turn off concept verify to render every version.
+                </p>
+                {(state.svg_variations.length
+                  ? state.svg_variations
+                  : [{ variation_label: "A", headline: "", eyebrow: "", subhead: "" }]
+                ).map((row, i) => {
+                  const update = (patch: Partial<SvgVariationRow>) => {
+                    const next = [...(state.svg_variations.length ? state.svg_variations : [row])]
+                    next[i] = { ...row, ...patch }
+                    set("svg_variations", next)
+                  }
+                  return (
+                    <div key={row.variation_label} className="grid gap-2 rounded-md border p-2 md:grid-cols-[auto_1fr]">
+                      <span className="pt-2 font-mono text-sm md:row-span-3">{row.variation_label}</span>
                       <input
                         value={row.headline}
-                        onChange={(e) => {
-                          const next = [...(state.svg_variations.length ? state.svg_variations : [row])]
-                          next[i] = { ...row, headline: e.target.value }
-                          set("svg_variations", next)
-                        }}
+                        onChange={(e) => update({ headline: e.target.value })}
                         className="rounded-md border px-2 py-1.5 text-sm"
-                        placeholder="Offer-driven headline"
+                        placeholder="Headline"
+                      />
+                      <input
+                        value={row.eyebrow}
+                        onChange={(e) => update({ eyebrow: e.target.value })}
+                        className="rounded-md border px-2 py-1.5 text-xs"
+                        placeholder={`Eyebrow (shared: ${state.tagline_eyebrow || "—"})`}
+                      />
+                      <input
+                        value={row.subhead}
+                        onChange={(e) => update({ subhead: e.target.value })}
+                        className="rounded-md border px-2 py-1.5 text-xs"
+                        placeholder={`Subhead (shared: ${state.subhead || "—"})`}
                       />
                     </div>
-                  ),
-                )}
+                  )
+                })}
               </div>
             </>
           ) : showVideoFields ? (

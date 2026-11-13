@@ -9,7 +9,11 @@ import { isRunwayConfigured } from "@/lib/agent/runway"
 import { processStaticBrief } from "@/lib/agent/static-generator"
 import { editStaticPhotoAsset } from "@/lib/agent/static-photo-recomposite"
 import { statusAfterStaticGeneration } from "@/lib/agent/creative-brief-status"
-import { previewFormatForBrief } from "@/lib/agent/static-brief-plan"
+import {
+  missingFormatsForVariation,
+  previewFormatForBrief,
+  targetFormatsForBrief,
+} from "@/lib/agent/static-brief-plan"
 import {
   expandStaticSizesFromAsset,
   generateStaticVariationPreview,
@@ -44,6 +48,7 @@ const PIPELINE_ACTIONS = new Set([
   "create_svg_static_brief",
   "generate_preview",
   "expand_static_sizes",
+  "expand_brief_sizes",
   "generate_variation_preview",
   "generate_svg_static",
   "acknowledge_claim_warning",
@@ -796,9 +801,13 @@ export async function PATCH(req: NextRequest) {
 
     try {
       const previewFormat = previewFormatForBrief(brief)
+      // SVG renders are cheap: preview every copy version at one size so they can be compared side by side.
+      const td = (brief.trigger_data ?? {}) as Record<string, unknown>
+      const svgCopyCount =
+        typeof td.svg_template_id === "string" && Array.isArray(td.svg_variations) ? td.svg_variations.length : 0
       const generated = await processStaticBrief({
         briefId: body.brief_id,
-        variations: 1,
+        variations: (svgCopyCount > 1 ? Math.min(svgCopyCount, 3) : 1) as 1 | 2 | 3,
         formats: [previewFormat],
       })
       return NextResponse.json({ ok: true, generated, preview_format: previewFormat })
@@ -806,6 +815,44 @@ export async function PATCH(req: NextRequest) {
       const message = err instanceof Error ? err.message : "Preview generation failed"
       return NextResponse.json({ error: message }, { status: 500 })
     }
+  }
+
+  if (body.action === "expand_brief_sizes") {
+    if (!body.brief_id) return NextResponse.json({ error: "brief_id is required" }, { status: 400 })
+    const [{ data: brief, error: briefError }, { data: assets, error: assetsError }] = await Promise.all([
+      admin!.from("creative_briefs").select("id, trigger_data, format, success_criteria").eq("id", body.brief_id).maybeSingle(),
+      admin!
+        .from("creative_assets")
+        .select("id, format, variation_label, status, created_at")
+        .eq("brief_id", body.brief_id)
+        .neq("status", "rejected")
+        .order("created_at", { ascending: true }),
+    ])
+    if (briefError || assetsError) {
+      return NextResponse.json({ error: (briefError ?? assetsError)!.message }, { status: 500 })
+    }
+    if (!brief) return NextResponse.json({ error: "Brief not found" }, { status: 404 })
+
+    const rows = (assets ?? []) as Array<{ id: string; format: string | null; variation_label: string | null }>
+    const targets = targetFormatsForBrief(brief)
+    const preview = previewFormatForBrief(brief)
+    const labels = [...new Set(rows.map((row) => (row.variation_label ?? "A").toUpperCase().slice(0, 1)))].sort()
+
+    let generated = 0
+    const errors: Array<{ variation_label: string; error: string }> = []
+    for (const label of labels) {
+      const forLabel = rows.filter((row) => (row.variation_label ?? "A").toUpperCase().slice(0, 1) === label)
+      const missing = missingFormatsForVariation(targets, forLabel, label)
+      if (!missing.length) continue
+      const anchor = forLabel.find((row) => row.format === preview) ?? forLabel[0]
+      try {
+        const result = await expandStaticSizesFromAsset({ assetId: anchor.id, formats: missing })
+        generated += result.generated
+      } catch (err) {
+        errors.push({ variation_label: label, error: err instanceof Error ? err.message : "Size expansion failed" })
+      }
+    }
+    return NextResponse.json({ ok: errors.length === 0, generated, variations: labels.length, errors })
   }
 
   if (body.action === "expand_static_sizes") {

@@ -564,6 +564,24 @@ export default function AgentsDashboard() {
     }
   }
 
+  /** New copy set: same template, photo, sizes and naming — opens the editor to rewrite the copy. */
+  const duplicateBrief = async (briefId: string) => {
+    setBusyAction(`duplicate-brief-${briefId}`)
+    setPipelineMessage(null)
+    try {
+      const json = (await patchPipeline({ action: "duplicate_brief", brief_id: briefId })) as {
+        brief?: Parameters<typeof structuredEditorFromBrief>[0]
+      }
+      await mutatePipeline()
+      if (json.brief) setEditBrief(structuredEditorFromBrief(json.brief))
+      setPipelineMessage("Brief duplicated — change the copy, then generate.")
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not duplicate brief.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
   const generatePreview = async (briefId: string) => {
     setBusyAction(`preview-${briefId}`)
     setPipelineMessage(null)
@@ -1246,6 +1264,15 @@ export default function AgentsDashboard() {
                               Edit brief &amp; copy
                             </button>
                             <button
+                              type="button"
+                              onClick={() => void duplicateBrief(brief.id)}
+                              disabled={busyAction === `duplicate-brief-${brief.id}`}
+                              className="text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
+                              title="New copy set with the same photo, template and sizes"
+                            >
+                              Duplicate
+                            </button>
+                            <button
                               onClick={() => approveBrief(brief.id)}
                               disabled={!canApproveBrief || busyAction === `approve-brief-${brief.id}`}
                               className="flex-1 text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
@@ -1462,6 +1489,15 @@ export default function AgentsDashboard() {
                           >
                             Edit brief &amp; copy
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => void duplicateBrief(brief.id)}
+                            disabled={busyAction === `duplicate-brief-${brief.id}`}
+                            className="text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
+                            title="New copy set with the same photo, template and sizes"
+                          >
+                            Duplicate
+                          </button>
                           {!isActivelyGenerating ? (
                             <button
                               type="button"
@@ -1530,13 +1566,24 @@ export default function AgentsDashboard() {
                           </p>
                         ) : null}
                         {group.brief ? (
-                          <button
-                            type="button"
-                            onClick={() => setEditBrief(structuredEditorFromBrief(group.brief!))}
-                            className="mt-2 text-xs px-3 py-1.5 border rounded hover:bg-muted"
-                          >
-                            Edit brief &amp; copy
-                          </button>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditBrief(structuredEditorFromBrief(group.brief!))}
+                              className="text-xs px-3 py-1.5 border rounded hover:bg-muted"
+                            >
+                              Edit brief &amp; copy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void duplicateBrief(group.brief!.id)}
+                              disabled={busyAction === `duplicate-brief-${group.brief!.id}`}
+                              className="text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
+                              title="New copy set with the same photo, template and sizes"
+                            >
+                              Duplicate
+                            </button>
+                          </div>
                         ) : null}
                       </div>
                       <div className="grid gap-3 md:grid-cols-3">

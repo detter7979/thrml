@@ -51,7 +51,7 @@ function setGtagDisableFlags(disable: boolean) {
   const ids = getAnalyticsIds()
   if (!ids) return
   const { gaMeasurementId, googleAdsId } = ids
-  const win = window as Window & Record<string, boolean | undefined>
+  const win = window as unknown as Record<string, boolean | undefined>
   if (gaMeasurementId) win[`ga-disable-${gaMeasurementId}`] = disable ? true : undefined
   if (googleAdsId) win[`ga-disable-${googleAdsId}`] = disable ? true : undefined
 }

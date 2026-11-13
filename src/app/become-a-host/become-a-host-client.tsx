@@ -17,10 +17,32 @@ import { HOST_NEW_LISTING_PATH } from "@/lib/host/is-host-user"
 import { nextHostUiIntent } from "@/lib/host/promote-host-profile"
 import { trackBecomeHostClick, trackHostOnboardingComplete } from "@/lib/tracking/google-ads"
 import { LEGAL_VERSIONS } from "@/lib/legal-config"
+import { META_EVENT_HOST_ONBOARDING_STARTED } from "@/lib/meta-capi"
 import { createClient } from "@/lib/supabase/client"
 
 import { HostLandingIntro } from "./host-landing-intro"
 const TOTAL_STEPS = 3
+
+/**
+ * Host signup KPI: the user has an account and has begun onboarding (reached step 2), either right after
+ * signing up from this page or by continuing while already signed in. Same name in GA4 and Meta (Pixel +
+ * CAPI); fires once per browser session so a refresh doesn't double count.
+ */
+function trackHostOnboardingStarted(source: "resumed_after_signup" | "signed_in") {
+  const key = "thrml_host_onboarding_started"
+  try {
+    if (window.sessionStorage.getItem(key)) return
+    window.sessionStorage.setItem(key, "1")
+  } catch {
+    // Storage unavailable (private mode): still fire once for this page view.
+  }
+  trackGaEvent(META_EVENT_HOST_ONBOARDING_STARTED, { source })
+  trackMetaEvent(
+    META_EVENT_HOST_ONBOARDING_STARTED,
+    { content_name: "host_onboarding_started", content_type: "host_onboarding", source },
+    { custom: true },
+  )
+}
 
 function ProgressBar({ step }: { step: number }) {
   return (
@@ -146,7 +168,8 @@ export function BecomeAHostClient({
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
 
   useEffect(() => {
-    trackGaEvent("host_onboarding_start", { step: 1 })
+    // Landing-page view (step 1). Distinct from host_onboarding_started, which needs an account.
+    trackGaEvent("host_landing_view", { step: 1 })
     // Custom host event — ViewContent is reserved for guest listing views (C012 optimizes on it).
     trackMetaEvent(
       "host_onboarding_viewed",
@@ -190,6 +213,7 @@ export function BecomeAHostClient({
       if (!cancelled && resumingAfterSignup) {
         setStep(2)
         trackGaEvent("host_onboarding_step", { step: 2, resumed_after_signup: true })
+        trackHostOnboardingStarted("resumed_after_signup")
       }
     }
 
@@ -215,6 +239,7 @@ export function BecomeAHostClient({
     }
     setStep(2)
     trackGaEvent("host_onboarding_step", { step: 2 })
+    trackHostOnboardingStarted("signed_in")
   }
 
   function handleRulesAccept() {

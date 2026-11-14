@@ -491,7 +491,7 @@ export function BriefEditorModal({
                     value={state.photo_gcs_path}
                     onChange={(e) => set("photo_gcs_path", e.target.value)}
                     className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 font-mono text-xs"
-                    placeholder="creative/2026/hosts/… (GCS object path)"
+                    placeholder="gs://thrml/2026/library/… (pick from the library below)"
                   />
                   {state.photo_gcs_path ? (
                     <button
@@ -506,7 +506,7 @@ export function BriefEditorModal({
                 <AssetLibraryPanel
                   mediaType="static"
                   selectedPath={state.photo_gcs_path}
-                  onSelect={(entry) => set("photo_gcs_path", entry.gcsPath.replace(/^gs:\/\/[^/]+\//, ""))}
+                  onSelect={(entry) => set("photo_gcs_path", entry.gcsPath)}
                 />
               </div>
 

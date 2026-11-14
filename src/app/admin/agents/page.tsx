@@ -33,6 +33,7 @@ import {
   structuredEditorToPatch,
   type StructuredBriefEditorState,
 } from "@/components/admin/creative/brief-editor-modal"
+import { AdminSelect } from "@/components/admin/admin-select"
 
 type AgentRun = {
   id: string; agent_name: string; status: string; started_at: string
@@ -1995,7 +1996,7 @@ export default function AgentsDashboard() {
                 >
                   Target campaign
                 </label>
-                <select
+                <AdminSelect
                   id="meta-campaign"
                   value={selectedCampaignId}
                   onChange={(event) => {
@@ -2016,7 +2017,7 @@ export default function AgentsDashboard() {
                       </option>
                     ))
                   )}
-                </select>
+                </AdminSelect>
               </div>
               <div className="space-y-2">
                 <label
@@ -2025,7 +2026,7 @@ export default function AgentsDashboard() {
                 >
                   Target ad set
                 </label>
-                <select
+                <AdminSelect
                   id="meta-adset"
                   value={selectedAdsetId}
                   onChange={(event) => setSelectedAdsetId(event.target.value)}
@@ -2047,7 +2048,7 @@ export default function AgentsDashboard() {
                       </option>
                     ))
                   )}
-                </select>
+                </AdminSelect>
               </div>
               <p className="text-xs text-muted-foreground">
                 Lists live Meta campaigns and ad sets

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog"
 
 import { AssetLibraryPanel } from "./asset-library-panel"
+import { AdminSelect } from "@/components/admin/admin-select"
 
 export type BriefVariationRow = {
   variation_label: string
@@ -673,7 +674,7 @@ export function BriefEditorModal({
             {isSplitHeaderSvg ? (
               <label className="space-y-1 text-xs font-medium text-muted-foreground md:col-span-2">
                 Preview size
-                <select
+                <AdminSelect
                   value={state.formats.includes(state.preview_format) ? state.preview_format : state.formats[0] ?? ""}
                   onChange={(e) => set("preview_format", e.target.value)}
                   className="w-full rounded-md border px-2 py-1.5 text-sm"
@@ -683,7 +684,7 @@ export function BriefEditorModal({
                       {fmt}
                     </option>
                   ))}
-                </select>
+                </AdminSelect>
                 <span className="block font-normal">
                   Previews render every copy version at this size. Build the other checked sizes once you like them.
                 </span>
@@ -692,7 +693,7 @@ export function BriefEditorModal({
               <>
               <label className="space-y-1 text-xs font-medium text-muted-foreground">
                 Variations (1–3)
-                <select
+                <AdminSelect
                   value={state.variations}
                   onChange={(e) => {
                     const next = clampVariations(Number(e.target.value))
@@ -706,7 +707,7 @@ export function BriefEditorModal({
                   <option value={1}>1</option>
                   <option value={2}>2</option>
                   <option value={3}>3</option>
-                </select>
+                </AdminSelect>
               </label>
               <label className="flex items-end gap-2 text-sm pb-1">
                 <input

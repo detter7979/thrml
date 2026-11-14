@@ -343,7 +343,8 @@ export async function listAssetsForBrief(briefId: string): Promise<ListedCreativ
 export async function uploadBufferToCreativeObject(
   objectPath: string,
   buffer: Buffer,
-  contentType: string
+  contentType: string,
+  customMetadata?: Record<string, string>
 ): Promise<UploadedCreativeAsset> {
   const bucket = getCreativeBucket()
   const bucketName = bucket.name
@@ -351,7 +352,7 @@ export async function uploadBufferToCreativeObject(
 
   await file.save(buffer, {
     resumable: false,
-    metadata: { contentType },
+    metadata: customMetadata ? { contentType, metadata: customMetadata } : { contentType },
   })
 
   return {

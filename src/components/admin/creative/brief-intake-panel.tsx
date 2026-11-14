@@ -25,6 +25,7 @@ import {
   T4_BASE_VIDEO_UPLOAD,
   T5_BLOCK_SPLIT_VIDEO_UPLOAD,
 } from "@/lib/agent/t4-base-video-upload"
+import { AdminSelect } from "@/components/admin/admin-select"
 
 export type CreativeTemplateSummary = {
   id: string
@@ -409,7 +410,7 @@ export function BriefIntakePanel({
       <div className="grid gap-3 md:grid-cols-[1fr_auto] items-end">
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
           Template
-          <select
+          <AdminSelect
             value={selectedTemplateId}
             onChange={(e) => {
               setSelectedTemplateId(e.target.value)
@@ -431,7 +432,7 @@ export function BriefIntakePanel({
                 ))}
               </optgroup>
             ))}
-          </select>
+          </AdminSelect>
         </label>
         <label className="flex items-center gap-2 text-sm pb-2">
           <input type="checkbox" checked={conceptVerify} onChange={(e) => setConceptVerify(e.target.checked)} />
@@ -612,7 +613,7 @@ export function BriefIntakePanel({
                 <div className="grid gap-2 md:grid-cols-2">
                   <label className="space-y-1 text-xs font-medium text-muted-foreground">
                     Template
-                    <select
+                    <AdminSelect
                       value={svgTemplateId}
                       onChange={(e) => setSvgTemplateId(e.target.value)}
                       className="w-full rounded-md border px-3 py-2 text-sm bg-background"
@@ -623,11 +624,11 @@ export function BriefIntakePanel({
                           {template.label}
                         </option>
                       ))}
-                    </select>
+                    </AdminSelect>
                   </label>
                   <label className="space-y-1 text-xs font-medium text-muted-foreground">
                     Aspect ratio
-                    <select
+                    <AdminSelect
                       value={svgAspectRatio}
                       onChange={(e) =>
                         setSvgAspectRatio(e.target.value as "1:1" | "4:5" | "9:16")
@@ -637,7 +638,7 @@ export function BriefIntakePanel({
                       <option value="1:1">1:1</option>
                       <option value="4:5">4:5</option>
                       <option value="9:16">9:16</option>
-                    </select>
+                    </AdminSelect>
                   </label>
                 </div>
 

@@ -123,9 +123,21 @@ function publicUrl(bucketName: string, objectPath: string) {
 }
 
 function parseGcsPath(gcsPath: string) {
-  const match = /^gs:\/\/([^/]+)\/(.+)$/.exec(gcsPath) ?? /^([^/]+)\/(.+)$/.exec(gcsPath)
-  if (!match) throw new Error(`Invalid GCS path: ${gcsPath}`)
-  return { bucketName: match[1], objectPath: match[2] }
+  const trimmed = gcsPath.trim()
+  const full = /^gs:\/\/([^/]+)\/(.+)$/.exec(trimmed)
+  if (full) return { bucketName: full[1], objectPath: full[2] }
+
+  const bare = /^([^/]+)\/(.+)$/.exec(trimmed)
+  if (!bare) throw new Error(`Invalid GCS path: ${gcsPath}`)
+  // "bucket/object" only when the first segment is a bucket we know; otherwise it's an object path
+  // in the main bucket (e.g. "2026/library/generated/x.png" saved from the brief editor's photo picker).
+  const knownBuckets = new Set(
+    [process.env.GCS_BUCKET_NAME, process.env.GCS_CREATIVE_BUCKET, "thrml-creative"]
+      .map((name) => name?.trim())
+      .filter(Boolean),
+  )
+  if (knownBuckets.has(bare[1])) return { bucketName: bare[1], objectPath: bare[2] }
+  return { bucketName: requireEnv("GCS_BUCKET_NAME"), objectPath: trimmed.replace(/^\/+/, "") }
 }
 
 function fileForStoredGcsPath(bucketName: string, objectPath: string) {
@@ -445,12 +457,17 @@ export async function listCreativeAssetLibrary(opts?: {
     }
   }
 
-  await collect("main", getBucket())
-  if (entries.length < limit) {
-    await collect("creative", getCreativeBucket())
+  const mainBucket = getBucket()
+  const creativeBucket = getCreativeBucket()
+  await collect("main", mainBucket)
+  // Without GCS_CREATIVE_BUCKET both resolve to the same bucket; listing it twice showed every asset twice.
+  if (entries.length < limit && creativeBucket.name !== mainBucket.name) {
+    await collect("creative", creativeBucket)
   }
 
+  const seen = new Set<string>()
   return entries
+    .filter((entry) => (seen.has(entry.gcsPath) ? false : (seen.add(entry.gcsPath), true)))
     .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))
     .slice(0, limit)
 }

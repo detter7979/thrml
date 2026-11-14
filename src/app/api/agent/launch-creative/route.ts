@@ -247,7 +247,9 @@ async function createMetaPlacementCreative(params: {
 }) {
   const objectStorySpec: Record<string, string> = { page_id: params.pageId }
   if (params.instagramActorId) {
-    objectStorySpec.instagram_actor_id = params.instagramActorId
+    // instagram_actor_id was removed in Marketing API v22 (all versions since Sep 2025) and now
+    // fails with "(#100) Param instagram_actor_id must be a valid Instagram account id".
+    // The IG business account id goes in instagram_user_id.
     objectStorySpec.instagram_user_id = params.instagramActorId
   }
 

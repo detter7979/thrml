@@ -1752,7 +1752,7 @@ export default function AgentsDashboard() {
                             onClick={() => openPlacementBundleLaunch(group.assets)}
                             className="text-xs px-3 py-1.5 bg-[#9A4A33] text-white rounded hover:opacity-90"
                           >
-                            Launch 1 ad ({bundleAssets.length} sizes)
+                            Launch to Meta: 1 ad, {bundleAssets.length} sizes (recommended)
                           </button>
                         ) : null}
                         <button
@@ -1760,7 +1760,7 @@ export default function AgentsDashboard() {
                           disabled={selectedApproved.length === 0}
                           className="text-xs px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
                         >
-                          Push selected to Meta
+                          Launch selected as separate ads
                         </button>
                       </div>
                     </div>

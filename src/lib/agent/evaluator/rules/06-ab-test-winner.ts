@@ -2,6 +2,7 @@ import type { Ad } from "@/types/paid-media"
 
 import type { EvaluatorContext, PerformanceDailyRow, RuleResult } from "../types"
 import { isoDateUtcDaysAgo } from "../types"
+import { nextTestId as nextTestIdFor } from "../next-test-id"
 
 function adMetrics7d(rows: PerformanceDailyRow[], adId: string): { clicks: number; conv: number } {
   const from = isoDateUtcDaysAgo(7)
@@ -74,7 +75,7 @@ export function rule06AbTestWinner(ctx: EvaluatorContext): RuleResult[] {
       const p = pWinnerBetter(winner.conv, winner.clicks, loser.conv, loser.clicks)
       if (p <= thresh) continue
 
-      const nextTestId = `${loser.ad.test_id}-T1`
+      const nextTestId = nextTestIdFor(loser.ad.test_id)
 
       out.push({
         kind: "PAUSE_AD",

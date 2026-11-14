@@ -16,7 +16,8 @@ export default async function SettingsLayout({ children }: { children: ReactNode
   return (
     <div className="min-h-screen bg-warm-50">
       <Navbar />
-      <main id="main-content" className="min-w-0 overflow-x-hidden">
+      {/* At least a full screen tall, so the footer always starts below the fold (matches admin + dashboard). */}
+      <main id="main-content" className="min-h-[100svh] min-w-0 overflow-x-hidden">
         {children}
       </main>
       <SiteFooter />

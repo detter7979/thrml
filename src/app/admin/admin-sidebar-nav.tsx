@@ -75,7 +75,16 @@ function itemIsActive(item: NavItem, pathname: string | null) {
   return p === item.href || p.startsWith(`${item.href}/`)
 }
 
-export function AdminSidebarNav() {
+/** Label of the admin section the current path belongs to (for the mobile header). */
+export function activeAdminSectionLabel(pathname: string | null): string {
+  for (const section of SECTIONS) {
+    const item = section.items.find((i) => itemIsActive(i, pathname))
+    if (item) return item.label
+  }
+  return "Admin"
+}
+
+export function AdminSidebarNav({ onNavigate }: { onNavigate?: () => void } = {}) {
   const pathname = usePathname()
 
   return (
@@ -93,7 +102,9 @@ export function AdminSidebarNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
+                  onClick={onNavigate}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm transition md:py-2 ${
                     active
                       ? "bg-[#E8DCCB] text-[#2A2118]"
                       : "text-[#5B4A3A] hover:bg-[#DED0BE] hover:text-[#1F170F]"
@@ -110,6 +121,7 @@ export function AdminSidebarNav() {
       <div className="border-t border-[#DCCDBA] pt-3">
         <Link
           href="/dashboard"
+          onClick={onNavigate}
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#5B4A3A] hover:bg-[#DED0BE] hover:text-[#1F170F]"
         >
           <UserRound className="size-4" />

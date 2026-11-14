@@ -16,7 +16,8 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
     <div className="min-h-screen bg-warm-50">
       <Navbar />
       <PlatformFeesProvider initialPercents={feePercents}>
-        <main id="main-content" className="min-w-0 overflow-x-hidden">
+        {/* At least a full screen tall, so the footer always starts below the fold (matches admin + dashboard). */}
+        <main id="main-content" className="min-h-[100svh] min-w-0 overflow-x-hidden">
           <DeferredMainWithMotion>{children}</DeferredMainWithMotion>
         </main>
       </PlatformFeesProvider>

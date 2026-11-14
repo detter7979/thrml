@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Recommendation } from "@/types/paid-media"
 
 import type { CreativeStrategy } from "./creative-payload"
+import { nextTestId } from "./next-test-id"
 
 export type BriefFromRecResult = { ok: true; briefId: string } | { ok: false; error: string }
 
@@ -73,18 +74,54 @@ export async function insertCreativeBriefFromGenerateCreativeRecommendation(
     cta: string
     status: string
     platform_ad_id: string | null
+    test_id: string | null
+    gcs_path: string | null
   }
 
   let ad: BriefSourceAd | null = null
   if (rec.target_ad_id) {
     const { data, error } = await admin
       .from("ads")
-      .select("id, legacy_id, name, hook_copy, angle, format, cta, status, platform_ad_id")
+      .select("id, legacy_id, name, hook_copy, angle, format, cta, status, platform_ad_id, test_id, gcs_path")
       .eq("id", rec.target_ad_id)
       .maybeSingle()
     if (error) return { ok: false, error: error.message }
     ad = data as BriefSourceAd | null
   }
+
+  // The brief that produced the source ad's creative (matched by its GCS path). When it's an SVG
+  // template brief, the iteration reuses its template, photo, sizes and copy so it lands in the same
+  // pipeline flow (preview → build sizes → launch) instead of a bare 1x1 Imagen brief.
+  type SourceBrief = {
+    id: string
+    format: string | null
+    copy_primary: string | null
+    copy_headline: string | null
+    copy_subtext: string | null
+    cta: string | null
+    campaign_short_name: string | null
+    success_criteria: Record<string, unknown> | null
+    trigger_data: Record<string, unknown> | null
+  }
+  let sourceBrief: SourceBrief | null = null
+  if (ad?.gcs_path) {
+    const { data: asset } = await admin
+      .from("creative_assets")
+      .select("brief_id")
+      .eq("gcs_path", ad.gcs_path)
+      .limit(1)
+      .maybeSingle()
+    if (asset?.brief_id) {
+      const { data } = await admin
+        .from("creative_briefs")
+        .select("id, format, copy_primary, copy_headline, copy_subtext, cta, campaign_short_name, success_criteria, trigger_data")
+        .eq("id", asset.brief_id)
+        .maybeSingle()
+      sourceBrief = (data as SourceBrief | null) ?? null
+    }
+  }
+  const sourceTd = sourceBrief?.trigger_data ?? null
+  const sourceIsSvg = typeof sourceTd?.svg_template_id === "string"
 
   const rawVars = effectivePayload.variants
   const variants = Array.isArray(rawVars) ? rawVars.filter((x) => x && typeof x === "object") : []
@@ -177,6 +214,44 @@ export async function insertCreativeBriefFromGenerateCreativeRecommendation(
       variants: variants.length ? variants : undefined,
     },
     created_by: "EVALUATOR_AGENT",
+  }
+
+  if (sourceBrief && sourceIsSvg && sourceTd) {
+    const sourceNaming =
+      sourceTd.naming && typeof sourceTd.naming === "object" ? (sourceTd.naming as Record<string, unknown>) : {}
+    const sourceSc = sourceBrief.success_criteria ?? {}
+    const formats = Array.isArray(sourceSc.formats) ? sourceSc.formats : ["4x5", "9x16"]
+    Object.assign(briefRow.trigger_data, {
+      template_id: sourceTd.template_id,
+      category: sourceTd.category,
+      generation_tool: sourceTd.generation_tool ?? "svg_template",
+      svg_template_id: sourceTd.svg_template_id,
+      svg_tokens: sourceTd.svg_tokens,
+      svg_variations: sourceTd.svg_variations,
+      photo_gcs_path: sourceTd.photo_gcs_path,
+      angle: sourceTd.angle ?? ad?.angle,
+      naming: {
+        ...sourceNaming,
+        test_id: nextTestId(
+          (typeof sourceNaming.test_id === "string" && sourceNaming.test_id) || ad?.test_id || null,
+        ),
+      },
+      source_brief_id: sourceBrief.id,
+    })
+    // Ready to preview in the pipeline (same flow as a brief made from a template).
+    ;(briefRow as { status: string }).status = "briefed"
+    briefRow.format = sourceBrief.format ?? formats.join(",")
+    briefRow.copy_primary = sourceBrief.copy_primary ?? briefRow.copy_primary
+    briefRow.copy_headline = sourceBrief.copy_headline ?? briefRow.copy_headline
+    briefRow.copy_subtext = sourceBrief.copy_subtext
+    briefRow.cta = sourceBrief.cta ?? briefRow.cta
+    briefRow.campaign_short_name = sourceBrief.campaign_short_name ?? briefRow.campaign_short_name
+    ;(briefRow as { success_criteria: Record<string, unknown> }).success_criteria = {
+      ...briefRow.success_criteria,
+      formats,
+      concept_verify: false,
+      ...(typeof sourceSc.preview_format === "string" ? { preview_format: sourceSc.preview_format } : {}),
+    }
   }
 
   const { data: inserted, error: iErr } = await admin.from("creative_briefs").insert(briefRow).select("id").single()

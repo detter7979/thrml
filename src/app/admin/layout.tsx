@@ -1,8 +1,8 @@
-import Link from "next/link"
 import type { ReactNode } from "react"
 
 import { SiteFooter } from "@/components/shared/SiteFooter"
 import { requireAdmin } from "@/lib/admin-guard"
+import { AdminMobileNav } from "./admin-mobile-nav"
 import { AdminSidebarNav } from "./admin-sidebar-nav"
 
 export const dynamic = "force-dynamic"
@@ -19,21 +19,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         </div>
         <AdminSidebarNav />
       </aside>
-      <main className="overflow-auto">
+      <AdminMobileNav />
+      <main className="min-w-0 overflow-auto">
         <div className="mx-auto w-full max-w-[1400px]">
           {/* At least one screen tall, so the footer always starts just below the fold. */}
           <div className="min-h-[100svh]">{children}</div>
           <SiteFooter />
         </div>
       </main>
-      <aside className="sticky bottom-0 border-t border-[#DCCDBA] bg-[#F3EADD] p-3 md:hidden">
-        <Link
-          href="/admin"
-          className="block rounded-lg border border-[#DCCDBA] px-3 py-2 text-center text-sm text-[#2A2118]"
-        >
-          Admin home
-        </Link>
-      </aside>
     </div>
   )
 }

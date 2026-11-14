@@ -584,7 +584,7 @@ export function BookingFlowClient({
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 md:px-8">
+    <div className="mx-auto max-w-5xl space-y-6 px-4 pb-20 pt-8 md:px-8 md:pb-28">
       <WaiverModal
         open={waiverModalOpen}
         listingTitle={listingTitle}

@@ -118,7 +118,7 @@ export default async function BookingConfirmationPage({
     subtotal > 0 ? String(Math.round((guestFee / subtotal) * 1000) / 10) : "—"
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-10 md:px-8">
+    <div className="mx-auto max-w-4xl space-y-6 px-4 pb-20 pt-10 md:px-8 md:pb-28">
       {shouldTrackPurchase ? (
         <BookingConfirmationTracker
           bookingId={booking.id}

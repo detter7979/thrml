@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { duplicateBriefRow, mergeBriefTriggerData } from "@/lib/agent/brief-copy-sets"
 
 import { appendApprovedCreativeToNamer, cloneNamerAdToAdSet } from "@/lib/agent/namer-creative-append"
-import { deleteCreativeBrief, purgeCreativePipeline } from "@/lib/agent/creative-pipeline-purge"
+import { deleteCreativeAssets, deleteCreativeBrief, purgeCreativePipeline } from "@/lib/agent/creative-pipeline-purge"
 import { refreshCreativeAssetUrl, refreshCreativeObjectUrl } from "@/lib/agent/gcs"
 import { isRunwayConfigured } from "@/lib/agent/runway"
 import { processStaticBrief } from "@/lib/agent/static-generator"
@@ -40,6 +40,7 @@ export const maxDuration = 300
 const PIPELINE_ACTIONS = new Set([
   "reject_brief",
   "delete_brief",
+  "delete_assets",
   "update_brief",
   "duplicate_brief",
   "approve_asset",
@@ -461,6 +462,7 @@ export async function PATCH(req: NextRequest) {
     action?: string
     brief_id?: string
     asset_id?: string
+    asset_ids?: string[]
     brief?: Record<string, unknown>
     edit_prompt?: string
     save_as_new_variant?: boolean
@@ -980,6 +982,18 @@ export async function PATCH(req: NextRequest) {
 
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
     return NextResponse.json({ brief: data })
+  }
+
+  if (body.action === "delete_assets") {
+    const ids = Array.isArray(body.asset_ids) ? body.asset_ids.filter((id): id is string => typeof id === "string") : []
+    if (ids.length === 0) return NextResponse.json({ error: "asset_ids is required" }, { status: 400 })
+    try {
+      const summary = await deleteCreativeAssets(ids)
+      return NextResponse.json({ ok: true, summary })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Delete failed"
+      return NextResponse.json({ error: message }, { status: message.startsWith("Cannot delete") ? 409 : 500 })
+    }
   }
 
   if (body.action === "delete_brief") {

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import {
   assetLaunchRecords,
+  canLaunchAsPlacementBundle,
+  stripLegacyAdPrefix,
   primaryBundleFormatRank,
   selectPlacementBundleAssets,
   validatePlacementBundle,
@@ -28,6 +30,7 @@ describe("relaunching a creative into more ad sets", () => {
       asset({ id: "b", format: "9x16", meta_ad_id: "111" }),
     ]
     expect(validatePlacementBundle(rows)).toBeNull()
+    expect(canLaunchAsPlacementBundle(rows)).toBe(true)
     expect(selectPlacementBundleAssets(rows).map((r) => r.id).sort()).toEqual(["a", "b"])
   })
 
@@ -48,5 +51,12 @@ describe("relaunching a creative into more ad sets", () => {
 
   it("names the ad after the 4x5 asset", () => {
     expect(primaryBundleFormatRank("4x5")).toBeLessThan(primaryBundleFormatRank("9x16"))
+  })
+
+  it("drops a stale AD### from a convention name", () => {
+    expect(stripLegacyAdPrefix("AD023_T01_A_idle_space_Static_4x5_list_now")).toBe(
+      "T01_A_idle_space_Static_4x5_list_now",
+    )
+    expect(stripLegacyAdPrefix("T01_A_ease_Static_4x5_list_now")).toBe("T01_A_ease_Static_4x5_list_now")
   })
 })

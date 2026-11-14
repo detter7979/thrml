@@ -8,6 +8,7 @@ import {
   canLaunchAsPlacementBundle,
   isLaunchableStaticImage,
   primaryBundleFormatRank,
+  stripLegacyAdPrefix,
   validatePlacementBundle,
   type AssetLaunchRecord,
   type LaunchableAssetRow,
@@ -673,7 +674,7 @@ async function launchPlacementBundle(params: {
     }
     try {
       paidMediaSync = await upsertAdFromNamerCreative(params.admin, {
-        conventionName: primaryAsset.convention_name?.trim() ?? adName,
+        conventionName: stripLegacyAdPrefix(primaryAsset.convention_name) || adName,
         legacyAdId: reservation.adId,
         adSetLegacyId: reservation.adSetLegacyId || undefined,
         platformAdId: metaAdId,
@@ -834,6 +835,14 @@ export async function POST(req: NextRequest) {
     }
 
     const isVideo = VIDEO_LAUNCH_TOOLS.has(tool)
+    const alreadyThere = assetLaunchRecords(creativeAsset.performance_data).find((row) => row.adset_id === adsetId)
+    if (alreadyThere) {
+      return jsonError(
+        `This creative is already in that ad set (${alreadyThere.legacy_ad_id ?? alreadyThere.meta_ad_id}).`,
+        409,
+      )
+    }
+
     // Static images get their AD### at launch (one namer row per Meta ad). Video keeps its approve-time row.
     let singleReservation: NamerLaunchReservation | null = null
     if (!BASE_VIDEO_TOOLS.has(tool) && isLaunchableStaticImage(creativeAsset as LaunchableAssetRow)) {
@@ -970,6 +979,16 @@ export async function POST(req: NextRequest) {
             ? creativeAsset.performance_data
             : {}),
           launch_mode: "single",
+          launches: [
+            ...assetLaunchRecords(creativeAsset.performance_data),
+            {
+              adset_id: adsetId,
+              meta_ad_id: metaAdId,
+              legacy_ad_id: singleReservation?.adId ?? null,
+              ad_name: adName,
+              launched_at: launchedAt,
+            },
+          ],
         },
       })
       .eq("id", assetId)
@@ -1014,7 +1033,7 @@ export async function POST(req: NextRequest) {
     try {
       paidMediaSync = singleReservation
         ? await upsertAdFromNamerCreative(admin!, {
-            conventionName: creativeAsset.convention_name?.trim() ?? adName,
+            conventionName: stripLegacyAdPrefix(creativeAsset.convention_name) || adName,
             legacyAdId: singleReservation.adId,
             adSetLegacyId: singleReservation.adSetLegacyId || undefined,
             platformAdId: metaAdId,

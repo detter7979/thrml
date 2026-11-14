@@ -35,6 +35,8 @@ import {
   type StructuredBriefEditorState,
 } from "@/components/admin/creative/brief-editor-modal"
 import { AdminSelect } from "@/components/admin/admin-select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ChevronDown } from "lucide-react"
 
 type AgentRun = {
   id: string; agent_name: string; status: string; started_at: string
@@ -792,7 +794,9 @@ export default function AgentsDashboard() {
             (notes.length ? ` Namer sheet note: ${notes[0]}` : "")
         )
       } else {
-        for (const assetId of launchAssetIds) {
+        for (const [adsetId, assetId] of selectedAdsetIds.flatMap((setId) =>
+          launchAssetIds.map((id) => [setId, id] as const)
+        )) {
           const asset = generatedAssets.find((a) => a.id === assetId)
           const isVideo = asset ? isLaunchableVideo(asset) : false
           if (isVideo) {
@@ -810,7 +814,7 @@ export default function AgentsDashboard() {
           const res = await fetch("/api/agent/launch-creative", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ assetId, adsetId: selectedAdsetId, status: "PAUSED" }),
+            body: JSON.stringify({ assetId, adsetId, status: "PAUSED" }),
           })
           clearProgressTimers()
           const json = await res.json().catch(() => ({}))
@@ -2119,12 +2123,29 @@ export default function AgentsDashboard() {
                     </button>
                   ) : null}
                 </div>
-                {!selectedCampaignId || filteredMetaAdsets.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {!selectedCampaignId ? "Select a campaign first" : "No ad sets in this campaign"}
-                  </p>
-                ) : (
-                  <div className="space-y-1 rounded-md border bg-background p-2">
+                <Popover>
+                  <PopoverTrigger
+                    disabled={!selectedCampaignId || filteredMetaAdsets.length === 0}
+                    className="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-warm-100 bg-[#FCFAF7] px-3 text-left text-sm text-[#1A1410] disabled:opacity-50"
+                  >
+                    <span className="truncate">
+                      {!selectedCampaignId
+                        ? "Select a campaign first"
+                        : filteredMetaAdsets.length === 0
+                          ? "No ad sets in this campaign"
+                          : selectedAdsetIds.length === 0
+                            ? "Choose ad sets…"
+                            : selectedAdsetIds.length === 1
+                              ? (filteredMetaAdsets.find((a) => (a.platform_id ?? a.id) === selectedAdsetIds[0])
+                                  ?.adset_name ?? "1 ad set")
+                              : `${selectedAdsetIds.length} ad sets selected`}
+                    </span>
+                    <ChevronDown className="size-4 shrink-0 opacity-60" />
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    className="z-[400] w-[var(--radix-popover-trigger-width)] border-warm-100 bg-[#FFFEFD] p-1"
+                  >
                     {filteredMetaAdsets.map((adset) => {
                       const id = adset.platform_id ?? adset.id
                       const already = launchedAdsetIds.get(id)
@@ -2132,7 +2153,7 @@ export default function AgentsDashboard() {
                       return (
                         <label
                           key={adset.id}
-                          className={`flex items-start gap-2 rounded px-2 py-1.5 text-sm ${already ? "opacity-60" : "cursor-pointer hover:bg-muted"}`}
+                          className={`flex items-start gap-2 rounded px-2 py-2 text-sm text-[#2F241E] ${already ? "opacity-60" : "cursor-pointer hover:bg-[#F7ECE3]"}`}
                         >
                           <input
                             type="checkbox"
@@ -2155,8 +2176,8 @@ export default function AgentsDashboard() {
                         </label>
                       )
                     })}
-                  </div>
-                )}
+                  </PopoverContent>
+                </Popover>
               </div>
               <p className="text-xs text-muted-foreground">
                 Lists live Meta campaigns and ad sets

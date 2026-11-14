@@ -1566,3 +1566,175 @@ export async function cloneNamerAdToAdSet(
 
   return { ok: true, adId: newAdId, tabTitle }
 }
+
+export type NamerLaunchReservation = {
+  adId: string
+  adName: string
+  adSetLegacyId: string
+  campaignLegacyId: string
+  tabTitle: string
+  row1Based: number
+  /** True when a planned (pre-filled) Ad Builder row was claimed instead of appending a new one. */
+  claimedPlannedRow: boolean
+}
+
+function cellAt(row: string[], headers: string[], patterns: readonly RegExp[]): string {
+  const idx = colIndex(headers, patterns)
+  return idx >= 0 ? (row[idx] ?? "").trim() : ""
+}
+
+async function writeLaunchRow(
+  sheets: ReturnType<typeof createGoogleSheetsClient>,
+  sheetId: string,
+  tabTitle: string,
+  row1Based: number,
+  values: string[],
+) {
+  const endCol = columnToLetter(Math.max(values.length - 1, 0))
+  const escapedTab = tabTitle.replace(/'/g, "''")
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: sheetId,
+    range: `'${escapedTab}'!A${row1Based}:${endCol}${row1Based}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [values] },
+  })
+}
+
+/**
+ * One Ad Builder row (one AD###) per Meta ad. Called right before the ad is created so the ad can be
+ * named with its ID. Claims a planned row for the same ad set + angle/test/variant/format/CTA that has
+ * no platform ad yet; otherwise appends a row with the next free AD###.
+ */
+export async function reserveNamerAdForLaunch(
+  admin: SupabaseClient,
+  opts: { assetId: string; platformAdSetId: string },
+): Promise<{ ok: true; reservation: NamerLaunchReservation } | { ok: false; reason: string }> {
+  const sheetId = await resolveNamerSheetId(admin)
+  if (!sheetId) return { ok: false, reason: "NAMER_SHEET_ID not configured" }
+
+  const loaded = await loadAssetAndBrief(admin, opts.assetId)
+  if (!loaded) return { ok: false, reason: "Asset or brief not found" }
+
+  const { data: adSet } = await admin
+    .from("ad_sets")
+    .select("legacy_id, campaigns(legacy_id)")
+    .eq("platform_adset_id", opts.platformAdSetId.trim())
+    .maybeSingle()
+  const adSetLegacyId = String(adSet?.legacy_id ?? "").toUpperCase()
+  const campaignRel = adSet?.campaigns as { legacy_id?: string } | { legacy_id?: string }[] | null | undefined
+  const campaignLegacyId = String(
+    (Array.isArray(campaignRel) ? campaignRel[0]?.legacy_id : campaignRel?.legacy_id) ?? "",
+  ).toUpperCase()
+
+  try {
+    const sheets = createGoogleSheetsClient()
+    const tabTitles = await listSpreadsheetTabs(sheets, sheetId)
+    const tabTitle = resolveTabTitle(tabTitles, ...CREATIVE_BUILDER_TAB_CANDIDATES)
+    if (!tabTitle) return { ok: false, reason: "Ad Builder tab not found" }
+    const prepared = await loadPreparedSheetTab(sheets, sheetId, tabTitle)
+    if (!prepared) return { ok: false, reason: "Ad Builder header not found" }
+    const { rows, headerInfo, headers } = prepared
+
+    const links = {
+      gcsPath: normalizeNamerGcsPath(loaded.asset.gcs_path),
+      signedUrl: loaded.asset.gcs_url?.trim() ?? "",
+    }
+    const draft = buildNamerCreativeRow(
+      loaded.asset,
+      loaded.brief,
+      { campaignGen: "Pending", adSetGen: "Pending" },
+      links,
+      headerInfo.layout,
+      { campaignId: campaignLegacyId, adSetId: adSetLegacyId, adId: "AD000" },
+    )
+    if (!draft) return { ok: false, reason: "Could not build namer row" }
+
+    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+    let plannedIdx = -1
+    if (adSetLegacyId) {
+      for (let r = headerInfo.headerRow + 1; r < rows.length; r++) {
+        const line = rows[r] ?? []
+        if (!same(cellAt(line, headers, HEADER_PATTERNS.thrmlAdSetId), adSetLegacyId)) continue
+        if (cellAt(line, headers, HEADER_PATTERNS.platformAdId)) continue
+        if (!/^AD\d+$/i.test(cellAt(line, headers, HEADER_PATTERNS.thrmlAdId))) continue
+        if (!same(cellAt(line, headers, [/^angle$/i]), draft.angle)) continue
+        if (!same(cellAt(line, headers, [/^test$/i, /^test id$/i]), draft.testId)) continue
+        if (!same(cellAt(line, headers, [/^var$/i, /^variant$/i]), draft.variant)) continue
+        if (!same(cellAt(line, headers, [/^format$/i, /^format type$/i]), draft.formatType)) continue
+        if (!same(cellAt(line, headers, [/^cta$/i]), draft.cta)) continue
+        plannedIdx = r
+        break
+      }
+    }
+
+    const dataRows = rows.slice(headerInfo.headerRow + 1)
+    const adId =
+      plannedIdx >= 0
+        ? cellAt(rows[plannedIdx] ?? [], headers, HEADER_PATTERNS.thrmlAdId).toUpperCase()
+        : allocateNextThrmlLegacyId(collectColumnValues(dataRows, headers, HEADER_PATTERNS.thrmlAdId), "ad")
+
+    const row = buildNamerCreativeRow(
+      loaded.asset,
+      loaded.brief,
+      { campaignGen: "Pending", adSetGen: "Pending" },
+      links,
+      headerInfo.layout,
+      { campaignId: campaignLegacyId, adSetId: adSetLegacyId, adId },
+    )
+    if (!row) return { ok: false, reason: "Could not build namer row" }
+
+    const row1Based = plannedIdx >= 0 ? plannedIdx + 1 : rows.length + 1
+    const values = mapRowToHeaderColumns(headers, row, headerInfo.layout, undefined, row1Based)
+    await writeLaunchRow(sheets, sheetId, tabTitle, row1Based, values)
+
+    return {
+      ok: true,
+      reservation: {
+        adId,
+        adName: row.adName,
+        adSetLegacyId,
+        campaignLegacyId,
+        tabTitle,
+        row1Based,
+        claimedPlannedRow: plannedIdx >= 0,
+      },
+    }
+  } catch (err) {
+    return { ok: false, reason: sheetsErrorMessage(err) }
+  }
+}
+
+/** Fill the platform IDs (and ad set / campaign links) on a row reserved by reserveNamerAdForLaunch. */
+export async function finalizeNamerAdForLaunch(
+  admin: SupabaseClient,
+  opts: { assetId: string; reservation: NamerLaunchReservation; platformIds: MetaPlatformIds },
+): Promise<{ ok: boolean; reason?: string }> {
+  const sheetId = await resolveNamerSheetId(admin)
+  if (!sheetId) return { ok: false, reason: "NAMER_SHEET_ID not configured" }
+  const loaded = await loadAssetAndBrief(admin, opts.assetId)
+  if (!loaded) return { ok: false, reason: "Asset or brief not found" }
+  try {
+    const sheets = createGoogleSheetsClient()
+    const prepared = await loadPreparedSheetTab(sheets, sheetId, opts.reservation.tabTitle)
+    if (!prepared) return { ok: false, reason: "Ad Builder header not found" }
+    const { headerInfo, headers } = prepared
+    const row = buildNamerCreativeRow(
+      loaded.asset,
+      loaded.brief,
+      { campaignGen: "Pending", adSetGen: "Pending" },
+      { gcsPath: normalizeNamerGcsPath(loaded.asset.gcs_path), signedUrl: loaded.asset.gcs_url?.trim() ?? "" },
+      headerInfo.layout,
+      {
+        campaignId: opts.reservation.campaignLegacyId,
+        adSetId: opts.reservation.adSetLegacyId,
+        adId: opts.reservation.adId,
+      },
+    )
+    if (!row) return { ok: false, reason: "Could not build namer row" }
+    const values = mapRowToHeaderColumns(headers, row, headerInfo.layout, opts.platformIds, opts.reservation.row1Based)
+    await writeLaunchRow(sheets, sheetId, opts.reservation.tabTitle, opts.reservation.row1Based, values)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, reason: sheetsErrorMessage(err) }
+  }
+}

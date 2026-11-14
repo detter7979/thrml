@@ -8,6 +8,7 @@ import type { RenderJob, VideoConfig } from "@/lib/agent/types"
 import { parseStoredStaticVariations } from "@/lib/agent/host-monetization-static"
 import { resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
 import {
+  assetLaunchRecords,
   canLaunchAsPlacementBundle,
   selectPlacementBundleAssets,
   toLaunchableAssetRow,
@@ -276,7 +277,8 @@ export default function AgentsDashboard() {
   const [drafts, setDrafts] = useState<InboxDraft[]>([])
   const [launchAssetIds, setLaunchAssetIds] = useState<string[]>([])
   const [selectedCampaignId, setSelectedCampaignId] = useState("")
-  const [selectedAdsetId, setSelectedAdsetId] = useState("")
+  const [selectedAdsetIds, setSelectedAdsetIds] = useState<string[]>([])
+  const selectedAdsetId = selectedAdsetIds[0] ?? ""
   const [pipelineMessage, setPipelineMessage] = useState<string | null>(null)
   const [editBrief, setEditBrief] = useState<StructuredBriefEditorState | null>(null)
   const [selectedAssetIds, setSelectedAssetIds] = useState<Record<string, boolean>>({})
@@ -715,8 +717,9 @@ export default function AgentsDashboard() {
       (adset) => adset.platform_campaign_id === defaultCampaignId
     )
     setSelectedCampaignId(defaultCampaignId)
-    setSelectedAdsetId(
-      adsetsForCampaign[0]?.platform_id ?? metaAdsets[0]?.platform_id ?? metaAdsets[0]?.id ?? ""
+    // Single-ad-set campaigns are preselected; otherwise pick the ad sets (or "Select all").
+    setSelectedAdsetIds(
+      adsetsForCampaign.length === 1 && adsetsForCampaign[0]?.platform_id ? [adsetsForCampaign[0].platform_id] : []
     )
     setLaunchProgress(null)
   }
@@ -731,40 +734,39 @@ export default function AgentsDashboard() {
     }
     try {
       if (launchAsPlacementBundle) {
-        setLaunchProgress(
-          `Uploading ${launchAssetIds.length} images and creating one Meta ad with placement rules…`
-        )
-        const res = await fetch("/api/agent/launch-creative", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            assetIds: launchAssetIds,
-            adsetId: selectedAdsetId,
-            status: "PAUSED",
-          }),
-        })
-        const json = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          const detail = (json as { error?: string }).error
-          throw new Error(detail ?? "Launch failed")
-        }
-        const formats = (json as { formats?: string[] }).formats
-        const namerSync = (
-          json as {
-            namerPlatformSync?: { updated?: number; errors?: { reason: string }[] }
+        const targets = selectedAdsetIds.filter((id) => !launchedAdsetIds.has(id))
+        const created: string[] = []
+        const notes: string[] = []
+        for (const [index, adsetId] of targets.entries()) {
+          const adsetName = metaAdsets.find((a) => a.platform_id === adsetId)?.adset_name ?? adsetId
+          setLaunchProgress(
+            `Creating ad ${index + 1} of ${targets.length} in ${adsetName} (${launchAssetIds.length} sizes)…`
+          )
+          const res = await fetch("/api/agent/launch-creative", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ assetIds: launchAssetIds, adsetId, status: "PAUSED" }),
+          })
+          const json = (await res.json().catch(() => ({}))) as {
+            error?: string
+            adName?: string
+            adId?: string | null
+            namerNote?: string | null
           }
-        ).namerPlatformSync
-        const namerNote =
-          namerSync && (namerSync.updated ?? 0) > 0
-            ? ` Namer sheet updated (${namerSync.updated} row${namerSync.updated === 1 ? "" : "s"}).`
-            : namerSync?.errors?.length
-              ? " Namer sheet ID sync had issues — check Ad Builder tab."
-              : ""
+          if (!res.ok) {
+            await mutatePipeline()
+            throw new Error(
+              `${json.error ?? "Launch failed"} (${adsetName})` +
+                (created.length ? `. Already created: ${created.join(", ")}.` : "")
+            )
+          }
+          created.push(`${json.adId ?? json.adName ?? "ad"} → ${adsetName}`)
+          if (json.namerNote) notes.push(json.namerNote)
+        }
         setLaunchProgress("Done")
         setPipelineMessage(
-          (formats?.length
-            ? `Created 1 paused Meta ad with placements: ${formats.join(", ")}. Turn it on in Ads Manager.`
-            : "Created 1 paused Meta ad with all selected sizes.") + namerNote
+          `Created ${created.length} paused Meta ad${created.length === 1 ? "" : "s"}: ${created.join("; ")}. Turn them on in Ads Manager.` +
+            (notes.length ? ` Namer sheet note: ${notes[0]}` : "")
         )
       } else {
         for (const assetId of launchAssetIds) {
@@ -818,7 +820,7 @@ export default function AgentsDashboard() {
       }
       setLaunchAssetIds([])
       setSelectedCampaignId("")
-      setSelectedAdsetId("")
+      setSelectedAdsetIds([])
       setSelectedAssetIds({})
       await mutatePipeline()
     } catch (err) {
@@ -984,8 +986,26 @@ export default function AgentsDashboard() {
     return validatePlacementBundle(launchBundleRows)
   }, [launchAsPlacementBundle, activeLaunchAssets.length, launchBundleRows])
 
+  /** Ad sets the creatives in the launch dialog are already in → the ad ID created there. */
+  const launchedAdsetIds = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const asset of activeLaunchAssets) {
+      for (const row of assetLaunchRecords(asset.performance_data)) {
+        map.set(row.adset_id, row.legacy_ad_id ?? row.meta_ad_id)
+      }
+    }
+    return map
+  }, [activeLaunchAssets])
+  const selectableAdsetIds = useMemo(
+    () =>
+      filteredMetaAdsets
+        .map((adset) => adset.platform_id ?? adset.id)
+        .filter((id) => !launchedAdsetIds.has(id)),
+    [filteredMetaAdsets, launchedAdsetIds]
+  )
+
   const launchBundleDisabledReason = useMemo(() => {
-    if (!selectedAdsetId) return "Select a target ad set."
+    if (!selectedAdsetId) return "Select at least one ad set."
     if (launchAsPlacementBundle) return placementBundleBlockReason
     if (activeLaunchAssets.length > 1) return placementBundleBlockReason
     return null
@@ -1527,6 +1547,13 @@ export default function AgentsDashboard() {
                   const bundleAssets = selectPlacementBundleAssets(
                     group.assets.map(toLaunchableAssetRow)
                   )
+                  const groupLaunches = [
+                    ...new Map(
+                      group.assets
+                        .flatMap((a) => assetLaunchRecords(a.performance_data))
+                        .map((row) => [row.meta_ad_id, row] as const)
+                    ).values(),
+                  ]
                   const groupLabels = [
                     ...new Set(group.assets.map((a) => (a.variation_label ?? "A").toUpperCase().slice(0, 1))),
                   ].sort()
@@ -1569,6 +1596,17 @@ export default function AgentsDashboard() {
                             Missing {missingSizes.join(", ")} for version
                             {missingByLabel.length === 1 ? "" : "s"} {missingByLabel.map((row) => row.label).join(", ")}.
                             Build them before a multi-placement launch.
+                          </p>
+                        ) : null}
+                        {groupLaunches.length ? (
+                          <p className="mt-1 text-xs text-green-800">
+                            In Meta (paused until you turn them on):{" "}
+                            {groupLaunches
+                              .map(
+                                (row) =>
+                                  `${row.legacy_ad_id ?? "ad"} → ${metaAdsets.find((a) => a.platform_id === row.adset_id)?.adset_name ?? row.adset_id}`
+                              )
+                              .join(" · ")}
                           </p>
                         ) : null}
                         {bundleAssets.length >= 2 ? (
@@ -1753,7 +1791,7 @@ export default function AgentsDashboard() {
                             onClick={() => openPlacementBundleLaunch(group.assets)}
                             className="text-xs px-3 py-1.5 bg-[#9A4A33] text-white rounded hover:opacity-90"
                           >
-                            Launch to Meta: 1 ad, {bundleAssets.length} sizes (recommended)
+                            {groupLaunches.length ? "Launch into more ad sets" : `Launch to Meta: 1 ad, ${bundleAssets.length} sizes (recommended)`}
                           </button>
                         ) : null}
                         <button
@@ -2003,8 +2041,7 @@ export default function AgentsDashboard() {
                   onChange={(event) => {
                     const campaignId = event.target.value
                     setSelectedCampaignId(campaignId)
-                    const firstAdset = metaAdsets.find((adset) => adset.platform_campaign_id === campaignId)
-                    setSelectedAdsetId(firstAdset?.platform_id ?? "")
+                    setSelectedAdsetIds([])
                   }}
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                 >
@@ -2021,35 +2058,62 @@ export default function AgentsDashboard() {
                 </AdminSelect>
               </div>
               <div className="space-y-2">
-                <label
-                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                  htmlFor="meta-adset"
-                >
-                  Target ad set
-                </label>
-                <AdminSelect
-                  id="meta-adset"
-                  value={selectedAdsetId}
-                  onChange={(event) => setSelectedAdsetId(event.target.value)}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  disabled={!selectedCampaignId || filteredMetaAdsets.length === 0}
-                >
-                  {!selectedCampaignId || filteredMetaAdsets.length === 0 ? (
-                    <option value="">
-                      {!selectedCampaignId
-                        ? "Select a campaign first"
-                        : "No ad sets in this campaign"}
-                    </option>
-                  ) : (
-                    filteredMetaAdsets.map((adset) => (
-                      <option key={adset.id} value={adset.platform_id ?? adset.id}>
-                        {adset.adset_name}
-                        {adset.status ? ` · ${adset.status}` : ""}
-                        {adset.market ? ` · ${adset.market}` : ""}
-                      </option>
-                    ))
-                  )}
-                </AdminSelect>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Target ad sets
+                  </span>
+                  {selectableAdsetIds.length > 1 ? (
+                    <button
+                      type="button"
+                      className="text-xs underline"
+                      onClick={() =>
+                        setSelectedAdsetIds(
+                          selectedAdsetIds.length === selectableAdsetIds.length ? [] : selectableAdsetIds
+                        )
+                      }
+                    >
+                      {selectedAdsetIds.length === selectableAdsetIds.length ? "Clear" : "Select all"}
+                    </button>
+                  ) : null}
+                </div>
+                {!selectedCampaignId || filteredMetaAdsets.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {!selectedCampaignId ? "Select a campaign first" : "No ad sets in this campaign"}
+                  </p>
+                ) : (
+                  <div className="space-y-1 rounded-md border bg-background p-2">
+                    {filteredMetaAdsets.map((adset) => {
+                      const id = adset.platform_id ?? adset.id
+                      const already = launchedAdsetIds.get(id)
+                      const checked = selectedAdsetIds.includes(id)
+                      return (
+                        <label
+                          key={adset.id}
+                          className={`flex items-start gap-2 rounded px-2 py-1.5 text-sm ${already ? "opacity-60" : "cursor-pointer hover:bg-muted"}`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={checked && !already}
+                            disabled={Boolean(already)}
+                            onChange={() =>
+                              setSelectedAdsetIds(
+                                checked ? selectedAdsetIds.filter((x) => x !== id) : [...selectedAdsetIds, id]
+                              )
+                            }
+                          />
+                          <span>
+                            {adset.adset_name}
+                            {adset.status ? ` · ${adset.status}` : ""}
+                            {already ? (
+                              <span className="block text-xs text-green-800">Already launched here ({already})</span>
+                            ) : null}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Lists live Meta campaigns and ad sets
@@ -2078,7 +2142,7 @@ export default function AgentsDashboard() {
                 onClick={() => {
                   setLaunchAssetIds([])
                   setSelectedCampaignId("")
-                  setSelectedAdsetId("")
+                  setSelectedAdsetIds([])
                   setLaunchProgress(null)
                 }}
                 className="text-sm px-3 py-1.5 border rounded hover:bg-muted"

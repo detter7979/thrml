@@ -56,8 +56,8 @@ export function selectPlacementBundleAssets(
   const eligible = assets.filter(
     (asset) =>
       isLaunchableStaticImage(asset) &&
-      asset.status === "approved" &&
-      !asset.meta_ad_id &&
+      // Approved creatives stay launchable after a launch, so the same ad can go into more ad sets.
+      (asset.status === "approved" || asset.status === "launched") &&
       asset.brief_id
   )
   if (eligible.length < 2) return []
@@ -104,12 +104,8 @@ export function validatePlacementBundle(assets: LaunchableAssetRow[]): string | 
   if (!assets.every(isLaunchableStaticImage)) {
     return "Placement bundle only supports static images (not video)."
   }
-  if (!assets.every((asset) => asset.status === "approved")) {
+  if (!assets.every((asset) => asset.status === "approved" || asset.status === "launched")) {
     return "All selected assets must be approved before launch."
-  }
-  const launched = assets.filter((asset) => asset.meta_ad_id)
-  if (launched.length > 0) {
-    return "One or more selected assets are already launched. Deselect launched sizes."
   }
   const briefIds = new Set(assets.map((asset) => asset.brief_id).filter(Boolean))
   if (briefIds.size !== 1) return "All assets must belong to the same brief."
@@ -127,4 +123,32 @@ export function validatePlacementBundle(assets: LaunchableAssetRow[]): string | 
     return "Select only one asset per format (no duplicate 1x1 / 4x5 / 9x16)."
   }
   return null
+}
+
+export type AssetLaunchRecord = {
+  adset_id: string
+  meta_ad_id: string
+  legacy_ad_id?: string | null
+  ad_name?: string | null
+  launched_at: string
+}
+
+/** Launches recorded on an asset (one per ad set it has been launched into). */
+export function assetLaunchRecords(performanceData: unknown): AssetLaunchRecord[] {
+  if (!performanceData || typeof performanceData !== "object") return []
+  const raw = (performanceData as Record<string, unknown>).launches
+  if (!Array.isArray(raw)) return []
+  return raw.filter(
+    (row): row is AssetLaunchRecord =>
+      Boolean(row) &&
+      typeof row === "object" &&
+      typeof (row as AssetLaunchRecord).adset_id === "string" &&
+      typeof (row as AssetLaunchRecord).meta_ad_id === "string",
+  )
+}
+
+/** Feed-first: the 4x5 asset names the ad; then 1x1, then 9x16. */
+export function primaryBundleFormatRank(format: string | null | undefined): number {
+  const f = (format ?? "").trim()
+  return f === "4x5" ? 0 : f === "1x1" ? 1 : f === "9x16" ? 2 : 3
 }

@@ -4,8 +4,12 @@ import { downloadCreativeAsset, getSignedGcsReadUrl } from "@/lib/agent/gcs"
 import { hasResolvableLaunchCopy, resolveBriefCopyForMeta } from "@/lib/agent/brief-copy-for-meta"
 import { ctaToMetaEnumFromBrief } from "@/lib/agent/meta-cta"
 import {
+  assetLaunchRecords,
   canLaunchAsPlacementBundle,
+  isLaunchableStaticImage,
+  primaryBundleFormatRank,
   validatePlacementBundle,
+  type AssetLaunchRecord,
   type LaunchableAssetRow,
 } from "@/lib/agent/launch-creative-bundle"
 import {
@@ -31,8 +35,13 @@ import {
 import { uploadVideo } from "@/lib/agent/meta-video-upload"
 import { requireAdminApi } from "@/lib/admin-guard"
 import { META_URL_TAGS } from "@/lib/attribution/url-params"
-import { syncNamerPlatformIdsForAssets } from "@/lib/agent/namer-creative-append"
-import { syncPaidMediaFromCreativeLaunch } from "@/lib/agent/namer-supabase-sync"
+import {
+  finalizeNamerAdForLaunch,
+  reserveNamerAdForLaunch,
+  syncNamerPlatformIdsForAssets,
+  type NamerLaunchReservation,
+} from "@/lib/agent/namer-creative-append"
+import { syncPaidMediaFromCreativeLaunch, upsertAdFromNamerCreative } from "@/lib/agent/namer-supabase-sync"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -412,7 +421,7 @@ async function launchPlacementBundle(params: {
   const { data: rows, error } = await params.admin
     .from("creative_assets")
     .select(
-      "id, brief_id, asset_type, generation_tool, variation_index, variation_label, format, gcs_path, convention_name, status, meta_ad_id, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name, trigger_data)"
+      "id, brief_id, asset_type, generation_tool, variation_index, variation_label, format, gcs_path, convention_name, status, meta_ad_id, performance_data, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name, trigger_data)"
     )
     .in("id", params.assetIds)
 
@@ -424,6 +433,20 @@ async function launchPlacementBundle(params: {
 
   const bundleError = validatePlacementBundle(assets)
   if (bundleError) return jsonError(bundleError, 400)
+
+  // The asset that names the ad and owns its namer row (4x5 first).
+  const primaryAsset = [...assets].sort(
+    (a, b) => primaryBundleFormatRank(a.format) - primaryBundleFormatRank(b.format),
+  )[0]!
+  const priorLaunch = assetLaunchRecords(primaryAsset.performance_data).find(
+    (row) => row.adset_id === params.adsetId,
+  )
+  if (priorLaunch) {
+    return jsonError(
+      `This creative is already in that ad set (${priorLaunch.legacy_ad_id ?? priorLaunch.meta_ad_id}).`,
+      409,
+    )
+  }
 
   const rawBrief = firstBrief(assets[0]!)
   if (!rawBrief) return jsonError("Creative brief not found for bundle", 404)
@@ -477,10 +500,27 @@ async function launchPlacementBundle(params: {
     placementImages.push({ format, imageHash })
   }
 
-  const adName = resolvePlacementBundleAdName(
-    assets.map((asset) => asset.convention_name),
-    legacyAdName(assets[0]!, brief)
-  )
+  // One AD### per Meta ad: reserve the namer row first so the ad carries its ID in its name.
+  let reservation: NamerLaunchReservation | null = null
+  let namerNote: string | undefined
+  try {
+    const reserved = await reserveNamerAdForLaunch(params.admin, {
+      assetId: primaryAsset.id,
+      platformAdSetId: params.adsetId,
+    })
+    if (reserved.ok) reservation = reserved.reservation
+    else namerNote = reserved.reason
+  } catch (err) {
+    namerNote = err instanceof Error ? err.message : "Namer reservation failed"
+  }
+  if (namerNote) console.warn("[launch-creative] namer reservation skipped:", namerNote)
+
+  const adName =
+    reservation?.adName ??
+    resolvePlacementBundleAdName(
+      assets.map((asset) => asset.convention_name),
+      legacyAdName(assets[0]!, brief)
+    )
 
   const launchCopy = resolvedLaunchCopyStrings(brief)
   const instagram = await resolveMetaInstagramActorId({
@@ -574,52 +614,77 @@ async function launchPlacementBundle(params: {
   const launchedAt = new Date().toISOString()
   const formats = placementImages.map((row) => row.format)
 
+  const launchRecord: AssetLaunchRecord = {
+    adset_id: params.adsetId,
+    meta_ad_id: metaAdId,
+    legacy_ad_id: reservation?.adId ?? null,
+    ad_name: adName,
+    launched_at: launchedAt,
+  }
+
   for (const asset of assets) {
     const imageHash = placementImages.find((row) => row.format === normalizeStaticFormat(asset.format))
       ?.imageHash
+    const existing =
+      asset.performance_data && typeof asset.performance_data === "object" ? asset.performance_data : {}
     const { error: updateError } = await params.admin
       .from("creative_assets")
       .update({
-        status: "launched",
+        // Stays "approved" so the same creative can be launched into more ad sets.
+        status: "approved",
         meta_creative_id: metaCreativeId,
         meta_ad_id: metaAdId,
         meta_adset_id: params.adsetId,
         launched_at: launchedAt,
         ...(imageHash ? { meta_image_hash: imageHash } : {}),
         performance_data: {
+          ...existing,
           launch_mode: "placement_bundle",
           placement_formats: formats,
+          launches: [...assetLaunchRecords(existing), launchRecord],
         },
       })
       .eq("id", asset.id)
     if (updateError) throw updateError
   }
 
-  await maybeMarkBriefLaunched(params.admin, assets[0]!.brief_id!)
-
-  let namerPlatformSync: Awaited<ReturnType<typeof syncNamerPlatformIdsForAssets>> | undefined
-  let paidMediaSync: Awaited<ReturnType<typeof syncPaidMediaFromCreativeLaunch>>[] = []
-  try {
-    namerPlatformSync = await syncNamerPlatformIdsForAssets(
-      params.admin,
-      assets.map((asset) => asset.id)
-    )
-    if (namerPlatformSync.errors.length) {
-      console.warn("[launch-creative] namer platform ID sync partial", namerPlatformSync)
-    }
-  } catch (err) {
-    console.warn("[launch-creative] namer platform ID sync failed", err)
-  }
-
-  for (const asset of assets) {
+  let paidMediaSync: Awaited<ReturnType<typeof upsertAdFromNamerCreative>> | undefined
+  if (reservation) {
     try {
-      const result = await syncPaidMediaFromCreativeLaunch(params.admin, asset.id)
-      paidMediaSync.push(result)
-      if (!result.ok) {
-        console.warn("[launch-creative] paid-media sync failed", asset.id, result.reason)
-      }
+      const { data: adSetRow } = await params.admin
+        .from("ad_sets")
+        .select("campaigns(platform_campaign_id)")
+        .eq("platform_adset_id", params.adsetId)
+        .maybeSingle()
+      const rel = adSetRow?.campaigns as
+        | { platform_campaign_id?: string | null }
+        | { platform_campaign_id?: string | null }[]
+        | null
+        | undefined
+      const platformCampaignId = (Array.isArray(rel) ? rel[0]?.platform_campaign_id : rel?.platform_campaign_id) ?? ""
+      const finalized = await finalizeNamerAdForLaunch(params.admin, {
+        assetId: primaryAsset.id,
+        reservation,
+        platformIds: { adId: metaAdId, adSetId: params.adsetId, campaignId: platformCampaignId },
+      })
+      if (!finalized.ok) namerNote = finalized.reason
     } catch (err) {
-      console.warn("[launch-creative] paid-media sync error", asset.id, err)
+      namerNote = err instanceof Error ? err.message : "Namer update failed"
+    }
+    try {
+      paidMediaSync = await upsertAdFromNamerCreative(params.admin, {
+        conventionName: primaryAsset.convention_name?.trim() ?? adName,
+        legacyAdId: reservation.adId,
+        adSetLegacyId: reservation.adSetLegacyId || undefined,
+        platformAdId: metaAdId,
+        platformAdSetId: params.adsetId,
+        gcsPath: primaryAsset.gcs_path,
+        hookCopy: brief.hook || brief.copy_headline || null,
+        status: params.launchStatus === "ACTIVE" ? "TEST" : "PAUSED",
+      })
+      if (!paidMediaSync.ok) console.warn("[launch-creative] paid-media sync failed", paidMediaSync.reason)
+    } catch (err) {
+      console.warn("[launch-creative] paid-media sync error", err)
     }
   }
 
@@ -630,6 +695,8 @@ async function launchPlacementBundle(params: {
     metaAdId,
     metaCreativeId,
     adName,
+    adId: reservation?.adId ?? null,
+    namerNote: namerNote ?? null,
     landingUrl,
     formats,
     assetIds: assets.map((asset) => asset.id),
@@ -639,7 +706,6 @@ async function launchPlacementBundle(params: {
     instagramActorId: instagramActorId ?? null,
     instagramDiagnostics: instagram.diagnostics,
     adsManagerUrl: adsManagerUrl(params.adAccountId, metaAdId),
-    namerPlatformSync,
     paidMediaSync,
   })
 }
@@ -768,7 +834,18 @@ export async function POST(req: NextRequest) {
     }
 
     const isVideo = VIDEO_LAUNCH_TOOLS.has(tool)
-    const adName = resolveAdName(creativeAsset, brief)
+    // Static images get their AD### at launch (one namer row per Meta ad). Video keeps its approve-time row.
+    let singleReservation: NamerLaunchReservation | null = null
+    if (!BASE_VIDEO_TOOLS.has(tool) && isLaunchableStaticImage(creativeAsset as LaunchableAssetRow)) {
+      try {
+        const reserved = await reserveNamerAdForLaunch(admin!, { assetId, platformAdSetId: adsetId })
+        if (reserved.ok) singleReservation = reserved.reservation
+        else console.warn("[launch-creative] namer reservation skipped:", reserved.reason)
+      } catch (err) {
+        console.warn("[launch-creative] namer reservation failed", err)
+      }
+    }
+    const adName = singleReservation?.adName ?? resolveAdName(creativeAsset, brief)
     const singleLaunchStatus: LaunchStatus = isVideo ? "PAUSED" : launchStatus
     const landingUrl = resolveLaunchLandingUrl(brief)
     const preflightWarnings = collectLaunchPreflightWarnings(brief, { isVideo })
@@ -903,16 +980,50 @@ export async function POST(req: NextRequest) {
     let namerPlatformSync: Awaited<ReturnType<typeof syncNamerPlatformIdsForAssets>> | undefined
     let paidMediaSync: Awaited<ReturnType<typeof syncPaidMediaFromCreativeLaunch>> | undefined
     try {
-      namerPlatformSync = await syncNamerPlatformIdsForAssets(admin!, [assetId])
-      if (namerPlatformSync.errors.length) {
-        console.warn("[launch-creative] namer platform ID sync partial", namerPlatformSync)
+      if (singleReservation) {
+        const { data: adSetRow } = await admin!
+          .from("ad_sets")
+          .select("campaigns(platform_campaign_id)")
+          .eq("platform_adset_id", adsetId)
+          .maybeSingle()
+        const rel = adSetRow?.campaigns as
+          | { platform_campaign_id?: string | null }
+          | { platform_campaign_id?: string | null }[]
+          | null
+          | undefined
+        const finalized = await finalizeNamerAdForLaunch(admin!, {
+          assetId,
+          reservation: singleReservation,
+          platformIds: {
+            adId: metaAdId,
+            adSetId: adsetId,
+            campaignId: (Array.isArray(rel) ? rel[0]?.platform_campaign_id : rel?.platform_campaign_id) ?? "",
+          },
+        })
+        if (!finalized.ok) console.warn("[launch-creative] namer update failed", finalized.reason)
+      } else {
+        namerPlatformSync = await syncNamerPlatformIdsForAssets(admin!, [assetId])
+        if (namerPlatformSync.errors.length) {
+          console.warn("[launch-creative] namer platform ID sync partial", namerPlatformSync)
+        }
       }
     } catch (err) {
       console.warn("[launch-creative] namer platform ID sync failed", err)
     }
 
     try {
-      paidMediaSync = await syncPaidMediaFromCreativeLaunch(admin!, assetId)
+      paidMediaSync = singleReservation
+        ? await upsertAdFromNamerCreative(admin!, {
+            conventionName: creativeAsset.convention_name?.trim() ?? adName,
+            legacyAdId: singleReservation.adId,
+            adSetLegacyId: singleReservation.adSetLegacyId || undefined,
+            platformAdId: metaAdId,
+            platformAdSetId: adsetId,
+            gcsPath: creativeAsset.gcs_path,
+            hookCopy: brief.hook || brief.copy_headline || null,
+            status: launchStatus === "ACTIVE" ? "TEST" : "PAUSED",
+          })
+        : await syncPaidMediaFromCreativeLaunch(admin!, assetId)
       if (!paidMediaSync.ok) {
         console.warn("[launch-creative] paid-media sync failed", paidMediaSync.reason)
       }

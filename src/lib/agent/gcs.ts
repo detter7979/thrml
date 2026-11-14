@@ -445,12 +445,17 @@ export async function listCreativeAssetLibrary(opts?: {
     }
   }
 
-  await collect("main", getBucket())
-  if (entries.length < limit) {
-    await collect("creative", getCreativeBucket())
+  const mainBucket = getBucket()
+  const creativeBucket = getCreativeBucket()
+  await collect("main", mainBucket)
+  // Without GCS_CREATIVE_BUCKET both resolve to the same bucket; listing it twice showed every asset twice.
+  if (entries.length < limit && creativeBucket.name !== mainBucket.name) {
+    await collect("creative", creativeBucket)
   }
 
+  const seen = new Set<string>()
   return entries
+    .filter((entry) => (seen.has(entry.gcsPath) ? false : (seen.add(entry.gcsPath), true)))
     .sort((a, b) => Date.parse(b.createdAt ?? "") - Date.parse(a.createdAt ?? ""))
     .slice(0, limit)
 }

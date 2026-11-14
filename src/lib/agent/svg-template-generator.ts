@@ -6,7 +6,7 @@ import yaml from "js-yaml"
 
 import { resolveNamingFromBrief } from "@/lib/agent/creative-templates"
 import { uploadCreativeAsset as uploadGcsCreativeAsset } from "@/lib/agent/gcs"
-import { getSignedGcsReadUrl } from "@/lib/agent/gcs"
+import { downloadCreativeAsset } from "@/lib/agent/gcs"
 import { unifiedStaticPath } from "@/lib/agent/gcs-paths"
 import {
   findHostClaimViolations,
@@ -60,8 +60,17 @@ const SVG_DEFAULT_BACKDROP: Record<SvgTemplateId, string> = {
 
 const defaultBackdropDataUrlCache = new Map<string, Promise<string>>()
 
-function bufferToPhotoDataUrl(buffer: Buffer) {
-  const mime = buffer[0] === 0xff && buffer[1] === 0xd8 ? "image/jpeg" : "image/png"
+function sniffImageMime(buffer: Buffer): string | null {
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) return "image/jpeg"
+  if (buffer[0] === 0x89 && buffer[1] === 0x50) return "image/png"
+  if (buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") {
+    return "image/webp"
+  }
+  return null
+}
+
+function bufferToPhotoDataUrl(buffer: Buffer, contentType?: string | null) {
+  const mime = sniffImageMime(buffer) ?? (contentType?.startsWith("image/") ? contentType : "image/png")
   return `data:${mime};base64,${buffer.toString("base64")}`
 }
 
@@ -72,7 +81,7 @@ function templateUsesBackdropPhoto(templateId: string) {
 async function loadDefaultBackdropDataUrl(filePath: string) {
   let cached = defaultBackdropDataUrlCache.get(filePath)
   if (!cached) {
-    cached = readFile(filePath).then(bufferToPhotoDataUrl)
+    cached = readFile(filePath).then((buffer) => bufferToPhotoDataUrl(buffer))
     defaultBackdropDataUrlCache.set(filePath, cached)
   }
   return cached
@@ -84,7 +93,10 @@ export async function resolveSvgBackdropPhotoUrl(
   photoGcsPath?: string | null,
 ) {
   if (photoGcsPath?.trim()) {
-    return getSignedGcsReadUrl(photoGcsPath.trim(), { expiresInSec: 3600 })
+    // resvg does not fetch remote hrefs, so a signed URL rendered an empty photo area.
+    // Embed the image bytes as a data URL instead.
+    const photo = await downloadCreativeAsset(photoGcsPath.trim())
+    return bufferToPhotoDataUrl(photo.buffer, photo.contentType)
   }
 
   const defaultPath = SVG_DEFAULT_BACKDROP[templateId]

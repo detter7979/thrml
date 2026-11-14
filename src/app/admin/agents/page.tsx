@@ -1007,7 +1007,7 @@ export default function AgentsDashboard() {
   if (loading) return <div className="p-8 text-sm text-muted-foreground">Loading agent dashboard...</div>
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Agent Dashboard</h1>
@@ -1032,10 +1032,11 @@ export default function AgentsDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b">
+      {/* Scrolls sideways on phones instead of squeezing tabs off-screen. */}
+      <div className="-mx-4 flex gap-1 overflow-x-auto border-b px-4 [scrollbar-width:none] md:-mx-6 md:px-6 [&::-webkit-scrollbar]:hidden" role="tablist">
         {TABS.map(t => (
-          <button key={t.key} onClick={() => selectTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+          <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} onClick={() => selectTab(t.key)}
+            className={`shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             {t.label}
           </button>
         ))}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { AdminSelect } from "@/components/admin/admin-select"
 
 type Row = Record<string, string | number>
 
@@ -157,24 +158,24 @@ export function PerformanceClient() {
         </label>
         <label className="text-xs text-[#6E5B49]">
           Group by{" "}
-          <select value={group} onChange={(e) => setGroup(e.target.value as GroupKey)} className={select}>
+          <AdminSelect value={group} onChange={(e) => setGroup(e.target.value as GroupKey)} className={select}>
             {Object.entries(GROUPS).map(([k, g]) => (
               <option key={k} value={k}>
                 {g.label}
               </option>
             ))}
-          </select>
+          </AdminSelect>
         </label>
-        <select value={platform} onChange={(e) => setPlatform(e.target.value)} className={select} aria-label="Platform">
+        <AdminSelect value={platform} onChange={(e) => setPlatform(e.target.value)} className={select} aria-label="Platform">
           <option value="">All platforms</option>
           <option value="Meta">Meta</option>
           <option value="Google Ads">Google Ads</option>
-        </select>
-        <select value={persona} onChange={(e) => setPersona(e.target.value)} className={select} aria-label="Persona">
+        </AdminSelect>
+        <AdminSelect value={persona} onChange={(e) => setPersona(e.target.value)} className={select} aria-label="Persona">
           <option value="">Hosts + guests</option>
           <option value="host">Hosts</option>
           <option value="guest">Guests</option>
-        </select>
+        </AdminSelect>
         <label className="flex items-center gap-1.5 text-xs text-[#6E5B49]">
           <input type="checkbox" checked={test} onChange={(e) => setTest(e.target.checked)} /> Test data
         </label>

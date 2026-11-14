@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import type { EditableTag, LibraryItem } from "@/lib/creative/library"
 
 import { reorganizeCreativeFiles, saveCreativeTags } from "./actions"
+import { AdminSelect } from "@/components/admin/admin-select"
 
 const FILTERS: Array<{ key: keyof LibraryItem; label: string }> = [
   { key: "year", label: "Year" },
@@ -140,7 +141,7 @@ export function CreativeLibraryClient({ items, needsReorganize }: { items: Libra
         {FILTERS.map((f) => (
           <label key={f.key} className="flex flex-col text-xs text-[#6E5B49]">
             {f.label}
-            <select
+            <AdminSelect
               value={filters[f.key] ?? ""}
               onChange={(e) => setFilters((cur) => ({ ...cur, [f.key]: e.target.value }))}
               className="mt-1 rounded-lg border border-[#E7DACA] px-2 py-1.5 text-sm text-[#2A2118]"
@@ -151,7 +152,7 @@ export function CreativeLibraryClient({ items, needsReorganize }: { items: Libra
                   {o}
                 </option>
               ))}
-            </select>
+            </AdminSelect>
           </label>
         ))}
         <Button variant="outline" size="sm" onClick={() => { setFilters({}); setSearch("") }}>

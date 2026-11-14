@@ -107,8 +107,10 @@ async function generateOne(
 export async function generateImagen(
   prompt: string,
   opts: {
-    aspectRatio: '1:1' | '9:16' | '4:5'
+    aspectRatio: '1:1' | '9:16' | '4:5' | '4:3' | '3:4' | '16:9'
     count: 1 | 2 | 3 | 4
+    /** Send the prompt as written: no brand style suffix and no "no people" tail. */
+    raw?: boolean
   }
 ): Promise<{ base64: string; mimeType: string }[]> {
   const projectId = process.env.VERTEX_AI_PROJECT_ID
@@ -123,8 +125,11 @@ export async function generateImagen(
   const accessToken = await auth.getAccessToken()
   if (!accessToken) throw new Error('Failed to obtain Vertex AI access token')
 
-  let fullPrompt = prompt.endsWith(STYLE_SUFFIX) ? prompt : prompt + STYLE_SUFFIX
-  if (!fullPrompt.includes(NO_PEOPLE)) fullPrompt += NO_PEOPLE
+  let fullPrompt = prompt
+  if (!opts.raw) {
+    fullPrompt = prompt.endsWith(STYLE_SUFFIX) ? prompt : prompt + STYLE_SUFFIX
+    if (!fullPrompt.includes(NO_PEOPLE)) fullPrompt += NO_PEOPLE
+  }
 
   const tried: string[] = []
   for (const target of candidateTargets()) {

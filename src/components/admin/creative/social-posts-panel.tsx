@@ -11,6 +11,7 @@ import {
   type SocialPlatformKey,
   type SocialTriggerData,
 } from "@/lib/agent/social-constants"
+import { AdminSelect } from "@/components/admin/admin-select"
 
 type SocialPost = {
   id: string
@@ -210,7 +211,7 @@ export function SocialPostsPanel() {
       <div className="rounded-lg border p-3 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs font-medium" htmlFor="social-pillar">Pillar</label>
-          <select
+          <AdminSelect
             id="social-pillar"
             className="text-sm rounded-md border bg-background px-2 py-1"
             value={pillar}
@@ -219,7 +220,7 @@ export function SocialPostsPanel() {
             {SOCIAL_PILLARS.map((p) => (
               <option key={p} value={p}>{PILLAR_LABEL[p]}</option>
             ))}
-          </select>
+          </AdminSelect>
           <div className="flex flex-wrap gap-1.5">
             {SOCIAL_PLATFORMS.map((p) => (
               <button

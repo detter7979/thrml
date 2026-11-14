@@ -3,6 +3,7 @@
 import { format } from "date-fns"
 import { useRouter } from "next/navigation"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
+import { AdminSelect } from "@/components/admin/admin-select"
 
 export type DisputeDecisionRow = {
   id: string
@@ -389,7 +390,7 @@ export function DisputesDashboardClient({ initialTickets, stats, policy: initial
                   <div className="mt-4 space-y-3 rounded-lg border border-[#DCCDBA] bg-white p-4">
                     <label className="block text-xs font-medium uppercase tracking-wide text-[#6E5B49]">
                       Override action
-                      <select
+                      <AdminSelect
                         className="mt-1 w-full rounded-lg border border-[#DCCDBA] bg-[#FFFCF7] px-3 py-2 text-sm"
                         value={overrideAction}
                         onChange={(e) => setOverrideAction(e.target.value)}
@@ -399,7 +400,7 @@ export function DisputesDashboardClient({ initialTickets, stats, policy: initial
                             {a.replace(/_/g, " ")}
                           </option>
                         ))}
-                      </select>
+                      </AdminSelect>
                     </label>
                     {(overrideAction === "partial_refund" || overrideAction === "full_refund") && (
                       <label className="block text-xs font-medium uppercase tracking-wide text-[#6E5B49]">
@@ -492,7 +493,7 @@ export function DisputesDashboardClient({ initialTickets, stats, policy: initial
       <section className="mb-12">
         <h2 className="mb-4 font-medium text-lg">All tickets</h2>
         <div className="mb-4 flex flex-wrap gap-3">
-          <select
+          <AdminSelect
             className="rounded-lg border border-[#DCCDBA] bg-[#FFFCF7] px-3 py-2 text-sm"
             value={tableStatus}
             onChange={(e) => setTableStatus(e.target.value)}
@@ -503,8 +504,8 @@ export function DisputesDashboardClient({ initialTickets, stats, policy: initial
                 {s.replace(/_/g, " ")}
               </option>
             ))}
-          </select>
-          <select
+          </AdminSelect>
+          <AdminSelect
             className="rounded-lg border border-[#DCCDBA] bg-[#FFFCF7] px-3 py-2 text-sm"
             value={tableCategory}
             onChange={(e) => setTableCategory(e.target.value)}
@@ -515,7 +516,7 @@ export function DisputesDashboardClient({ initialTickets, stats, policy: initial
                 {c.replace(/_/g, " ")}
               </option>
             ))}
-          </select>
+          </AdminSelect>
           <input
             type="date"
             className="rounded-lg border border-[#DCCDBA] bg-[#FFFCF7] px-3 py-2 text-sm"

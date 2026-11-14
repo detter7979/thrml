@@ -1614,6 +1614,8 @@ export async function reserveNamerAdForLaunch(
 
   const loaded = await loadAssetAndBrief(admin, opts.assetId)
   if (!loaded) return { ok: false, reason: "Asset or brief not found" }
+  // The ID comes from the namer row, never from a stale AD### baked into the convention name.
+  loaded.asset.convention_name = (loaded.asset.convention_name ?? "").trim().replace(/^AD\d+_/i, "")
 
   const { data: adSet } = await admin
     .from("ad_sets")
@@ -1713,6 +1715,7 @@ export async function finalizeNamerAdForLaunch(
   if (!sheetId) return { ok: false, reason: "NAMER_SHEET_ID not configured" }
   const loaded = await loadAssetAndBrief(admin, opts.assetId)
   if (!loaded) return { ok: false, reason: "Asset or brief not found" }
+  loaded.asset.convention_name = (loaded.asset.convention_name ?? "").trim().replace(/^AD\d+_/i, "")
   try {
     const sheets = createGoogleSheetsClient()
     const prepared = await loadPreparedSheetTab(sheets, sheetId, opts.reservation.tabTitle)

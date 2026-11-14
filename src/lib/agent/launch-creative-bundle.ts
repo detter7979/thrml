@@ -81,22 +81,16 @@ export function selectPlacementBundleAssets(
   return best
 }
 
+/** Same rules as validatePlacementBundle, so the two can never disagree (they did: a launched creative
+ * passed validation but failed this check, which blocked the second ad set and pushed retries down the
+ * one-ad-per-size path). */
 export function canLaunchAsPlacementBundle(assets: LaunchableAssetRow[]): boolean {
-  if (assets.length < 2) return false
-  if (!assets.every(isLaunchableStaticImage)) return false
-  if (!assets.every((asset) => asset.status === "approved")) return false
-  if (assets.some((asset) => asset.meta_ad_id)) return false
+  return validatePlacementBundle(assets) === null
+}
 
-  const briefIds = new Set(assets.map((asset) => asset.brief_id).filter(Boolean))
-  if (briefIds.size !== 1) return false
-
-  const variationLabels = new Set(
-    assets.map((asset) => (asset.variation_label ?? "A").toUpperCase().slice(0, 1))
-  )
-  if (variationLabels.size !== 1) return false
-
-  const formats = placementBundleFormats(assets)
-  return formats.length === assets.length && new Set(formats).size === formats.length
+/** Convention name without a leading AD### (older approvals wrote the ID into the name). */
+export function stripLegacyAdPrefix(name: string | null | undefined): string {
+  return (name ?? "").trim().replace(/^AD\d+_/i, "")
 }
 
 export function validatePlacementBundle(assets: LaunchableAssetRow[]): string | null {

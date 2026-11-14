@@ -288,3 +288,47 @@ export async function purgeCreativePipeline(opts?: { dryRun?: boolean }): Promis
 
   return summary
 }
+
+export type DeleteCreativeAssetsSummary = { assetsDeleted: number; gcsDeleted: number; gcsFailed: number }
+
+/**
+ * Delete individual generated/approved creatives (records + their generated files). Refuses any asset
+ * that has been launched to Meta, and never touches base uploads or library photos.
+ */
+export async function deleteCreativeAssets(assetIds: string[]): Promise<DeleteCreativeAssetsSummary> {
+  const ids = [...new Set(assetIds.map((id) => id.trim()).filter(Boolean))]
+  if (ids.length === 0) throw new Error("asset_ids is required")
+  const admin = createAdminClient()
+
+  const { data, error } = await admin
+    .from("creative_assets")
+    .select("id, gcs_path, performance_data, launched_at, meta_ad_id")
+    .in("id", ids)
+  if (error) throw new Error(error.message)
+  const rows = (data ?? []) as AssetRow[]
+  if (rows.length === 0) throw new Error("Assets not found")
+
+  if (rows.some((asset) => asset.launched_at || asset.meta_ad_id)) {
+    throw new Error("Cannot delete creatives that are launched in Meta. Delete or archive the ads there first.")
+  }
+
+  const { generated } = collectBriefGcsPaths(rows, [])
+  const foundIds = rows.map((row) => row.id).filter(Boolean) as string[]
+
+  const { error: sourceError } = await admin
+    .from("creative_assets")
+    .update({ source_asset_id: null })
+    .in("source_asset_id", foundIds)
+  if (sourceError) throw new Error(sourceError.message)
+
+  const summary: DeleteCreativeAssetsSummary = { assetsDeleted: 0, gcsDeleted: 0, gcsFailed: 0 }
+  for (const objectPath of generated) {
+    if (await deleteCreativeObject(objectPath)) summary.gcsDeleted += 1
+    else summary.gcsFailed += 1
+  }
+
+  const { error: deleteError } = await admin.from("creative_assets").delete().in("id", foundIds)
+  if (deleteError) throw new Error(deleteError.message)
+  summary.assetsDeleted = foundIds.length
+  return summary
+}

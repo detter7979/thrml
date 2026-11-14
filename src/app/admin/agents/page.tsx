@@ -477,6 +477,29 @@ export default function AgentsDashboard() {
     }
   }
 
+  /** Delete chosen creatives (record + generated file). The server refuses anything launched in Meta. */
+  const deleteAssets = async (assets: CreativeAsset[]) => {
+    if (assets.length === 0) return
+    if (
+      !window.confirm(
+        `Delete ${assets.length} creative${assets.length === 1 ? "" : "s"}?\n\nThis removes the image${assets.length === 1 ? "" : "s"} from the pipeline and the bucket. The brief and its source photo are kept. This can't be undone from here.`,
+      )
+    ) {
+      return
+    }
+    setBusyAction("delete-assets")
+    setPipelineMessage(null)
+    try {
+      await patchPipeline({ action: "delete_assets", asset_ids: assets.map((a) => a.id) })
+      await mutatePipeline()
+      setPipelineMessage(`Deleted ${assets.length} creative${assets.length === 1 ? "" : "s"}.`)
+    } catch (err) {
+      setPipelineMessage(err instanceof Error ? err.message : "Could not delete creatives.")
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
   const deleteAllApprovedVideoBriefs = async () => {
     const videoBriefs = pipeline?.approvedVideoBriefs ?? []
     if (videoBriefs.length === 0) return
@@ -1801,6 +1824,26 @@ export default function AgentsDashboard() {
                         >
                           Launch selected as separate ads
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteAssets(selected)}
+                          disabled={selected.length === 0 || busyAction === "delete-assets"}
+                          className="text-xs px-3 py-1.5 border border-red-300 text-red-700 rounded hover:bg-red-50 disabled:opacity-50"
+                          title="Delete the selected creatives and their files"
+                        >
+                          Delete selected{selected.length ? ` (${selected.length})` : ""}
+                        </button>
+                        {group.brief && groupLaunches.length === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => void deleteBrief(group.brief!, group.brief!.hook ?? undefined)}
+                            disabled={busyAction === `delete-brief-${group.briefId}`}
+                            className="text-xs px-3 py-1.5 border border-red-300 text-red-700 rounded hover:bg-red-50 disabled:opacity-50"
+                            title="Delete this brief and all of its creatives"
+                          >
+                            Delete brief
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   )

@@ -265,6 +265,22 @@ async function fetchMetaLaunchTargets(admin: AdminClient): Promise<LaunchTargets
 
     launchCampaigns.sort((a, b) => a.campaign_name.localeCompare(b.campaign_name))
 
+    // If Meta returned a campaign but none of its ad sets (failed page, odd status), fill
+    // them in from the registry so the launch dialog never shows an empty campaign.
+    const campaignsWithAdsets = new Set(launchAdsets.map((a) => a.platform_campaign_id))
+    if (launchCampaigns.some((c) => !campaignsWithAdsets.has(c.platform_id))) {
+      try {
+        const registry = await fetchMetaAdsetsFromDb(admin)
+        for (const adset of registry.adsets) {
+          if (campaignsWithAdsets.has(adset.platform_campaign_id)) continue
+          if (!campaignIds.has(adset.platform_campaign_id)) continue
+          launchAdsets.push(adset)
+        }
+      } catch (err) {
+        console.error("[creative-pipeline] registry ad set fill-in failed:", err)
+      }
+    }
+
     return {
       campaigns: launchCampaigns,
       adsets: launchAdsets,

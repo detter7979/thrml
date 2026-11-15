@@ -333,23 +333,35 @@ export async function fetchInsights(
   return { insights: results, skippedEntityIds }
 }
 
-const LAUNCHABLE_EFFECTIVE_STATUSES = ["ACTIVE", "PAUSED"] as const
+/**
+ * A creative can be added to any campaign or ad set that still exists. Delivery state
+ * (CAMPAIGN_PAUSED, IN_PROCESS, WITH_ISSUES, ads off, in review…) must not hide a target:
+ * an allowlist of ["ACTIVE", "PAUSED"] made ad sets vanish from the launch dialog whenever
+ * Meta reported any other state.
+ */
+const NOT_LAUNCHABLE_EFFECTIVE_STATUSES = new Set(["DELETED", "ARCHIVED"])
+
+export function isLaunchableEffectiveStatus(status: string | null | undefined): boolean {
+  return !NOT_LAUNCHABLE_EFFECTIVE_STATUSES.has((status ?? "").toUpperCase())
+}
 
 async function fetchPaginatedAccountResource<T>(
   adAccountId: string,
   resource: "campaigns" | "adsets",
   fields: string,
-  effectiveStatuses: readonly string[],
+  effectiveStatuses: readonly string[] | null,
   logLabel: string
 ): Promise<T[]> {
   const acct = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`
   const token = encodeURIComponent(getMetaAccessToken())
   const encodedFields = encodeURIComponent(fields)
-  const filtering = encodeURIComponent(
-    JSON.stringify([{ field: "effective_status", operator: "IN", value: [...effectiveStatuses] }])
-  )
+  const filtering = effectiveStatuses
+    ? `&filtering=${encodeURIComponent(
+        JSON.stringify([{ field: "effective_status", operator: "IN", value: [...effectiveStatuses] }])
+      )}`
+    : ""
   const initial =
-    `${graphBase()}/${acct}/${resource}?fields=${encodedFields}&filtering=${filtering}&limit=500&access_token=${token}`
+    `${graphBase()}/${acct}/${resource}?fields=${encodedFields}${filtering}&limit=500&access_token=${token}`
 
   const rows: T[] = []
   let url: string | null = initial
@@ -385,10 +397,12 @@ export async function fetchLaunchableCampaigns(adAccountId: string): Promise<Met
     adAccountId,
     "campaigns",
     "id,name,status,effective_status",
-    LAUNCHABLE_EFFECTIVE_STATUSES,
+    null,
     "fetchLaunchableCampaigns"
   )
-  return rows.sort((a, b) => a.name.localeCompare(b.name))
+  return rows
+    .filter((row) => isLaunchableEffectiveStatus(row.effective_status ?? row.status))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** Ad sets available for creative launch (live Meta, not DB registry). */
@@ -397,10 +411,12 @@ export async function fetchLaunchableAdsets(adAccountId: string): Promise<MetaAd
     adAccountId,
     "adsets",
     "id,name,campaign_id,status,effective_status",
-    LAUNCHABLE_EFFECTIVE_STATUSES,
+    null,
     "fetchLaunchableAdsets"
   )
-  return rows.sort((a, b) => a.name.localeCompare(b.name))
+  return rows
+    .filter((row) => isLaunchableEffectiveStatus(row.effective_status ?? row.status))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**

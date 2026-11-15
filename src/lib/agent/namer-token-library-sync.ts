@@ -33,13 +33,12 @@ type BriefContext = {
   campaign_short_name?: string | null
 }
 
-/** Normalize naming tokens for Token Library Value column (snake_case). */
+/** Normalize naming tokens for the Token Library Value column: lowercase words joined with "-". */
 export function normalizePipelineTokenValue(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
-    .replace(/-/g, "_")
-    .replace(/\s+/g, "_")
+    .replace(/[_\s]+/g, "-")
 }
 
 /** Preserve FORMAT casing e.g. Static_9x16, Video_5s. */

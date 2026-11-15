@@ -176,7 +176,7 @@ describe("buildNamerCreativeRow", () => {
     )
 
     expect(row?.adId).toBe("AD001")
-    expect(row?.adName).toBe("AD001_T05_A_pov_earnings_Static_9x16_list_now")
+    expect(row?.adName).toBe("AD001_T05_A_pov-earnings_Static_9x16_list-now")
   })
 
   it("builds a Creative Builder row from convention_name", () => {
@@ -208,13 +208,13 @@ describe("buildNamerCreativeRow", () => {
     expect(row).toMatchObject({
       testId: "T05",
       variant: "A",
-      angle: "pov_earnings",
+      angle: "pov-earnings",
       formatType: "Static",
       sizeToken: "9x16",
       videoLength: "NA",
       aspectRatio: "9:16",
-      cta: "list_now",
-      adName: "T05_A_pov_earnings_Static_9x16_list_now",
+      cta: "list-now",
+      adName: "T05_A_pov-earnings_Static_9x16_list-now",
       hookPreview: "Turn your idle sauna into income",
       status: "TEST",
       assetGcsPath: "gs://thrml-creative/2026/05/hosts/pov_earnings/Static/A_9x16.png",

@@ -243,7 +243,7 @@ export function parseNamingConvention(name: string): ParsedName {
   }
 
   // [CTA]
-  const ctaKey = parts[c]?.toUpperCase()
+  const ctaKey = parts[c]?.toUpperCase().replace(/-/g, "_")
   base.cta = ctaKey && CTA_MAP[ctaKey] ? CTA_MAP[ctaKey] : (parts[c] ?? "")
 
   // [opt event] — derived from phase + audience group

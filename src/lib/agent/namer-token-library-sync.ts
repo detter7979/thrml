@@ -159,8 +159,9 @@ function findCategorySection(rows: string[][], headerRow: number, category: stri
   return { startRow, endRow, values }
 }
 
-function compareTokenValue(category: string, value: string): string {
-  return category === "FORMAT" ? value : value.toLowerCase()
+/** Section values are stored lowercased, so every category compares lowercased (FORMAT included). */
+export function compareTokenValue(_category: string, value: string): string {
+  return value.trim().toLowerCase()
 }
 
 async function resolveTabSheetId(

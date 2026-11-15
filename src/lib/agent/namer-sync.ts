@@ -298,11 +298,52 @@ async function autoLinkTab(
   return links
 }
 
+/** Builder IDs of rows that live on another ad platform (Google etc.) — never looked up in Meta. */
+export type NonMetaRows = { campaigns: Set<string>; adSets: Set<string> }
+
+/**
+ * True when a builder row belongs to a non-Meta platform. Campaign rows carry PLATFORM; ad sets
+ * and ads inherit it from their parent row. Records the row's own ID so its children are skipped too.
+ */
+export function isNonMetaRow(
+  entity: SheetEntityConfig["entity"],
+  row: string[],
+  headers: string[],
+  internalId: string,
+  nonMeta: NonMetaRows
+): boolean {
+  const id = internalId.trim().toUpperCase()
+  if (entity === "campaign") {
+    const platformTokenCol = colIndex(headers, [/^platform$/i])
+    const platform = platformTokenCol >= 0 ? (row[platformTokenCol] ?? "").trim().toUpperCase() : ""
+    if (platform && platform !== "META") {
+      if (id) nonMeta.campaigns.add(id)
+      return true
+    }
+    return false
+  }
+  if (entity === "ad_set") {
+    const parentCol = colIndex(headers, [/^camp\s*id$/i, /^campaign\s*id$/i])
+    const parent = parentCol >= 0 ? (row[parentCol] ?? "").trim().toUpperCase() : ""
+    if (parent && nonMeta.campaigns.has(parent)) {
+      if (id) nonMeta.adSets.add(id)
+      return true
+    }
+    return false
+  }
+  const adSetCol = colIndex(headers, [/^ad\s*set\s*id$/i, /^adset\s*id$/i])
+  const campCol = colIndex(headers, [/^campaign\s*id$/i, /^camp\s*id$/i])
+  const adSet = adSetCol >= 0 ? (row[adSetCol] ?? "").trim().toUpperCase() : ""
+  const camp = campCol >= 0 ? (row[campCol] ?? "").trim().toUpperCase() : ""
+  return (adSet !== "" && nonMeta.adSets.has(adSet)) || (camp !== "" && nonMeta.campaigns.has(camp))
+}
+
 async function syncTab(
   sheets: ReturnType<typeof createGoogleSheetsClient>,
   spreadsheetId: string,
   tabTitle: string,
-  config: SheetEntityConfig
+  config: SheetEntityConfig,
+  nonMeta: NonMetaRows = { campaigns: new Set(), adSets: new Set() }
 ): Promise<TabSyncStats> {
   const stats: TabSyncStats = {
     processed: 0,
@@ -340,6 +381,9 @@ async function syncTab(
     const currentStatus = (row[statusCol] ?? "").trim()
 
     if (!platformId && !internalId) continue
+    // Google (and other non-Meta) rows keep the status typed in the Sheet: looking their IDs up
+    // in Meta always fails and used to flip them to ARCHIVED.
+    if (isNonMetaRow(config.entity, row, headers, internalId, nonMeta)) continue
     if (!platformId && internalId) {
       stats.awaitingMetaBuild += 1
       continue
@@ -553,6 +597,7 @@ export async function runNamerSync(admin: SupabaseClient): Promise<NamerSyncResu
     }
     const linked = { campaigns: new Map<string, string>(), adSets: new Map<string, string>(), ads: new Map<string, string>() }
     const linkStats: AutoLinkStats = { linked: [] }
+    const nonMeta: NonMetaRows = { campaigns: new Set(), adSets: new Set() }
 
     for (const config of ENTITY_CONFIGS) {
       const tabTitle = resolveTabTitle(tabTitles, ...config.tabCandidates)
@@ -577,7 +622,7 @@ export async function runNamerSync(admin: SupabaseClient): Promise<NamerSyncResu
       )
       sheet_cells_updated += linkStats.linked.filter((l) => l.entity === config.entity).length
 
-      const tabStats = await syncTab(sheets, spreadsheetId, tabTitle, config)
+      const tabStats = await syncTab(sheets, spreadsheetId, tabTitle, config, nonMeta)
       changes.push(...tabStats.changes)
       sheet_cells_updated += tabStats.cellsUpdated
       awaiting_meta_build += tabStats.awaitingMetaBuild

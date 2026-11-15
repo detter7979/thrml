@@ -1,17 +1,24 @@
 import type { Ad } from "@/types/paid-media"
 
 import type { EvaluatorContext, PerformanceDailyRow, RuleResult } from "../types"
-import { isoDateUtcDaysAgo } from "../types"
+import { isoDateUtcDaysAgo, ruleNumber } from "../types"
 import { nextTestId as nextTestIdFor } from "../next-test-id"
 
-function adMetrics7d(rows: PerformanceDailyRow[], adId: string): { clicks: number; conv: number } {
-  const from = isoDateUtcDaysAgo(7)
+/** Clicks and conversions on the ad's own optimization event over the test window. */
+export function adMetricsWindow(
+  rows: PerformanceDailyRow[],
+  adId: string,
+  convEvent: string | null,
+  days: number
+): { clicks: number; conv: number } {
+  const from = isoDateUtcDaysAgo(days)
   let clicks = 0
   let conv = 0
   for (const r of rows) {
     if (r.level !== "ad" || r.entity_id !== adId || r.date < from) continue
+    // Clicks sit on one row per day; conversions are one row per event.
     clicks += Number(r.clicks) || 0
-    conv += Number(r.conversions) || 0
+    if (!convEvent || r.conv_event === convEvent) conv += Number(r.conversions) || 0
   }
   return { clicks, conv }
 }
@@ -47,9 +54,12 @@ function pWinnerBetter(convW: number, clkW: number, convL: number, clkL: number)
   return wins / s
 }
 
+/** Longest window performance_daily is loaded for (see fetch-data). */
+const TEST_WINDOW_DAYS = 14
+
 export function rule06AbTestWinner(ctx: EvaluatorContext): RuleResult[] {
-  const minClicks = 200
-  const thresh = 0.95
+  const minClicks = ruleNumber(ctx.rules, "global", "kill_clicks_threshold", 200)
+  const thresh = ruleNumber(ctx.rules, "global", "kill_confidence_threshold", 0.95)
   const out: RuleResult[] = []
 
   const testAds = ctx.ads.filter((a) => a.status === "TEST")
@@ -65,32 +75,42 @@ export function rule06AbTestWinner(ctx: EvaluatorContext): RuleResult[] {
     for (const [, group] of byTest) {
       if (group.length < 2) continue
       const stats = group.map((ad) => {
-        const m = adMetrics7d(ctx.performanceDaily, ad.id)
+        const set = ctx.adSets.find((s) => s.id === ad.ad_set_id)
+        const ev = (ad as { conv_event?: string | null }).conv_event || set?.conv_event || null
+        const m = adMetricsWindow(ctx.performanceDaily, ad.id, ev, TEST_WINDOW_DAYS)
         return { ad, ...m, rate: m.clicks > 0 ? m.conv / m.clicks : 0 }
       })
       const sorted = [...stats].sort((a, b) => b.rate - a.rate)
       const winner = sorted[0]
-      const loser = sorted[1]
-      if (winner.clicks < minClicks || loser.clicks < minClicks) continue
-      const p = pWinnerBetter(winner.conv, winner.clicks, loser.conv, loser.clicks)
-      if (p <= thresh) continue
+      if (winner.clicks < minClicks) continue
 
-      const nextTestId = nextTestIdFor(loser.ad.test_id)
+      // A test can have more than two ads (T01 runs four angles per ad set): judge every
+      // challenger against the leader, not only the runner-up.
+      let losers = 0
+      let bestP = 0
+      for (const loser of sorted.slice(1)) {
+        if (loser.clicks < minClicks) continue
+        const p = pWinnerBetter(winner.conv, winner.clicks, loser.conv, loser.clicks)
+        if (p <= thresh) continue
+        losers++
+        bestP = Math.max(bestP, p)
+        out.push({
+          kind: "PAUSE_AD",
+          target: { campaignId: loser.ad.campaign_id, adSetId: loser.ad.ad_set_id, adId: loser.ad.id },
+          payload: {
+            rule: "06-ab-test-winner",
+            role: "pause_loser",
+            winner_ad_id: winner.ad.id,
+            posterior: p,
+          },
+          evidence: { winner_clicks: winner.clicks, loser_clicks: loser.clicks, p_winner_better: p },
+          rationale: `AB ${loser.ad.test_id}: pause loser ${loser.ad.legacy_id ?? loser.ad.id}; winner ${winner.ad.legacy_id ?? winner.ad.id} (posterior ${(p * 100).toFixed(1)}%).`,
+          confidence: p,
+        })
+      }
+      if (losers === 0) continue
 
-      out.push({
-        kind: "PAUSE_AD",
-        target: { campaignId: loser.ad.campaign_id, adSetId: loser.ad.ad_set_id, adId: loser.ad.id },
-        payload: {
-          rule: "06-ab-test-winner",
-          role: "pause_loser",
-          winner_ad_id: winner.ad.id,
-          posterior: p,
-        },
-        evidence: { winner_clicks: winner.clicks, loser_clicks: loser.clicks, p_winner_better: p },
-        rationale: `AB ${loser.ad.test_id}: pause loser ${loser.ad.legacy_id ?? loser.ad.id}; winner ${winner.ad.legacy_id ?? winner.ad.id} (posterior ${(p * 100).toFixed(1)}%).`,
-        confidence: p,
-      })
-
+      const nextTestId = nextTestIdFor(winner.ad.test_id)
       out.push({
         kind: "LAUNCH_TEST",
         target: { campaignId: winner.ad.campaign_id, adSetId: winner.ad.ad_set_id },
@@ -100,9 +120,9 @@ export function rule06AbTestWinner(ctx: EvaluatorContext): RuleResult[] {
           carry_forward_winner_ad_id: winner.ad.id,
           suggested_next_test_id: nextTestId,
         },
-        evidence: { posterior: p },
+        evidence: { posterior: bestP },
         rationale: `Launch next test ${nextTestId} carrying forward winner creative from ${winner.ad.legacy_id ?? winner.ad.id}.`,
-        confidence: p,
+        confidence: bestP,
       })
     }
   }

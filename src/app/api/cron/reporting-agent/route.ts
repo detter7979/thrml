@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { syncMetaStatuses } from "@/lib/agent/meta-status-sync"
 import { runReportingIngest } from "@/lib/agent/reporting-agent-ingest"
 import { utcYesterdayRange } from "@/lib/dates/utc-yesterday"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -21,6 +22,13 @@ export async function GET(req: NextRequest) {
 
   try {
     const admin = createAdminClient()
+    // Ads are created PAUSED and switched on in Ads Manager. Mirror Meta's statuses first so a
+    // campaign or ad turned on yesterday is ingested today, not a day late.
+    try {
+      await syncMetaStatuses(admin)
+    } catch (e) {
+      console.error("[reporting-agent] meta status sync failed", e instanceof Error ? e.message : e)
+    }
     const { dateStart, dateEnd } = utcYesterdayRange()
     const result = await runReportingIngest(admin, { dateStart, dateEnd })
     if (!result.ok) {

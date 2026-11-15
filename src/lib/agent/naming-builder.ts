@@ -8,7 +8,12 @@
  *   {testId}_{variant}_{angle}_{format}_{cta}
  *
  * Example:
- *   AD001_T05_A_pov_earnings_Video_15s_list_now
+ *   AD001_T05_A_pov-earnings_Video_15s_list-now
+ *
+ * "_" separates fields and nothing else, so a name always splits into the same columns
+ * (ID · test · variant · angle · format · size/length · CTA). Multi-word angle and CTA
+ * tokens are joined with "-" (pov-earnings, idle-space, list-now). Names written before
+ * this rule used "_" inside those tokens; parseAdName still reads them.
  */
 
 export interface AdNameTokens {
@@ -24,7 +29,27 @@ export interface AdNameTokens {
 const THRML_AD_ID_RE = /^AD\d{3,}$/i
 const TEST_ID_RE = /^T\d{2,}$/
 const VARIANT_RE = /^[A-D]$/
-const TOKEN_RE = /^[a-z0-9_]+$/
+const TOKEN_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+/** Angle / CTA as written in a name: lowercase, words joined with "-" (never "_"). */
+export function toNameToken(raw: string): string {
+  return (raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+}
+
+/** Convert a whole ad name to the current rule; returns the input when it cannot be parsed. */
+export function canonicalAdName(name: string): string {
+  const tokens = parseAdName(name.trim())
+  if (!tokens) return name
+  try {
+    return buildAdName(tokens)
+  } catch {
+    return name
+  }
+}
 const FORMAT_RE = /^(Static|Video|Carousel|GIF)_[a-z0-9x]+$/
 
 const FORMAT_TYPES = ["Static", "Video", "Carousel", "GIF"] as const
@@ -54,12 +79,9 @@ export function buildAdName(tokens: AdNameTokens): string {
   if (!VARIANT_RE.test(tokens.variant)) {
     throw new InvalidAdNameError("variant", tokens.variant, "must be single letter A-D")
   }
-  if (!TOKEN_RE.test(tokens.angle)) {
-    throw new InvalidAdNameError(
-      "angle",
-      tokens.angle,
-      "must be snake_case (lowercase, digits, underscores)"
-    )
+  const angle = toNameToken(tokens.angle)
+  if (!TOKEN_RE.test(angle)) {
+    throw new InvalidAdNameError("angle", tokens.angle, 'must be lowercase words joined with "-", e.g. "idle-space"')
   }
   if (!FORMAT_RE.test(tokens.format)) {
     throw new InvalidAdNameError(
@@ -68,17 +90,18 @@ export function buildAdName(tokens: AdNameTokens): string {
       'must be {Type}_{spec} e.g. "Video_15s", "Static_9x16"'
     )
   }
-  if (!TOKEN_RE.test(tokens.cta)) {
-    throw new InvalidAdNameError("cta", tokens.cta, "must be snake_case")
+  const cta = toNameToken(tokens.cta)
+  if (!TOKEN_RE.test(cta)) {
+    throw new InvalidAdNameError("cta", tokens.cta, 'must be lowercase words joined with "-", e.g. "list-now"')
   }
 
   const parts = [
     ...(thrmlAdId ? [thrmlAdId] : []),
     tokens.testId,
     tokens.variant,
-    tokens.angle,
+    angle,
     tokens.format,
-    tokens.cta,
+    cta,
   ]
   return parts.join("_")
 }
@@ -106,9 +129,10 @@ export function parseAdName(name: string): AdNameTokens | null {
   }
   if (formatStart === -1) return null
 
-  const angle = parts.slice(2, formatStart).join("_")
+  // Legacy names carry "_" inside angle / CTA; both forms normalise to "-" tokens.
+  const angle = toNameToken(parts.slice(2, formatStart).join("_"))
   const format = `${parts[formatStart]}_${parts[formatStart + 1]}`
-  const cta = parts.slice(formatStart + 2).join("_")
+  const cta = toNameToken(parts.slice(formatStart + 2).join("_"))
 
   if (!angle || !cta) return null
 
@@ -122,7 +146,7 @@ export function parseAdName(name: string): AdNameTokens | null {
   }
 
   try {
-    if (buildAdName(tokens) !== name) return null
+    buildAdName(tokens)
   } catch {
     return null
   }

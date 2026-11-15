@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { buildAdName, parseAdName, InvalidAdNameError } from "../naming-builder"
+import { buildAdName, canonicalAdName, parseAdName, InvalidAdNameError } from "../naming-builder"
 
 describe("buildAdName", () => {
   it("builds a valid ad name", () => {
@@ -11,7 +11,7 @@ describe("buildAdName", () => {
         format: "Video_15s",
         cta: "list_now",
       })
-    ).toBe("T05_A_pov_earnings_Video_15s_list_now")
+    ).toBe("T05_A_pov-earnings_Video_15s_list-now")
   })
 
   it("prefixes internal Ad ID when provided", () => {
@@ -24,7 +24,7 @@ describe("buildAdName", () => {
         format: "Static_9x16",
         cta: "list_now",
       })
-    ).toBe("AD001_T05_A_pov_earnings_Static_9x16_list_now")
+    ).toBe("AD001_T05_A_pov-earnings_Static_9x16_list-now")
   })
 
   it("handles single-word angle", () => {
@@ -36,7 +36,7 @@ describe("buildAdName", () => {
         format: "Static_9x16",
         cta: "list_now",
       })
-    ).toBe("T01_A_income_Static_9x16_list_now")
+    ).toBe("T01_A_income_Static_9x16_list-now")
   })
 
   it("handles multi-token angle with digits", () => {
@@ -48,7 +48,7 @@ describe("buildAdName", () => {
         format: "Video_30s",
         cta: "get_started",
       })
-    ).toBe("T03_B_earnings_1000_Video_30s_get_started")
+    ).toBe("T03_B_earnings-1000_Video_30s_get-started")
   })
 
   it.each([
@@ -56,10 +56,10 @@ describe("buildAdName", () => {
     ["testId", "T5", /testId/],
     ["variant", "E", /variant/],
     ["variant", "AA", /variant/],
-    ["angle", "POV_Earnings", /angle/],
+    ["angle", "pov!earnings", /angle/],
     ["format", "video_15s", /format/],
     ["format", "Video", /format/],
-    ["cta", "List_Now", /cta/],
+    ["cta", "list.now", /cta/],
   ])("rejects invalid %s = %s", (field, badValue, expectedMessage) => {
     const valid = {
       testId: "T05",
@@ -78,9 +78,9 @@ describe("parseAdName", () => {
     expect(parseAdName("T05_A_pov_earnings_Video_15s_list_now")).toEqual({
       testId: "T05",
       variant: "A",
-      angle: "pov_earnings",
+      angle: "pov-earnings",
       format: "Video_15s",
-      cta: "list_now",
+      cta: "list-now",
     })
   })
 
@@ -89,9 +89,9 @@ describe("parseAdName", () => {
       thrmlAdId: "AD001",
       testId: "T05",
       variant: "A",
-      angle: "pov_earnings",
+      angle: "pov-earnings",
       format: "Static_9x16",
-      cta: "list_now",
+      cta: "list-now",
     })
   })
 
@@ -101,12 +101,12 @@ describe("parseAdName", () => {
       variant: "A",
       angle: "income",
       format: "Static_9x16",
-      cta: "list_now",
+      cta: "list-now",
     })
   })
 
   it("round-trips", () => {
-    const name = "T07_C_idle_space_summer_Carousel_1x1_book_now"
+    const name = "T07_C_idle-space-summer_Carousel_1x1_book-now"
     const parsed = parseAdName(name)!
     expect(parsed).not.toBeNull()
     expect(buildAdName(parsed)).toBe(name)
@@ -116,5 +116,28 @@ describe("parseAdName", () => {
     expect(parseAdName("not_a_name")).toBeNull()
     expect(parseAdName("T05_E_angle_Video_15s_cta")).toBeNull()
     expect(parseAdName("T05_A_angle_Unknown_15s_cta")).toBeNull()
+  })
+})
+
+describe("hyphenated name tokens", () => {
+  it("keeps exactly seven underscore-separated fields for multi-word angle and CTA", () => {
+    const name = buildAdName({
+      thrmlAdId: "AD016",
+      testId: "T01",
+      variant: "A",
+      angle: "idle_space",
+      format: "Static_4x5",
+      cta: "list_now",
+    })
+    expect(name).toBe("AD016_T01_A_idle-space_Static_4x5_list-now")
+    expect(name.split("_")).toHaveLength(7)
+  })
+
+  it("reads names written before the rule and converts them", () => {
+    expect(parseAdName("AD016_T01_A_idle_space_Static_4x5_list_now")?.angle).toBe("idle-space")
+    expect(canonicalAdName("AD016_T01_A_idle_space_Static_4x5_list_now")).toBe(
+      "AD016_T01_A_idle-space_Static_4x5_list-now"
+    )
+    expect(canonicalAdName("not a name")).toBe("not a name")
   })
 })

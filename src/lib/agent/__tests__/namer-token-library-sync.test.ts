@@ -39,7 +39,7 @@ const baseRow: NamerCreativeRow = {
 
 describe("normalizePipelineTokenValue", () => {
   it("normalizes hyphens and case", () => {
-    expect(normalizePipelineTokenValue("POV-Earnings")).toBe("pov_earnings")
+    expect(normalizePipelineTokenValue("POV_Earnings")).toBe("pov-earnings")
   })
 })
 
@@ -55,8 +55,8 @@ describe("extractPipelineTokens", () => {
     const tokens = extractPipelineTokens(baseRow, { hook: "Turn your idle sauna into income" })
     expect(tokens).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ category: "ANGLE", value: "pov_earnings", status: "TEST" }),
-        expect.objectContaining({ category: "CTA", value: "list_now" }),
+        expect.objectContaining({ category: "ANGLE", value: "pov-earnings", status: "TEST" }),
+        expect.objectContaining({ category: "CTA", value: "list-now" }),
         expect.objectContaining({ category: "FORMAT", value: "Static_9x16" }),
       ])
     )

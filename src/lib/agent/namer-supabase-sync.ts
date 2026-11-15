@@ -62,7 +62,8 @@ function normalizeCta(raw: string): CtaT {
     "explore",
     "join_waitlist",
   ]
-  const v = raw.trim().toLowerCase()
+  // Names and the Sheet write CTAs with "-" (list-now); the database enum keeps "_".
+  const v = raw.trim().toLowerCase().replace(/[-\s]+/g, "_")
   return allowed.includes(v as CtaT) ? (v as CtaT) : "list_now"
 }
 

@@ -1440,8 +1440,13 @@ export default function AgentsDashboard() {
                       const jobs = renderJobsByBrief[brief.id] ?? []
                       const config = brief.video_config
                       const baseAsset = baseVideoByBrief.get(brief.id)
+                      // The worker polls every 30s, so a fresh job is normal; only warn once it has
+                      // sat unclaimed for a couple of minutes.
                       const waitingForWorker = jobs.some(
-                        (job) => job.status === "pending" && job.attempts === 0
+                        (job) =>
+                          job.status === "pending" &&
+                          job.attempts === 0 &&
+                          Date.now() - Date.parse(job.created_at ?? "") > 2 * 60 * 1000
                       )
                       return (
                         <div key={brief.id} className="rounded-lg border p-3 space-y-3 border-amber-200 bg-amber-50/40">
@@ -1455,9 +1460,11 @@ export default function AgentsDashboard() {
                           </p>
                           {waitingForWorker ? (
                             <p className="rounded-md bg-amber-100 px-3 py-2 text-xs text-amber-900">
-                              Queued at attempt 0 — the render worker is not running or cannot reach Supabase/GCS.
-                              On Railway set <code className="font-mono">GCS_CREATIVE_BUCKET=thrml</code> and confirm
-                              the worker service is deployed.
+                              Still queued after 2+ minutes: the video render worker on Railway has not picked
+                              this up, so it is stopped, crashed or missing a setting. Open the worker service in
+                              Railway, check its latest deploy and logs, and confirm{" "}
+                              <code className="font-mono">GCS_CREATIVE_BUCKET=thrml</code>. Nothing is lost: the
+                              job runs on its own as soon as the worker is back.
                             </p>
                           ) : null}
                           {baseAsset && assetUrl(baseAsset) ? (

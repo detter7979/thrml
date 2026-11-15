@@ -5,6 +5,11 @@
 
 import { columnToLetter } from "@/lib/agent/google-sheets-client"
 
+/** Sheet expression for an angle / CTA cell as it appears in a name: lowercase, "_" and spaces → "-". */
+export function nameTokenExpr(ref: string): string {
+  return `SUBSTITUTE(SUBSTITUTE(LOWER(TRIM(${ref}))," ","-"),"_","-")`
+}
+
 function colIndex(headers: string[], patterns: readonly RegExp[]): number {
   for (let i = 0; i < headers.length; i++) {
     const h = (headers[i] ?? "").trim()
@@ -52,6 +57,7 @@ const AD_SET_NAME_AUTO = [/→?\s*ad set name/i, /^ad set name \(auto\)$/i]
  * Ad ID | AdSet ID | Campaign ID | ANGLE | FORMAT | Size | Video Length | CTA | TEST | VAR | Ad Name (auto) | ...
  *
  * Ad Name = {AdID}_{TEST}_{VAR}_{ANGLE}_{FORMAT token}_{CTA}
+ * ANGLE and CTA are written with "-" between words so "_" only ever separates fields.
  */
 export function buildAdBuilderAutoNameFormula(headers: string[], row1Based: number): string | null {
   const adId = colRef(headers, AD_ID, row1Based)
@@ -69,7 +75,7 @@ export function buildAdBuilderAutoNameFormula(headers: string[], row1Based: numb
   const formatToken = formatTokenExpr(format, size, videoLength)
   const idPrefix = adId ? `UPPER(${adId})&"_"&` : ""
 
-  return `=IF(OR(${test}="",${variant}=""),"",${idPrefix}${testNorm}&"_"&UPPER(${variant})&"_"&LOWER(${angle})&"_"&${formatToken}&"_"&LOWER(${cta}))`
+  return `=IF(OR(${test}="",${variant}=""),"",${idPrefix}${testNorm}&"_"&UPPER(${variant})&"_"&${nameTokenExpr(angle)}&"_"&${formatToken}&"_"&${nameTokenExpr(cta)})`
 }
 
 /**

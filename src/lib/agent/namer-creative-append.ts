@@ -17,7 +17,7 @@ import {
 } from "@/lib/agent/google-sheets-client"
 import { fetchMetaAd, fetchMetaAdSet } from "@/lib/agent/namer-meta-client"
 import { uploadBufferToCreativeObject, refreshCreativeAssetUrl } from "@/lib/agent/gcs"
-import { buildAdName, parseAdName } from "@/lib/agent/naming-builder"
+import { buildAdName, canonicalAdName, parseAdName } from "@/lib/agent/naming-builder"
 import {
   buildAdBuilderAdSetIdFormula,
   buildAdBuilderAutoNameFormula,
@@ -412,7 +412,7 @@ export function buildNamerCreativeRow(
   const adName =
     thrmlAdId && !tokens.thrmlAdId
       ? buildAdName({ ...tokens, thrmlAdId })
-      : conventionName
+      : canonicalAdName(conventionName)
 
   const [formatType, length, aspectRatio] = splitFormatToken(tokens.format)
   const sizeToken = sizeFromFormatToken(tokens.format, aspectRatio)
@@ -1651,7 +1651,9 @@ export async function reserveNamerAdForLaunch(
     )
     if (!draft) return { ok: false, reason: "Could not build namer row" }
 
-    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+    // "-" and "_" inside a token are the same token (idle-space = idle_space).
+    const norm = (v: string) => v.trim().toLowerCase().replace(/[_\s]+/g, "-")
+    const same = (a: string, b: string) => norm(a) === norm(b)
     let plannedIdx = -1
     if (adSetLegacyId) {
       for (let r = headerInfo.headerRow + 1; r < rows.length; r++) {

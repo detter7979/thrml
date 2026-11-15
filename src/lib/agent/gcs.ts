@@ -398,6 +398,32 @@ export async function getCreativeSignedWriteUrl(objectPath: string, contentType:
   return url
 }
 
+type BucketCorsRule = { origin?: string[]; method?: string[]; responseHeader?: string[]; maxAgeSeconds?: number }
+
+/**
+ * Browser uploads PUT straight to a signed URL, which the bucket only accepts cross-origin when
+ * its CORS config lists the site's origin. Adds the rule if it is missing (keeps existing rules).
+ * Best effort: the service account may not be allowed to edit bucket settings.
+ */
+export async function ensureCreativeBucketCors(origin: string): Promise<{ ok: boolean; changed: boolean; error?: string }> {
+  try {
+    const bucket = getCreativeBucket()
+    const [meta] = await bucket.getMetadata()
+    const rules = ((meta.cors ?? []) as BucketCorsRule[]).slice()
+    const covered = rules.some(
+      (r) =>
+        (r.origin ?? []).some((o) => o === "*" || o === origin) &&
+        (r.method ?? []).some((m) => m === "*" || m.toUpperCase() === "PUT")
+    )
+    if (covered) return { ok: true, changed: false }
+    rules.push({ origin: [origin], method: ["PUT", "GET", "HEAD"], responseHeader: ["Content-Type"], maxAgeSeconds: 3600 })
+    await bucket.setCorsConfiguration(rules)
+    return { ok: true, changed: true }
+  } catch (err) {
+    return { ok: false, changed: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function refreshCreativeObjectUrl(gcsPathOrObject: string) {
   const objectPath = gcsPathOrObject.startsWith("gs://")
     ? parseGcsPath(gcsPathOrObject).objectPath

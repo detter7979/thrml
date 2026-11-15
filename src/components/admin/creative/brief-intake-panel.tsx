@@ -93,11 +93,13 @@ function VideoUploadButton({
   onFile,
   disabled,
   busy,
+  percent,
   label = "Choose video file",
 }: {
   onFile: (file: File) => void
   disabled?: boolean
   busy?: boolean
+  percent?: number | null
   label?: string
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -122,7 +124,7 @@ function VideoUploadButton({
         onClick={() => inputRef.current?.click()}
         className="text-xs px-3 py-1.5 rounded-md border bg-background hover:bg-muted disabled:opacity-50"
       >
-        {busy ? "Uploading…" : label}
+        {busy ? (percent != null ? `Uploading… ${percent}%` : "Uploading…") : label}
       </button>
     </div>
   )
@@ -163,6 +165,7 @@ export function BriefIntakePanel({
   const [conceptVerify, setConceptVerify] = useState(true)
   const [showManual, setShowManual] = useState(false)
   const [uploadedGcsPath, setUploadedGcsPath] = useState("")
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null)
 
   const [staticDraft, setStaticDraft] = useState({
     hook: "",
@@ -348,26 +351,64 @@ export function BriefIntakePanel({
       throw new Error("Concept slug and asset slug are required before uploading.")
     }
 
-    const form = new FormData()
-    form.set("file", file)
-    form.set("conceptSlug", conceptSlug)
-    form.set("assetSlug", assetSlug)
-    form.set("category", opts?.category ?? "Hosts")
-    form.set("angleSlug", opts?.angleSlug ?? conceptSlug.replace(/-/g, "_"))
-
+    const contentType = file.type || "video/mp4"
     let res: Response
     try {
-      res = await fetch("/api/admin/agent/upload-base-video", { method: "POST", body: form })
+      res = await fetch("/api/admin/agent/upload-base-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conceptSlug,
+          assetSlug,
+          category: opts?.category ?? "Hosts",
+          angleSlug: opts?.angleSlug ?? conceptSlug.replace(/-/g, "_"),
+          contentType,
+          size: file.size,
+        }),
+      })
     } catch {
       throw new Error("Upload request failed — check your connection and try again.")
     }
 
-    const json = (await res.json().catch(() => ({}))) as { error?: string; detail?: string; gcsPath?: string }
+    const json = (await res.json().catch(() => ({}))) as {
+      error?: string
+      detail?: string
+      gcsPath?: string
+      uploadUrl?: string
+      contentType?: string
+      corsOk?: boolean
+      corsError?: string | null
+    }
     if (!res.ok) {
       const detail = json.detail ? `: ${json.detail}` : ""
       throw new Error(`${json.error ?? "Upload failed"}${detail}`)
     }
-    if (!json.gcsPath) throw new Error("Upload succeeded but storage path was missing.")
+    if (!json.gcsPath || !json.uploadUrl) throw new Error("Upload could not be prepared.")
+
+    // The file goes straight from this browser to storage (no size limit from the site's server).
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open("PUT", json.uploadUrl as string)
+      xhr.setRequestHeader("Content-Type", json.contentType ?? contentType)
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setUploadPercent(Math.round((e.loaded / e.total) * 100))
+      }
+      xhr.onload = () =>
+        xhr.status >= 200 && xhr.status < 300
+          ? resolve()
+          : reject(new Error(`Storage rejected the upload (HTTP ${xhr.status}).`))
+      xhr.onerror = () =>
+        reject(
+          new Error(
+            json.corsOk === false
+              ? `The storage bucket is not set up to accept uploads from this site yet (${json.corsError ?? "CORS"}).`
+              : "Upload was interrupted — check your connection and try again.",
+          ),
+        )
+      setUploadPercent(0)
+      xhr.send(file)
+    }).finally(() => setUploadPercent(null))
+
     setUploadedGcsPath(normalizeGcsObjectPath(json.gcsPath))
   }
 
@@ -475,16 +516,27 @@ export function BriefIntakePanel({
               </>
             ) : (
               <>
-                Create your base POV clip in Runway, export MP4, then upload to the creative GCS bucket via gsutil
-                (below), pick from the library, paste a path, or try the in-app uploader. After approval, the Railway
+                Create your base POV clip, export MP4 (or MOV), then upload it from this computer with the button
+                below, pick one from the library, or paste a storage path. After approval, the Railway
                 worker composites centered POV overlay copy (template v{DEFAULT_POV_SAUNA_TEMPLATE_VERSION}).
               </>
             )}
           </p>
 
+          <VideoUploadButton
+            busy={busyAction === "upload-base-video"}
+            disabled={busyAction !== null && busyAction !== "upload-base-video"}
+            percent={uploadPercent}
+            label="Upload video from this computer"
+            onFile={(file) => void uploadT4BaseVideo(file)}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            MP4, MOV or WebM, up to 1 GB. The file goes straight to storage and the path below fills in when it finishes.
+          </p>
+
           <details className="rounded-md border bg-background px-3 py-2 text-xs">
             <summary className="cursor-pointer font-medium text-foreground">
-              Upload directly to GCS (recommended)
+              Other ways: upload with gsutil
             </summary>
             <div className="mt-2 space-y-2 text-muted-foreground">
               <p>
@@ -525,13 +577,6 @@ export function BriefIntakePanel({
           >
             Use suggested path for this month
           </button>
-
-          <VideoUploadButton
-            busy={busyAction === "upload-base-video"}
-            disabled={busyAction !== null && busyAction !== "upload-base-video"}
-            label="Try in-app upload"
-            onFile={(file) => void uploadT4BaseVideo(file)}
-          />
 
           <AssetLibraryPanel
             mediaType="video"

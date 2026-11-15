@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { uploadBufferToCreativeObject } from "@/lib/agent/gcs"
+import { ensureCreativeBucketCors, getCreativeSignedWriteUrl, uploadBufferToCreativeObject } from "@/lib/agent/gcs"
 import { baseVideoPath } from "@/lib/agent/gcs-paths"
 import { requireAdminApi } from "@/lib/admin-guard"
 
@@ -9,6 +9,9 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+/** Direct browser → storage uploads skip the function body limit, so they can be much larger. */
+const MAX_DIRECT_UPLOAD_BYTES = 1024 * 1024 * 1024
+const DIRECT_UPLOAD_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"])
 
 function resolveUploadPath(body: {
   conceptSlug: string
@@ -88,6 +91,8 @@ export async function POST(req: NextRequest) {
     version?: number
     category?: string
     angleSlug?: string
+    contentType?: string
+    size?: number
   } | null
 
   const conceptSlug = body?.conceptSlug?.trim()
@@ -96,7 +101,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "conceptSlug and assetSlug required" }, { status: 400 })
   }
 
-  return NextResponse.json({
-    error: "Direct browser uploads must use multipart/form-data. Retry with the Choose video file button.",
-  }, { status: 400 })
+  // Direct upload: hand the browser a short-lived signed URL so the file goes straight to
+  // storage. Sending the file through this function fails for anything over the platform's
+  // ~4.5 MB request limit, which is every real video.
+  const videoType = (body?.contentType ?? "").trim().toLowerCase() || "video/mp4"
+  if (!DIRECT_UPLOAD_TYPES.has(videoType)) {
+    return NextResponse.json({ error: "Upload an MP4, MOV or WebM video." }, { status: 400 })
+  }
+  const size = Number(body?.size ?? 0)
+  if (size > MAX_DIRECT_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: `Video too large (max ${Math.round(MAX_DIRECT_UPLOAD_BYTES / (1024 * 1024))}MB)` },
+      { status: 413 },
+    )
+  }
+
+  const gcsPath = resolveUploadPath({
+    conceptSlug,
+    assetSlug,
+    version: body?.version,
+    category: body?.category,
+    angleSlug: body?.angleSlug,
+  })
+
+  try {
+    const origin = req.headers.get("origin") ?? new URL(req.url).origin
+    const cors = await ensureCreativeBucketCors(origin)
+    if (!cors.ok) console.warn("[upload-base-video] could not confirm bucket CORS:", cors.error)
+    const uploadUrl = await getCreativeSignedWriteUrl(gcsPath, videoType)
+    return NextResponse.json({ uploadUrl, gcsPath, contentType: videoType, corsOk: cors.ok, corsError: cors.error ?? null })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Could not prepare upload"
+    console.error("[upload-base-video] signed URL failed", err)
+    return NextResponse.json({ error: "Could not prepare the upload", detail: message }, { status: 500 })
+  }
 }

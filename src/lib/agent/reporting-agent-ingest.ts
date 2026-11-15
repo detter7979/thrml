@@ -404,14 +404,16 @@ export async function runReportingIngest(
         .from("ad_sets")
         .select("id, platform_adset_id")
         .eq("campaign_id", camp.id)
-        .in("status", ["TEST", "SCALE"])
+        // PAUSED children are included: an ad switched on or off mid-day still has spend for that
+        // day, and Meta returns no insight rows for objects that did not deliver.
+        .in("status", ["TEST", "SCALE", "PAUSED"])
         .not("platform_adset_id", "is", null)
 
       const { data: ads } = await admin
         .from("ads")
         .select("id, platform_ad_id")
         .eq("campaign_id", camp.id)
-        .in("status", ["TEST", "SCALE"])
+        .in("status", ["TEST", "SCALE", "PAUSED"])
         .not("platform_ad_id", "is", null)
 
       const setRows = adSets ?? []

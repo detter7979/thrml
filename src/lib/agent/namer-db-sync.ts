@@ -36,6 +36,13 @@ const BUDGET = [/budget\s*\/\s*day/i, /daily budget/i, /^budget(\s*\(\$\))?$/i]
 const CONV_EVENT = [/conv(ersion)?\.?\s*event/i, /^opt\.?\s*event$/i, /^event$/i]
 const NOTES = [/^notes$/i, /audience details/i]
 const BUDGET_MODE = [/budget\s*mode/i, /^abo\s*\/\s*cbo$/i]
+const LAUNCH = [/^launch$/i, /^launch\s*week$/i]
+
+/** LAUNCH column value (ISO week, e.g. 2026W46), normalised; "" when blank or not a week. */
+function launchWeekCell(value: string): string {
+  const v = value.trim().toUpperCase()
+  return /^\d{4}W\d{2}$/.test(v) ? v : ""
+}
 
 export function mapSheetStatusToDb(status: string): StatusT {
   const s = status.trim().toUpperCase()
@@ -116,7 +123,8 @@ export async function syncNamerBuildersToDb(admin: SupabaseClient, spreadsheetId
               phase: parsed.phase,
               funnel: parsed.funnel,
               event: parsed.event,
-              launch_week: parsed.launch_week,
+              // The week left the name; read it from the LAUNCH column (falls back to an old name's week).
+              launch_week: launchWeekCell(cellValue(row, header.headers, LAUNCH)) || parsed.launch_week,
               version: parsed.version,
               status: mapSheetStatusToDb(cellValue(row, header.headers, STATUS)),
               daily_budget_usd: budget !== null && Number.isFinite(budget) ? budget : null,

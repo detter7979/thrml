@@ -34,6 +34,12 @@ import {
 import { HEADER_PATTERNS, NAMER_TAB_CANDIDATES } from "@/lib/agent/namer-sheet-schema"
 import type { CtaT, EventT, StatusT } from "@/types/paid-media"
 
+/** LAUNCH column value (ISO week, e.g. 2026W46), normalised; "" when blank or not a week. */
+function launchWeekCell(value: string): string {
+  const v = value.trim().toUpperCase()
+  return /^\d{4}W\d{2}$/.test(v) ? v : ""
+}
+
 export type PaidMediaSyncResult = {
   ok: boolean
   campaign_id?: string
@@ -204,7 +210,8 @@ export async function upsertCampaignFromNamer(
     phase: parsed.phase,
     funnel: parsed.funnel,
     event: parsed.event,
-    launch_week: parsed.launch_week,
+    launch_week:
+      launchWeekCell(cellValue(row, tab.header, [/^launch$/i, /^launch\s*week$/i])) || parsed.launch_week,
     version: parsed.version,
     status: platformId ? "TEST" : status,
     daily_budget_usd: Number.isFinite(daily_budget_usd) ? daily_budget_usd : null,

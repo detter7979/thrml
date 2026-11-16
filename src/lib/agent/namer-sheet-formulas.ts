@@ -82,7 +82,8 @@ export function buildAdBuilderAutoNameFormula(headers: string[], row1Based: numb
  * Campaign Builder — live layout:
  * Camp ID | PLATFORM | PERSONA | SERVICE | GEO | PHASE | FUNNEL | EVENT | LAUNCH | ... | Campaign Name (auto)
  *
- * e.g. C001_META_host_sauna_SEA_P1_PROSP_BH_2026W46 (plus _v2 when VER is set)
+ * e.g. C001_META_host_sauna_SEA_P1_PROSP_BH (plus _v2 when VER is set). The LAUNCH column is kept
+ * as data (campaigns.launch_week, reporting cohort) but is no longer part of the name.
  */
 export function buildCampaignAutoNameFormula(headers: string[], row1Based: number): string | null {
   const campId = colRef(headers, CAMP_ID, row1Based)
@@ -93,7 +94,6 @@ export function buildCampaignAutoNameFormula(headers: string[], row1Based: numbe
   const phase = colRef(headers, [/^phase$/i], row1Based)
   const funnel = colRef(headers, [/^funnel$/i], row1Based)
   const event = colRef(headers, [/^event$/i, /^opt\.?\s*event$/i], row1Based)
-  const launch = colRef(headers, [/^launch$/i], row1Based)
   const ver = colRef(headers, [/^ver$/i, /^version$/i], row1Based)
 
   if (!campId || !platform) return null
@@ -107,7 +107,6 @@ export function buildCampaignAutoNameFormula(headers: string[], row1Based: numbe
     phase ?? null,
     funnel ? `UPPER(${funnel})` : null,
     event ? `UPPER(${event})` : null,
-    launch ?? null,
   ].filter(Boolean)
 
   const verSuffix = ver ? `&IF(${ver}="","","_"&LOWER(${ver}))` : ""

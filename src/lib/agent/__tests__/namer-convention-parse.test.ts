@@ -67,3 +67,25 @@ describe("normalizeAdFormatToken", () => {
     expect(normalizeAdFormatToken("unknown")).toBe("Static_1x1")
   })
 })
+
+describe("campaign names without a launch week", () => {
+  it("parses the new form and keeps reading the old one", async () => {
+    const { parseCampaignConventionName } = await import("@/lib/agent/namer-convention-parse")
+    const now = parseCampaignConventionName("C001_META_host_sauna_SEA_P1_PROSP_BH")
+    expect(now?.legacy_id).toBe("C001")
+    expect(now?.event).toBe("BH")
+    expect(now?.launch_week).toBe("")
+    expect(parseCampaignConventionName("C007_META_host_sauna_SEA_P3_LAL_ACT_v2")?.version).toBe("v2")
+    expect(parseCampaignConventionName("C001_META_host_sauna_SEA_P1_PROSP_BH_2026W46")?.launch_week).toBe("2026W46")
+    expect(parseCampaignConventionName("C007_META_host_sauna_SEA_P3_LAL_ACT_2027W04_v2")?.version).toBe("v2")
+  })
+
+  it("builds the sheet formula without the LAUNCH column", async () => {
+    const { buildCampaignAutoNameFormula } = await import("@/lib/agent/namer-sheet-formulas")
+    const headers = ["Camp ID", "PLATFORM", "PERSONA", "SERVICE", "GEO", "PHASE", "FUNNEL", "EVENT", "LAUNCH", "VER"]
+    const f = buildCampaignAutoNameFormula(headers, 4)!
+    expect(f).not.toContain("$I4")
+    expect(f).toContain("UPPER($H4)")
+    expect(f).toContain('IF($J4="","","_"&LOWER($J4))')
+  })
+})

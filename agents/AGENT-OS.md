@@ -15,16 +15,27 @@ Agents run on a Vercel Hobby plan via cron jobs, calling Next.js API routes.
 Every agent MUST log its run to the `agent_runs` table on completion.
 
 ### Active Agents
+Team names, membership, and the full cron inventory live in `agents/teams.md`.
+The digest email is a template. A House shadow summary is stored on `agent_runs` only when `AGENT_SHADOW_DIGEST=1`, and that summary is not sent.
+
 | Agent | Route | Schedule (UTC) | Purpose |
 |---|---|---|---|
+| reporting | /api/cron/agent-reporting | 02:30 daily | Paid-media report |
 | ads-evaluate | /api/cron/agent-evaluate | 03:00 daily | Meta + Google Ads optimization |
 | disputes | /api/cron/agent-disputes | 03:00 daily | Support ticket triage + resolution |
 | finance | /api/cron/agent-finance | 04:00 daily | P&L snapshot + weekly report |
 | social | /api/cron/agent-social | 05:00 daily | Content queue generation |
 | ops | /api/cron/agent-ops | 06:00 daily | Platform health + anomaly detection |
+| inbox | /api/cron/agent-inbox | 06:30 daily | Inbox classification and reply drafts |
 | digest | /api/cron/agent-digest | 07:00 daily | Morning summary email to Dom |
+| creative-brief | /api/cron/agent-creative-brief | 08:00 daily | Creative briefs |
+| social-publish | /api/cron/agent-social-publish | 08:30 daily | Approved social publishing |
 | reminders | /api/cron/reminders | 08:00 daily | Guest/host booking reminders |
 | send-messages | /api/cron/send-messages | 09:00 daily | Automated host→guest messages |
+| creative-static | /api/cron/agent-creative-static | 09:00 daily | Static creative generation |
+| reporting-ingest | /api/cron/reporting-agent | 09:05 daily | Performance ingest |
+| evaluator | /api/cron/evaluator-agent | 10:00 daily | Paid-media recommendations |
+| meta-ads | /api/cron/meta-ads-agent | 11:00 daily | Executes approved Meta recommendations |
 | review-requests | /api/cron/review-requests | 12:00 daily | Post-session review prompts |
 | retarget | /api/cron/retarget | 14:00 daily | Host/guest retargeting emails |
 

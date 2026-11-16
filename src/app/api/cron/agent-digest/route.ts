@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { renderThrmlEmail } from "@/lib/emails/render-layout"
 import { sendEmail } from "@/lib/emails/send"
+import {
+  digestRunResults,
+  runDigestShadow,
+  type DigestFacts,
+} from "@/lib/agent/digest-shadow"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 function cronAuth(req: NextRequest) {
@@ -28,6 +33,7 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdminClient()
+  const runStart = Date.now()
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "https://usethrml.com"
   const disputesInboxUrl = `${appUrl}/admin/inbox/disputes`
   const today = new Date().toISOString().slice(0, 10)
@@ -83,6 +89,19 @@ export async function GET(req: NextRequest) {
     // ── Build email ────────────────────────────────────────────────────────
     const subjectPrefix = criticals.length > 0 ? "🚨 " : warnings.length > 0 ? "⚠️ " : "✅ "
     const bookingRevenue = (newBookings ?? []).reduce((s, b) => s + Number(b.total_charged ?? 0), 0)
+    const facts: DigestFacts = {
+      date: today,
+      netPlatformRevenue: finance ? Number(finance.net_platform_revenue) : null,
+      bookingCount: (newBookings ?? []).length,
+      bookingRevenue,
+      pendingTickets: pendingTickets ?? 0,
+      pendingSocial: pendingSocial ?? 0,
+      criticalCount: criticals.length,
+      warningCount: warnings.length,
+      infoCount: infos.length,
+      alertLines: (alerts ?? []).map((a) => `[${a.severity}] [${a.category}] ${a.message}`),
+      agentRunLines: (agentRuns ?? []).map((r) => `${r.agent_name} ${r.status}`),
+    }
 
     const alertsHtml = (alerts ?? []).length === 0
       ? `<p style="color:#27AE60;font-size:14px">No alerts — all systems healthy.</p>`
@@ -169,12 +188,40 @@ ${(pendingTickets ?? 0) > 0 || criticals.length > 0 ? `
       to: "etter.dom@gmail.com",
       subject: `${subjectPrefix}thrml Digest${subjectRevenue}${alertSummary}`,
       html,
-      text: `thrml Agent Digest — ${today}\n\nAlerts: ${criticals.length} critical, ${warnings.length} warnings\nBookings: ${(newBookings ?? []).length} (${fmt(bookingRevenue)})\nOpen tickets: ${pendingTickets ?? 0}\nContent queued: ${pendingSocial ?? 0}`,
+      text: `thrml Agent Digest — ${today}\n\nAlerts: ${facts.criticalCount} critical, ${facts.warningCount} warnings\nBookings: ${facts.bookingCount} (${fmt(facts.bookingRevenue)})\nOpen tickets: ${facts.pendingTickets}\nContent queued: ${facts.pendingSocial}`,
     })
 
-    return NextResponse.json({ ok: true, date: today, alertCount: (alerts ?? []).length, bookingCount: (newBookings ?? []).length })
+    const shadow = await runDigestShadow(facts)
+    const results = digestRunResults(facts, shadow)
+    const { error: logError } = await admin.from("agent_runs").insert({
+      agent_name: "digest",
+      status: "success",
+      completed_at: new Date().toISOString(),
+      duration_ms: Date.now() - runStart,
+      results,
+    })
+    if (logError) console.error("[agent-digest] failed to record run", logError.message)
+
+    return NextResponse.json({
+      ok: true,
+      date: today,
+      alertCount: (alerts ?? []).length,
+      bookingCount: facts.bookingCount,
+      shadow: shadow.status,
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error"
+    try {
+      await admin.from("agent_runs").insert({
+        agent_name: "digest",
+        status: "error",
+        completed_at: new Date().toISOString(),
+        duration_ms: Date.now() - runStart,
+        error_message: msg,
+      })
+    } catch (logErr) {
+      console.error("[agent-digest] failed to record error", logErr)
+    }
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 }

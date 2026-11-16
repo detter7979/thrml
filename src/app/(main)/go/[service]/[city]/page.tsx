@@ -68,7 +68,7 @@ const TRUST_POINTS = [
 ] as const
 
 const STEPS = [
-  { icon: CalendarCheck, title: "Pick a sauna and a time", body: "Browse the saunas below and choose an open slot." },
+  { icon: CalendarCheck, title: "Pick a sauna and a time", body: "Choose a sauna that suits you and an open slot." },
   { icon: CreditCard, title: "Book in a few taps", body: "Pay securely. Your booking is confirmed right away or after the host accepts." },
   { icon: KeyRound, title: "Show up and unwind", body: "Your host sends arrival details. Message them in the app anytime." },
 ] as const

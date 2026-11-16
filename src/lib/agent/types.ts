@@ -11,6 +11,22 @@ export interface VideoCopyVariant {
   angle?: string
 }
 
+/** Overlay choices for the POV video template; stored on the brief and copied to each render job. */
+export interface VideoOverlayOptions {
+  /** Vertical centre of the overlay text, % of frame height (0 = top, 100 = bottom). Default 40. */
+  textPositionPct?: number
+  showLogo?: boolean
+  /** 0–1. Default 0.85. */
+  logoOpacity?: number
+  logoPosition?: "top" | "bottom"
+}
+
+export const DEFAULT_VIDEO_TEXT_POSITION_PCT = 40
+export const DEFAULT_VIDEO_LOGO_OPACITY = 0.85
+/** Mirrors the worker's safe-zone clamp (worker/src/template.ts). */
+export const VIDEO_TEXT_POSITION_MIN_PCT = 12
+export const VIDEO_TEXT_POSITION_MAX_PCT = 85
+
 export interface VideoConfig {
   source: "runway" | "uploaded"
   runwayPrompt?: string // required if source = 'runway'
@@ -22,6 +38,8 @@ export interface VideoConfig {
   duration?: 5 | 10 // Runway only
   ratio?: "720:1280" | "1280:720" | "768:1280" | "1280:768" // legacy values normalized at Runway call
   naming?: NamingDefaults
+  /** POV overlay only (template version 2): text height and optional logo. */
+  overlay?: VideoOverlayOptions
 }
 
 export interface RenderJob {

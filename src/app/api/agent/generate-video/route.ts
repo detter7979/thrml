@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
   const { error, admin } = await requireAdminApi()
   if (error) return error
 
-  const body = (await req.json().catch(() => null)) as { briefId?: string } | null
+  const body = (await req.json().catch(() => null)) as { briefId?: string; rerender?: boolean } | null
+  const rerender = body?.rerender === true
   const briefId = body?.briefId?.trim()
   if (!briefId) {
     return NextResponse.json({ error: "briefId required" }, { status: 400 })
@@ -42,7 +43,9 @@ export async function POST(req: NextRequest) {
   if (briefErr || !brief) {
     return NextResponse.json({ error: "brief not found" }, { status: 404 })
   }
-  if (brief.status !== "approved") {
+  // A re-render picks up edited copy / layout on a brief that already has videos.
+  const allowedStatuses = rerender ? ["approved", "variations_ready", "launched"] : ["approved"]
+  if (!allowedStatuses.includes(String(brief.status))) {
     return NextResponse.json(
       { error: `brief must be approved (current status: ${brief.status})` },
       { status: 400 }
@@ -221,6 +224,39 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Each re-render writes to its own file, so a video already uploaded to Meta is never replaced.
+    let revision = 0
+    if (rerender) {
+      const { count } = await admin!
+        .from("render_jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("brief_id", brief.id)
+      revision = Math.floor((count ?? 0) / Math.max(1, config.copyVariants.length)) + 1
+
+      // Retire earlier renders that never went to Meta; launched ones stay as they are.
+      const { data: previous } = await admin!
+        .from("creative_assets")
+        .select("id, status, meta_ad_id, performance_data")
+        .eq("brief_id", brief.id)
+        .eq("generation_tool", "composite-video")
+      const retire = (previous ?? [])
+        .filter((row) => {
+          const launches = (row.performance_data as { launches?: unknown[] } | null)?.launches
+          return row.status !== "launched" && !row.meta_ad_id && !(Array.isArray(launches) && launches.length > 0)
+        })
+        .map((row) => row.id as string)
+      if (retire.length > 0) {
+        await admin!.from("creative_assets").update({ status: "rejected" }).in("id", retire)
+      }
+    }
+
+    const renderOptions =
+      templateVersion === 2
+        ? { ...(config.overlay ?? {}), ...(revision > 0 ? { revision } : {}) }
+        : revision > 0
+          ? { revision }
+          : null
+
     const jobInserts = config.copyVariants.map((variant) => {
       let adName: string | null = null
       if (config.naming && variant.variant && variant.angle) {
@@ -245,6 +281,7 @@ export async function POST(req: NextRequest) {
         concept_slug: config.conceptSlug,
         template_version: templateVersion,
         ad_name: adName,
+        render_options: renderOptions && Object.keys(renderOptions).length > 0 ? renderOptions : null,
       }
     })
 

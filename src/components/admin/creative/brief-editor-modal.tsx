@@ -8,6 +8,12 @@ import { buildAdName } from "@/lib/agent/naming-builder"
 import { DEFAULT_HOST_HEADLINE, SPLIT_HEADER_DEFAULTS, isSplitHeaderSvgTemplate } from "@/lib/agent/svg-template-shared"
 import type { VideoConfig } from "@/lib/agent/types"
 import {
+  DEFAULT_VIDEO_LOGO_OPACITY,
+  DEFAULT_VIDEO_TEXT_POSITION_PCT,
+  VIDEO_TEXT_POSITION_MAX_PCT,
+  VIDEO_TEXT_POSITION_MIN_PCT,
+} from "@/lib/agent/types"
+import {
   DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
   DEFAULT_POV_VIDEO_OVERLAY,
 } from "@/lib/agent/video-template-copy"
@@ -88,6 +94,12 @@ export type StructuredBriefEditorState = {
   video_ratio: "720:1280" | "1280:720" | "768:1280" | "1280:768"
   video_template_version: number
   video_copy_variants: VideoCopyVariantRow[]
+  /** POV overlay: vertical centre of the text, % of frame height. */
+  video_text_position_pct: number
+  video_show_logo: boolean
+  /** 0–100 in the form; stored as 0–1. */
+  video_logo_opacity_pct: number
+  video_logo_position: "top" | "bottom"
 }
 
 export type CreativeBriefLike = {
@@ -236,6 +248,10 @@ export function structuredEditorFromBrief(brief: CreativeBriefLike): StructuredB
       vc?.ratio === "1280:720" || vc?.ratio === "1280:768" ? "1280:720" : "720:1280",
     video_template_version: vc?.templateVersion ?? DEFAULT_POV_SAUNA_TEMPLATE_VERSION,
     video_copy_variants: parseVideoCopyVariants(vc?.copyVariants),
+    video_text_position_pct: vc?.overlay?.textPositionPct ?? DEFAULT_VIDEO_TEXT_POSITION_PCT,
+    video_show_logo: vc?.overlay?.showLogo === true,
+    video_logo_opacity_pct: Math.round((vc?.overlay?.logoOpacity ?? DEFAULT_VIDEO_LOGO_OPACITY) * 100),
+    video_logo_position: vc?.overlay?.logoPosition === "top" ? "top" : "bottom",
   }
 }
 
@@ -337,6 +353,12 @@ export function structuredEditorToPatch(state: StructuredBriefEditorState) {
         testId: state.naming_test_id,
         format: state.naming_format,
         cta: state.naming_cta,
+      },
+      overlay: {
+        textPositionPct: state.video_text_position_pct,
+        showLogo: state.video_show_logo,
+        logoOpacity: Math.min(100, Math.max(0, state.video_logo_opacity_pct)) / 100,
+        logoPosition: state.video_logo_position,
       },
     } satisfies VideoConfig
     patch.format = "9x16"
@@ -642,6 +664,67 @@ export function BriefEditorModal({
                   </div>
                 ))}
               </div>
+
+              {(state.video_template_version || DEFAULT_POV_SAUNA_TEMPLATE_VERSION) === 2 ? (
+                <div className="space-y-3 border-t pt-3">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Overlay layout</p>
+                  <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+                    Text height: {state.video_text_position_pct}% from the top
+                    <input
+                      type="range"
+                      min={VIDEO_TEXT_POSITION_MIN_PCT}
+                      max={VIDEO_TEXT_POSITION_MAX_PCT}
+                      step={1}
+                      value={state.video_text_position_pct}
+                      onChange={(e) => set("video_text_position_pct", Number(e.target.value))}
+                      className="w-full"
+                    />
+                    <span className="block text-[11px] font-normal">
+                      Lower numbers move the text up. {DEFAULT_VIDEO_TEXT_POSITION_PCT}% is the default; the range
+                      stays inside the Stories and Reels safe zone.
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={state.video_show_logo}
+                      onChange={(e) => set("video_show_logo", e.target.checked)}
+                    />
+                    Add the thrml logo
+                  </label>
+                  {state.video_show_logo ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+                        Logo opacity: {state.video_logo_opacity_pct}%
+                        <input
+                          type="range"
+                          min={10}
+                          max={100}
+                          step={5}
+                          value={state.video_logo_opacity_pct}
+                          onChange={(e) => set("video_logo_opacity_pct", Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </label>
+                      <label className="block space-y-1 text-xs font-medium text-muted-foreground">
+                        Logo position
+                        <select
+                          value={state.video_logo_position}
+                          onChange={(e) => set("video_logo_position", e.target.value === "top" ? "top" : "bottom")}
+                          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="bottom">Bottom centre</option>
+                          <option value="top">Top centre</option>
+                        </select>
+                      </label>
+                    </div>
+                  ) : null}
+                  <p className="text-[11px] text-muted-foreground">
+                    Layout and copy changes apply to the next render. On a brief that already has videos, save
+                    and then use Re-render video on its card.
+                  </p>
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">

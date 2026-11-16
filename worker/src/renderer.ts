@@ -58,7 +58,7 @@ export function buildFilterComplex(args: {
   const fontPath = escapeDrawtextPath(resolveWorkerPath(t.fontPath))
   const copyFile = escapeDrawtextPath(args.copyTextFile)
   const showGradient = t.showGradient !== false && t.gradientHeight > 0
-  const showLogo = t.showLogo !== false && t.logoWidth > 0
+  const showLogo = t.showLogo !== false && (t.logoWidth > 0 || (t.logoWidthRatio ?? 0) > 0) && t.logoOpacity > 0
 
   const fontSizeExpr = t.fontSizeRatio ? `fontsize=h*${t.fontSizeRatio}` : `fontsize=${t.textSize}`
   const lineSpacing = t.textLineSpacing ?? 11
@@ -123,6 +123,20 @@ export function buildFilterComplex(args: {
       }),
     )
     current = "[txt]"
+  }
+
+  if (showLogo && (t.logoWidthRatio ?? 0) > 0) {
+    // Size the logo from the video's own width so it looks the same on any upload resolution.
+    const margin = t.logoMarginRatio ?? 0.17
+    const y = t.logoPosition === "top" ? `H*${margin}` : `H-h-H*${margin}`
+    const c = t.logoCrop
+    const crop = c ? `crop=${c.width}:${c.height}:${c.x}:${c.y},` : ""
+    parts.push(
+      `[1:v]${crop}format=rgba,colorchannelmixer=aa=${t.logoOpacity}[logoraw]`,
+      `[logoraw]${current}scale2ref=w=iw*${t.logoWidthRatio}:h=ow/main_a[logo][logobase]`,
+      `[logobase][logo]overlay=(W-w)/2:${y}[out]`,
+    )
+    return { filter: parts.join(";"), outputLabel: "out", inputs: 2 }
   }
 
   if (showLogo) {

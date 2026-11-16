@@ -6,7 +6,7 @@ import { ctaToMetaEnumFromBrief } from "@/lib/agent/meta-cta"
 import {
   assetLaunchRecords,
   canLaunchAsPlacementBundle,
-  isLaunchableStaticImage,
+  usesLaunchTimeAdId,
   primaryBundleFormatRank,
   stripLegacyAdPrefix,
   validatePlacementBundle,
@@ -78,6 +78,8 @@ type CreativeAssetRow = LaunchableAssetRow & {
   variation_index: number | null
   gcs_path: string | null
   convention_name: string | null
+  meta_video_id?: string | null
+  meta_thumbnail_image_hash?: string | null
   performance_data?: Record<string, unknown> | null
   creative_briefs: CreativeBrief | CreativeBrief[] | null
 }
@@ -792,7 +794,7 @@ export async function POST(req: NextRequest) {
     const { data: asset, error: assetError } = await admin!
       .from("creative_assets")
       .select(
-        "id, brief_id, asset_type, generation_tool, variation_index, variation_label, gcs_path, convention_name, status, meta_ad_id, performance_data, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name, trigger_data)"
+        "id, brief_id, asset_type, generation_tool, variation_index, variation_label, format, gcs_path, convention_name, status, meta_ad_id, meta_video_id, meta_thumbnail_image_hash, performance_data, creative_briefs(id, copy_primary, copy_headline, copy_subtext, cta, hook, campaign_short_name, trigger_data)"
       )
       .eq("id", assetId)
       .maybeSingle()
@@ -830,7 +832,12 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (creativeAsset.status === "launched" && creativeAsset.meta_ad_id) {
+    // Legacy launches (no per-ad-set record) can't be repeated; newer ones are checked per ad set below.
+    if (
+      creativeAsset.status === "launched" &&
+      creativeAsset.meta_ad_id &&
+      assetLaunchRecords(creativeAsset.performance_data).length === 0
+    ) {
       return jsonError("Asset already launched", 409, { metaAdId: creativeAsset.meta_ad_id })
     }
 
@@ -843,9 +850,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Static images get their AD### at launch (one namer row per Meta ad). Video keeps its approve-time row.
+    // Static images and rendered videos get their AD### at launch (one namer row per Meta ad).
     let singleReservation: NamerLaunchReservation | null = null
-    if (!BASE_VIDEO_TOOLS.has(tool) && isLaunchableStaticImage(creativeAsset as LaunchableAssetRow)) {
+    const launchTimeId = usesLaunchTimeAdId(creativeAsset as LaunchableAssetRow)
+    if (launchTimeId) {
       try {
         const reserved = await reserveNamerAdForLaunch(admin!, { assetId, platformAdSetId: adsetId })
         if (reserved.ok) singleReservation = reserved.reservation
@@ -875,11 +883,15 @@ export async function POST(req: NextRequest) {
         return jsonError("Creative brief needs copy_primary or hook for video ad message", 400)
       }
 
-      const signedUrl = await getSignedGcsReadUrl(creativeAsset.gcs_path, { expiresInSec: 3600 })
-      const { videoId, thumbnailImageHash } = await uploadVideo({
-        fileUrl: signedUrl,
-        name: adName,
-      })
+      // The same video file serves every ad set: upload it to Meta once and reuse it afterwards.
+      let videoId = creativeAsset.meta_video_id?.trim() || ""
+      let thumbnailImageHash = creativeAsset.meta_thumbnail_image_hash?.trim() || ""
+      if (!videoId || !thumbnailImageHash) {
+        const signedUrl = await getSignedGcsReadUrl(creativeAsset.gcs_path, { expiresInSec: 3600 })
+        const uploaded = await uploadVideo({ fileUrl: signedUrl, name: adName })
+        videoId = uploaded.videoId
+        thumbnailImageHash = uploaded.thumbnailImageHash
+      }
       videoMetaFields = {
         meta_video_id: videoId,
         meta_thumbnail_image_hash: thumbnailImageHash,
@@ -966,7 +978,8 @@ export async function POST(req: NextRequest) {
     const { error: updateError } = await admin!
       .from("creative_assets")
       .update({
-        status: "launched",
+        // Stays approved so the same creative can be launched into more ad sets.
+        status: launchTimeId ? "approved" : "launched",
         meta_creative_id: metaCreativeId,
         meta_ad_id: metaAdId,
         meta_adset_id: adsetId,

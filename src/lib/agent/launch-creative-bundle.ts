@@ -43,6 +43,15 @@ export function isLaunchableStaticImage(asset: LaunchableAssetRow): boolean {
   return asset.asset_type === "image"
 }
 
+/**
+ * Creatives that get their AD### when they launch (one namer row per Meta ad) instead of at approval:
+ * static images and rendered videos. They stay "approved" after a launch so the same creative can go
+ * into more ad sets.
+ */
+export function usesLaunchTimeAdId(asset: LaunchableAssetRow): boolean {
+  return isLaunchableStaticImage(asset) || VIDEO_LAUNCH_TOOLS.has(asset.generation_tool ?? "")
+}
+
 export function placementBundleFormats(assets: LaunchableAssetRow[]): StaticFormat[] {
   return assets
     .map((asset) => normalizeStaticFormat(asset.format))

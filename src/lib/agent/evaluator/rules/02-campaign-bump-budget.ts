@@ -13,6 +13,8 @@ function bumpPct(currentDaily: number): number {
 export function rule02CampaignBumpBudget(ctx: EvaluatorContext): RuleResult[] {
   const monthlyCap = ruleNumber(ctx.rules, "billing", "monthly_account_cap_usd", 5000)
   const maxDailyPct = ruleNumber(ctx.rules, "underperformance.budget", "max_daily_increase_pct", 30) / 100
+  // Don't propose scaling on a handful of results.
+  const minConversions = ruleNumber(ctx.rules, "global", "min_conversions_to_scale_default", 10)
   const days = 7
   const out: RuleResult[] = []
 
@@ -26,7 +28,7 @@ export function rule02CampaignBumpBudget(ctx: EvaluatorContext): RuleResult[] {
 
     const { cac, spend, conv, dates } = hostGuestCac(ctx.performance, c, days)
     const target = targetCacUsd(ctx, c)
-    if (cac === null || conv <= 0) continue
+    if (cac === null || conv <= 0 || conv < minConversions) continue
     if (dates.size < 7) continue
     if (cac > target) continue
 

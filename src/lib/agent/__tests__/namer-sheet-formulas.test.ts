@@ -76,7 +76,8 @@ describe("buildCampaignAutoNameFormula", () => {
     expect(formula).toContain("$A4")
     expect(formula).toContain("UPPER($B4)")
     expect(formula).toContain("LOWER($C4)")
-    expect(formula).toContain("$I4")
+    // LAUNCH (column I) is data only; it is no longer part of the name.
+    expect(formula).not.toContain("$I4")
   })
 })
 

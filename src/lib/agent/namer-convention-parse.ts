@@ -53,6 +53,7 @@ export function parseCampaignConventionName(raw: string): ParsedCampaignConventi
 
   const parts = name.split("_").filter(Boolean)
   if (parts.length < 7) return null
+  // C001_META_host_sauna_SEA_P1_PROSP_BH = 8 parts with an ID, 7 without.
 
   let i = 0
   let legacy_id: string | null = null
@@ -89,9 +90,13 @@ export function parseCampaignConventionName(raw: string): ParsedCampaignConventi
   if (!EVENTS.has(event)) return null
   i++
 
-  const launch_week = parts[i] ?? ""
-  if (!/^\d{4}W\d{2}$/i.test(launch_week)) return null
-  i++
+  // Launch week is optional: names dropped it in Nov 2026 (it lives in the LAUNCH column and
+  // campaigns.launch_week). Older names that still carry it are read as before.
+  let launch_week = ""
+  if (/^\d{4}W\d{2}$/i.test(parts[i] ?? "")) {
+    launch_week = parts[i]!
+    i++
+  }
 
   let version = ""
   if (i < parts.length && /^v\d+$/i.test(parts[i] ?? "")) {

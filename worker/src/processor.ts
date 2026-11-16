@@ -7,7 +7,7 @@ import type { GcsClient } from "./gcs.js"
 import { logger } from "./logger.js"
 import { render } from "./renderer.js"
 import { angleSlugFromConcept, unifiedVideoRenderPath } from "./paths.js"
-import { getTemplate } from "./template.js"
+import { applyRenderOptions, getTemplate, parseRenderOptions } from "./template.js"
 import {
   type RenderJob,
   insertCreativeAsset,
@@ -42,6 +42,7 @@ export async function processJob(job: RenderJob, deps: ProcessorDeps): Promise<v
   log.info("Processing job")
 
   const now = new Date()
+  const renderOptions = parseRenderOptions(job.render_options)
   const angleSlug = angleSlugFromConcept(job.concept_slug)
   const renderedGcsPath = unifiedVideoRenderPath({
     date: now,
@@ -49,6 +50,7 @@ export async function processJob(job: RenderJob, deps: ProcessorDeps): Promise<v
     angleSlug,
     variantSlug: job.variant_slug,
     templateVersion: job.template_version,
+    revision: renderOptions.revision,
   })
 
   const workDir = await mkdtemp(join(tmpdir(), `render-${job.id.slice(0, 8)}-`))
@@ -61,7 +63,7 @@ export async function processJob(job: RenderJob, deps: ProcessorDeps): Promise<v
         log.info({ path: job.base_video_gcs_path }, "Downloading base video")
         await deps.gcs.download(job.base_video_gcs_path, baseLocal)
 
-        const template = getTemplate(job.template_version)
+        const template = applyRenderOptions(getTemplate(job.template_version), renderOptions)
         log.info({ templateVersion: template.version }, "Rendering")
         await render({
           baseVideoPath: baseLocal,

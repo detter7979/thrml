@@ -55,8 +55,79 @@ export interface VideoTemplate {
   gradientMaxOpacity: number
   showGradient?: boolean
   showLogo?: boolean
+  /** Logo width as a fraction of the frame width (used instead of logoWidth when set). */
+  logoWidthRatio?: number
+  /** Visible area of the logo file (it has transparent padding), so it scales and centres correctly. */
+  logoCrop?: { width: number; height: number; x: number; y: number }
+  /** Where the logo sits; margins keep it inside the Stories / Reels safe zone. */
+  logoPosition?: "top" | "bottom"
+  /** Distance from the top or bottom edge as a fraction of frame height. */
+  logoMarginRatio?: number
   /** v3 — block split: orange top block + bottom video region. */
   blockSplit?: BlockSplitLayout
+}
+
+/**
+ * Per-job overrides chosen on the brief (render_jobs.render_options). Everything is optional;
+ * an empty object renders the template exactly as before.
+ */
+export interface RenderOptions {
+  /** Vertical centre of the POV text, as % of frame height (0 = top edge, 100 = bottom edge). */
+  textPositionPct?: number
+  showLogo?: boolean
+  /** 0–1. */
+  logoOpacity?: number
+  logoPosition?: "top" | "bottom"
+  /** Re-render counter; keeps each re-render in its own output file. */
+  revision?: number
+}
+
+/** The wordmark occupies this box inside assets/thrml-logo.png (551×200 with transparent padding). */
+export const THRML_LOGO_CROP = { width: 263, height: 85, x: 0, y: 57 }
+
+/** Keep text clear of the app UI at the very top and bottom of a 9:16 frame. */
+export const TEXT_POSITION_MIN_PCT = 12
+export const TEXT_POSITION_MAX_PCT = 85
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n))
+}
+
+export function parseRenderOptions(raw: unknown): RenderOptions {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {}
+  const r = raw as Record<string, unknown>
+  const out: RenderOptions = {}
+  const pos = Number(r.textPositionPct)
+  if (r.textPositionPct != null && Number.isFinite(pos)) {
+    out.textPositionPct = clamp(pos, TEXT_POSITION_MIN_PCT, TEXT_POSITION_MAX_PCT)
+  }
+  if (typeof r.showLogo === "boolean") out.showLogo = r.showLogo
+  const opacity = Number(r.logoOpacity)
+  if (r.logoOpacity != null && Number.isFinite(opacity)) out.logoOpacity = clamp(opacity, 0, 1)
+  if (r.logoPosition === "top" || r.logoPosition === "bottom") out.logoPosition = r.logoPosition
+  const revision = Number(r.revision)
+  if (r.revision != null && Number.isInteger(revision) && revision > 0) out.revision = revision
+  return out
+}
+
+/** Returns a copy of the template with the brief's overrides applied (POV overlay templates only). */
+export function applyRenderOptions(template: VideoTemplate, options: RenderOptions): VideoTemplate {
+  if (template.blockSplit) return template
+  const t: VideoTemplate = { ...template }
+  if (options.textPositionPct != null && t.textTopRatio != null) {
+    t.textTopRatio = Math.round(options.textPositionPct * 10) / 1000
+  }
+  if (options.showLogo === true) {
+    t.showLogo = true
+    t.logoWidthRatio = t.logoWidthRatio ?? 0.22
+    t.logoCrop = t.logoCrop ?? THRML_LOGO_CROP
+    t.logoPosition = options.logoPosition ?? t.logoPosition ?? "bottom"
+    t.logoMarginRatio = t.logoMarginRatio ?? (t.logoPosition === "top" ? 0.12 : 0.17)
+    t.logoOpacity = options.logoOpacity ?? (t.logoOpacity > 0 ? t.logoOpacity : 0.85)
+  } else if (options.showLogo === false) {
+    t.showLogo = false
+  }
+  return t
 }
 
 /** v1 — bottom gradient scrim, centered copy mid-frame, thrml logo lockup. */

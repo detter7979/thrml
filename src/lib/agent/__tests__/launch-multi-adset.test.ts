@@ -60,3 +60,23 @@ describe("relaunching a creative into more ad sets", () => {
     expect(stripLegacyAdPrefix("T01_A_ease_Static_4x5_list_now")).toBe("T01_A_ease_Static_4x5_list_now")
   })
 })
+
+describe("launch-time ad IDs", () => {
+  it("covers static images and rendered videos, not base videos", async () => {
+    const { usesLaunchTimeAdId } = await import("@/lib/agent/launch-creative-bundle")
+    const row = (generation_tool: string, asset_type: string) => ({
+      id: "a",
+      brief_id: "b",
+      asset_type,
+      generation_tool,
+      variation_label: "A",
+      format: "9x16",
+      status: "approved",
+      meta_ad_id: null,
+    })
+    expect(usesLaunchTimeAdId(row("svg_template", "image"))).toBe(true)
+    expect(usesLaunchTimeAdId(row("composite-video", "video"))).toBe(true)
+    expect(usesLaunchTimeAdId(row("manual", "video"))).toBe(false)
+    expect(usesLaunchTimeAdId(row("runway", "video"))).toBe(false)
+  })
+})

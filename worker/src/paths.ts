@@ -18,9 +18,12 @@ export function unifiedVideoRenderPath(args: {
   angleSlug: string
   variantSlug: string
   templateVersion: number
+  /** Re-render number; each re-render gets its own file so a launched video is never overwritten. */
+  revision?: number
 }): string {
-  const { date, category, angleSlug, variantSlug, templateVersion } = args
-  return `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/composite/${slug(variantSlug)}_9x16_v${templateVersion}.mp4`
+  const { date, category, angleSlug, variantSlug, templateVersion, revision } = args
+  const rev = revision && revision > 0 ? `_r${revision}` : ""
+  return `${yyyy(date)}/${mm(date)}/${slug(category)}/${slug(angleSlug)}/Video/composite/${slug(variantSlug)}_9x16_v${templateVersion}${rev}.mp4`
 }
 
 export function angleSlugFromConcept(conceptSlug: string): string {

@@ -395,14 +395,14 @@ export default function AgentsDashboard() {
   }
 
 
-  const generateVideoVariants = async (briefId: string) => {
+  const generateVideoVariants = async (briefId: string, opts?: { rerender?: boolean }) => {
     setBusyAction(`generate-video-${briefId}`)
     setPipelineMessage(null)
     try {
       const res = await fetch("/api/agent/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ briefId }),
+        body: JSON.stringify({ briefId, rerender: opts?.rerender === true }),
       })
       const json = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -1672,6 +1672,17 @@ export default function AgentsDashboard() {
                             >
                               Duplicate
                             </button>
+                            {isVideoBrief(group.brief) ? (
+                              <button
+                                type="button"
+                                onClick={() => void generateVideoVariants(group.brief!.id, { rerender: true })}
+                                disabled={busyAction === `generate-video-${group.brief!.id}`}
+                                className="text-xs px-3 py-1.5 border rounded hover:bg-muted disabled:opacity-50"
+                                title="Render again with the brief's current overlay copy, text height and logo settings. Videos already in Meta are kept."
+                              >
+                                {busyAction === `generate-video-${group.brief!.id}` ? "Queuing…" : "Re-render video"}
+                              </button>
+                            ) : null}
                           </div>
                         ) : null}
                       </div>

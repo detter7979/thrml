@@ -10,6 +10,8 @@ export interface RenderJob {
   concept_slug: string
   template_version: number
   ad_name?: string | null
+  /** Overlay choices from the brief (text height, logo). See RenderOptions. */
+  render_options?: unknown
   status: "pending" | "running" | "completed" | "failed" | "cancelled"
   attempts: number
   max_attempts: number

@@ -30,7 +30,7 @@ import {
   fetchLaunchableCampaigns,
   getMetaAdAccountId,
 } from "@/lib/agent/meta-ads-api"
-import { isLaunchableStaticImage, type LaunchableAssetRow } from "@/lib/agent/launch-creative-bundle"
+import { usesLaunchTimeAdId, type LaunchableAssetRow } from "@/lib/agent/launch-creative-bundle"
 import { requireAdminApi } from "@/lib/admin-guard"
 
 export const runtime = "nodejs"
@@ -1095,8 +1095,9 @@ export async function PATCH(req: NextRequest) {
   let namer_sync: Awaited<ReturnType<typeof appendApprovedCreativeToNamer>> | undefined
   // Static images get their namer row (and AD###) when they launch: one row per Meta ad, not one per
   // approved size. Approving three sizes used to burn three ad IDs before anything was live.
-  const staticImage = data ? isLaunchableStaticImage(data as LaunchableAssetRow) : false
-  if (body.action === "approve_asset" && data && !staticImage) {
+  // Rendered videos follow the same rule.
+  const launchTimeId = data ? usesLaunchTimeAdId(data as LaunchableAssetRow) : false
+  if (body.action === "approve_asset" && data && !launchTimeId) {
     try {
       namer_sync = await appendApprovedCreativeToNamer(admin!, data.id)
       if (!namer_sync.ok) {

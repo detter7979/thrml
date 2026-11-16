@@ -18,7 +18,7 @@ import { rule08Through10CreativePerformance } from "./rules/08-creative-from-per
 import { rule09AdSetWastedSpend } from "./rules/09-ad-set-wasted-spend"
 import { rule10AudienceTest } from "./rules/10-audience-test"
 import type { EvaluatorContext, EvaluatorRunResult, RuleResult } from "./types"
-import { ruleNumber } from "./types"
+import { isoDateUtcDaysAgo, ruleNumber } from "./types"
 
 const LOG_KIND = "AGENT_RUN" as RecKindT
 const EXECUTOR = "EVALUATOR_AGENT" as const
@@ -55,11 +55,51 @@ export function suppressUnderStoppedCampaigns(raw: RuleResult[]): RuleResult[] {
   )
 }
 
+/** First day in the loaded window on which an entity delivered (had impressions or spend). */
+export function firstDeliveryDate(
+  ctx: Pick<EvaluatorContext, "performanceDaily">,
+  level: "campaign" | "ad_set" | "ad",
+  entityId: string
+): string | null {
+  let first: string | null = null
+  for (const r of ctx.performanceDaily) {
+    if (r.level !== level || r.entity_id !== entityId) continue
+    if (!((Number(r.impressions) || 0) > 0 || (Number(r.spend_usd) || 0) > 0)) continue
+    if (first === null || r.date < first) first = r.date
+  }
+  return first
+}
+
+/**
+ * Warm-up (global::warm_up_days_default): while an ad set is inside its first N days of delivery,
+ * drop every proposal aimed at it or its ads, so nothing is paused, scaled or replaced while Meta is
+ * still learning. Campaign-only proposals use the campaign's own first delivery day. Data-freshness
+ * alerts (rule 07) always pass.
+ */
+export function suppressDuringWarmUp(ctx: EvaluatorContext, raw: RuleResult[]): RuleResult[] {
+  const warmDays = Math.round(ruleNumber(ctx.rules, "global", "warm_up_days_default", 7))
+  if (!(warmDays > 0)) return raw
+  // Delivery that began on or after this date is still warming up.
+  const cutoff = isoDateUtcDaysAgo(warmDays - 1)
+  const adSetOfAd = new Map(ctx.ads.map((a) => [a.id, a.ad_set_id]))
+  return raw.filter((p) => {
+    if (String(p.payload?.rule ?? "").startsWith("07")) return true
+    const adSetId = p.target.adSetId ?? (p.target.adId ? adSetOfAd.get(p.target.adId) : undefined)
+    const first = adSetId
+      ? firstDeliveryDate(ctx, "ad_set", adSetId)
+      : p.target.campaignId
+        ? firstDeliveryDate(ctx, "campaign", p.target.campaignId)
+        : null
+    return !(first !== null && first >= cutoff)
+  })
+}
+
 /** Run every rule on a context (no DB). Used by the evaluator and the admin test scenario. */
 export function proposeFromContext(ctx: EvaluatorContext): { raw: RuleResult[]; proposals: RuleResult[] } {
   const raw: RuleResult[] = []
   for (const rule of ALL_RULES) raw.push(...rule(ctx))
-  return { raw, proposals: applyFloorAndCap(ctx, dedupeProposals(suppressUnderStoppedCampaigns(raw), ctx.recentRecs)) }
+  const eligible = suppressDuringWarmUp(ctx, suppressUnderStoppedCampaigns(raw))
+  return { raw, proposals: applyFloorAndCap(ctx, dedupeProposals(eligible, ctx.recentRecs)) }
 }
 
 async function insertRecommendations(

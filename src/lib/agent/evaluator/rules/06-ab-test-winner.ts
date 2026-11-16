@@ -60,6 +60,9 @@ const TEST_WINDOW_DAYS = 14
 export function rule06AbTestWinner(ctx: EvaluatorContext): RuleResult[] {
   const minClicks = ruleNumber(ctx.rules, "global", "kill_clicks_threshold", 200)
   const thresh = ruleNumber(ctx.rules, "global", "kill_confidence_threshold", 0.95)
+  // No winner calls until the test has delivered for this many days.
+  const minTestDays = Math.round(ruleNumber(ctx.rules, "global", "min_test_window_days", 7))
+  const testStartCutoff = minTestDays > 0 ? isoDateUtcDaysAgo(minTestDays - 1) : null
   const out: RuleResult[] = []
 
   const testAds = ctx.ads.filter((a) => a.status === "TEST")
@@ -74,6 +77,15 @@ export function rule06AbTestWinner(ctx: EvaluatorContext): RuleResult[] {
   for (const [, byTest] of bySetTest) {
     for (const [, group] of byTest) {
       if (group.length < 2) continue
+      if (testStartCutoff) {
+        let firstDay: string | null = null
+        for (const r of ctx.performanceDaily) {
+          if (r.level !== "ad" || !group.some((ad) => ad.id === r.entity_id)) continue
+          if (!((Number(r.impressions) || 0) > 0 || (Number(r.spend_usd) || 0) > 0)) continue
+          if (firstDay === null || r.date < firstDay) firstDay = r.date
+        }
+        if (firstDay === null || firstDay >= testStartCutoff) continue
+      }
       const stats = group.map((ad) => {
         const set = ctx.adSets.find((s) => s.id === ad.ad_set_id)
         const ev = (ad as { conv_event?: string | null }).conv_event || set?.conv_event || null

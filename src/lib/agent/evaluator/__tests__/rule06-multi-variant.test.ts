@@ -7,7 +7,7 @@ import { isoDateUtcDaysAgo } from "../types"
 function row(adId: string, clicks: number | null, conversions: number, convEvent: string): PerformanceDailyRow {
   return {
     id: Math.random(),
-    date: isoDateUtcDaysAgo(2),
+    date: isoDateUtcDaysAgo(9),
     level: "ad",
     entity_id: adId,
     platform_entity_id: null,
@@ -79,5 +79,23 @@ describe("rule 06 with more than two ads in a test", () => {
   it("stays quiet until ads reach the click threshold", () => {
     const daily = [row("a1", 60, 20, "BH"), row("a2", 60, 1, "BH"), row("a3", 60, 1, "BH"), row("a4", 60, 2, "BH")]
     expect(rule06AbTestWinner(ctx(daily))).toEqual([])
+  })
+})
+
+describe("rules that were stored but not enforced", () => {
+  it("rule 06 makes no call before the test window ends", () => {
+    const daily = [row("a1", 400, 120, "BH"), row("a2", 400, 20, "BH"), row("a3", 400, 16, "BH"), row("a4", 400, 110, "BH")]
+      .map((r) => ({ ...r, date: isoDateUtcDaysAgo(3) }))
+    expect(rule06AbTestWinner(ctx(daily))).toEqual([])
+  })
+
+  it("warm-up drops proposals for an ad set that started delivering inside the window", async () => {
+    const { suppressDuringWarmUp } = await import("../index")
+    const c = ctx([{ ...row("a1", 10, 0, "BH"), level: "ad_set", entity_id: "s1", date: isoDateUtcDaysAgo(2) } as PerformanceDailyRow])
+    const pause = { kind: "PAUSE_AD", target: { campaignId: "c1", adId: "a2" }, payload: { rule: "03" }, evidence: {}, rationale: "", confidence: 0.9 } as const
+    const stale = { ...pause, payload: { rule: "07-stale-data" } }
+    expect(suppressDuringWarmUp(c, [pause, stale])).toEqual([stale])
+    const old = ctx([{ ...row("a1", 10, 0, "BH"), level: "ad_set", entity_id: "s1", date: isoDateUtcDaysAgo(9) } as PerformanceDailyRow])
+    expect(suppressDuringWarmUp(old, [pause])).toEqual([pause])
   })
 })

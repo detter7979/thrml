@@ -1591,7 +1591,9 @@ export default function AgentsDashboard() {
                   const groupLabels = [
                     ...new Set(group.assets.map((a) => (a.variation_label ?? "A").toUpperCase().slice(0, 1))),
                   ].sort()
-                  const missingByLabel = group.brief
+                  // A video ad is one 9:16 file: no other sizes or static variations to build.
+                  const videoGroup = group.brief ? isVideoBrief(group.brief) : false
+                  const missingByLabel = group.brief && !videoGroup
                     ? groupLabels
                         .map((label) => ({
                           label,
@@ -1605,9 +1607,10 @@ export default function AgentsDashboard() {
                   const planLabels = group.brief
                     ? parseStoredStaticVariations(group.brief.trigger_data)?.map((row) => row.variation_label)
                     : undefined
-                  const pendingVariationLabels = group.brief
+                  const pendingVariationLabels = group.brief && !videoGroup
                     ? nextVariationLabelsForBrief(group.brief, group.assets, planLabels)
                     : []
+                  const approvedInGroup = group.assets.filter((asset) => asset.status === "approved")
                   return (
                     <div key={group.briefId} className="rounded-lg border p-3 space-y-3">
                       <div>
@@ -1776,7 +1779,7 @@ export default function AgentsDashboard() {
                         })}
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {group.brief && selectedApproved.length > 0 ? (
+                        {group.brief && !videoGroup && selectedApproved.length > 0 ? (
                           <button
                             type="button"
                             onClick={() => {
@@ -1839,13 +1842,32 @@ export default function AgentsDashboard() {
                             {groupLaunches.length ? "Launch into more ad sets" : `Launch to Meta: 1 ad, ${bundleAssets.length} sizes (recommended)`}
                           </button>
                         ) : null}
-                        <button
-                          onClick={() => openLaunchModal(selectedApproved.map((asset) => asset.id))}
-                          disabled={selectedApproved.length === 0}
-                          className="text-xs px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
-                        >
-                          Launch selected as separate ads
-                        </button>
+                        {videoGroup ? (
+                          <button
+                            onClick={() =>
+                              openLaunchModal(
+                                (selectedApproved.length ? selectedApproved : approvedInGroup).map((asset) => asset.id)
+                              )
+                            }
+                            disabled={approvedInGroup.length === 0}
+                            className="text-xs px-3 py-1.5 bg-[#9A4A33] text-white rounded hover:opacity-90 disabled:opacity-50"
+                            title={
+                              approvedInGroup.length === 0
+                                ? "Approve the video first (the tick under it)"
+                                : "Creates one paused video ad per ad set you choose"
+                            }
+                          >
+                            {groupLaunches.length ? "Launch into more ad sets" : "Launch video to Meta"}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => openLaunchModal(selectedApproved.map((asset) => asset.id))}
+                            disabled={selectedApproved.length === 0}
+                            className="text-xs px-3 py-1.5 bg-foreground text-background rounded hover:opacity-90 disabled:opacity-50"
+                          >
+                            Launch selected as separate ads
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => void deleteAssets(selected)}

@@ -17,6 +17,7 @@ Every agent MUST log its run to the `agent_runs` table on completion.
 ### Active Agents
 Team names, membership, and the full cron inventory live in `agents/teams.md`.
 The digest email is a template. A House shadow summary is stored on `agent_runs` only when `AGENT_SHADOW_DIGEST=1`, and that summary is not sent.
+`AGENT_SHADOW_SKILLS` records a second reading for a named skill. `AGENT_LIVE_SKILLS` is the cutover for that skill. Empty lists keep the current Claude reply.
 
 | Agent | Route | Schedule (UTC) | Purpose |
 |---|---|---|---|

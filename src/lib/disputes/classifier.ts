@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 
 import { CLAUDE_MODEL } from "@/lib/agent/model"
+import { resolveSkillText } from "@/lib/agent/skill-route"
 
 export type DisputeCategory =
   | "access_failure"
@@ -125,17 +126,30 @@ Return this exact JSON shape (no other text):
   "suggested_reply": "<polite, professional 2-3 paragraph reply to send to the user explaining what will happen>"
 }`
 
-  const response = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 1000,
-    messages: [{ role: "user", content: userPrompt }],
+  const resolved = await resolveSkillText({
+    skill: "disputes",
     system: systemPrompt,
+    prompt: userPrompt,
+    maxTokens: 1000,
+    claude: async () => {
+      const response = await client.messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 1000,
+        messages: [{ role: "user", content: userPrompt }],
+        system: systemPrompt,
+      })
+      const text = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => (b as { type: "text"; text: string }).text)
+        .join("")
+      return {
+        text,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+      }
+    },
   })
-
-  const rawText = response.content
-    .filter((b) => b.type === "text")
-    .map((b) => (b as { type: "text"; text: string }).text)
-    .join("")
+  const rawText = resolved.text
 
   const cleaned = rawText.replace(/```json|```/g, "").trim()
 

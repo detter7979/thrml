@@ -59,6 +59,15 @@ Leave the flag unset until both of these are set in the Vercel project:
 
 Checked against the live catalog on 15 Nov 2026: `spacexai/grok-4.20-non-reasoning` is a short-summary model. Re-check the catalog before relying on that id. If the flag is on and the model or credentials are missing, the run records `shadow.status = "skipped"` and the email still sends.
 
+### Skill pipe
+
+Social posts (`social`), creative briefs (`creative`), inbox classification (`email-inbox`), and dispute classification (`disputes`) still call Claude. Two lists decide what happens next. Leave both empty until a digest shadow has been compared.
+
+- `AGENT_SHADOW_SKILLS` — comma-separated skill names, or `*`. Each listed skill keeps acting on the Claude reply. A Grok reading is stored as its own `agent_runs` row named `shadow:<skill>`.
+- `AGENT_LIVE_SKILLS` — same shape. A listed skill acts on the Grok reply instead of Claude. If the gateway call fails, that skill uses Claude for that run.
+
+Both lists use `AGENT_SHADOW_MODEL` and the gateway credential already used by the digest. Finance, ops, reporting, and the digest email do not call Claude, so they are not on either list.
+
 ## Studio
 
 Creative production. Briefs and the content queue. Publishing stays behind the current approval status.

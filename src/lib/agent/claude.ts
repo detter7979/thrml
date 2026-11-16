@@ -3,6 +3,7 @@ import fs from "fs"
 import path from "path"
 
 import { CLAUDE_MODEL } from "./model"
+import { resolveSkillText } from "./skill-route"
 
 const client = new Anthropic()
 
@@ -50,6 +51,15 @@ export type AgentCallResult = {
   stopReason?: string
   /** Set when the API call itself failed (bad key, no credit, retired model, overload…). */
   error?: string
+  /** Which model produced `text`. Gateway only when the skill is on AGENT_LIVE_SKILLS. */
+  liveSource?: "claude" | "gateway"
+  /** Second reading. Present only when the skill is on AGENT_SHADOW_SKILLS. Callers keep using `text`. */
+  shadow?: {
+    status: "skipped" | "recorded" | "failed"
+    model: string | null
+    text: string | null
+    reason: string | null
+  }
 }
 
 /**
@@ -65,37 +75,47 @@ export async function callAgent(opts: AgentCallOptions): Promise<AgentCallResult
     })),
     { role: "user", content: opts.prompt },
   ]
+  const maxTokens = opts.maxTokens ?? 1000
 
-  try {
-    const response = await client.messages.create({
-      model: opts.model ?? CLAUDE_MODEL,
-      max_tokens: opts.maxTokens ?? 1000,
-      system: systemPrompt,
-      messages,
-    })
+  return resolveSkillText({
+    skill: opts.skill,
+    system: systemPrompt,
+    prompt: opts.prompt,
+    history: opts.history,
+    maxTokens,
+    claude: async () => {
+      try {
+        const response = await client.messages.create({
+          model: opts.model ?? CLAUDE_MODEL,
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages,
+        })
 
-    const text = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
-      .join("")
+        const text = response.content
+          .filter((b) => b.type === "text")
+          .map((b) => (b as { type: "text"; text: string }).text)
+          .join("")
 
-    return {
-      text,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      stopReason: response.stop_reason ?? undefined,
-    }
-  } catch (err) {
-    console.error(`[agent/claude] callAgent failed for skill=${opts.skill}`, err)
-    const status = (err as { status?: number })?.status
-    const message = err instanceof Error ? err.message : String(err)
-    return {
-      text: "",
-      inputTokens: 0,
-      outputTokens: 0,
-      error: `Claude API error${status ? ` ${status}` : ""}: ${message.slice(0, 200)}`,
-    }
-  }
+        return {
+          text,
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+          stopReason: response.stop_reason ?? undefined,
+        }
+      } catch (err) {
+        console.error(`[agent/claude] callAgent failed for skill=${opts.skill}`, err)
+        const status = (err as { status?: number })?.status
+        const message = err instanceof Error ? err.message : String(err)
+        return {
+          text: "",
+          inputTokens: 0,
+          outputTokens: 0,
+          error: `Claude API error${status ? ` ${status}` : ""}: ${message.slice(0, 200)}`,
+        }
+      }
+    },
+  })
 }
 
 /**

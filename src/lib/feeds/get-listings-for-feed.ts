@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 import { createClient } from "@/lib/supabase/server"
 
 export type FeedListing = {
@@ -37,8 +39,9 @@ type ListingRow = {
   listing_photos: ListingPhoto[] | null
 }
 
-export async function getListingsForFeed(): Promise<FeedListing[]> {
-  const supabase = await createClient()
+/** Pass a client (e.g. the admin client in a cron) to read outside a request's cookie session. */
+export async function getListingsForFeed(client?: SupabaseClient): Promise<FeedListing[]> {
+  const supabase = client ?? (await createClient())
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://usethrml.com"
 
   const { data: listings, error } = await supabase

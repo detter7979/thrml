@@ -73,7 +73,7 @@ import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
 import { SPEC_CONFIG } from "@/lib/constants/specs"
 import { trackMetaEvent } from "@/components/meta-pixel"
-import { trackGaEvent } from "@/lib/analytics/ga"
+import { trackGoogleListingEvent } from "@/lib/analytics/listing-events"
 import { roundUpTo30 } from "@/lib/slots"
 import { createClient } from "@/lib/supabase/client"
 import type { BookingModel } from "@/lib/service-types"
@@ -797,13 +797,17 @@ function BookingWidget({
       endTime: selected.endTime,
     })
 
-    trackGaEvent("begin_checkout", {
-      listing_id: listingId,
-      listing_title: listingTitle,
-      service_type: serviceTypeId,
-      city,
+    trackGoogleListingEvent("begin_checkout", {
+      listingId,
       value: totals.guestTotal,
-      currency: "USD",
+      gaParams: {
+        listing_id: listingId,
+        listing_title: listingTitle,
+        service_type: serviceTypeId,
+        city,
+        value: totals.guestTotal,
+        currency: "USD",
+      },
     })
     trackMetaEvent("InitiateCheckout", {
       content_ids: [listingId],
@@ -1293,13 +1297,17 @@ export function ListingDetailClient({
       : null
 
   useEffect(() => {
-    trackGaEvent("view_item", {
-      listing_id: id,
-      item_name: title,
-      item_category: serviceTypeId,
-      city,
+    trackGoogleListingEvent("view_item", {
+      listingId: id,
       value: pricing.price_solo ?? 0,
-      currency: "USD",
+      gaParams: {
+        listing_id: id,
+        item_name: title,
+        item_category: serviceTypeId,
+        city,
+        value: pricing.price_solo ?? 0,
+        currency: "USD",
+      },
     })
     // No title or category: listing titles usually name the wellness service ("Cedar Sauna…"),
     // which the privacy policy says is never shared with ad platforms. The listing ID is enough.

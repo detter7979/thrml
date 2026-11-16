@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 
 import { trackMetaEvent } from "@/components/meta-pixel"
-import { trackGaEvent } from "@/lib/analytics/ga"
+import { trackGoogleListingEvent } from "@/lib/analytics/listing-events"
 import { isAnalyticsConsented } from "@/lib/cookie-consent"
 
 type BookingConfirmationTrackerProps = {
@@ -33,14 +33,18 @@ export function BookingConfirmationTracker({
     const purchaseEventId = `purchase_${bookingId}`
 
     // GA4 purchase (client-side — deduplicates against server-side MP event).
-    trackGaEvent("purchase", {
-      event_id: purchaseEventId,
-      transaction_id: bookingId,
-      listing_id: listingId,
+    trackGoogleListingEvent("purchase", {
+      listingId,
       value: totalAmount,
-      currency: "USD",
-      service_type: serviceType,
-      city,
+      gaParams: {
+        event_id: purchaseEventId,
+        transaction_id: bookingId,
+        listing_id: listingId,
+        value: totalAmount,
+        currency: "USD",
+        service_type: serviceType,
+        city,
+      },
     })
 
     // Meta Pixel purchase.

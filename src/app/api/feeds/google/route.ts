@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 import {
   formatFeedPrice,
@@ -18,13 +18,11 @@ function escapeXml(value: string) {
     .replace(/'/g, "&apos;")
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const token =
-      request.headers.get("x-feed-token") ?? new URL(request.url).searchParams.get("token")
-    if (process.env.FEED_API_TOKEN && token !== process.env.FEED_API_TOKEN) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    // Public on purpose: the feed only carries what listing pages already show (title, city-level
+    // location, price, first photo, URL). A shared-secret token here broke Meta's scheduled fetch
+    // for months when the env value changed, and protected nothing that isn't already public.
 
     const listings = await getListingsForFeed()
 

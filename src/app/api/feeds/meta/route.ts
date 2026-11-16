@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 import {
   formatFeedPrice,
@@ -16,18 +16,11 @@ function csvField(value: string | number | null | undefined): string {
   return `"${str.replace(/"/g, '""')}"`
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Use header token first; for query param, read raw to avoid + → space decoding
-    const headerToken = request.headers.get("x-feed-token")
-    const rawSearch = new URL(request.url).search
-    const rawTokenMatch = rawSearch.match(/[?&]token=([^&]*)/)
-    const queryToken = rawTokenMatch ? decodeURIComponent(rawTokenMatch[1]) : null
-    const token = headerToken ?? queryToken
-
-    if (process.env.FEED_API_TOKEN && token !== process.env.FEED_API_TOKEN) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    // Public on purpose: the feed only carries what listing pages already show (title, city-level
+    // location, price, first photo, URL). A shared-secret token here broke Meta's scheduled fetch
+    // for months when the env value changed, and protected nothing that isn't already public.
 
     const listings = await getListingsForFeed()
 

@@ -15,6 +15,9 @@ Agents run on a Vercel Hobby plan via cron jobs, calling Next.js API routes.
 Every agent MUST log its run to the `agent_runs` table on completion.
 
 ### Active Agents
+Team names, membership, and the full cron inventory live in `agents/teams.md`.
+The digest email is a template. A House shadow summary is stored on `agent_runs` only when `AGENT_SHADOW_DIGEST=1`, and that summary is not sent.
+
 | Agent | Route | Schedule (UTC) | Purpose |
 |---|---|---|---|
 | ads-evaluate | /api/cron/agent-evaluate | 03:00 daily | Meta + Google Ads optimization |

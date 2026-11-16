@@ -12,7 +12,7 @@ import {
   type FireCapiEventResult,
 } from "@/lib/meta-capi"
 
-export type NewsletterSource = "homepage" | "account"
+export type NewsletterSource = "homepage" | "account" | "launch_waitlist" | "guest_lp"
 
 export function newNewsletterLeadEventId(): string {
   return `lead_newsletter_${crypto.randomUUID()}`

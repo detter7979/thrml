@@ -16,6 +16,32 @@ export function isSaunasOnlyLaunch() {
   return SAUNAS_ONLY_LAUNCH
 }
 
+/**
+ * Public guest launch (bookings open to everyone). Before this date the site invites guests to
+ * join the launch list instead of the general newsletter. Override with
+ * NEXT_PUBLIC_GUEST_LAUNCH_DATE (YYYY-MM-DD, Pacific time).
+ */
+export const GUEST_LAUNCH_DATE = process.env.NEXT_PUBLIC_GUEST_LAUNCH_DATE?.trim() || "2026-12-14"
+
+/** Start of the launch day in Seattle (PST, UTC-8 in December). */
+export function guestLaunchInstant(date: string = GUEST_LAUNCH_DATE): Date {
+  const parsed = new Date(`${date}T00:00:00-08:00`)
+  return Number.isNaN(parsed.getTime()) ? new Date("2026-12-14T00:00:00-08:00") : parsed
+}
+
+export function isGuestPreLaunch(now: Date = new Date(), date: string = GUEST_LAUNCH_DATE): boolean {
+  return now.getTime() < guestLaunchInstant(date).getTime()
+}
+
+/** "December 14" — for copy like "Bookings open December 14". */
+export function guestLaunchLabel(date: string = GUEST_LAUNCH_DATE): string {
+  return guestLaunchInstant(date).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    timeZone: "America/Los_Angeles",
+  })
+}
+
 export function isLaunchVisibleServiceType(serviceType: string) {
   if (!SAUNAS_ONLY_LAUNCH) return true
   return serviceType === "sauna"

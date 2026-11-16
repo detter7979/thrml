@@ -2,7 +2,12 @@ import { after, NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
 import { resolveResendFrom, resolveResendReplyTo } from "@/lib/emails/send"
-import { newsletterWelcomeVariantA as welcomeEmail } from "@/lib/emails/newsletter-welcome"
+import {
+  launchWaitlistWelcome,
+  newsletterWelcomeVariantA as welcomeEmail,
+} from "@/lib/emails/newsletter-welcome"
+import { guestLaunchLabel, isGuestPreLaunch } from "@/lib/launch-config"
+import { parseSubscribeExtras } from "@/lib/newsletter/subscribe-input"
 import { fireNewsletterLead, newNewsletterLeadEventId, type NewsletterSource } from "@/lib/meta/newsletter-lead"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
@@ -50,11 +55,12 @@ export async function POST(request: NextRequest) {
     const marketCity = sanitizeMarket(body?.market_city)
     const marketState = sanitizeMarket(body?.market_state)
 
-    const source: NewsletterSource = body?.source === "account" ? "account" : "homepage"
+    const extras = parseSubscribeExtras(body as Record<string, unknown> | null)
+    const source: NewsletterSource = extras.source
     const supabase = createAdminClient()
     const { data: existing, error: selectError } = await supabase
       .from("newsletter_subscribers")
-      .select("id")
+      .select("id, launch_notify")
       .eq("email", email)
       .eq("is_active", true)
       .maybeSingle()
@@ -64,6 +70,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (existing) {
+      // Already on the list: just add them to the launch announcement if they asked for it.
+      if (extras.launchNotify && !existing.launch_notify) {
+        const { error: flagError } = await supabase
+          .from("newsletter_subscribers")
+          .update({ launch_notify: true })
+          .eq("id", existing.id)
+        if (flagError) throw flagError
+      }
       return NextResponse.json({ message: "Already subscribed" })
     }
 
@@ -75,6 +89,10 @@ export async function POST(request: NextRequest) {
           source,
           is_active: true,
           unsubscribed_at: null,
+          launch_notify: extras.launchNotify,
+          signup_path: extras.signupPath,
+          utm_source: extras.utmSource,
+          utm_campaign: extras.utmCampaign,
           ...(marketCity
             ? {
                 market_city: marketCity,
@@ -108,7 +126,10 @@ export async function POST(request: NextRequest) {
     }
 
     const resend = new Resend(resendApiKey)
-    const emailTemplate = await welcomeEmail({ email })
+    const emailTemplate =
+      extras.launchNotify && isGuestPreLaunch()
+        ? await launchWaitlistWelcome({ email, launchLabel: guestLaunchLabel() })
+        : await welcomeEmail({ email })
     const fromAddress = resolveResendFrom()
     const replyTo = resolveResendReplyTo()
     const recipient =

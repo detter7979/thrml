@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { isSaunasOnlyLaunch } from "@/lib/launch-config"
+import { guestLaunchLabel, isGuestPreLaunch, isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { getHomeListingsForCards } from "@/lib/listings/home-listings"
 import { SITE_COPY } from "@/lib/site-copy"
 
@@ -112,7 +112,12 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(siteSchema) }}
       />
-      <HomePageClient initialListings={listings} totalActiveListingsCount={totalActiveCount} />
+      <HomePageClient
+        initialListings={listings}
+        totalActiveListingsCount={totalActiveCount}
+        preLaunch={isGuestPreLaunch()}
+        launchLabel={guestLaunchLabel()}
+      />
     </>
   )
 }

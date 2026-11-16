@@ -33,7 +33,7 @@ import {
   metaInstagramAccountMissingHint,
   resolveMetaInstagramActorId,
 } from "@/lib/agent/meta-instagram-account"
-import { uploadVideo } from "@/lib/agent/meta-video-upload"
+import { fetchVideoThumbnail, uploadVideo, videoThumbnailFields, type VideoThumbnail } from "@/lib/agent/meta-video-upload"
 import { requireAdminApi } from "@/lib/admin-guard"
 import { META_URL_TAGS } from "@/lib/attribution/url-params"
 import {
@@ -334,7 +334,7 @@ async function createMetaVideoCreative(params: {
   pageId: string
   name: string
   videoId: string
-  thumbnailImageHash: string
+  thumbnail: VideoThumbnail
   landingUrl: string
   primaryCopy: string
   headline: string | null
@@ -342,7 +342,7 @@ async function createMetaVideoCreative(params: {
 }) {
   const videoData: Record<string, unknown> = {
     video_id: params.videoId,
-    image_hash: params.thumbnailImageHash,
+    ...videoThumbnailFields(params.thumbnail),
     message: params.primaryCopy,
     call_to_action: {
       type: ctaToMetaEnumFromBrief(params.brief),
@@ -885,16 +885,22 @@ export async function POST(req: NextRequest) {
 
       // The same video file serves every ad set: upload it to Meta once and reuse it afterwards.
       let videoId = creativeAsset.meta_video_id?.trim() || ""
-      let thumbnailImageHash = creativeAsset.meta_thumbnail_image_hash?.trim() || ""
-      if (!videoId || !thumbnailImageHash) {
+      let thumbnail: VideoThumbnail = { imageHash: creativeAsset.meta_thumbnail_image_hash?.trim() || undefined }
+      if (!videoId) {
         const signedUrl = await getSignedGcsReadUrl(creativeAsset.gcs_path, { expiresInSec: 3600 })
         const uploaded = await uploadVideo({ fileUrl: signedUrl, name: adName })
         videoId = uploaded.videoId
-        thumbnailImageHash = uploaded.thumbnailImageHash
+        thumbnail = uploaded.thumbnail
+      } else if (!thumbnail.imageHash) {
+        thumbnail = await fetchVideoThumbnail(videoId)
+      }
+      // Keep the Meta video ID even if a later step fails, so a retry doesn't upload it again.
+      if (videoId !== (creativeAsset.meta_video_id ?? "")) {
+        await admin!.from("creative_assets").update({ meta_video_id: videoId }).eq("id", assetId)
       }
       videoMetaFields = {
         meta_video_id: videoId,
-        meta_thumbnail_image_hash: thumbnailImageHash,
+        ...(thumbnail.imageHash ? { meta_thumbnail_image_hash: thumbnail.imageHash } : {}),
       }
 
       const videoHeadline = resolvedLaunchCopyStrings(brief).headline
@@ -904,7 +910,7 @@ export async function POST(req: NextRequest) {
         pageId,
         name: adName,
         videoId,
-        thumbnailImageHash,
+        thumbnail,
         landingUrl,
         primaryCopy,
         headline: videoHeadline,

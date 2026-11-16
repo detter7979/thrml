@@ -3,7 +3,7 @@
 import { trackMetaEvent } from "@/components/meta-pixel"
 import { PricingTable } from "@/components/listings/PricingTable"
 import { Button } from "@/components/ui/button"
-import { trackGaEvent } from "@/lib/analytics/ga"
+import { trackGoogleListingEvent } from "@/lib/analytics/listing-events"
 import { type PricingTiers } from "@/lib/pricing"
 
 interface BookingWidgetProps {
@@ -19,12 +19,16 @@ export function BookingWidget({ pricing, listingId, listingTitle, serviceType }:
   function handleReserveClick() {
     if (!listingId) return
 
-    trackGaEvent("begin_checkout", {
-      listing_id: listingId,
-      item_name: listingTitle,
-      item_category: serviceType,
+    trackGoogleListingEvent("begin_checkout", {
+      listingId,
       value: price,
-      currency: "USD",
+      gaParams: {
+        listing_id: listingId,
+        item_name: listingTitle,
+        item_category: serviceType,
+        value: price,
+        currency: "USD",
+      },
     })
 
     trackMetaEvent("InitiateCheckout", {

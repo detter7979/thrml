@@ -89,6 +89,39 @@ export async function googleAdsSearch(query: string): Promise<Record<string, unk
   return out
 }
 
+export type GoogleAdsMutateResult = {
+  results: { resourceName?: string }[]
+  /** Set when partialFailure was requested and some operations failed. */
+  partialFailureMessage: string | null
+}
+
+/**
+ * POST `<resource>:mutate` (e.g. "assets", "assetSets", "assetSetAssets") for this customer.
+ * With partialFailure, good operations still apply and failed ones come back without a resourceName.
+ */
+export async function googleAdsMutate(
+  resource: string,
+  operations: Record<string, unknown>[],
+  opts: { partialFailure?: boolean } = {}
+): Promise<GoogleAdsMutateResult> {
+  if (!operations.length) return { results: [], partialFailureMessage: null }
+  const token = await getGoogleAccessToken()
+  const res = await fetch(`${baseUrl()}/${resource}:mutate`, {
+    method: "POST",
+    headers: gadsHeaders(token),
+    body: JSON.stringify({ operations, partialFailure: Boolean(opts.partialFailure) }),
+  })
+  if (!res.ok) throw new Error(`Google Ads ${resource} mutate failed: ${res.status} ${(await res.text()).slice(0, 600)}`)
+  const json = (await res.json()) as {
+    results?: { resourceName?: string }[]
+    partialFailureError?: { message?: string }
+  }
+  return {
+    results: json.results ?? [],
+    partialFailureMessage: json.partialFailureError?.message ?? null,
+  }
+}
+
 /** True when Google Ads credentials are configured (developer token + customer + OAuth). */
 export function googleAdsConfigured(): boolean {
   try {

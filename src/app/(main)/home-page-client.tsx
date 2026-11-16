@@ -11,6 +11,7 @@ const ListingGrid = dynamic(
   { ssr: true }
 )
 import { trackMetaEvent } from "@/components/meta-pixel"
+import { LaunchNotifyForm } from "@/components/marketing/launch-notify-form"
 import { Button } from "@/components/ui/button"
 import {
   FALLBACK_SERVICE_TYPES,
@@ -39,9 +40,12 @@ const newsletterButtonClass =
 type HomePageClientProps = {
   initialListings: HomeListingCardRow[]
   totalActiveListingsCount: number
+  /** Before the public guest launch: the email section becomes the launch list. */
+  preLaunch?: boolean
+  launchLabel?: string
 }
 
-export function HomePageClient({ initialListings }: HomePageClientProps) {
+export function HomePageClient({ initialListings, preLaunch = false, launchLabel }: HomePageClientProps) {
   const [newsletterEmail, setNewsletterEmail] = useState("")
   const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "loading" | "success">("idle")
   const [newsletterError, setNewsletterError] = useState<string | null>(null)
@@ -349,6 +353,19 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
 
       <section className="bg-[#1A1410] py-16 md:py-20">
         <div className={`mx-auto max-w-6xl ${pageXClass}`}>
+          {preLaunch ? (
+            <>
+              <h3 className="mb-4 font-serif text-3xl leading-tight text-[#F5EFE8] md:text-4xl">
+                Bookings open {launchLabel ?? "soon"}
+              </h3>
+              <p className="mb-8 max-w-xl text-base leading-relaxed text-white/65">
+                Private saunas around Seattle, hosted by locals and booked by the session. Leave your email and
+                we&apos;ll send you one note the day you can book.
+              </p>
+              <LaunchNotifyForm source="launch_waitlist" buttonLabel="Notify me" />
+            </>
+          ) : (
+          <>
           <h3 className="mb-4 font-serif text-3xl leading-tight text-[#F5EFE8] md:text-4xl">
             Don&apos;t miss a session
           </h3>
@@ -410,6 +427,8 @@ export function HomePageClient({ initialListings }: HomePageClientProps) {
                 <p className="mt-3 px-1 text-xs text-white/50">Occasional emails only. No spam.</p>
               )}
             </form>
+          )}
+          </>
           )}
         </div>
       </section>

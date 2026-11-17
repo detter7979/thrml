@@ -3,8 +3,6 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { renderThrmlEmailPair } from "@/lib/emails/render-layout"
 import { sendEmail } from "@/lib/emails/send"
 import { THRML_APP_URL } from "@/lib/emails/transactional-send"
-import { isGuestPreLaunch } from "@/lib/launch-config"
-import { includeInBiweeklyDispatch } from "@/lib/newsletter/biweekly-audience"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 import { emailAlreadySent, logEmailSent } from "./email-log"
@@ -188,17 +186,14 @@ async function sendToNewsletterSubscribers(
 
   const { data: subscribers } = await admin
     .from("newsletter_subscribers")
-    .select("email, last_biweekly_edition, launch_notify")
+    .select("email, last_biweekly_edition")
     .eq("is_active", true)
-
-  const preLaunch = isGuestPreLaunch()
 
   for (const row of subscribers ?? []) {
     const email = (row.email as string | null)?.trim().toLowerCase()
     if (!email) continue
     handled.add(email)
     if (row.last_biweekly_edition === tag) continue
-    if (!includeInBiweeklyDispatch({ launchNotify: row.launch_notify === true, preLaunch })) continue
 
     const unsubscribeUrl = `${APP_URL}/unsubscribe?email=${encodeURIComponent(email)}`
     const { subject, html, text } = await buildBiweeklyNewsletterEmail({ edition, unsubscribeUrl })

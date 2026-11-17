@@ -29,7 +29,9 @@ export function Navbar() {
   const loginHref = `/login?next=${encodeURIComponent(pathForAuth)}`
   const signupHref = `/signup?next=${encodeURIComponent(pathForAuth)}`
   const isHome = pathname === "/"
-  const [scrolled, setScrolled] = useState(() => !isHome)
+  const isGuestLanding = pathname?.startsWith("/go/") ?? false
+  const overlayNav = isHome || isGuestLanding
+  const [scrolled, setScrolled] = useState(false)
   const [userName, setUserName] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [loggedIn, setLoggedIn] = useState(false)
@@ -55,13 +57,13 @@ export function Navbar() {
   }
 
   useEffect(() => {
-    if (!isHome) return
+    if (!overlayNav) return
 
     const onScroll = () => setScrolled(window.scrollY > 24)
     onScroll()
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
-  }, [isHome])
+  }, [overlayNav])
 
   useEffect(() => {
     const load = async () => {
@@ -249,8 +251,8 @@ export function Navbar() {
     setIsMobileNavOpen(false)
   }
 
-  const homeTransparent = isHome && !scrolled
-  const desktopLinkColor = homeTransparent ? "text-[#F5EFE8]" : "text-[#1A1410]"
+  const overlayTransparent = overlayNav && !scrolled
+  const desktopLinkColor = overlayTransparent ? "text-[#F5EFE8]" : "text-[#1A1410]"
   const initials = (userName ?? "M")
     .split(" ")
     .map((part) => part[0])
@@ -260,8 +262,8 @@ export function Navbar() {
 
   return (
     <header
-      className={`top-0 z-50 w-full ${isHome ? "fixed" : "sticky"} ${
-        homeTransparent
+      className={`top-0 z-50 w-full ${overlayNav ? "fixed" : "sticky"} ${
+        overlayTransparent
           ? "bg-transparent"
           : "bg-white/96 shadow-[0_8px_24px_rgba(26,20,16,0.08)] backdrop-blur"
       }`}
@@ -343,7 +345,7 @@ export function Navbar() {
                       </Link>
                     </DropdownMenuItem>
                   </>
-                ) : (
+                ) : !isGuestLanding ? (
                   <DropdownMenuItem asChild className="text-[#8B4513] font-medium">
                     <Link
                       href="/become-a-host"
@@ -363,7 +365,7 @@ export function Navbar() {
                       Become a host
                     </Link>
                   </DropdownMenuItem>
-                )}
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={async () => {
@@ -377,7 +379,7 @@ export function Navbar() {
             </DropdownMenu>
           ) : (
             <>
-              {!isHome ? (
+              {!isHome && !isGuestLanding ? (
                 <Button
                   asChild
                   variant="ghost"
@@ -418,7 +420,7 @@ export function Navbar() {
                 type="button"
                 suppressHydrationWarning
                 className={`inline-flex items-center justify-center rounded-full p-2 ${
-                  homeTransparent ? "text-[#F5EFE8]" : "text-[#1A1410]"
+                  overlayTransparent ? "text-[#F5EFE8]" : "text-[#1A1410]"
                 }`}
               >
                 <Menu className="size-6" />
@@ -502,7 +504,7 @@ export function Navbar() {
                           </Link>
                         </motion.div>
                       </>
-                    ) : (
+                    ) : !isGuestLanding ? (
                       <>
                         <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
                           <div className="my-1 border-t border-[#3A3029]" />
@@ -528,7 +530,7 @@ export function Navbar() {
                           </Link>
                         </motion.div>
                       </>
-                    )}
+                    ) : null}
                     <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
                       <div className="my-1 border-t border-[#3A3029]" />
                     </motion.div>
@@ -560,7 +562,7 @@ export function Navbar() {
                         </Link>
                       </Button>
                     </motion.div>
-                    {!isHome ? (
+                    {!isHome && !isGuestLanding ? (
                       <>
                         <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
                           <div className="my-1 border-t border-[#3A3029]" />

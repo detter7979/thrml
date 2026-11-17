@@ -17,6 +17,9 @@ type LaunchNotifyFormProps = {
   buttonLabel?: string
   successMessage?: string
   finePrint?: string
+  /** Stored on the subscriber so the weekly digest can say "new spaces in Seattle". */
+  marketCity?: string
+  marketState?: string
 }
 
 function readUtm(key: string): string | undefined {
@@ -34,6 +37,8 @@ export function LaunchNotifyForm({
   buttonLabel = "Notify me",
   successMessage = "You're on the list. We'll email you the day bookings open.",
   finePrint = "One email when bookings open. Unsubscribe anytime.",
+  marketCity,
+  marketState,
 }: LaunchNotifyFormProps) {
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -69,6 +74,8 @@ export function LaunchNotifyForm({
           signup_path: window.location.pathname,
           utm_source: readUtm("utm_source"),
           utm_campaign: readUtm("utm_campaign"),
+          market_city: marketCity,
+          market_state: marketState,
         }),
       })
       if (!response.ok) throw new Error("Subscribe failed")

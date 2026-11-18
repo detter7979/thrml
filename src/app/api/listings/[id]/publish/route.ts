@@ -1,4 +1,7 @@
-import { NextRequest, NextResponse } from "next/server"
+import { after, NextRequest, NextResponse } from "next/server"
+
+import { sendAdminListingPendingEmail } from "@/lib/emails/host-applications"
+import { normalizeApprovalStatus } from "@/lib/host/listing-approval"
 
 import { assertHostInsuranceAttested } from "@/lib/host/insurance-attestation"
 import { assertPublishableListingCopy } from "@/lib/listings/host-claim-policy"
@@ -121,6 +124,22 @@ export async function POST(
     delete publishPayload[missingColumn]
   }
 
+  // Founding-host phase: the DB keeps unapproved listings inactive; tell the host and alert admin.
+  const { data: approvalRow } = await supabase
+    .from("listings")
+    .select("approval_status")
+    .eq("id", listingId)
+    .maybeSingle()
+  const pendingReview = normalizeApprovalStatus(approvalRow?.approval_status) === "pending"
+  if (pendingReview) {
+    const title = typeof listing.title === "string" ? listing.title : null
+    after(() =>
+      sendAdminListingPendingEmail({ listingId, title, hostEmail: user.email ?? null }).catch((err) =>
+        console.error("[publish] pending alert failed", err)
+      )
+    )
+  }
+
   if (body.deactivateOriginal && parentListingId) {
     const deactivatePayload: Record<string, unknown> = {
       is_active: false,
@@ -149,5 +168,5 @@ export async function POST(
     }
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, pendingReview })
 }

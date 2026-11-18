@@ -15,6 +15,7 @@ import { StarRating } from "@/components/reviews/StarRating"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { formatMoney, type ListingCancellationPolicy } from "@/lib/cancellations"
+import { hostListingStatusLabel, PENDING_REVIEW_MESSAGE, type ApprovalStatus } from "@/lib/host/listing-approval"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 type ListingRow = {
@@ -25,6 +26,7 @@ type ListingRow = {
   access_code_template?: string | null
   access_code_type: string | null
   is_active: boolean
+  approval_status?: ApprovalStatus
   price_from: number
   cancellation_policy: ListingCancellationPolicy
   active_booking_count: number
@@ -498,6 +500,12 @@ export function DashboardListingsClient({
 
   return (
     <div className="space-y-4">
+      {listings.some((item) => item.approval_status === "pending") ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {PENDING_REVIEW_MESSAGE}
+        </div>
+      ) : null}
+
       {toastMessage ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           {toastMessage}
@@ -670,7 +678,7 @@ export function DashboardListingsClient({
                 <div className="text-left">
                   <p className="font-serif text-xl text-[#1A1410]">{listing.title}</p>
                   <p className="text-xs text-[#7A6A5D]">
-                    {listing.is_active ? "Live" : "Draft"} · {listing.active_booking_count} active booking
+                    {hostListingStatusLabel(listing)} · {listing.active_booking_count} active booking
                     {listing.active_booking_count === 1 ? "" : "s"}
                   </p>
                 </div>
@@ -678,6 +686,7 @@ export function DashboardListingsClient({
                   <p className="text-sm font-medium text-[#C75B3A]">
                     From ${Number(listing.price_from ?? 0).toFixed(0)}
                   </p>
+                  {(listing.approval_status ?? "approved") === "approved" ? (
                   <button
                     type="button"
                     onClick={(event) => {
@@ -706,6 +715,11 @@ export function DashboardListingsClient({
                         ? "Deactivate"
                         : "Reactivate"}
                   </button>
+                  ) : (
+                    <span className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      {listing.approval_status === "pending" ? "Pending review" : "Not approved"}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={(event) => {

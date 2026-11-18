@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin-guard"
+import { normalizeApprovalStatus } from "@/lib/host/listing-approval"
 
 import { AdminListingsClient } from "./listings-client"
 
@@ -9,7 +10,7 @@ export default async function AdminListingsPage() {
 
   const { data: listingRows } = await admin
     .from("listings")
-    .select("id, host_id, title, service_type, city, state, location_city, location_state, is_active, is_deleted, created_at")
+    .select("id, host_id, title, service_type, city, state, location_city, location_state, is_active, is_deleted, created_at, approval_status")
     .order("created_at", { ascending: false })
 
   const listings = (listingRows ?? []) as Array<Record<string, unknown>>
@@ -59,6 +60,7 @@ export default async function AdminListingsPage() {
       city_state: cityState || "—",
       is_active: Boolean(row.is_active),
       is_deleted: Boolean(row.is_deleted),
+      approval_status: normalizeApprovalStatus(row.approval_status),
       bookings_count: countMap.get(id) ?? 0,
       created_at: typeof row.created_at === "string" ? row.created_at : null,
     }

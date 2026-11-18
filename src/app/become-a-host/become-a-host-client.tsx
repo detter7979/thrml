@@ -148,14 +148,20 @@ export function BecomeAHostClient({
   guestBookingsOpen = false,
   saunasOnly = true,
   foundingOffer = null,
+  applicationsMode = false,
 }: {
   guestBookingsOpen?: boolean
   saunasOnly?: boolean
   foundingOffer?: FoundingOffer | null
+  /** Founding-host phase: send new visitors to the application instead of signup. */
+  applicationsMode?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const resumingAfterSignup = searchParams.get("resume") === "1"
+  // Invited hosts skip the application with ?start=1 (or are resuming after signup).
+  const invited = searchParams.get("start") === "1"
+  const sendToApplication = applicationsMode && !invited && !resumingAfterSignup
   const { hostFeePercent } = usePlatformFeePercents()
   const hostKeepLabel = formatHostKeepPercent(hostFeePercent)
   const [step, setStep] = useState(1)
@@ -232,6 +238,12 @@ export function BecomeAHostClient({
       { content_name: "become_a_host", source: `landing_${placement}` },
       { custom: true }
     )
+    if (sendToApplication) {
+      trackGaEvent("host_application_redirect", { step: 1, placement })
+      const query = typeof window !== "undefined" ? window.location.search : ""
+      router.push(`/become-a-host/apply${query}`)
+      return
+    }
     if (signedIn === false) {
       trackGaEvent("host_onboarding_signup_redirect", { step: 1, placement })
       router.push(hostSignupHref())
@@ -346,6 +358,7 @@ export function BecomeAHostClient({
                   signedOut={signedIn === false}
                   loginHref={hostLoginHref()}
                   onStart={handleStep1Continue}
+                  applyFirst={sendToApplication}
                   howItWorks={<HowItWorksAnimation />}
                 />
               ) : null}

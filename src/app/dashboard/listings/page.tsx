@@ -12,6 +12,7 @@ import {
 } from "@/lib/supabase/public-profiles"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { normalizeApprovalStatus } from "@/lib/host/listing-approval"
 import { DashboardListingsClient } from "./listings-client"
 
 function isMissingColumnError(message: string) {
@@ -333,6 +334,7 @@ export default async function DashboardListingsPage({
           typeof listing.access_code_template === "string" ? listing.access_code_template : null,
         access_code_type: typeof listing.access_code_type === "string" ? listing.access_code_type : "static",
         is_active: Boolean(listing.is_active),
+        approval_status: normalizeApprovalStatus(listing.approval_status),
         price_from: Number(listing.fixed_session_price ?? listing.price_solo ?? 0),
         cancellation_policy: normalizeCancellationPolicy(listing.cancellation_policy),
         active_booking_count: (bookingsByListing.get(listingId) ?? []).length,

@@ -153,6 +153,7 @@ export function HostLandingIntro({
   loginHref,
   onStart,
   howItWorks,
+  applyFirst = false,
 }: {
   hostKeepLabel: string
   hostFeePercent: number
@@ -163,6 +164,8 @@ export function HostLandingIntro({
   loginHref: string
   onStart: (placement: "hero" | "footer") => void
   howItWorks: React.ReactNode
+  /** Founding-host phase: the button opens the application. */
+  applyFirst?: boolean
 }) {
   const faqs = buildFaqs({ hostKeepLabel, guestBookingsOpen, saunasOnly, foundingOffer })
   const spaceNoun = saunasOnly ? "sauna" : "space"
@@ -172,7 +175,7 @@ export function HostLandingIntro({
       className="h-12 w-full rounded-full bg-[#C4623A] text-base font-medium text-white hover:bg-[#b05530]"
       onClick={() => onStart(placement)}
     >
-      {signedOut ? `List your ${spaceNoun} — it's free →` : "Get started →"}
+      {applyFirst ? `Apply to host your ${spaceNoun} →` : signedOut ? `List your ${spaceNoun} — it's free →` : "Get started →"}
     </Button>
   )
 

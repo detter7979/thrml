@@ -18,6 +18,8 @@ import { pickListingInsertPayload } from "@/lib/listings/pick-listing-insert-pay
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { sendAdminListingPendingEmail } from "@/lib/emails/host-applications"
+import { fetchHostFunnelSettings, normalizeApprovalStatus } from "@/lib/host/listing-approval"
 import { createClient } from "@/lib/supabase/server"
 
 function errorFromUnknown(err: unknown): { message: string; code: string | null } {
@@ -108,6 +110,15 @@ export async function POST(request: NextRequest) {
       .select("id", { count: "exact", head: true })
       .eq("host_id", user.id)
 
+    // Founding-host phase: new listings wait for approval (DB trigger keeps them inactive).
+    const funnel = await fetchHostFunnelSettings(admin).catch(() => null)
+    const { data: approvalRow } = await admin
+      .from("listings")
+      .select("approval_status")
+      .eq("id", data.id)
+      .maybeSingle()
+    const pendingReview = normalizeApprovalStatus(approvalRow?.approval_status) === "pending"
+
     const isFirstListing = count === 1
     const metaIds = newListingMetaEventIds(isFirstListing)
     const eventSourceUrl =
@@ -119,8 +130,16 @@ export async function POST(request: NextRequest) {
       await promoteProfileToHost(admin, user.id).catch((err) => {
         console.error("[POST /api/listings] promote host profile failed", err)
       })
+      if (pendingReview) {
+        await sendAdminListingPendingEmail({
+          listingId: data.id,
+          title,
+          hostEmail: user.email ?? null,
+        }).catch((err) => console.error("[POST /api/listings] pending alert failed", err))
+      }
       // Founding host program: hosts who publish before guest launch claim a spot while any remain.
-      if (!guestBookingsOpen()) {
+      // While listings need approval, founding status is granted when an admin approves instead.
+      if (!guestBookingsOpen() && !funnel?.requireListingApproval) {
         const { error: claimError } = await admin.rpc("claim_founding_host", { p_host: user.id })
         if (claimError) {
           console.error("[POST /api/listings] claim_founding_host failed", claimError.message)
@@ -142,6 +161,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       listingId: data.id,
+      pendingReview,
       meta: {
         host_listing_created_event_id: metaIds.host_listing_created_event_id,
         host_first_listing_created_event_id: metaIds.host_first_listing_created_event_id,

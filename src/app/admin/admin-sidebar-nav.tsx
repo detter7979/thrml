@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   BarChart3,
   CalendarDays,
+  ClipboardList,
   Gift,
   Home,
   Inbox,
@@ -43,6 +44,7 @@ const SECTIONS: NavSection[] = [
   {
     label: "Growth",
     items: [
+      { href: "/admin/host-applications", label: "Host applications", icon: ClipboardList },
       { href: "/admin/launch-readiness", label: "Launch readiness", icon: Rocket },
       { href: "/admin/paid-media", label: "Paid media", icon: Megaphone },
     ],

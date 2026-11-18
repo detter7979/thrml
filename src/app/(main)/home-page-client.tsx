@@ -356,12 +356,17 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
           {preLaunch ? (
             <>
               <h3 className="mb-1 font-serif text-2xl leading-tight text-[#F5EFE8] md:text-3xl">
-                Opening {launchLabel ?? "soon"}
+                Warming up for {launchLabel ?? "launch"}.
               </h3>
               <p className="mb-4 max-w-md text-sm leading-relaxed text-white/65">
-                We&apos;ll send one note the morning those first sessions open.
+                Private backyard saunas across Seattle, hosted by your neighbors. Get one email the morning
+                booking opens, before the first times fill up.
               </p>
-              <LaunchNotifyForm source="launch_waitlist" buttonLabel="Notify me" />
+              <LaunchNotifyForm
+                source="launch_waitlist"
+                buttonLabel="Save me a spot"
+                finePrint="No unwanted spam. Unsubscribe anytime."
+              />
             </>
           ) : (
           <>

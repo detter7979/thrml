@@ -151,6 +151,7 @@ async function getMessagePreviews(userId: string): Promise<MessagePreview[]> {
 export async function GuestOverviewPage({ userId, canHost }: GuestOverviewPageProps) {
   const [nextSession, messages] = await Promise.all([getNextSession(userId), getMessagePreviews(userId)])
   const unread = messages.reduce((sum, message) => sum + message.unread, 0)
+  const waiting = messages.filter((message) => message.unread > 0)
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 md:px-8 md:py-8">
@@ -181,25 +182,20 @@ export async function GuestOverviewPage({ userId, canHost }: GuestOverviewPagePr
         </div>
       </Link>
 
-      <section className="overflow-hidden rounded-3xl bg-white">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <MessageCircle className="size-4 text-[#8B4513]" />
-            <h2 className="text-base font-semibold text-[#1A1410]">Messages</h2>
-            {unread > 0 ? (
+      {/* Only replies waiting on you; the Inbox tab holds everything else. */}
+      {waiting.length > 0 ? (
+        <section className="overflow-hidden rounded-3xl bg-white">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="size-4 text-[#8B4513]" />
+              <h2 className="text-base font-semibold text-[#1A1410]">New messages</h2>
               <span className="rounded-full bg-[#C75B3A] px-2 py-0.5 text-xs font-medium text-white">{unread}</span>
-            ) : null}
+            </div>
+            <Link href="/dashboard/messages" className="text-sm font-medium text-[#8B4513]">
+              Inbox
+            </Link>
           </div>
-          <Link href="/dashboard/messages" className="text-sm font-medium text-[#8B4513]">
-            Inbox
-          </Link>
-        </div>
-        {messages.length === 0 ? (
-          <p className="border-t border-[#F0E8E0] px-4 py-4 text-sm text-[#6D5E51]">
-            Hosts reply here after you book.
-          </p>
-        ) : (
-          messages.map((message) => (
+          {waiting.map((message) => (
             <Link
               key={message.id}
               href={`/dashboard/messages/${message.id}`}
@@ -211,22 +207,12 @@ export async function GuestOverviewPage({ userId, canHost }: GuestOverviewPagePr
               </Avatar>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-[#1A1410]">{message.name}</span>
-                <span className="block truncate text-xs text-[#7A6A5D]">{message.body ?? "No messages yet"}</span>
+                <span className="block truncate text-xs text-[#7A6A5D]">{message.body ?? "New message"}</span>
               </span>
             </Link>
-          ))
-        )}
-      </section>
-
-      <Link href="/dashboard/saved" className="block rounded-3xl bg-white px-4 py-4">
-        <p className="text-sm font-medium text-[#1A1410]">Wishlists</p>
-        <p className="mt-1 text-sm text-[#6D5E51]">Spaces you saved for later.</p>
-      </Link>
-
-      <Link href="/dashboard/account#profile" className="block rounded-3xl bg-white px-4 py-4">
-        <p className="text-sm font-medium text-[#1A1410]">Profile</p>
-        <p className="mt-1 text-sm text-[#6D5E51]">Name, photo, phone, and how we reach you.</p>
-      </Link>
+          ))}
+        </section>
+      ) : null}
 
       {canHost ? null : <GuestHostCta />}
     </div>

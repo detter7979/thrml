@@ -1,8 +1,9 @@
 import Link from "next/link"
 import Image from "next/image"
 import { cache, Suspense } from "react"
-import { LayoutGrid, MessageSquareText, Plus, ScrollText, UserRound } from "lucide-react"
+import { Plus } from "lucide-react"
 
+import { EarningsCard } from "@/components/dashboard/EarningsCard"
 import { FoundingHostStatus } from "@/components/host/FoundingHostStatus"
 import { HostSetupChecklist } from "@/components/host/HostSetupChecklist"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -73,15 +74,6 @@ function initialsFrom(name: string) {
     .slice(0, 2)
     .toUpperCase()
   return initials || "H"
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value)
 }
 
 function formatSessionDateTime(sessionDate: string | null, startTime: string | null) {
@@ -395,39 +387,31 @@ function SectionSkeleton({ heightClass = "h-24" }: { heightClass?: string }) {
   return <div className={`w-full animate-pulse rounded-xl bg-[#F0E8E0] ${heightClass}`} />
 }
 
-async function IdentityCardSection({ userId }: { userId: string }) {
+async function HostHeader({ userId }: { userId: string }) {
   const data = await getHostOverviewData(userId)
-  const activeListingsCount = data.listings.filter((listing) => listing.isActive).length
   const rating = data.profile.rating
   const showNewRating = data.profile.totalReviews === 0 || rating === null
+  const firstName = data.profile.name.split(" ")[0] || data.profile.name
 
   return (
-    <section className="rounded-2xl bg-[#FAF7F4] p-4">
-      <div className="flex items-center gap-4">
-        <Avatar className="h-14 w-14">
-          <AvatarImage src={data.profile.avatarUrl ?? undefined} alt={data.profile.name} />
-          <AvatarFallback>{initialsFrom(data.profile.name)}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0">
-          <p className="truncate text-lg font-semibold text-[#1A1410]">{data.profile.name}</p>
-          <div className="mt-0.5 flex items-center gap-2 text-sm text-[#6D5E51]">
-            {showNewRating ? (
-              <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New</span>
-            ) : (
-              <span>★ {rating.toFixed(1)} ({data.profile.totalReviews})</span>
-            )}
-            <span className="rounded-full bg-[#F0E8E0] px-2 py-0.5 text-[11px] font-medium text-[#8B4513]">Host</span>
-          </div>
-          <p className="mt-1 text-sm text-[#6D5E51]">
-            {activeListingsCount} active listing{activeListingsCount === 1 ? "" : "s"}
-          </p>
-          <Link
-            href={`/hosts/${userId}`}
-            className="mt-1 inline-flex text-sm font-medium text-[#8B4513] hover:underline"
-          >
-            View host profile →
-          </Link>
-        </div>
+    <section className="flex items-center gap-3">
+      <Avatar className="h-12 w-12">
+        <AvatarImage src={data.profile.avatarUrl ?? undefined} alt={data.profile.name} />
+        <AvatarFallback>{initialsFrom(data.profile.name)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-medium tracking-[0.16em] text-[#C75B3A] uppercase">Today</p>
+        <h1 className="truncate font-serif text-3xl text-[#1A1410]">Hi, {firstName}</h1>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        {showNewRating ? (
+          <span className="rounded-full bg-[#FDEBDD] px-2 py-0.5 text-xs text-[#8B3A20]">New host</span>
+        ) : (
+          <span className="text-sm text-[#6D5E51]">★ {rating.toFixed(1)} ({data.profile.totalReviews})</span>
+        )}
+        <Link href={`/hosts/${userId}`} className="text-xs font-medium text-[#8B4513] hover:underline">
+          Public profile →
+        </Link>
       </div>
     </section>
   )
@@ -435,29 +419,7 @@ async function IdentityCardSection({ userId }: { userId: string }) {
 
 async function EarningsSection({ userId }: { userId: string }) {
   const data = await getHostOverviewData(userId)
-  const hasEarnings = data.earnings.thisMonth > 0 || data.earnings.allTime > 0
-
-  return (
-    <section className="rounded-2xl bg-[#1A1410] p-4 text-[#F5EFE8]">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium tracking-[0.14em] text-[#E8B9A4] uppercase">Earnings</p>
-        <Link href="/dashboard/earnings" className="text-sm font-medium text-[#F5EFE8]">
-          Details
-        </Link>
-      </div>
-      <div className="mt-3 flex items-center justify-between">
-        <p className="text-sm text-white/70">This month</p>
-        <p className="font-serif text-3xl">{formatCurrency(data.earnings.thisMonth)}</p>
-      </div>
-      <div className="mt-2 flex items-center justify-between">
-        <p className="text-sm text-white/70">All time</p>
-        <p className="text-sm font-medium">{formatCurrency(data.earnings.allTime)}</p>
-      </div>
-      {hasEarnings ? null : (
-        <p className="mt-3 text-xs text-white/60">Activate a listing to start earning.</p>
-      )}
-    </section>
-  )
+  return <EarningsCard thisMonth={data.earnings.thisMonth} allTime={data.earnings.allTime} />
 }
 
 async function UpcomingSection({ userId }: { userId: string }) {
@@ -524,105 +486,52 @@ async function UpcomingSection({ userId }: { userId: string }) {
   )
 }
 
-async function MessagesSection({ userId }: { userId: string }) {
+/** Only conversations waiting on the host; everything else lives in Inbox. Hidden when caught up. */
+async function NeedsReplySection({ userId }: { userId: string }) {
   const data = await getHostOverviewData(userId)
-  return (
-    <section className="rounded-2xl bg-white p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-base font-semibold text-[#1A1410]">Messages</h2>
-        {data.unreadMessageTotal > 0 ? (
-          <span className="rounded-full bg-[#8B4513] px-2 py-0.5 text-xs font-medium text-white">
-            {data.unreadMessageTotal > 99 ? "99+" : data.unreadMessageTotal}
-          </span>
-        ) : null}
-      </div>
-
-      {data.messages.length === 0 ? (
-        <p className="text-sm text-[#6D5E51]">No messages yet</p>
-      ) : (
-        <div className="space-y-2">
-          {data.messages.map((conversation) => (
-            <Link
-              key={conversation.id}
-              href={`/dashboard/messages/${conversation.id}`}
-              className={`flex items-center gap-3 rounded-xl border p-3 ${
-                conversation.unreadCount > 0 ? "border-[#E9D9CC] border-l-4 border-l-[#8B4513] bg-[#FFF8F2]" : "border-[#EFE6DC]"
-              }`}
-            >
-              <Avatar size="default">
-                <AvatarImage src={conversation.otherPartyAvatar ?? undefined} alt={conversation.otherPartyName} />
-                <AvatarFallback>{initialsFrom(conversation.otherPartyName)}</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className={`truncate text-sm ${conversation.unreadCount > 0 ? "font-semibold text-[#1A1410]" : "font-medium text-[#1A1410]"}`}>
-                  {conversation.otherPartyName}
-                  {conversation.listingTitle ? <span className="font-normal text-[#6D5E51]"> · {conversation.listingTitle}</span> : null}
-                </p>
-                <p className="truncate text-xs text-[#7A6A5D]">{conversation.body ?? "No messages yet"}</p>
-              </div>
-              <p className="text-[11px] text-[#9A897B]">{relativeTime(conversation.lastMessageAt)}</p>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-3">
-        <Link href="/dashboard/messages" className="text-sm font-medium text-[#8B4513]">
-          Go to inbox →
-        </Link>
-      </div>
-    </section>
-  )
-}
-
-function QuickActionsSection() {
-  const actions = [
-    { href: "/dashboard/listings/new", label: "New listing", detail: "Add another space", icon: Plus },
-    { href: "/dashboard/listings", label: "My listings", detail: "Prices, photos, and availability", icon: LayoutGrid },
-    { href: "/dashboard/account#house-rules", label: "House rules", detail: "Defaults guests agree to", icon: ScrollText },
-    { href: "/dashboard/host/templates", label: "Message templates", detail: "Replies you can send in one tap", icon: MessageSquareText },
-    { href: "/dashboard/account#profile", label: "Edit profile", detail: "Name, photo, phone, and bio", icon: UserRound },
-  ]
+  const waiting = data.messages.filter((conversation) => conversation.unreadCount > 0)
+  if (waiting.length === 0) return null
 
   return (
     <section className="overflow-hidden rounded-2xl bg-white">
-      {actions.map((action, index) => {
-        const Icon = action.icon
-        return (
-          <Link
-            key={action.href}
-            href={action.href}
-            className={`flex items-center gap-3 px-4 py-3 ${index > 0 ? "border-t border-[#F0E8E0]" : ""}`}
-          >
-            <Icon className="size-4 shrink-0 text-[#8B4513]" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-[#1A1410]">{action.label}</span>
-              <span className="block text-xs text-[#7A6A5D]">{action.detail}</span>
-            </span>
-          </Link>
-        )
-      })}
+      <div className="flex items-center justify-between px-4 py-3">
+        <h2 className="text-base font-semibold text-[#1A1410]">Needs a reply</h2>
+        <Link href="/dashboard/messages" className="text-sm font-medium text-[#8B4513]">
+          Inbox
+        </Link>
+      </div>
+      {waiting.map((conversation) => (
+        <Link
+          key={conversation.id}
+          href={`/dashboard/messages/${conversation.id}`}
+          className="flex items-center gap-3 border-t border-[#F0E8E0] px-4 py-3"
+        >
+          <Avatar size="default">
+            <AvatarImage src={conversation.otherPartyAvatar ?? undefined} alt={conversation.otherPartyName} />
+            <AvatarFallback>{initialsFrom(conversation.otherPartyName)}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-[#1A1410]">
+              {conversation.otherPartyName}
+              {conversation.listingTitle ? <span className="font-normal text-[#6D5E51]"> · {conversation.listingTitle}</span> : null}
+            </p>
+            <p className="truncate text-xs text-[#7A6A5D]">{conversation.body ?? "New message"}</p>
+          </div>
+          <p className="text-[11px] text-[#9A897B]">{relativeTime(conversation.lastMessageAt)}</p>
+        </Link>
+      ))}
     </section>
   )
 }
 
-async function ListingStatusSection({ userId }: { userId: string }) {
+/**
+ * Listing counts plus the two listing actions. With no listings yet the setup checklist already
+ * says "List your space", so this stays out of the way. Profile settings (house rules, templates,
+ * edit profile) live on the Profile tab.
+ */
+async function YourSpacesSection({ userId }: { userId: string }) {
   const data = await getHostOverviewData(userId)
-  if (data.listings.length === 0) {
-    return (
-      <section className="rounded-2xl border border-[#EADFD4] bg-white p-4">
-        <p className="text-lg">🏠 List your first space</p>
-        <p className="mt-1 text-sm text-[#6D5E51]">
-          Start earning from your private sauna.
-        </p>
-        <div className="mt-3">
-          <Link href="/dashboard/listings/new" className="text-sm font-medium text-[#8B4513]">
-            Get started →
-          </Link>
-        </div>
-      </section>
-    )
-  }
+  if (data.listings.length === 0) return null
 
   const active = data.listings.filter((listing) => listing.isActive).length
   const paused = data.listings.filter(
@@ -636,15 +545,28 @@ async function ListingStatusSection({ userId }: { userId: string }) {
 
   return (
     <section className="rounded-2xl bg-white p-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-[#1A1410]">Your spaces</h2>
+        <Link href="/dashboard/listings" className="text-sm font-medium text-[#8B4513]">
+          Manage
+        </Link>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Link href="/dashboard/listings?status=active" className="rounded-full bg-[#EFF7F1] px-3 py-1 text-xs font-medium text-[#2F7A46]">
           ● {active} active
         </Link>
-        <Link href="/dashboard/listings?status=draft" className="rounded-full bg-[#F3E8DE] px-3 py-1 text-xs font-medium text-[#6D5E51]">
-          ○ {draft} draft
-        </Link>
-        <Link href="/dashboard/listings?status=paused" className="rounded-full bg-[#F6ECE8] px-3 py-1 text-xs font-medium text-[#8A3D2E]">
-          ✗ {paused} paused
+        {draft > 0 ? (
+          <Link href="/dashboard/listings?status=draft" className="rounded-full bg-[#F3E8DE] px-3 py-1 text-xs font-medium text-[#6D5E51]">
+            ○ {draft} draft
+          </Link>
+        ) : null}
+        {paused > 0 ? (
+          <Link href="/dashboard/listings?status=paused" className="rounded-full bg-[#F6ECE8] px-3 py-1 text-xs font-medium text-[#8A3D2E]">
+            ✗ {paused} paused
+          </Link>
+        ) : null}
+        <Link href="/dashboard/listings/new" className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-[#8B4513]">
+          <Plus className="size-3.5" /> New listing
         </Link>
       </div>
     </section>
@@ -654,16 +576,16 @@ async function ListingStatusSection({ userId }: { userId: string }) {
 export function HostOverviewPage({ userId }: { userId: string }) {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 md:px-8 md:py-8">
+      <Suspense fallback={<SectionSkeleton heightClass="h-14" />}>
+        <HostHeader userId={userId} />
+      </Suspense>
+
       <Suspense fallback={null}>
         <HostSetupChecklist userId={userId} />
       </Suspense>
 
       <Suspense fallback={null}>
         <FoundingHostStatus userId={userId} />
-      </Suspense>
-
-      <Suspense fallback={<SectionSkeleton heightClass="h-28" />}>
-        <IdentityCardSection userId={userId} />
       </Suspense>
 
       <Suspense fallback={<SectionSkeleton heightClass="h-28" />}>
@@ -674,14 +596,12 @@ export function HostOverviewPage({ userId }: { userId: string }) {
         <UpcomingSection userId={userId} />
       </Suspense>
 
-      <Suspense fallback={<SectionSkeleton heightClass="h-36" />}>
-        <MessagesSection userId={userId} />
+      <Suspense fallback={null}>
+        <NeedsReplySection userId={userId} />
       </Suspense>
 
-      <QuickActionsSection />
-
-      <Suspense fallback={<SectionSkeleton heightClass="h-20" />}>
-        <ListingStatusSection userId={userId} />
+      <Suspense fallback={null}>
+        <YourSpacesSection userId={userId} />
       </Suspense>
     </div>
   )

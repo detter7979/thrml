@@ -127,7 +127,7 @@ export async function generateMetadata({
   const state = trimStr(listing.state) || trimStr(listing.location_state)
   const place = [city, state].filter(Boolean).join(", ")
   const listingTitle = listing.title ?? "thrml Wellness Space"
-  const title = place ? `${listingTitle} — ${place}` : listingTitle
+  const title = place ? `${listingTitle} | ${place}` : listingTitle
   const normalizedServiceType = (listing.service_type ?? "wellness_space").replace(/_/g, " ")
   const description = `Book ${listing.title ?? "this space"}, a private ${normalizedServiceType}${
     place ? ` in ${place}` : ""

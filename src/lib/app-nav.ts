@@ -5,11 +5,32 @@ const MODE_KEY = "thrml.appMode"
 const ONBOARDING_KEY = "thrml.onboarding.v1"
 export const APP_MODE_EVENT = "thrml:app-mode"
 
+/** Explore with the "Have a sauna? Become a host" prompt (for people who chose both). */
+export const EXPLORE_WITH_HOST_PROMPT = "/explore?intent=both"
+
 /** Where a new account lands once email is confirmed. */
 export function postSignupPath(intent: AppIntent, requestedNext: string | null): string {
   if (requestedNext) return requestedNext
   if (intent === "host") return "/become-a-host"
+  if (intent === "both") return EXPLORE_WITH_HOST_PROMPT
   return "/explore"
+}
+
+/**
+ * Where onboarding sends someone, with no account required. The choice only picks a starting
+ * point: every account can book and host. Hosts meet sign-up inside the host flow when needed.
+ */
+export type OnboardingExit = AppIntent | "look_around"
+
+export function onboardingDestination(exit: OnboardingExit): string {
+  if (exit === "host") return "/become-a-host"
+  if (exit === "both") return EXPLORE_WITH_HOST_PROMPT
+  return "/explore"
+}
+
+/** Tab-bar mode to start in after onboarding. */
+export function onboardingMode(exit: OnboardingExit): AppMode {
+  return exit === "host" ? "hosting" : "booking"
 }
 
 export function modeForIntent(intent: AppIntent): AppMode {

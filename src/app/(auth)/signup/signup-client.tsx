@@ -93,6 +93,8 @@ function SignupForm() {
   const [loading, setLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [introDone, setIntroDone] = useState(Boolean(intentFromQuery))
+  // The intro starts with nothing selected; the account form keeps its own default above.
+  const [introChoice, setIntroChoice] = useState<IntentOption | null>(null)
 
   const passwordScore = useMemo(() => {
     let score = 0
@@ -343,13 +345,15 @@ function SignupForm() {
   if (!introDone) {
     return (
       <SignupIntro
-        intent={intent}
+        intent={introChoice}
         onIntent={(next) => {
+          setIntroChoice(next)
           setIntent(next)
           writeAppMode(modeForIntent(next))
         }}
         onContinue={() => {
-          writeAppMode(modeForIntent(intent))
+          if (!introChoice) return
+          writeAppMode(modeForIntent(introChoice))
           setIntroDone(true)
         }}
       />

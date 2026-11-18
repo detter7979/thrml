@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest"
 
-import { isAppTabActive, modeForIntent, postSignupPath, showAppTabBar, tabsForMode } from "@/lib/app-nav"
+import {
+  isAppTabActive,
+  modeForIntent,
+  onboardingDestination,
+  onboardingMode,
+  postSignupPath,
+  showAppTabBar,
+  tabsForMode,
+} from "@/lib/app-nav"
 
 describe("postSignupPath", () => {
-  it("sends guests and both to explore, and hosts into listing", () => {
+  it("sends guests to explore, both to explore with the host prompt, and hosts into listing", () => {
     expect(postSignupPath("guest", null)).toBe("/explore")
-    expect(postSignupPath("both", null)).toBe("/explore")
+    expect(postSignupPath("both", null)).toBe("/explore?intent=both")
     expect(postSignupPath("host", null)).toBe("/become-a-host")
   })
 
@@ -62,5 +70,20 @@ describe("app tab bar", () => {
     expect(isAppTabActive("/dashboard/bookings", "inbox")).toBe(false)
     expect(isAppTabActive("/dashboard", "profile")).toBe(false)
     expect(isAppTabActive("/dashboard/listings", "today")).toBe(false)
+  })
+})
+
+describe("onboarding exits", () => {
+  it("routes each choice without requiring an account", () => {
+    expect(onboardingDestination("guest")).toBe("/explore")
+    expect(onboardingDestination("both")).toBe("/explore?intent=both")
+    expect(onboardingDestination("host")).toBe("/become-a-host")
+    expect(onboardingDestination("look_around")).toBe("/explore")
+  })
+
+  it("opens hosting mode only for host exits", () => {
+    expect(onboardingMode("host")).toBe("hosting")
+    expect(onboardingMode("both")).toBe("booking")
+    expect(onboardingMode("look_around")).toBe("booking")
   })
 })

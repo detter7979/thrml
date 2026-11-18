@@ -22,6 +22,7 @@ import {
   sanitizeLaunchVisibleServiceTypes,
   showServiceTypeTags,
 } from "@/lib/launch-config"
+import { ExploreEmptyState, ExploreHostPrompt } from "@/components/explore/explore-launch-states"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
@@ -1537,6 +1538,8 @@ export function ExploreClient() {
         </div>
       ) : null}
 
+      <ExploreHostPrompt show={searchParams.get("intent") === "both"} />
+
       {!error ? (
         <>
           {viewMode === "split" ? (
@@ -1553,18 +1556,7 @@ export function ExploreClient() {
                       ))
                     : modeListings.length
                       ? modeListings.map((listing, index) => listCard(listing, false, index === 0))
-                      : (
-                        <div className="rounded-2xl bg-white p-8 text-center">
-                          <p className="font-serif text-2xl">No spaces found in this area</p>
-                          <button
-                            type="button"
-                            className="mt-3 rounded-full bg-[#C75B3A] px-4 py-2 text-sm text-white"
-                            onClick={() => updateFilter("distanceMiles", 50)}
-                          >
-                            Expand search radius
-                          </button>
-                        </div>
-                      )}
+                      : <ExploreEmptyState onExpandRadius={() => updateFilter("distanceMiles", 50)} />}
                 </div>
                 </div>
               <div className="relative h-full min-h-[240px] md:min-h-0">
@@ -1622,6 +1614,11 @@ export function ExploreClient() {
                     ))
                   : listings.map((listing, index) => listCard(listing, true, index === 0))}
               </div>
+              {!loading && listings.length === 0 ? (
+                <div className="mx-auto max-w-xl">
+                  <ExploreEmptyState onExpandRadius={() => updateFilter("distanceMiles", 50)} />
+                </div>
+              ) : null}
               {!isMobile ? (
                 <button
                   type="button"

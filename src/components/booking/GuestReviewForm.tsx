@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react"
 import { StarRating } from "@/components/reviews/StarRating"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { REVIEW_TONE_BY_RATING } from "@/lib/reviews"
+import { REVIEW_TONE_BY_RATING } from "@/lib/review-ratings"
 
 export type GuestReviewSuccess = {
   reviewId: string

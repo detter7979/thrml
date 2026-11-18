@@ -28,5 +28,5 @@ export default async function DashboardOverviewPage() {
   }
 
   const canHost = profile?.ui_intent === "both"
-  return <GuestOverviewPage canHost={canHost} />
+  return <GuestOverviewPage userId={user.id} canHost={canHost} />
 }

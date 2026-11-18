@@ -112,7 +112,7 @@ export function MessagesInboxClient({
 
   if (loading && conversations.length === 0) {
     return (
-      <div className="grid min-h-[calc(100dvh-80px)] grid-cols-1 md:grid-cols-[360px_1fr]">
+      <div className="grid min-h-[calc(100dvh-80px-4.25rem)] grid-cols-1 md:min-h-[calc(100dvh-80px)] md:grid-cols-[360px_1fr]">
         <ConversationListSkeleton />
         <div className="hidden bg-[#F7F3EE] md:block">
           <MessageThreadSkeleton />
@@ -122,7 +122,7 @@ export function MessagesInboxClient({
   }
 
   return (
-    <div className="grid min-h-[calc(100dvh-80px)] grid-cols-1 md:grid-cols-[360px_1fr]">
+    <div className="grid min-h-[calc(100dvh-80px-4.25rem)] grid-cols-1 md:min-h-[calc(100dvh-80px)] md:grid-cols-[360px_1fr]">
       <ConversationList
         conversations={conversations}
         activeConversationId={selectedId}

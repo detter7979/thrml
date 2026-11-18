@@ -506,7 +506,7 @@ export function DashboardShell({
       </div>
 
       <main className="pb-24 md:pb-0">{children}</main>
-      <AppTabBar loggedIn isHost={isHost} />
+      <AppTabBar loggedIn isHost={isHost} unreadMessages={unreadMessagesCount} />
     </div>
   )
 }

@@ -6,6 +6,30 @@ import { createClient } from "@/lib/supabase/server"
 
 import { AccountClient } from "./account-client"
 
+async function earningsSnapshot(userId: string) {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from("bookings")
+    .select("host_payout, session_date, status")
+    .eq("host_id", userId)
+    .in("status", ["confirmed", "completed"])
+
+  const now = new Date()
+  let thisMonth = 0
+  let allTime = 0
+  for (const row of data ?? []) {
+    const payout = Number(row.host_payout ?? 0)
+    if (!Number.isFinite(payout)) continue
+    allTime += payout
+    if (typeof row.session_date !== "string") continue
+    const sessionDate = new Date(`${row.session_date}T12:00:00`)
+    if (sessionDate.getMonth() === now.getMonth() && sessionDate.getFullYear() === now.getFullYear()) {
+      thisMonth += payout
+    }
+  }
+  return { thisMonth, allTime }
+}
+
 export default async function DashboardAccountPage() {
   const supabase = await createClient()
   const {
@@ -55,6 +79,8 @@ export default async function DashboardAccountPage() {
       : "guest"
   // Host-only account sections: active listings, or explicit host intent (not guest / both-without-listings).
   const hostingEnabled = Boolean((activeListingCount ?? 0) > 0) || uiIntent === "host"
+  const hostTools = hostingEnabled || uiIntent === "both"
+  const earnings = hostTools ? await earningsSnapshot(user.id) : null
   const notificationPreferences = normalizeNotificationPreferences(profile?.notification_preferences)
 
   return (
@@ -74,6 +100,8 @@ export default async function DashboardAccountPage() {
       stripePayoutsEnabled={Boolean(isMockHost || profile?.stripe_payouts_enabled)}
       stripeChargesEnabled={Boolean(isMockHost || profile?.stripe_charges_enabled)}
       hostingEnabled={hostingEnabled}
+      hostTools={hostTools}
+      earnings={earnings}
       notificationPreferences={notificationPreferences}
       idVerificationStatus={
         typeof profile?.id_verification_status === "string" ? profile.id_verification_status : null

@@ -1030,6 +1030,61 @@ export function ExploreClient() {
 
   const listCard = (listing: ListingResult, large = false, imageHighPriority = false) => {
     const active = listing.id === activeId
+    const photo = listing.photoUrl
+      ? listingPhotoThumbnailUrl(listing.photoUrl, { width: large && isMobile ? 800 : large ? 320 : 200 }) ||
+        listing.photoUrl
+      : null
+    if (large && isMobile) {
+      return (
+        <div
+          key={listing.id}
+          onClick={() => {
+            router.push(`/listings/${listing.id}?from=${encodeURIComponent(currentExploreUrl)}`)
+          }}
+          className="cursor-pointer overflow-hidden rounded-3xl bg-white shadow-[0_8px_24px_rgba(26,20,16,0.06)]"
+        >
+          <div className="relative aspect-[4/3]">
+            {photo ? (
+              <Image
+                src={photo}
+                alt={listing.title}
+                fill
+                className="object-cover"
+                sizes="100vw"
+                loading={imageHighPriority ? "eager" : "lazy"}
+                priority={imageHighPriority}
+                {...(imageHighPriority ? { fetchPriority: "high" as const } : {})}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#F1E5D8] to-[#ECD8C7] text-4xl">
+                {listing.serviceIcon}
+              </div>
+            )}
+          </div>
+          <div className="space-y-1 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-serif text-2xl leading-tight text-[#1A1410]">{listing.title}</p>
+              <p className="shrink-0 text-base font-semibold text-[#C75B3A]">
+                ${Math.round(listing.priceSolo)}
+                <span className="text-xs font-medium text-[#8A7769]">
+                  {listing.sessionType === "fixed_session" ? " /session" : " /pp/hr"}
+                </span>
+              </p>
+            </div>
+            <p className="text-sm text-[#6C5B4F]">
+              {listing.distanceMiles.toFixed(1)} mi away ·{" "}
+              {hasPublishedRating(listing.reviewCount, listing.rating)
+                ? `★ ${listing.rating.toFixed(1)}`
+                : "New"}{" "}
+              · up to {listing.capacity}
+            </p>
+            <p className="text-xs text-[#8A7769]">
+              {listing.availableToday ? "Available today" : listing.nextAvailableLabel}
+            </p>
+          </div>
+        </div>
+      )
+    }
     return (
       <div
         key={listing.id}
@@ -1067,12 +1122,9 @@ export function ExploreClient() {
         <div
           className={`relative aspect-[16/9] shrink-0 overflow-hidden rounded-xl ${large ? "w-[140px]" : "w-24"}`}
         >
-          {listing.photoUrl ? (
+          {photo ? (
             <Image
-              src={
-                listingPhotoThumbnailUrl(listing.photoUrl, { width: large ? 320 : 200 }) ||
-                listing.photoUrl
-              }
+              src={photo}
               alt={listing.title}
               fill
               className="object-cover"
@@ -1462,6 +1514,13 @@ export function ExploreClient() {
         </div>
       </div>
 
+      {isMobile && (viewMode === "list" || Boolean(error)) ? (
+        <div className="px-4 pt-4">
+          <p className="text-[13px] font-medium tracking-[0.16em] text-[#C75B3A] uppercase">{locationLabel}</p>
+          <h1 className="mt-1 font-serif text-4xl leading-none text-[#1A1410]">Spaces near you</h1>
+        </div>
+      ) : null}
+
       {error ? (
         <div className="mx-auto mt-6 max-w-xl rounded-2xl bg-white p-8 text-center shadow">
           <p className="font-serif text-2xl">Couldn&apos;t load spaces. Try adjusting your filters.</p>
@@ -1517,7 +1576,25 @@ export function ExploreClient() {
 
           {viewMode === "list" ? (
             <div className="px-4 pt-4 pb-24 md:px-6 md:pb-4">
-              <div className="mb-3 flex items-center justify-between md:hidden">
+              <div className="mb-4 md:hidden">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-[#6C5B4F]">{resultCountLabel}</p>
+                  <Select value={filters.sort} onValueChange={(value) => updateFilter("sort", value as SortKey)}>
+                    <SelectTrigger className="h-8 w-[150px] rounded-full border bg-white px-3 text-sm shadow-none focus-visible:ring-1">
+                      <SelectValue placeholder="Sort" />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      <SelectItem value="recommended">Recommended</SelectItem>
+                      <SelectItem value="nearest">Nearest</SelectItem>
+                      <SelectItem value="price_low">Price: low</SelectItem>
+                      <SelectItem value="price_high">Price: high</SelectItem>
+                      <SelectItem value="rating">Highest rated</SelectItem>
+                      <SelectItem value="newest">Newest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="mb-3 hidden items-center justify-between md:flex">
                 <div>
                   <p className="text-sm text-[#6C5B4F]">{resultCountLabel}</p>
                   {showingNearbyFallback ? (
@@ -1538,7 +1615,7 @@ export function ExploreClient() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-3 xl:grid-cols-3 md:grid-cols-2">
+              <div className="grid gap-5 md:grid-cols-2 md:gap-3 xl:grid-cols-3">
                 {loading
                   ? new Array(9).fill(null).map((_, i) => (
                       <div key={i} className="h-[170px] animate-pulse rounded-2xl bg-white/70" />

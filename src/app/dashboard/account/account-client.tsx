@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle2, Loader2 } from "lucide-react"
 
+import { ProfileHome } from "@/components/dashboard/ProfileHome"
 import { HostInsuranceAttestation } from "@/components/host/HostInsuranceAttestation"
 import { IdentityVerificationCTA, type IdentityUiStatus } from "@/components/profile/IdentityVerificationCTA"
 import { AvatarUpload } from "@/components/profile/AvatarUpload"
@@ -98,6 +99,8 @@ export function AccountClient({
   stripePayoutsEnabled,
   stripeChargesEnabled,
   hostingEnabled,
+  hostTools,
+  earnings,
   notificationPreferences,
   idVerificationStatus,
   idVerified,
@@ -120,6 +123,8 @@ export function AccountClient({
   stripePayoutsEnabled: boolean
   stripeChargesEnabled: boolean
   hostingEnabled: boolean
+  hostTools: boolean
+  earnings: { thisMonth: number; allTime: number } | null
   notificationPreferences: NotificationPreferences
   idVerificationStatus: string | null
   idVerified: boolean
@@ -795,7 +800,7 @@ export function AccountClient({
 
   return (
     <div className="space-y-6 px-4 py-6 md:px-8 md:py-8">
-      <h1 className="font-serif text-3xl text-[#1A1410]">Account</h1>
+      <ProfileHome fullName={fullName} hostTools={hostTools} earnings={earnings} />
 
       {hostingEnabled ? (
         <IdentityVerificationCTA
@@ -805,7 +810,7 @@ export function AccountClient({
         />
       ) : null}
 
-      <section id="notifications" className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
+      <section id="profile" className="scroll-mt-24 space-y-4 rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">PROFILE</h2>
         <div className="flex items-center gap-3">
           <AvatarUpload
@@ -1036,8 +1041,8 @@ export function AccountClient({
         </section>
       ) : null}
 
-      {hostingEnabled ? (
-        <section className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
+      {hostTools ? (
+        <section id="house-rules" className="scroll-mt-24 space-y-4 rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">HOUSE RULES</h2>
           <p className="text-sm text-[#6A5848]">
             Save your default house rules, then apply them across all current listings in one click.
@@ -1074,7 +1079,7 @@ export function AccountClient({
         </section>
       ) : null}
 
-      <section className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
+      <section id="notifications" className="scroll-mt-24 space-y-4 rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">NOTIFICATIONS</h2>
           <p className="text-xs text-[#7A6A5D]">

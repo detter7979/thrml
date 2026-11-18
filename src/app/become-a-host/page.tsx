@@ -7,6 +7,7 @@ import { formatHostKeepPercent } from "@/lib/fees"
 import { getPlatformFeePercentsCached } from "@/lib/fees-server"
 import { fetchFoundingHostSettings, foundingSpotsRemaining } from "@/lib/host/founding-host"
 import { guestBookingsOpen, hasCompletedHostOnboarding } from "@/lib/host/host-funnel"
+import { fetchHostFunnelSettings } from "@/lib/host/listing-approval"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isSaunasOnlyLaunch } from "@/lib/launch-config"
 import { HOST_NEW_LISTING_PATH } from "@/lib/host/is-host-user"
@@ -76,6 +77,14 @@ export default async function BecomeAHostPage() {
     }
   }
 
+  // Founding-host phase: new visitors apply first (invited hosts use ?start=1).
+  let applicationsMode = false
+  try {
+    applicationsMode = (await fetchHostFunnelSettings(createAdminClient())).hostApplicationsMode
+  } catch {
+    applicationsMode = false
+  }
+
   return (
     <Suspense
       fallback={
@@ -89,6 +98,7 @@ export default async function BecomeAHostPage() {
         guestBookingsOpen={guestBookingsOpen()}
         saunasOnly={isSaunasOnlyLaunch()}
         foundingOffer={foundingOffer}
+        applicationsMode={applicationsMode}
       />
       </PlatformFeesProvider>
     </Suspense>

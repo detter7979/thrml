@@ -7,6 +7,8 @@ export type AdminAuditAction =
   | "grant_credit"
   | "listing_delete"
   | "listing_status"
+  | "listing_approval"
+  | "host_application_update"
   | "dispute_resolve"
   | "settings_update"
   | "namer_sheet.write"

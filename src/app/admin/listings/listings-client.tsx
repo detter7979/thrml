@@ -1,11 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Search } from "lucide-react"
 import { useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import type { ApprovalStatus } from "@/lib/host/listing-approval"
 
 type AdminListingRow = {
   id: string
@@ -15,6 +16,7 @@ type AdminListingRow = {
   city_state: string
   is_active: boolean
   is_deleted: boolean
+  approval_status: ApprovalStatus
   bookings_count: number
   created_at: string | null
 }
@@ -31,6 +33,10 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const [pendingOnly, setPendingOnly] = useState(searchParams.get("filter") === "pending")
+  const [notice, setNotice] = useState<string | null>(null)
+  const pendingCount = rows.filter((row) => row.approval_status === "pending" && !row.is_deleted).length
   const [query, setQuery] = useState("")
   const [page, setPage] = useState(1)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -38,13 +44,14 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
 
   const filteredRows = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    if (!normalized) return rows
-    return rows.filter((row) =>
+    const base = pendingOnly ? rows.filter((row) => row.approval_status === "pending" && !row.is_deleted) : rows
+    if (!normalized) return base
+    return base.filter((row) =>
       [row.id, row.title ?? "", row.service_type ?? "", row.host_name ?? "", row.city_state].some((value) =>
         value.toLowerCase().includes(normalized)
       )
     )
-  }, [rows, query])
+  }, [rows, query, pendingOnly])
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
   const selectablePageIds = pageRows
@@ -71,6 +78,37 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
         setError(payload.error ?? "Unable to update listing status.")
         return
       }
+      router.refresh()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function decide(id: string, action: "approve" | "approve_founding" | "decline") {
+    setBusyId(id)
+    setError(null)
+    setNotice(null)
+    try {
+      const response = await fetch(`/api/admin/listings/${id}/approval`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string
+        foundingRequestedButFull?: boolean
+      }
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to update approval.")
+        return
+      }
+      setNotice(
+        payload.foundingRequestedButFull
+          ? "Approved and live, but founding spots are full, so the host gets the standard fee."
+          : action === "decline"
+            ? "Declined. The host was emailed."
+            : "Approved and live. The host was emailed."
+      )
       router.refresh()
     } finally {
       setBusyId(null)
@@ -151,6 +189,17 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
         <div className="flex items-center gap-2 text-xs text-[#6E5B49]">
           <Button
             size="sm"
+            variant="outline"
+            className={`border-[#CDBCA8] text-xs ${pendingOnly ? "bg-[#2A2118] text-white hover:bg-[#2A2118]/90" : "bg-[#FCF8F3] text-[#2A2118] hover:bg-[#E6D8C6]"}`}
+            onClick={() => {
+              setPendingOnly((v) => !v)
+              setPage(1)
+            }}
+          >
+            Pending review ({pendingCount})
+          </Button>
+          <Button
+            size="sm"
             className="border border-[#B15538] bg-[#C75B3A] text-[#fff] hover:bg-[#AF4D31]"
             disabled={bulkBusy || bulkEligibleCount === 0}
             onClick={() => void deactivateSelected()}
@@ -180,6 +229,12 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
           </Button>
         </div>
       </div>
+
+      {notice ? (
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {notice}
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">
@@ -211,7 +266,15 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
           </thead>
           <tbody>
             {pageRows.map((row) => {
-              const status = row.is_deleted ? "deleted" : row.is_active ? "active" : "inactive"
+              const status = row.is_deleted
+                ? "deleted"
+                : row.approval_status === "pending"
+                  ? "pending review"
+                  : row.approval_status === "declined"
+                    ? "declined"
+                    : row.is_active
+                      ? "active"
+                      : "inactive"
               const disabled = busyId === row.id || bulkBusy
               return (
                 <tr key={row.id} className="border-b border-[#E4D8C8] hover:bg-[#EFE3D3]/50">
@@ -242,6 +305,8 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
                           ? "bg-emerald-100 text-emerald-700"
                           : status === "inactive"
                             ? "bg-zinc-200 text-zinc-700"
+                            : status === "pending review"
+                              ? "bg-amber-100 text-amber-800"
                             : "bg-rose-100 text-rose-700"
                       }`}
                     >
@@ -268,7 +333,39 @@ export function AdminListingsClient({ rows }: { rows: AdminListingRow[] }) {
                       >
                         <Link href={`/dashboard/listings/${row.id}/edit`}>Edit</Link>
                       </Button>
-                      {!row.is_deleted ? (
+                      {!row.is_deleted && row.approval_status !== "approved" ? (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-7 bg-emerald-700 text-xs text-white hover:bg-emerald-800"
+                            disabled={disabled}
+                            onClick={() => void decide(row.id, "approve_founding")}
+                          >
+                            Approve as founding
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 border-emerald-300 bg-[#FCF8F3] text-xs text-emerald-800 hover:bg-emerald-50"
+                            disabled={disabled}
+                            onClick={() => void decide(row.id, "approve")}
+                          >
+                            Approve
+                          </Button>
+                          {row.approval_status === "pending" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 border-rose-200 bg-[#FCF8F3] text-xs text-rose-700 hover:bg-rose-50"
+                              disabled={disabled}
+                              onClick={() => void decide(row.id, "decline")}
+                            >
+                              Decline
+                            </Button>
+                          ) : null}
+                        </>
+                      ) : null}
+                      {!row.is_deleted && row.approval_status === "approved" ? (
                         <Button
                           size="sm"
                           variant="outline"

@@ -21,7 +21,7 @@ const ROLES: Array<{ id: AppIntent; title: string; body: string }> = [
 ]
 
 /** Quiet, non-tappable facts on screen 1: nothing here should pull people out of the intro. */
-const HIGHLIGHTS = ["Private sessions", "Local hosts", "Starting in Seattle"]
+const HIGHLIGHTS = ["Private sessions", "Local hosts"]
 
 const eyebrow = "text-[12px] font-medium tracking-[0.16em] text-[#A8472B] uppercase"
 const headline = "font-serif text-[34px] leading-[1.06] text-[#1A1410] [text-wrap:balance]"

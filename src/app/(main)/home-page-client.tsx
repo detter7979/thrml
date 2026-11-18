@@ -351,7 +351,7 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
 
       </main>
 
-      <section className="bg-[#1A1410] py-8 md:py-12">
+      <section className="bg-[#1A1410] pt-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))] md:py-12">
         <div className={`mx-auto max-w-6xl ${pageXClass}`}>
           {preLaunch ? (
             <>

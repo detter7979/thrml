@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { ChevronRight, MessageCircle, ScrollText, Sparkles, Wallet } from "lucide-react"
 
+import { SignOutButton } from "@/components/auth/sign-out-button"
 import { CookieSettingsLink } from "@/components/cookie-settings-link"
 import { DoNotSellLink } from "@/components/do-not-sell-link"
 import { AppModeSwitch } from "@/components/shared/AppModeSwitch"
@@ -87,6 +88,8 @@ export function ProfileHome({
           </Link>
         ))}
       </div>
+
+      <SignOutButton />
 
       <div className="flex flex-wrap gap-x-4 gap-y-2 px-1 text-xs text-[#7A6A5D] md:hidden">
         <Link href="/privacy">Privacy</Link>

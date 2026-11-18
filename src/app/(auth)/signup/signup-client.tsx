@@ -23,7 +23,7 @@ import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { MIN_PASSWORD_LENGTH } from "@/lib/security/password-policy"
 import { isHostFunnelPath } from "@/lib/host/host-funnel"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
-import { modeForIntent, onboardingDestination, onboardingMode, postSignupPath, writeAppMode } from "@/lib/app-nav"
+import { modeForIntent, postSignupPath, writeAppMode } from "@/lib/app-nav"
 import { rememberReturnTo } from "@/lib/auth/return-to"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -355,11 +355,6 @@ function SignupForm() {
           if (!introChoice) return
           writeAppMode(modeForIntent(introChoice))
           setIntroDone(true)
-        }}
-        onShortcut={(shortcut) => {
-          const exit = shortcut === "host" ? "shortcut_host" : "shortcut_explore"
-          writeAppMode(onboardingMode(exit))
-          router.push(onboardingDestination(exit))
         }}
       />
     )

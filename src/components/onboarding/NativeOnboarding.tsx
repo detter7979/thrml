@@ -55,7 +55,6 @@ export function NativeOnboarding() {
           if (intent) finish(intent)
         }}
         onLookAround={() => finish("look_around")}
-        onShortcut={(shortcut) => finish(shortcut === "host" ? "shortcut_host" : "shortcut_explore")}
         onLogin={() => {
           markOnboardingComplete()
           setOpen(false)

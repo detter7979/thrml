@@ -20,17 +20,17 @@ export function postSignupPath(intent: AppIntent, requestedNext: string | null):
  * Where onboarding sends someone, with no account required. The choice only picks a starting
  * point: every account can book and host. Hosts meet sign-up inside the host flow when needed.
  */
-export type OnboardingExit = AppIntent | "look_around" | "shortcut_explore" | "shortcut_host"
+export type OnboardingExit = AppIntent | "look_around"
 
 export function onboardingDestination(exit: OnboardingExit): string {
-  if (exit === "host" || exit === "shortcut_host") return "/become-a-host"
+  if (exit === "host") return "/become-a-host"
   if (exit === "both") return EXPLORE_WITH_HOST_PROMPT
   return "/explore"
 }
 
 /** Tab-bar mode to start in after onboarding. */
 export function onboardingMode(exit: OnboardingExit): AppMode {
-  return exit === "host" || exit === "shortcut_host" ? "hosting" : "booking"
+  return exit === "host" ? "hosting" : "booking"
 }
 
 export function modeForIntent(intent: AppIntent): AppMode {

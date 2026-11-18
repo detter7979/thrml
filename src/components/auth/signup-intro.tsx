@@ -12,8 +12,6 @@ import { trackGaEvent } from "@/lib/analytics/ga"
 import type { AppIntent } from "@/lib/app-nav"
 import { cn } from "@/lib/utils"
 
-export type IntroShortcut = "explore" | "host"
-
 const STEPS = 3
 
 const ROLES: Array<{ id: AppIntent; title: string; body: string }> = [
@@ -21,6 +19,9 @@ const ROLES: Array<{ id: AppIntent; title: string; body: string }> = [
   { id: "host", title: "List my sauna", body: "Start earning from your space." },
   { id: "both", title: "A little of both", body: "Explore saunas and become a host." },
 ]
+
+/** Quiet, non-tappable facts on screen 1: nothing here should pull people out of the intro. */
+const HIGHLIGHTS = ["Private sessions", "Local hosts", "Starting in Seattle"]
 
 const eyebrow = "text-[12px] font-medium tracking-[0.16em] text-[#A8472B] uppercase"
 const headline = "font-serif text-[34px] leading-[1.06] text-[#1A1410] [text-wrap:balance]"
@@ -66,7 +67,7 @@ function Action({
 }
 
 /**
- * Three-screen intro: what thrml is (both sides, with shortcuts), how a visit works (and that
+ * Three-screen intro: what thrml is (for guests and hosts), how a visit works (and that
  * hosts set their own hours), then a starting point. The choice personalizes the next step only:
  * every account can book and host.
  */
@@ -76,7 +77,6 @@ export function SignupIntro({
   onContinue,
   onLookAround,
   onLogin,
-  onShortcut,
 }: {
   /** Nothing is preselected: null until the person picks. */
   intent: AppIntent | null
@@ -84,7 +84,6 @@ export function SignupIntro({
   onContinue: () => void
   onLookAround?: () => void
   onLogin?: () => void
-  onShortcut?: (shortcut: IntroShortcut) => void
 }) {
   const [step, setStep] = useState(0)
 
@@ -117,22 +116,14 @@ export function SignupIntro({
               <p className={eyebrow}>Discover. Book. Host.</p>
               <h1 className={headline}>Sauna, on your terms.</h1>
               <p className={bodyText}>Discover private saunas near you, or earn by listing your own.</p>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-1 text-[15px]">
-                <Action
-                  onClick={onShortcut ? () => onShortcut("explore") : undefined}
-                  href="/explore"
-                  className="inline-flex h-11 items-center gap-1.5 text-[#1A1410]"
-                >
-                  <span className="underline decoration-[#DDD4C8] underline-offset-[6px]">Explore saunas</span> <span aria-hidden="true">&rarr;</span>
-                </Action>
-                <Action
-                  onClick={onShortcut ? () => onShortcut("host") : undefined}
-                  href="/become-a-host"
-                  className="inline-flex h-11 items-center gap-1.5 font-medium text-[#A8472B]"
-                >
-                  <span className="underline decoration-[#C75B3A]/40 underline-offset-[6px]">Become a host</span> <span aria-hidden="true">&rarr;</span>
-                </Action>
-              </div>
+              <ul className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-[14px] text-[#7A6355]" aria-label="What thrml offers">
+                {HIGHLIGHTS.map((item) => (
+                  <li key={item} className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#C75B3A]" aria-hidden="true" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
             </div>
             <div className="mt-6 space-y-5">
               <Progress step={0} />

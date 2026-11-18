@@ -74,18 +74,15 @@ describe("app tab bar", () => {
 })
 
 describe("onboarding exits", () => {
-  it("routes each choice and shortcut without requiring an account", () => {
+  it("routes each choice without requiring an account", () => {
     expect(onboardingDestination("guest")).toBe("/explore")
     expect(onboardingDestination("both")).toBe("/explore?intent=both")
     expect(onboardingDestination("host")).toBe("/become-a-host")
     expect(onboardingDestination("look_around")).toBe("/explore")
-    expect(onboardingDestination("shortcut_explore")).toBe("/explore")
-    expect(onboardingDestination("shortcut_host")).toBe("/become-a-host")
   })
 
   it("opens hosting mode only for host exits", () => {
     expect(onboardingMode("host")).toBe("hosting")
-    expect(onboardingMode("shortcut_host")).toBe("hosting")
     expect(onboardingMode("both")).toBe("booking")
     expect(onboardingMode("look_around")).toBe("booking")
   })

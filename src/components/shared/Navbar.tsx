@@ -1,9 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { motion } from "framer-motion"
 import Link from "next/link"
-import { Menu } from "lucide-react"
 import { usePathname } from "next/navigation"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -16,8 +14,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { trackMetaEvent } from "@/components/meta-pixel"
+import { AppTabBar } from "@/components/shared/AppTabBar"
 import { trackBecomeHostClick } from "@/lib/tracking/google-ads"
 import { createClient } from "@/lib/supabase/client"
 
@@ -36,7 +34,6 @@ export function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isHost, setIsHost] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false)
 
   function normalizeAvatarUrl(value: unknown) {
     return typeof value === "string" && value.trim().length > 0 ? value : null
@@ -245,10 +242,6 @@ export function Navbar() {
     setIsUserMenuOpen(false)
   }
 
-  function closeMobileNav() {
-    setIsMobileNavOpen(false)
-  }
-
   const homeTransparent = isHome && !scrolled
   const desktopLinkColor = homeTransparent ? "text-[#F5EFE8]" : "text-[#1A1410]"
   const initials = (userName ?? "M")
@@ -259,6 +252,7 @@ export function Navbar() {
     .toUpperCase()
 
   return (
+    <>
     <header
       className={`top-0 z-50 w-full ${isHome ? "fixed" : "sticky"} ${
         homeTransparent
@@ -410,190 +404,9 @@ export function Navbar() {
             </>
           )}
         </nav>
-
-        <div className="md:hidden">
-          <Sheet open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen}>
-            <SheetTrigger asChild>
-              <button
-                type="button"
-                suppressHydrationWarning
-                className={`inline-flex items-center justify-center rounded-full p-2 ${
-                  homeTransparent ? "text-[#F5EFE8]" : "text-[#1A1410]"
-                }`}
-              >
-                <Menu className="size-6" />
-                <span className="sr-only">Open navigation</span>
-              </button>
-            </SheetTrigger>
-            <SheetContent side="top" className="h-svh border-0 bg-[#1A1410] text-[#F5EFE8]">
-              <SheetHeader>
-                <SheetTitle className="font-serif text-4xl lowercase text-[#F5EFE8]">thrml</SheetTitle>
-              </SheetHeader>
-              <motion.div
-                className="flex flex-col gap-5 px-4 py-6 text-lg"
-                initial="hidden"
-                animate="visible"
-                variants={{
-                  hidden: {},
-                  visible: { transition: { staggerChildren: 0.06, delayChildren: 0.1 } },
-                }}
-              >
-                <motion.div
-                  variants={{
-                    hidden: { opacity: 0, x: -16 },
-                    visible: {
-                      opacity: 1,
-                      x: 0,
-                      transition: { type: "spring", stiffness: 350, damping: 30 },
-                    },
-                  }}
-                >
-                  <Link href="/explore" onClick={closeMobileNav}>
-                    Explore
-                  </Link>
-                </motion.div>
-                {loggedIn ? (
-                  <>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <Link href="/dashboard" onClick={closeMobileNav}>
-                        Overview
-                      </Link>
-                    </motion.div>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <Link href="/dashboard/bookings" onClick={closeMobileNav}>
-                        Bookings
-                      </Link>
-                    </motion.div>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <Link href="/dashboard/saved" onClick={closeMobileNav}>
-                        Saved spaces
-                      </Link>
-                    </motion.div>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <Link href="/dashboard/messages" className="flex items-center gap-2" onClick={closeMobileNav}>
-                        Messages
-                        {unreadCount > 0 ? (
-                          unreadCount > 9 ? (
-                            <span className="rounded-full bg-[#C93C3C] px-1.5 py-0.5 text-[10px] text-white">9+</span>
-                          ) : (
-                            <span className="size-2 rounded-full bg-[#C93C3C]" />
-                          )
-                        ) : null}
-                      </Link>
-                    </motion.div>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <Link href="/dashboard/account" onClick={closeMobileNav}>
-                        Account
-                      </Link>
-                    </motion.div>
-                    {isHost ? (
-                      <>
-                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                          <div className="my-1 border-t border-[#3A3029]" />
-                        </motion.div>
-                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                          <Link href="/dashboard/listings" onClick={closeMobileNav}>
-                            Listings
-                          </Link>
-                        </motion.div>
-                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                          <Link href="/dashboard/earnings" onClick={closeMobileNav}>
-                            Earnings
-                          </Link>
-                        </motion.div>
-                      </>
-                    ) : (
-                      <>
-                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                          <div className="my-1 border-t border-[#3A3029]" />
-                        </motion.div>
-                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                          <Link
-                            href="/become-a-host"
-                            className="text-[#FFAB90] font-medium"
-                            onClick={() => {
-                              trackBecomeHostClick("/become-a-host")
-                              trackMetaEvent(
-                                "become_host_click",
-                                {
-                                  content_name: "become_a_host",
-                                  source: "nav",
-                                },
-                                { custom: true }
-                              )
-                              closeMobileNav()
-                            }}
-                          >
-                            Become a host
-                          </Link>
-                        </motion.div>
-                      </>
-                    )}
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <div className="my-1 border-t border-[#3A3029]" />
-                    </motion.div>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <button
-                        type="button"
-                        className="text-left"
-                        aria-label="Sign out of your account"
-                        onClick={async () => {
-                          closeMobileNav()
-                          await handleSignOut()
-                        }}
-                      >
-                        Sign out
-                      </button>
-                    </motion.div>
-                  </>
-                ) : (
-                  <>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <Link href={loginHref} onClick={closeMobileNav}>
-                        Log in
-                      </Link>
-                    </motion.div>
-                    <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                      <Button asChild className="mt-2 rounded-full bg-[#C75B3A] text-white hover:bg-[#B45033]">
-                        <Link href={signupHref} onClick={closeMobileNav}>
-                          Sign up
-                        </Link>
-                      </Button>
-                    </motion.div>
-                    {!isHome ? (
-                      <>
-                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                          <div className="my-1 border-t border-[#3A3029]" />
-                        </motion.div>
-                        <motion.div variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 350, damping: 30 } } }}>
-                          <Link
-                            href="/become-a-host"
-                            className="text-[#FFAB90] font-medium"
-                            onClick={() => {
-                              trackBecomeHostClick("/become-a-host")
-                              trackMetaEvent(
-                                "become_host_click",
-                                {
-                                  content_name: "become_a_host",
-                                  source: "nav",
-                                },
-                                { custom: true }
-                              )
-                              closeMobileNav()
-                            }}
-                          >
-                            Become a host
-                          </Link>
-                        </motion.div>
-                      </>
-                    ) : null}
-                  </>
-                )}
-              </motion.div>
-            </SheetContent>
-          </Sheet>
-        </div>
       </div>
     </header>
+    <AppTabBar loggedIn={loggedIn} isHost={isHost} />
+    </>
   )
 }

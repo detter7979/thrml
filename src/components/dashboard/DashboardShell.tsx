@@ -8,13 +8,10 @@ import {
   Heart,
   Home,
   Landmark,
-  LayoutGrid,
   MessageCircle,
   PlusCircle,
   Settings,
   Sparkles,
-  User,
-  UserCircle,
 } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 
@@ -23,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { trackMetaEvent } from "@/components/meta-pixel"
 import { trackBecomeHostClick } from "@/lib/tracking/google-ads"
+import { AppTabBar } from "@/components/shared/AppTabBar"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -83,23 +81,6 @@ export function DashboardShell({
     { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
   ]
   const desktopItems = isHost ? hostDesktopPrimaryItems : guestDesktopItems
-  const mobileItems = isHost
-    ? [
-        { href: "/dashboard", label: "Overview", icon: Home },
-        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-        { href: "/dashboard/listings", label: "Listings", icon: LayoutGrid },
-        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
-        { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
-        { href: "/dashboard/account", label: "Account", icon: UserCircle },
-      ]
-    : [
-        { href: "/dashboard", label: "Overview", icon: Home },
-        { href: "/dashboard/bookings", label: "Bookings", icon: CalendarDays },
-        { href: "/dashboard/messages", label: "Messages", icon: MessageCircle },
-        { href: "/dashboard/saved", label: "Saved", icon: Heart },
-        { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
-        { href: "/dashboard/account", label: "Account", icon: User },
-      ]
   const isOverviewPage = pathname === "/dashboard"
   const mobileHeaderTitle = isOverviewPage ? "Overview" : isHost ? "Host dashboard" : "Guest dashboard"
   const mobileHeaderSubtitle = isHost
@@ -525,38 +506,7 @@ export function DashboardShell({
       </div>
 
       <main className="pb-24 md:pb-0">{children}</main>
-
-      <nav
-        className="fixed right-0 bottom-0 left-0 z-50 border-t border-[#F0E8E0] bg-white md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <div className="flex h-16">
-        {mobileItems.map((item) => {
-          const Icon = item.icon
-          const active = isNavItemActive(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex min-h-[44px] flex-1 flex-col items-center justify-center gap-1 py-1 text-[11px] font-medium",
-                active ? "text-[#8B4513]" : "text-[#9CA3AF]"
-              )}
-            >
-              <div className="relative">
-                <Icon className="size-5" />
-                {item.href === "/dashboard/messages" && unreadMessagesCount > 0 ? (
-                  <span className="absolute -top-2 -right-2 rounded-full bg-[#C75B3A] px-1 text-[9px] leading-4 text-white">
-                    {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
-                  </span>
-                ) : null}
-              </div>
-              {item.label}
-            </Link>
-          )
-        })}
-        </div>
-      </nav>
+      <AppTabBar loggedIn isHost={isHost} />
     </div>
   )
 }

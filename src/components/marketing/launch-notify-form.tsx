@@ -118,7 +118,7 @@ export function LaunchNotifyForm({
         aria-hidden="true"
         style={{ display: "none" }}
       />
-      <div className="flex w-full flex-col items-center gap-3 sm:flex-row sm:items-stretch">
+      <div className="flex w-full max-w-md flex-col gap-2 sm:flex-row sm:items-center">
         <label htmlFor={inputId} className="sr-only">
           Email address
         </label>
@@ -133,16 +133,16 @@ export function LaunchNotifyForm({
             setEmail(event.target.value)
             if (error) setError(null)
           }}
-          placeholder="Enter your email"
+          placeholder="Email"
           disabled={status === "loading"}
-          className={`h-[52px] w-full flex-1 rounded-full border px-6 text-base text-[#1A1410] outline-none placeholder:text-[#8E8176] focus:border-[#C75B3A] disabled:cursor-not-allowed disabled:opacity-70 md:h-14 ${
+          className={`h-10 w-full rounded-lg border px-3 text-sm text-[#1A1410] outline-none placeholder:text-[#8E8176] focus:border-[#C75B3A] disabled:cursor-not-allowed disabled:opacity-70 sm:min-w-0 sm:flex-1 ${
             dark ? "border-white/20 bg-white" : "border-warm-200 bg-white"
           }`}
         />
         <Button
           type="submit"
           disabled={status === "loading"}
-          className="inline-flex h-[52px] min-h-[52px] w-full items-center justify-center rounded-full bg-[#C75B3A] px-8 text-base font-medium text-white hover:bg-[#B45033] disabled:cursor-not-allowed disabled:opacity-80 sm:w-auto md:h-14"
+          className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-[#C75B3A] px-4 text-sm font-medium text-white hover:bg-[#B45033] disabled:cursor-not-allowed disabled:opacity-80 sm:w-auto"
         >
           {status === "loading" ? (
             <span className="inline-flex items-center gap-2">

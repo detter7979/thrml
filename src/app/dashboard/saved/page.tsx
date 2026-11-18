@@ -134,7 +134,7 @@ export default function DashboardSavedPage() {
   return (
     <div className="space-y-5 px-4 py-6 md:px-8 md:py-8">
       <div className="space-y-1">
-        <h1 className="font-serif text-[28px] text-[#1A1410]">Saved Spaces</h1>
+        <h1 className="hidden font-serif text-[28px] text-[#1A1410] md:block">Saved Spaces</h1>
         <p className="text-sm text-[#6D5E51]">{savedCount} spaces saved</p>
       </div>
 

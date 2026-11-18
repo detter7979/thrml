@@ -7,6 +7,7 @@ import { GoogleTagLoader } from "@/components/analytics/google-tag-loader";
 import { SmoothScrollProviderDeferred } from "@/components/layout/deferred-motion-boundaries";
 import { CookieConsentProvider } from "@/contexts/cookie-consent-context";
 import { MetaPixel } from "@/components/meta-pixel";
+import { NativeOnboarding } from "@/components/onboarding/NativeOnboarding";
 import { ReferralCapture } from "@/components/ReferralCapture";
 import { SITE_COPY } from "@/lib/site-copy";
 import "./globals.css";
@@ -98,6 +99,7 @@ export default function RootLayout({
         </a>
         <CookieConsentProvider>
           <SmoothScrollProviderDeferred>{children}</SmoothScrollProviderDeferred>
+          <NativeOnboarding />
           <Suspense fallback={null}>
             <ReferralCapture />
           </Suspense>

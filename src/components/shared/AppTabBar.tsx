@@ -2,10 +2,29 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarDays, Compass, Heart, MessageCircle, Sparkles, UserRound } from "lucide-react"
+import { useEffect, useState } from "react"
+import { CalendarDays, Compass, Heart, Home, MessageCircle, Sparkles, UserRound } from "lucide-react"
 
-import { activityTab, isAppTabActive, showAppTabBar, type AppTabId } from "@/lib/app-nav"
+import {
+  APP_MODE_EVENT,
+  isAppTabActive,
+  readAppMode,
+  showAppTabBar,
+  tabsForMode,
+  type AppMode,
+  type AppTabId,
+} from "@/lib/app-nav"
 import { cn } from "@/lib/utils"
+
+const ICONS = {
+  explore: Compass,
+  today: Home,
+  wishlists: Heart,
+  bookings: CalendarDays,
+  listings: Sparkles,
+  inbox: MessageCircle,
+  profile: UserRound,
+} as const
 
 export function AppTabBar({
   loggedIn,
@@ -17,28 +36,22 @@ export function AppTabBar({
   unreadMessages?: number
 }) {
   const pathname = usePathname() || "/"
-  if (!showAppTabBar(pathname)) return null
+  const [mode, setMode] = useState<AppMode>(isHost ? "hosting" : "booking")
 
-  const activity = activityTab(isHost)
-  const gate = (href: string) => (loggedIn ? href : `/login?next=${encodeURIComponent(href)}`)
+  useEffect(() => {
+    const sync = () => setMode(readAppMode(isHost))
+    sync()
+    window.addEventListener(APP_MODE_EVENT, sync)
+    window.addEventListener("storage", sync)
+    return () => {
+      window.removeEventListener(APP_MODE_EVENT, sync)
+      window.removeEventListener("storage", sync)
+    }
+  }, [isHost])
 
-  const tabs: Array<{ id: AppTabId; href: string; label: string; icon: typeof Compass }> = [
-    { id: "explore", href: "/explore", label: "Explore", icon: Compass },
-    { id: "inbox", href: gate("/dashboard/messages"), label: "Inbox", icon: MessageCircle },
-    {
-      id: "activity",
-      href: gate(activity.href),
-      label: activity.label,
-      icon: isHost ? Sparkles : CalendarDays,
-    },
-    { id: "wishlists", href: gate("/dashboard/saved"), label: "Wishlists", icon: Heart },
-    {
-      id: "profile",
-      href: loggedIn ? "/dashboard/account" : "/signup",
-      label: "Profile",
-      icon: UserRound,
-    },
-  ]
+  if (!loggedIn || !showAppTabBar(pathname)) return null
+
+  const tabs = tabsForMode(mode)
 
   return (
     <nav
@@ -48,7 +61,7 @@ export function AppTabBar({
     >
       <ul className="mx-auto flex h-16 max-w-lg">
         {tabs.map((tab) => {
-          const Icon = tab.icon
+          const Icon = ICONS[tab.id as AppTabId]
           const active = isAppTabActive(pathname, tab.id)
           return (
             <li key={tab.id} className="flex-1">

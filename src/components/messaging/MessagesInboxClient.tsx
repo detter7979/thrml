@@ -121,15 +121,19 @@ export function MessagesInboxClient({
     )
   }
 
+  const threadOpen = Boolean(activeConversationId)
+
   return (
-    <div className="grid min-h-[calc(100dvh-80px-4.25rem)] grid-cols-1 md:min-h-[calc(100dvh-80px)] md:grid-cols-[360px_1fr]">
-      <ConversationList
-        conversations={conversations}
-        activeConversationId={selectedId}
-        showTemplatesLink={canManageTemplates}
-        onOpenConversation={handleOpenConversation}
-      />
-      <div className="bg-[#F7F3EE]">
+    <div className="grid min-h-[calc(100dvh-4.5rem-4.25rem-env(safe-area-inset-bottom))] grid-cols-1 md:min-h-[calc(100dvh-80px)] md:grid-cols-[360px_1fr]">
+      <div className={threadOpen ? "hidden md:block" : "block"}>
+        <ConversationList
+          conversations={conversations}
+          activeConversationId={selectedId}
+          showTemplatesLink={canManageTemplates}
+          onOpenConversation={handleOpenConversation}
+        />
+      </div>
+      <div className={threadOpen ? "bg-[#F7F3EE]" : "hidden bg-[#F7F3EE] md:block"}>
         {loading && selectedId ? (
           <MessageThreadSkeleton />
         ) : selectedId ? (

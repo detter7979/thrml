@@ -81,11 +81,30 @@ export function DashboardShell({
     { href: "/dashboard/referrals", label: "Referrals", icon: Gift },
   ]
   const desktopItems = isHost ? hostDesktopPrimaryItems : guestDesktopItems
-  const isOverviewPage = pathname === "/dashboard"
-  const mobileHeaderTitle = isOverviewPage ? "Overview" : isHost ? "Host dashboard" : "Guest dashboard"
-  const mobileHeaderSubtitle = isHost
-    ? `${activeListingsCount} active listing${activeListingsCount === 1 ? "" : "s"}`
-    : `${upcomingBookingsCount} upcoming session${upcomingBookingsCount === 1 ? "" : "s"}`
+  const inMessageThread = pathname.startsWith("/dashboard/messages/")
+  const mobileHeaderTitle = pathname.startsWith("/dashboard/messages")
+    ? "Inbox"
+    : pathname.startsWith("/dashboard/listings")
+      ? "Listings"
+      : pathname.startsWith("/dashboard/bookings")
+        ? "Bookings"
+        : pathname.startsWith("/dashboard/saved")
+          ? "Wishlists"
+          : pathname.startsWith("/dashboard/account") || pathname.startsWith("/dashboard/profile")
+            ? "Profile"
+            : pathname.startsWith("/dashboard/earnings")
+              ? "Earnings"
+              : pathname.startsWith("/dashboard/referrals")
+                ? "Referrals"
+                : pathname.startsWith("/dashboard/host/templates")
+                  ? "Templates"
+                  : "Today"
+  const mobileHeaderSubtitle =
+    pathname === "/dashboard"
+      ? isHost
+        ? `${activeListingsCount} active listing${activeListingsCount === 1 ? "" : "s"}`
+        : `${upcomingBookingsCount} upcoming session${upcomingBookingsCount === 1 ? "" : "s"}`
+      : null
   const dashboardPrimaryCtaHref = !isHost || !hasListings ? "/become-a-host" : "/dashboard/listings/new"
 
   const initials = fullNameValue
@@ -491,19 +510,14 @@ export function DashboardShell({
         </div>
       </aside>
 
+      {inMessageThread ? null : (
       <div className="sticky top-0 z-50 border-b border-[#E7DED3] bg-white md:hidden" style={{ paddingTop: "env(safe-area-inset-top)" }}>
         <div className="px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <Link href="/" className="font-serif text-2xl lowercase text-[#1A1410]">
-              thrml
-            </Link>
-            <span className="text-right">
-              <span className="block text-sm font-medium text-[#1A1410]">{mobileHeaderTitle}</span>
-              <span className="block text-xs text-[#7A6A5D]">{mobileHeaderSubtitle}</span>
-            </span>
-          </div>
+          <h1 className="font-serif text-2xl text-[#1A1410]">{mobileHeaderTitle}</h1>
+          {mobileHeaderSubtitle ? <p className="text-xs text-[#7A6A5D]">{mobileHeaderSubtitle}</p> : null}
         </div>
       </div>
+      )}
 
       <main className="pb-24 md:pb-0">{children}</main>
       <AppTabBar loggedIn isHost={isHost} unreadMessages={unreadMessagesCount} />

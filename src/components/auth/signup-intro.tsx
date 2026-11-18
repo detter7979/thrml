@@ -17,14 +17,14 @@ const SLIDES = [
   },
   {
     image: "/hero-sauna.png",
-    alt: "A wood-fired barrel sauna open in a cedar forest",
+    alt: "A wood-fired sauna glowing open in a dark forest",
     kicker: "How a visit works",
     title: "Pick a time. Show up. Unwind.",
     body: "You pay on thrml. The cancellation rule is on the listing before you book, and your host sends the way in.",
   },
   {
-    image: "/hero-main-bg.jpg",
-    alt: "Warm light from a sauna door on a wooden deck",
+    image: "/hero-cold-plunge.png",
+    alt: "A snow-covered barrel sauna beside a wooden plunge",
     kicker: "If you have the space",
     title: "Your sauna can earn while you are out.",
     body: "List it, set your hours, and guests book the sessions you are not using.",
@@ -41,10 +41,14 @@ export function SignupIntro({
   intent,
   onIntent,
   onContinue,
+  onLookAround,
+  onLogin,
 }: {
   intent: AppIntent
   onIntent: (intent: AppIntent) => void
   onContinue: () => void
+  onLookAround?: () => void
+  onLogin?: () => void
 }) {
   const [index, setIndex] = useState(0)
   const [choosing, setChoosing] = useState(false)
@@ -65,12 +69,22 @@ export function SignupIntro({
 
       <div className="relative z-10 flex min-h-[100svh] flex-col px-6 pt-6 pb-8">
         <div className="flex items-center justify-between">
-          <Link href="/" className="font-serif text-3xl lowercase">
-            thrml
-          </Link>
-          <Link href="/login" className="text-sm text-white/80">
-            Log in
-          </Link>
+          {onLookAround ? (
+            <span className="font-serif text-3xl lowercase">thrml</span>
+          ) : (
+            <Link href="/" className="font-serif text-3xl lowercase">
+              thrml
+            </Link>
+          )}
+          {onLogin ? (
+            <button type="button" onClick={onLogin} className="text-sm text-white/80">
+              Log in
+            </button>
+          ) : (
+            <Link href="/login" className="text-sm text-white/80">
+              Log in
+            </Link>
+          )}
         </div>
 
         <div className="mt-auto mx-auto w-full max-w-lg">
@@ -106,6 +120,15 @@ export function SignupIntro({
               >
                 Continue
               </button>
+              {onLookAround ? (
+                <button type="button" onClick={onLookAround} className="block w-full py-2 text-center text-sm text-white/75">
+                  Look around first
+                </button>
+              ) : (
+                <Link href="/explore" className="block py-2 text-center text-sm text-white/75">
+                  Look around first
+                </Link>
+              )}
             </div>
           ) : (
             <div>

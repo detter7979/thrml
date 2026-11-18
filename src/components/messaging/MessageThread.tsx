@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { format, isToday, isYesterday } from "date-fns"
+import { ChevronLeft } from "lucide-react"
 
 import { DashboardSkeletonBlock } from "@/components/dashboard/dashboard-loading-skeletons"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -180,8 +181,12 @@ export function MessageThread({
     .toUpperCase()
 
   return (
-    <section className="flex h-[calc(100dvh-130px)] flex-col">
+    <section className="flex h-[calc(100dvh-4.25rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col pt-[env(safe-area-inset-top)] md:h-[calc(100dvh-4.5rem)] md:pt-0">
       <header className="border-b border-[#E7DED3] bg-white px-4 py-3">
+        <Link href="/dashboard/messages" className="mb-2 inline-flex items-center gap-1 text-sm text-[#6D5E51] md:hidden">
+          <ChevronLeft className="size-4" />
+          Inbox
+        </Link>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <Avatar size="default">

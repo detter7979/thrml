@@ -23,7 +23,7 @@ import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { MIN_PASSWORD_LENGTH } from "@/lib/security/password-policy"
 import { isHostFunnelPath } from "@/lib/host/host-funnel"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
-import { postSignupPath } from "@/lib/app-nav"
+import { modeForIntent, postSignupPath, writeAppMode } from "@/lib/app-nav"
 import { rememberReturnTo } from "@/lib/auth/return-to"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -77,8 +77,11 @@ function SignupForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [phone, setPhone] = useState("")
+  const queryIntent = searchParams.get("intent")
+  const intentFromQuery: IntentOption | null =
+    queryIntent === "guest" || queryIntent === "host" || queryIntent === "both" ? queryIntent : null
   const [intent, setIntent] = useState<IntentOption>(() =>
-    searchParams.get("intent") === "host" || isHostFunnelPath(requestedNext) ? "host" : "guest"
+    intentFromQuery ?? (isHostFunnelPath(requestedNext) ? "host" : "guest")
   )
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -89,7 +92,7 @@ function SignupForm() {
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [introDone, setIntroDone] = useState(false)
+  const [introDone, setIntroDone] = useState(Boolean(intentFromQuery))
 
   const passwordScore = useMemo(() => {
     let score = 0
@@ -107,6 +110,11 @@ function SignupForm() {
   function getPostSignupDestination() {
     return postSignupPath(intent, requestedNext)
   }
+
+  useEffect(() => {
+    if (!intentFromQuery) return
+    writeAppMode(modeForIntent(intentFromQuery))
+  }, [intentFromQuery])
 
   useEffect(() => {
     if (resendCooldown <= 0) return
@@ -334,7 +342,17 @@ function SignupForm() {
 
   if (!introDone) {
     return (
-      <SignupIntro intent={intent} onIntent={setIntent} onContinue={() => setIntroDone(true)} />
+      <SignupIntro
+        intent={intent}
+        onIntent={(next) => {
+          setIntent(next)
+          writeAppMode(modeForIntent(next))
+        }}
+        onContinue={() => {
+          writeAppMode(modeForIntent(intent))
+          setIntroDone(true)
+        }}
+      />
     )
   }
 
@@ -525,7 +543,10 @@ function SignupForm() {
               <div className="grid gap-2">
                 <button
                   type="button"
-                  onClick={() => setIntent("guest")}
+                  onClick={() => {
+                    setIntent("guest")
+                    writeAppMode("booking")
+                  }}
                   className={cn(
                     baseCard,
                     intent === "guest" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]"
@@ -535,7 +556,10 @@ function SignupForm() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIntent("host")}
+                  onClick={() => {
+                    setIntent("host")
+                    writeAppMode("hosting")
+                  }}
                   className={cn(
                     baseCard,
                     intent === "host" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]"
@@ -545,7 +569,10 @@ function SignupForm() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIntent("both")}
+                  onClick={() => {
+                    setIntent("both")
+                    writeAppMode("booking")
+                  }}
                   className={cn(
                     baseCard,
                     intent === "both" ? "border-[#C75B3A] bg-[#FFF5F0]" : "hover:bg-[#FAF8F4]"

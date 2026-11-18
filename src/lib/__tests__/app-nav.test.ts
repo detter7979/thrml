@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { activityTab, isAppTabActive, postSignupPath, showAppTabBar } from "@/lib/app-nav"
+import { isAppTabActive, modeForIntent, postSignupPath, showAppTabBar, tabsForMode } from "@/lib/app-nav"
 
 describe("postSignupPath", () => {
   it("sends guests and both to explore, and hosts into listing", () => {
@@ -14,29 +14,53 @@ describe("postSignupPath", () => {
   })
 })
 
+describe("modeForIntent", () => {
+  it("opens hosting only for people who came to list", () => {
+    expect(modeForIntent("host")).toBe("hosting")
+    expect(modeForIntent("guest")).toBe("booking")
+    expect(modeForIntent("both")).toBe("booking")
+  })
+})
+
 describe("app tab bar", () => {
-  it("hides during checkout", () => {
+  it("hides during checkout and account creation", () => {
     expect(showAppTabBar("/book/abc")).toBe(false)
     expect(showAppTabBar("/listing/abc")).toBe(false)
+    expect(showAppTabBar("/signup")).toBe(false)
     expect(showAppTabBar("/explore")).toBe(true)
   })
 
-  it("points the activity tab at listings for hosts and bookings for guests", () => {
-    expect(activityTab(true)).toEqual({ href: "/dashboard/listings", label: "Listings" })
-    expect(activityTab(false)).toEqual({ href: "/dashboard/bookings", label: "Bookings" })
+  it("gives booking and hosting their own tabs", () => {
+    expect(tabsForMode("booking").map((tab) => tab.label)).toEqual([
+      "Explore",
+      "Wishlists",
+      "Bookings",
+      "Inbox",
+      "Profile",
+    ])
+    expect(tabsForMode("hosting").map((tab) => tab.label)).toEqual([
+      "Today",
+      "Listings",
+      "Bookings",
+      "Inbox",
+      "Profile",
+    ])
   })
 
   it("lights one tab for the screen you are on", () => {
     expect(isAppTabActive("/listing/1", "explore")).toBe(true)
     expect(isAppTabActive("/dashboard/messages", "inbox")).toBe(true)
     expect(isAppTabActive("/dashboard/messages/abc", "inbox")).toBe(true)
-    expect(isAppTabActive("/dashboard/listings/new", "activity")).toBe(true)
+    expect(isAppTabActive("/dashboard/listings/new", "listings")).toBe(true)
     expect(isAppTabActive("/dashboard/saved", "wishlists")).toBe(true)
+    expect(isAppTabActive("/dashboard/bookings", "bookings")).toBe(true)
+    expect(isAppTabActive("/dashboard", "today")).toBe(true)
     expect(isAppTabActive("/dashboard/account", "profile")).toBe(true)
     expect(isAppTabActive("/dashboard/earnings", "profile")).toBe(true)
     expect(isAppTabActive("/dashboard/host/templates", "profile")).toBe(true)
-    expect(isAppTabActive("/dashboard/host/templates", "activity")).toBe(false)
+    expect(isAppTabActive("/dashboard/host/templates", "listings")).toBe(false)
     expect(isAppTabActive("/dashboard/bookings", "inbox")).toBe(false)
     expect(isAppTabActive("/dashboard", "profile")).toBe(false)
+    expect(isAppTabActive("/dashboard/listings", "today")).toBe(false)
   })
 })

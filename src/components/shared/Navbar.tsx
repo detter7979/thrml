@@ -269,6 +269,17 @@ export function Navbar() {
           thrml
         </Link>
 
+        {!loggedIn ? (
+          <div className="flex items-center gap-3 md:hidden">
+            <Link href={loginHref} className={`text-sm ${desktopLinkColor}`}>
+              Log in
+            </Link>
+            <Link href={signupHref} className="rounded-full bg-[#C75B3A] px-4 py-2 text-sm font-medium text-white">
+              Sign up
+            </Link>
+          </div>
+        ) : null}
+
         <nav className="hidden items-center gap-7 md:flex">
           {loggedIn ? (
             <DropdownMenu open={isUserMenuOpen} onOpenChange={setIsUserMenuOpen}>

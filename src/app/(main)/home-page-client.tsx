@@ -126,14 +126,14 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
 
   const heroImages = {
     mobile: {
-      url: "/hero-main-bg-mobile.jpg",
-      objectPosition: "center center",
-      alt: "Barrel sauna glowing warmly on a backyard deck at dusk",
+      url: "/onboarding-forest-sauna.jpg",
+      objectPosition: "64% center",
+      alt: "A barrel sauna on a stone patio in a cedar forest",
     },
     desktop: {
-      url: "/hero-main-bg.jpg",
+      url: "/onboarding-forest-sauna.jpg",
       objectPosition: "center center",
-      alt: "Barrel sauna glowing warmly on a backyard deck at dusk",
+      alt: "A barrel sauna on a stone patio in a cedar forest",
     },
   }
 
@@ -192,7 +192,7 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
             src={heroImages.mobile.url}
             alt={heroImages.mobile.alt}
             fill
-            className="object-cover scale-x-[-1] md:hidden"
+            className="object-cover md:hidden"
             style={{ objectPosition: heroImages.mobile.objectPosition }}
             sizes="100vw"
             priority
@@ -351,16 +351,15 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
 
       </main>
 
-      <section className="bg-[#1A1410] py-16 md:py-20">
+      <section className="bg-[#1A1410] py-8 md:py-12">
         <div className={`mx-auto max-w-6xl ${pageXClass}`}>
           {preLaunch ? (
             <>
-              <h3 className="mb-4 font-serif text-3xl leading-tight text-[#F5EFE8] md:text-4xl">
-                Bookings open {launchLabel ?? "soon"}
+              <h3 className="mb-1 font-serif text-2xl leading-tight text-[#F5EFE8] md:text-3xl">
+                Opening {launchLabel ?? "soon"}
               </h3>
-              <p className="mb-8 max-w-xl text-base leading-relaxed text-white/65">
-                Private saunas around Seattle, hosted by locals and booked by the session. Leave your email and
-                we&apos;ll send you one note the day you can book.
+              <p className="mb-4 max-w-md text-sm leading-relaxed text-white/65">
+                We&apos;ll send one note the morning those first sessions open.
               </p>
               <LaunchNotifyForm source="launch_waitlist" buttonLabel="Notify me" />
             </>

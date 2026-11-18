@@ -1,7 +1,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { cache, Suspense } from "react"
-import { LayoutGrid, Plus, Settings } from "lucide-react"
+import { LayoutGrid, MessageSquareText, Plus, ScrollText, UserRound } from "lucide-react"
 
 import { FoundingHostStatus } from "@/components/host/FoundingHostStatus"
 import { HostSetupChecklist } from "@/components/host/HostSetupChecklist"
@@ -79,7 +79,8 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value)
 }
 
@@ -437,24 +438,24 @@ async function EarningsSection({ userId }: { userId: string }) {
   const hasEarnings = data.earnings.thisMonth > 0 || data.earnings.allTime > 0
 
   return (
-    <section className="rounded-2xl bg-white p-4">
+    <section className="rounded-2xl bg-[#1A1410] p-4 text-[#F5EFE8]">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-[#6D5E51]">This month</p>
-        <p className="text-lg font-semibold text-[#1A1410]">{formatCurrency(data.earnings.thisMonth)}</p>
-      </div>
-      <div className="my-3 border-t border-[#F0E8E0]" />
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-[#6D5E51]">All time</p>
-        <p className="text-lg font-semibold text-[#1A1410]">{formatCurrency(data.earnings.allTime)}</p>
-      </div>
-      <div className="mt-3 flex items-center justify-between">
-        <p className="text-xs text-[#7A6A5D]">
-          {hasEarnings ? "" : "$0 · Start earning by activating your first listing"}
-        </p>
-        <Link href="/dashboard/earnings" className="text-sm font-medium text-[#8B4513]">
-          View details →
+        <p className="text-xs font-medium tracking-[0.14em] text-[#E8B9A4] uppercase">Earnings</p>
+        <Link href="/dashboard/earnings" className="text-sm font-medium text-[#F5EFE8]">
+          Details
         </Link>
       </div>
+      <div className="mt-3 flex items-center justify-between">
+        <p className="text-sm text-white/70">This month</p>
+        <p className="font-serif text-3xl">{formatCurrency(data.earnings.thisMonth)}</p>
+      </div>
+      <div className="mt-2 flex items-center justify-between">
+        <p className="text-sm text-white/70">All time</p>
+        <p className="text-sm font-medium">{formatCurrency(data.earnings.allTime)}</p>
+      </div>
+      {hasEarnings ? null : (
+        <p className="mt-3 text-xs text-white/60">Activate a listing to start earning.</p>
+      )}
     </section>
   )
 }
@@ -576,28 +577,31 @@ async function MessagesSection({ userId }: { userId: string }) {
 
 function QuickActionsSection() {
   const actions = [
-    { href: "/dashboard/listings/new", label: "New listing", icon: Plus },
-    { href: "/dashboard/listings", label: "My listings", icon: LayoutGrid },
-    { href: "/dashboard/account", label: "Settings", icon: Settings },
+    { href: "/dashboard/listings/new", label: "New listing", detail: "Add another space", icon: Plus },
+    { href: "/dashboard/listings", label: "My listings", detail: "Prices, photos, and availability", icon: LayoutGrid },
+    { href: "/dashboard/account#house-rules", label: "House rules", detail: "Defaults guests agree to", icon: ScrollText },
+    { href: "/dashboard/host/templates", label: "Message templates", detail: "Replies you can send in one tap", icon: MessageSquareText },
+    { href: "/dashboard/account#profile", label: "Edit profile", detail: "Name, photo, phone, and bio", icon: UserRound },
   ]
 
   return (
-    <section className="rounded-2xl bg-[#F7F3EE] p-0">
-      <div className="grid grid-cols-3 gap-2">
-        {actions.map((action) => {
-          const Icon = action.icon
-          return (
-            <Link
-              key={action.href}
-              href={action.href}
-              className="flex flex-col items-center justify-center rounded-xl border border-[#E5DDD6] bg-white p-3 text-center"
-            >
-              <Icon className="mb-1 size-4 text-[#8B4513]" />
-              <span className="text-[13px] font-medium text-[#1A1410]">{action.label}</span>
-            </Link>
-          )
-        })}
-      </div>
+    <section className="overflow-hidden rounded-2xl bg-white">
+      {actions.map((action, index) => {
+        const Icon = action.icon
+        return (
+          <Link
+            key={action.href}
+            href={action.href}
+            className={`flex items-center gap-3 px-4 py-3 ${index > 0 ? "border-t border-[#F0E8E0]" : ""}`}
+          >
+            <Icon className="size-4 shrink-0 text-[#8B4513]" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-[#1A1410]">{action.label}</span>
+              <span className="block text-xs text-[#7A6A5D]">{action.detail}</span>
+            </span>
+          </Link>
+        )
+      })}
     </section>
   )
 }

@@ -2,12 +2,20 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarDays, Compass, Heart, LayoutGrid, Sparkles, UserRound } from "lucide-react"
+import { CalendarDays, Compass, Heart, MessageCircle, Sparkles, UserRound } from "lucide-react"
 
 import { activityTab, isAppTabActive, showAppTabBar, type AppTabId } from "@/lib/app-nav"
 import { cn } from "@/lib/utils"
 
-export function AppTabBar({ loggedIn, isHost }: { loggedIn: boolean; isHost: boolean }) {
+export function AppTabBar({
+  loggedIn,
+  isHost,
+  unreadMessages = 0,
+}: {
+  loggedIn: boolean
+  isHost: boolean
+  unreadMessages?: number
+}) {
   const pathname = usePathname() || "/"
   if (!showAppTabBar(pathname)) return null
 
@@ -16,7 +24,7 @@ export function AppTabBar({ loggedIn, isHost }: { loggedIn: boolean; isHost: boo
 
   const tabs: Array<{ id: AppTabId; href: string; label: string; icon: typeof Compass }> = [
     { id: "explore", href: "/explore", label: "Explore", icon: Compass },
-    { id: "dashboard", href: gate("/dashboard"), label: "Dashboard", icon: LayoutGrid },
+    { id: "inbox", href: gate("/dashboard/messages"), label: "Inbox", icon: MessageCircle },
     {
       id: "activity",
       href: gate(activity.href),
@@ -52,7 +60,14 @@ export function AppTabBar({ loggedIn, isHost }: { loggedIn: boolean; isHost: boo
                   active ? "text-[#1A1410]" : "text-[#8E8176]"
                 )}
               >
-                <Icon className="size-5" strokeWidth={active ? 2.25 : 1.75} />
+                <span className="relative">
+                  <Icon className="size-5" strokeWidth={active ? 2.25 : 1.75} />
+                  {tab.id === "inbox" && unreadMessages > 0 ? (
+                    <span className="absolute -top-1.5 -right-2 min-w-4 rounded-full bg-[#C75B3A] px-1 text-center text-[9px] leading-4 text-white">
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  ) : null}
+                </span>
                 {tab.label}
               </Link>
             </li>

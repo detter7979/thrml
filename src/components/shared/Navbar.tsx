@@ -406,7 +406,7 @@ export function Navbar() {
         </nav>
       </div>
     </header>
-    <AppTabBar loggedIn={loggedIn} isHost={isHost} />
+    <AppTabBar loggedIn={loggedIn} isHost={isHost} unreadMessages={unreadCount} />
     </>
   )
 }

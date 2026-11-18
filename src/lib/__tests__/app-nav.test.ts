@@ -28,11 +28,15 @@ describe("app tab bar", () => {
 
   it("lights one tab for the screen you are on", () => {
     expect(isAppTabActive("/listing/1", "explore")).toBe(true)
-    expect(isAppTabActive("/dashboard", "dashboard")).toBe(true)
+    expect(isAppTabActive("/dashboard/messages", "inbox")).toBe(true)
+    expect(isAppTabActive("/dashboard/messages/abc", "inbox")).toBe(true)
     expect(isAppTabActive("/dashboard/listings/new", "activity")).toBe(true)
     expect(isAppTabActive("/dashboard/saved", "wishlists")).toBe(true)
     expect(isAppTabActive("/dashboard/account", "profile")).toBe(true)
-    expect(isAppTabActive("/dashboard/bookings", "dashboard")).toBe(false)
-    expect(isAppTabActive("/dashboard/messages", "dashboard")).toBe(true)
+    expect(isAppTabActive("/dashboard/earnings", "profile")).toBe(true)
+    expect(isAppTabActive("/dashboard/host/templates", "profile")).toBe(true)
+    expect(isAppTabActive("/dashboard/host/templates", "activity")).toBe(false)
+    expect(isAppTabActive("/dashboard/bookings", "inbox")).toBe(false)
+    expect(isAppTabActive("/dashboard", "profile")).toBe(false)
   })
 })

@@ -15,7 +15,7 @@ export function showAppTabBar(pathname: string): boolean {
   return true
 }
 
-export type AppTabId = "explore" | "dashboard" | "activity" | "wishlists" | "profile"
+export type AppTabId = "explore" | "inbox" | "activity" | "wishlists" | "profile"
 
 export function activityTab(isHost: boolean): { href: string; label: string } {
   return isHost
@@ -33,16 +33,11 @@ export function isAppTabActive(pathname: string, id: AppTabId): boolean {
       pathname.startsWith("/listings/")
     )
   }
-  if (id === "dashboard") {
-    if (pathname === "/dashboard") return true
-    if (!pathname.startsWith("/dashboard/")) return false
-    return !(
-      isAppTabActive(pathname, "activity") ||
-      isAppTabActive(pathname, "wishlists") ||
-      isAppTabActive(pathname, "profile")
-    )
+  if (id === "inbox") {
+    return pathname === "/dashboard/messages" || pathname.startsWith("/dashboard/messages/")
   }
   if (id === "activity") {
+    if (pathname.startsWith("/dashboard/host/templates")) return false
     return (
       pathname.startsWith("/dashboard/bookings") ||
       pathname.startsWith("/dashboard/listings") ||
@@ -54,6 +49,8 @@ export function isAppTabActive(pathname: string, id: AppTabId): boolean {
     return (
       pathname.startsWith("/dashboard/account") ||
       pathname.startsWith("/dashboard/profile") ||
+      pathname.startsWith("/dashboard/earnings") ||
+      pathname.startsWith("/dashboard/host/templates") ||
       pathname.startsWith("/settings")
     )
   }

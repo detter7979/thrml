@@ -3,6 +3,7 @@
 import { useState } from "react"
 
 import { createClient } from "@/lib/supabase/client"
+import { unregisterPushDevice } from "@/lib/native/capacitor"
 
 const PROFILE_NAME_OVERRIDE_KEY = "thrml.profileNameOverride"
 
@@ -11,6 +12,7 @@ export function SignOutButton() {
 
   async function signOut() {
     setPending(true)
+    await unregisterPushDevice()
     const supabase = createClient()
     await supabase.auth.signOut()
     try {

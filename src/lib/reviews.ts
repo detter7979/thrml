@@ -2,17 +2,9 @@ import { getServiceType } from "@/lib/constants/service-types"
  
 import { sendHostNewReviewEmail } from "@/lib/emails"
 
-export const SUB_RATING_KEYS = ["cleanliness", "accuracy", "communication", "value"] as const
-export type SubRatingKey = (typeof SUB_RATING_KEYS)[number]
-export type SubRatings = Partial<Record<SubRatingKey, number>>
+import { SUB_RATING_KEYS, type SubRatings } from "@/lib/review-ratings"
 
-export const REVIEW_TONE_BY_RATING: Record<number, string> = {
-  1: "Terrible",
-  2: "Poor",
-  3: "Okay",
-  4: "Great",
-  5: "Exceptional",
-}
+export { REVIEW_TONE_BY_RATING, SUB_RATING_KEYS, type SubRatingKey, type SubRatings } from "@/lib/review-ratings"
 
 export function clampRating(value: unknown): number | null {
   const parsed = Number(value)

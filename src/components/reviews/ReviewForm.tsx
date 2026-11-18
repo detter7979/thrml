@@ -8,7 +8,7 @@ import { useDropzone } from "react-dropzone"
 import { StarRating } from "@/components/reviews/StarRating"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { REVIEW_TONE_BY_RATING, type SubRatings } from "@/lib/reviews"
+import { REVIEW_TONE_BY_RATING, type SubRatings } from "@/lib/review-ratings"
 import { createClient } from "@/lib/supabase/client"
 
 type ReviewFormProps = {

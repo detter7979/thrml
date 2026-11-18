@@ -5,6 +5,7 @@ import { useMemo, useState, type MouseEvent } from "react"
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { trackGaEvent } from "@/lib/analytics/ga"
+import { hasNativeShareSheet, PUBLIC_ORIGIN, shareNatively } from "@/lib/native/capacitor"
 
 type ShareButtonProps = {
   listing: {
@@ -20,12 +21,15 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
   const [copied, setCopied] = useState(false)
   const [open, setOpen] = useState(false)
   const canUseNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function"
+  const inApp = hasNativeShareSheet()
   const facebookAppId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID?.trim()
 
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined") return `/listings/${listing.id}`
-    return `${window.location.origin}/listings/${listing.id}`
-  }, [listing.id])
+    // In the iOS app the page origin isn't the public site, so share the usethrml.com address.
+    const origin = inApp ? PUBLIC_ORIGIN : window.location.origin
+    return `${origin}/listings/${listing.id}`
+  }, [listing.id, inApp])
 
   function stopCardNavigation(event: MouseEvent) {
     event.stopPropagation()
@@ -133,6 +137,37 @@ export function ShareButton({ listing, variant = "detail", className }: ShareBut
         Share
       </button>
     )
+
+  // In the iOS app, Share goes straight to the system share sheet.
+  async function handleAppShare(event: MouseEvent<HTMLButtonElement>) {
+    stopCardNavigation(event)
+    event.preventDefault()
+    trackGaEvent("share", { method: "ios_share_sheet", content_type: "listing", item_id: listing.id })
+    await shareNatively({ title: listing.title, text: `${listing.title} on thrml`, url: shareUrl })
+  }
+
+  if (inApp) {
+    return variant === "card" ? (
+      <button
+        type="button"
+        onClick={(event) => void handleAppShare(event)}
+        className={`inline-flex size-11 items-center justify-center rounded-full bg-[rgba(255,255,255,0.85)] backdrop-blur-[4px] transition ${className ?? ""}`}
+        aria-label="Share listing"
+      >
+        <Share2 className="size-[18px] text-[#555]" />
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={(event) => void handleAppShare(event)}
+        className={`inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-[#4F4035] ${className ?? ""}`}
+        aria-label="Share listing"
+      >
+        <Share2 className="size-4" />
+        Share
+      </button>
+    )
+  }
 
   const rowClass =
     "flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-[#3F332A] transition hover:bg-[#F8F4EF]"

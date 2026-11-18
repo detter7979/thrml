@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { REVIEW_TONE_BY_RATING } from "@/lib/reviews"
+import { REVIEW_TONE_BY_RATING } from "@/lib/review-ratings"
 
 export type BookingReviewSuccess = {
   reviewId: string

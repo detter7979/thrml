@@ -199,6 +199,7 @@ export async function sendHostCancellationNotice(
     to: booking.host_email,
     subject: `Booking canceled by guest — ${formatLongDate(booking.session_date)}`,
     userId: booking.host_id ?? null,
+    push: true,
     preferenceKey: "booking_cancelled",
     layout: {
       preview: `Guest canceled — ${title}`,
@@ -227,6 +228,7 @@ export async function sendGuestHostCancelledNotice(
     to: booking.guest_email,
     subject: "Your booking has been canceled by the host",
     userId: booking.guest_id ?? null,
+    push: true,
     preferenceKey: "booking_cancelled",
     layout: {
       preview: "Your host canceled this booking",
@@ -278,6 +280,7 @@ export async function sendHostNewBookingAlert(booking: BookingConfirmedEmailPayl
     to: booking.host_email,
     subject: `New booking — ${booking.guest_name ?? "Guest"} on ${formatLongDate(booking.session_date)}`,
     userId: booking.host_id ?? null,
+    push: true,
     preferenceKey: "new_booking",
     layout: {
       preview: `New booking — ${booking.guest_name ?? "Guest"}`,
@@ -316,6 +319,7 @@ export async function sendGuestBookingConfirmation(booking: BookingConfirmedEmai
     to: booking.guest_email,
     subject: `You're booked — ${title}`,
     userId: booking.guest_id ?? null,
+    push: true,
     preferenceKey: "new_booking",
     layout: {
       preview: `You're booked — ${title}`,
@@ -366,6 +370,7 @@ export async function sendHostNewReviewEmail(args: {
     to: args.hostEmail,
     subject: `New review for ${args.listingTitle}`,
     userId: args.hostId ?? null,
+    push: true,
     preferenceKey: "new_review",
     layout: {
       preview: `New review for ${args.listingTitle}`,
@@ -417,6 +422,7 @@ export async function sendHostPayoutSentEmail(args: {
     to: args.hostEmail,
     subject: `Session complete — payout processing for ${args.listingTitle}`,
     userId: args.hostId ?? null,
+    push: true,
     preferenceKey: "payout_sent",
     layout: {
       preview: `Payout processing — ${args.listingTitle}`,
@@ -474,6 +480,7 @@ export async function sendPreArrivalReminderEmail(args: {
     to: args.guestEmail,
     subject: `Your session tomorrow — ${args.listingTitle}`,
     userId: args.guestId ?? null,
+    push: true,
     preferenceKey: "new_booking",
     layout: {
       preview: `Your session tomorrow — ${args.listingTitle}`,
@@ -545,6 +552,7 @@ export async function sendHost24HourReminder(args: {
     to: args.hostEmail,
     subject: `Guest arriving tomorrow — ${args.listingTitle}`,
     userId: args.hostId ?? null,
+    push: true,
     preferenceKey: "new_booking",
     layout: {
       preview: `Guest arriving tomorrow — ${args.listingTitle}`,
@@ -584,6 +592,7 @@ export async function sendHostTwoHourReminder(args: {
     to: args.hostEmail,
     subject: `Host reminder — session starts soon at ${args.listingTitle}`,
     userId: args.hostId ?? null,
+    push: true,
     preferenceKey: "new_booking",
     layout: {
       preview: `Session starts soon — ${args.listingTitle}`,
@@ -613,6 +622,7 @@ export async function sendPostSessionReviewRequestEmail(args: {
     to: args.guestEmail,
     subject: `How was your session at ${args.listingTitle}?`,
     userId: args.guestId ?? null,
+    push: true,
     preferenceKey: "new_booking",
     layout: {
       preview: `How was your session at ${args.listingTitle}?`,
@@ -656,6 +666,7 @@ export async function sendHostGuestReviewRequestEmail(args: {
     to: args.hostEmail,
     subject: `Rate ${guestFirstName} — how was your guest?`,
     userId: args.hostId ?? null,
+    push: true,
     preferenceKey: "new_review",
     layout: {
       preview: `Rate ${guestFirstName} after their session`,
@@ -687,6 +698,7 @@ export async function sendHostBookingRequestEmail(booking: BookingRequestEmailPa
     to: booking.host_email,
     subject,
     userId: booking.host_id ?? null,
+    push: true,
     preferenceKey: "new_booking",
     layout: {
       preview: subject,
@@ -732,6 +744,7 @@ export async function sendHostBookingRequestReminderEmail(
     to: booking.host_email,
     subject,
     userId: booking.host_id ?? null,
+    push: true,
     preferenceKey: "new_booking",
     layout: {
       preview: subject,
@@ -799,6 +812,7 @@ export async function sendGuestBookingRequestDeclinedEmail(booking: BookingReque
     to: booking.guest_email,
     subject,
     userId: booking.guest_id ?? null,
+    push: true,
     preferenceKey: "booking_cancelled",
     layout: {
       preview: subject,
@@ -826,6 +840,7 @@ export async function sendGuestBookingRequestExpiredEmail(booking: BookingReques
     to: booking.guest_email,
     subject,
     userId: booking.guest_id ?? null,
+    push: true,
     preferenceKey: "booking_cancelled",
     layout: {
       preview: subject,
@@ -851,6 +866,7 @@ export async function sendGuestBookingPaymentCaptureFailedEmail(booking: Booking
     to: booking.guest_email,
     subject,
     userId: booking.guest_id ?? null,
+    push: true,
     preferenceKey: "booking_cancelled",
     layout: {
       preview: subject,

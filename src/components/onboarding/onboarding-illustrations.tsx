@@ -28,10 +28,21 @@ function TextureDefs({ p }: { p: string }) {
         />
         <feComposite in="SourceGraphic" in2="dots" operator="in" />
       </filter>
-      <linearGradient id={`${p}-sky`} x1="0" y1="0" x2="0" y2="1">
+      <radialGradient id={`${p}-sky`} cx="0.5" cy="0.62" r="0.62">
         <stop offset="0" stopColor="#F2BFA2" stopOpacity="0.5" />
-        <stop offset="0.8" stopColor={CREAM} stopOpacity="0" />
+        <stop offset="0.6" stopColor="#F2BFA2" stopOpacity="0.2" />
+        <stop offset="1" stopColor={CREAM} stopOpacity="0" />
+      </radialGradient>
+      {/* Fades the left and right edges so a scene never reads as a boxed picture. */}
+      <linearGradient id={`${p}-edgefade`} x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#fff" stopOpacity="0" />
+        <stop offset="0.1" stopColor="#fff" stopOpacity="1" />
+        <stop offset="0.9" stopColor="#fff" stopOpacity="1" />
+        <stop offset="1" stopColor="#fff" stopOpacity="0" />
       </linearGradient>
+      <mask id={`${p}-edges`} maskUnits="userSpaceOnUse" x="0" y="0" width="390" height="400">
+        <rect x="0" y="0" width="390" height="400" fill={`url(#${p}-edgefade)`} />
+      </mask>
       <radialGradient id={`${p}-glow`}>
         <stop offset="0" stopColor="#EE7F50" stopOpacity="0.95" />
         <stop offset="0.45" stopColor={ACCENT} stopOpacity="0.38" />
@@ -94,7 +105,7 @@ function Scene({
       className={className}
     >
       <TextureDefs p={p} />
-      {children}
+      <g mask={`url(#${p}-edges)`}>{children}</g>
     </svg>
   )
 }

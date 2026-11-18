@@ -105,13 +105,13 @@ export function SignupIntro({
   const logo = <span className="font-serif text-[28px] tracking-[-0.01em] text-[#1A1410]">thrml</span>
 
   return (
-    <div className="flex min-h-[100svh] flex-col bg-[#F7F3EE] text-[#1A1410]">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 pt-[max(env(safe-area-inset-top),16px)] pb-[max(env(safe-area-inset-bottom),20px)]">
+    <div className="flex h-[100svh] flex-col overflow-y-auto bg-[#F7F3EE] text-[#1A1410]">
+      <div className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-6 pt-[max(env(safe-area-inset-top),16px)] pb-[max(env(safe-area-inset-bottom),20px)]">
         {step === 0 ? (
           <>
             {header(logo)}
-            <div className="mt-2 flex min-h-[150px] flex-1 items-end">
-              <IntroIllustration className="max-h-[300px] w-full" />
+            <div className="relative mt-2 min-h-[120px] flex-1">
+              <IntroIllustration className="absolute inset-x-0 bottom-0 h-full max-h-[340px] w-full" />
             </div>
             <div className="mt-5 space-y-3">
               <p className={eyebrow}>Discover. Book. Host.</p>
@@ -151,8 +151,8 @@ export function SignupIntro({
         {step === 1 ? (
           <>
             {header(logo)}
-            <div className="mt-2 flex min-h-[150px] flex-1 items-end">
-              <ExperienceIllustration className="max-h-[300px] w-full" />
+            <div className="relative mt-2 min-h-[120px] flex-1">
+              <ExperienceIllustration className="absolute inset-x-0 bottom-0 h-full max-h-[340px] w-full" />
             </div>
             <div className="mt-5 space-y-3">
               <p className={eyebrow}>Book. Show up. Unwind.</p>
@@ -183,8 +183,8 @@ export function SignupIntro({
                 Back
               </button>
             )}
-            <div className="flex min-h-[72px] flex-1 items-end">
-              <ChooseIllustration className="max-h-[196px] w-full" />
+            <div className="relative min-h-0 flex-1">
+              <ChooseIllustration className="absolute inset-x-0 bottom-0 h-full max-h-[196px] w-full" />
             </div>
             <div className="mt-3 space-y-2">
               <p className={eyebrow}>How you&apos;ll use thrml</p>

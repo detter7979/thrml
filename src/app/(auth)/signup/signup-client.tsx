@@ -23,7 +23,7 @@ import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { MIN_PASSWORD_LENGTH } from "@/lib/security/password-policy"
 import { isHostFunnelPath } from "@/lib/host/host-funnel"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
-import { modeForIntent, postSignupPath, writeAppMode } from "@/lib/app-nav"
+import { modeForIntent, onboardingDestination, onboardingMode, postSignupPath, writeAppMode } from "@/lib/app-nav"
 import { rememberReturnTo } from "@/lib/auth/return-to"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -93,6 +93,8 @@ function SignupForm() {
   const [loading, setLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [introDone, setIntroDone] = useState(Boolean(intentFromQuery))
+  // The intro starts with nothing selected; the account form keeps its own default above.
+  const [introChoice, setIntroChoice] = useState<IntentOption | null>(null)
 
   const passwordScore = useMemo(() => {
     let score = 0
@@ -343,14 +345,21 @@ function SignupForm() {
   if (!introDone) {
     return (
       <SignupIntro
-        intent={intent}
+        intent={introChoice}
         onIntent={(next) => {
+          setIntroChoice(next)
           setIntent(next)
           writeAppMode(modeForIntent(next))
         }}
         onContinue={() => {
-          writeAppMode(modeForIntent(intent))
+          if (!introChoice) return
+          writeAppMode(modeForIntent(introChoice))
           setIntroDone(true)
+        }}
+        onShortcut={(shortcut) => {
+          const exit = shortcut === "host" ? "shortcut_host" : "shortcut_explore"
+          writeAppMode(onboardingMode(exit))
+          router.push(onboardingDestination(exit))
         }}
       />
     )

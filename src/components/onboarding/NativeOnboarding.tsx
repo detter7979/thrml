@@ -7,19 +7,19 @@ import { SignupIntro } from "@/components/auth/signup-intro"
 import {
   isNativeShell,
   markOnboardingComplete,
-  modeForIntent,
   onboardingComplete,
-  postSignupPath,
+  onboardingDestination,
+  onboardingMode,
   writeAppMode,
   type AppIntent,
+  type OnboardingExit,
 } from "@/lib/app-nav"
-import { createClient } from "@/lib/supabase/client"
 
 export function NativeOnboarding() {
   const pathname = usePathname() || "/"
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [intent, setIntent] = useState<AppIntent>("guest")
+  const [intent, setIntent] = useState<AppIntent | null>(null)
 
   useEffect(() => {
     if (!isNativeShell()) {
@@ -37,27 +37,25 @@ export function NativeOnboarding() {
 
   if (!open) return null
 
-  async function finish(next: string, mode = modeForIntent(intent)) {
+  // No account is needed to browse or to apply to host: sign-in happens at booking, saving,
+  // or listing submission, so every exit goes straight to its destination.
+  function finish(exit: OnboardingExit) {
     markOnboardingComplete()
-    writeAppMode(mode)
+    writeAppMode(onboardingMode(exit))
     setOpen(false)
-    router.push(next)
+    router.push(onboardingDestination(exit))
   }
 
   return (
-    <div className="fixed inset-0 z-[220] overflow-y-auto bg-[#1A1410]">
+    <div className="fixed inset-0 z-[220] overflow-y-auto bg-[#F7F3EE]">
       <SignupIntro
         intent={intent}
         onIntent={setIntent}
-        onContinue={async () => {
-          const supabase = createClient()
-          const {
-            data: { user },
-          } = await supabase.auth.getUser()
-          const next = user ? postSignupPath(intent, null) : `/signup?intent=${intent}`
-          await finish(next)
+        onContinue={() => {
+          if (intent) finish(intent)
         }}
-        onLookAround={() => finish("/explore", "booking")}
+        onLookAround={() => finish("look_around")}
+        onShortcut={(shortcut) => finish(shortcut === "host" ? "shortcut_host" : "shortcut_explore")}
         onLogin={() => {
           markOnboardingComplete()
           setOpen(false)

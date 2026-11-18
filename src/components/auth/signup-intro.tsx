@@ -115,8 +115,8 @@ export function SignupIntro({
             </div>
             <div className="mt-5 space-y-3">
               <p className={eyebrow}>Discover. Book. Host.</p>
-              <h1 className={headline}>Your sauna experience starts here.</h1>
-              <p className={bodyText}>Discover private saunas near you, or earn by sharing your own.</p>
+              <h1 className={headline}>Sauna, on your terms.</h1>
+              <p className={bodyText}>Discover private saunas near you, or earn by listing your own.</p>
               <div className="flex flex-wrap gap-2 pt-1">
                 <Action
                   onClick={onShortcut ? () => onShortcut("explore") : undefined}
@@ -128,7 +128,7 @@ export function SignupIntro({
                 <Action
                   onClick={onShortcut ? () => onShortcut("host") : undefined}
                   href="/become-a-host"
-                  className="inline-flex h-11 items-center rounded-full border border-[#DDD4C8] px-4 text-[14px] text-[#1A1410]"
+                  className="inline-flex h-11 items-center rounded-full border border-[#C75B3A] px-4 text-[14px] font-medium text-[#A8472B]"
                 >
                   Become a host
                 </Action>
@@ -158,8 +158,7 @@ export function SignupIntro({
               <p className={eyebrow}>Book. Show up. Unwind.</p>
               <h1 className={headline}>Your time. Your sauna.</h1>
               <p className={bodyText}>
-                Find a time that works, book a private session, and unwind. Have a sauna? Set your own hours and
-                welcome guests.
+                Book a private sauna session on your schedule. Own a sauna? Set your hours and start earning.
               </p>
             </div>
             <div className="mt-6 space-y-5">

@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const hostKeep = formatHostKeepPercent(hostFeePercent)
 
   return {
-    title: "Become a Host — List Your Wellness Space",
+    title: "Become a Host | List Your Wellness Space",
     description: `Earn passive income by listing your private sauna, cold plunge, or wellness space on thrml. Free to list. You keep ${hostKeep}.`,
     alternates: { canonical: "https://usethrml.com/become-a-host" },
     openGraph: {

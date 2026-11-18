@@ -117,20 +117,20 @@ export function SignupIntro({
               <p className={eyebrow}>Discover. Book. Host.</p>
               <h1 className={headline}>Sauna, on your terms.</h1>
               <p className={bodyText}>Discover private saunas near you, or earn by listing your own.</p>
-              <div className="flex flex-wrap gap-2 pt-1">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-1 text-[15px]">
                 <Action
                   onClick={onShortcut ? () => onShortcut("explore") : undefined}
                   href="/explore"
-                  className="inline-flex h-11 items-center rounded-full border border-[#DDD4C8] px-4 text-[14px] text-[#1A1410]"
+                  className="inline-flex h-11 items-center gap-1.5 text-[#1A1410]"
                 >
-                  Explore saunas
+                  <span className="underline decoration-[#DDD4C8] underline-offset-[6px]">Explore saunas</span> <span aria-hidden="true">&rarr;</span>
                 </Action>
                 <Action
                   onClick={onShortcut ? () => onShortcut("host") : undefined}
                   href="/become-a-host"
-                  className="inline-flex h-11 items-center rounded-full border border-[#C75B3A] px-4 text-[14px] font-medium text-[#A8472B]"
+                  className="inline-flex h-11 items-center gap-1.5 font-medium text-[#A8472B]"
                 >
-                  Become a host
+                  <span className="underline decoration-[#C75B3A]/40 underline-offset-[6px]">Become a host</span> <span aria-hidden="true">&rarr;</span>
                 </Action>
               </div>
             </div>

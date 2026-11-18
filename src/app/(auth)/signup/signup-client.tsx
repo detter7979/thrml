@@ -184,7 +184,8 @@ function SignupForm() {
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
     const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo },
+      // Always show Google's account chooser so signing out and back in can switch accounts.
+      options: { redirectTo, queryParams: { prompt: "select_account" } },
     })
 
     if (oauthError) {

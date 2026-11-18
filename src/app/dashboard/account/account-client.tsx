@@ -100,7 +100,6 @@ export function AccountClient({
   stripeChargesEnabled,
   hostingEnabled,
   hostTools,
-  earnings,
   notificationPreferences,
   idVerificationStatus,
   idVerified,
@@ -124,7 +123,6 @@ export function AccountClient({
   stripeChargesEnabled: boolean
   hostingEnabled: boolean
   hostTools: boolean
-  earnings: { thisMonth: number; allTime: number } | null
   notificationPreferences: NotificationPreferences
   idVerificationStatus: string | null
   idVerified: boolean
@@ -800,15 +798,8 @@ export function AccountClient({
 
   return (
     <div className="space-y-6 px-4 py-6 md:px-8 md:py-8">
-      <ProfileHome fullName={fullName} hostTools={hostTools} earnings={earnings} />
+      <ProfileHome fullName={fullName} hostTools={hostTools} hostingEnabled={hostingEnabled} />
 
-      {hostingEnabled ? (
-        <IdentityVerificationCTA
-          status={(idVerificationStatus ?? null) as IdentityUiStatus}
-          verified={idVerified}
-          verifiedAt={idVerifiedAt}
-        />
-      ) : null}
 
       <section id="profile" className="scroll-mt-24 space-y-4 rounded-2xl bg-white p-5 shadow-sm">
         <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">PROFILE</h2>
@@ -937,10 +928,18 @@ export function AccountClient({
       </section>
 
       {hostingEnabled ? (
+        <IdentityVerificationCTA
+          status={(idVerificationStatus ?? null) as IdentityUiStatus}
+          verified={idVerified}
+          verifiedAt={idVerifiedAt}
+        />
+      ) : null}
+
+      {hostingEnabled ? (
         <section id="payout-settings" className="space-y-4 rounded-2xl bg-white p-5 shadow-sm">
           <h2 className="text-sm font-medium tracking-wide text-[#7A6A5D]">PAYOUT SETTINGS</h2>
           {!hasStripeAccount ? (
-            <StripeConnectBanner />
+            <StripeConnectBanner compact />
           ) : showPayoutSuccessSection ? (
             <div className="space-y-3">
               <div className="rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3 text-sm font-medium text-[#166534]">

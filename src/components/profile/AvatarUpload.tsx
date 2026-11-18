@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import { Camera, Check, Loader2 } from "lucide-react"
 
+import { pickPhotoNatively } from "@/lib/native/capacitor"
 import { createClient } from "@/lib/supabase/client"
 
 const ACCEPTED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
@@ -50,19 +51,30 @@ export function AvatarUpload({
 
   async function handleFileSelected(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    if (!file) return
+    event.target.value = ""
+    if (file) await uploadFile(file)
+  }
 
+  /** In the iOS app: the system sheet with Take Photo / Choose from Library. Elsewhere: file picker. */
+  async function choosePhoto() {
+    const nativeFile = await pickPhotoNatively("avatar")
+    if (nativeFile === undefined) {
+      inputRef.current?.click()
+      return
+    }
+    if (nativeFile) await uploadFile(nativeFile)
+  }
+
+  async function uploadFile(file: File) {
     setError(null)
 
     if (!ACCEPTED_MIME_TYPES.has(file.type)) {
       setError("Please upload a JPG, PNG, or WEBP image.")
-      event.target.value = ""
       return
     }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setError("Image must be smaller than 5MB.")
-      event.target.value = ""
       return
     }
 
@@ -126,7 +138,6 @@ export function AvatarUpload({
       }
     } finally {
       setIsUploading(false)
-      event.target.value = ""
     }
   }
 
@@ -134,7 +145,7 @@ export function AvatarUpload({
     <div className="space-y-2">
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
+        onClick={() => void choosePhoto()}
         className="group relative inline-flex size-24 items-center justify-center overflow-hidden rounded-full border border-[#E7DED3] bg-[#F3ECE5] text-lg font-semibold text-[#5D4E42]"
         aria-label="Upload profile photo"
         disabled={isUploading}
@@ -146,7 +157,7 @@ export function AvatarUpload({
         )}
 
         <span className="pointer-events-none absolute inset-0 bg-black/20 opacity-0 transition-opacity group-hover:opacity-100" />
-        <span className="pointer-events-none absolute right-1 bottom-1 inline-flex size-7 items-center justify-center rounded-full bg-white text-[#1A1410] opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+        <span className="pointer-events-none absolute right-1 bottom-1 inline-flex size-7 items-center justify-center rounded-full bg-white text-[#1A1410] shadow-sm transition-opacity md:opacity-0 md:group-hover:opacity-100">
           <Camera className="size-4" />
         </span>
 

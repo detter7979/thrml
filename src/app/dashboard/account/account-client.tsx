@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { buildFullName, splitFullName } from "@/lib/name-utils"
 import type { NotificationPreferenceKey, NotificationPreferences } from "@/lib/notification-preferences"
 import { createClient } from "@/lib/supabase/client"
+import { isNativeShell } from "@/lib/app-nav"
 
 function formatPhoneNumber(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 10)
@@ -155,6 +156,8 @@ export function AccountClient({
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(notificationPreferences)
+  const [inApp, setInApp] = useState(false)
+  useEffect(() => setInApp(isNativeShell()), [])
   const [prefsSaveState, setPrefsSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [notificationToast, setNotificationToast] = useState<{ tone: "success" | "error"; message: string } | null>(
     null
@@ -1090,6 +1093,27 @@ export function AccountClient({
                   ? "Unable to save"
                   : ""}
           </p>
+        </div>
+        {inApp ? (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-[#1A1410]">Phone notifications</p>
+              <p className="text-xs text-[#7A6A5D]">
+                Bookings, messages and the updates you choose below, on this phone. Emails aren&apos;t affected.
+              </p>
+            </div>
+            <Switch
+              checked={notificationPrefs.push_enabled}
+              onCheckedChange={(checked) => updateNotificationPreference("push_enabled", checked)}
+            />
+          </div>
+        ) : null}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-[#1A1410]">New messages</p>
+          <Switch
+            checked={notificationPrefs.new_message}
+            onCheckedChange={(checked) => updateNotificationPreference("new_message", checked)}
+          />
         </div>
         {hostingEnabled ? (
           <>

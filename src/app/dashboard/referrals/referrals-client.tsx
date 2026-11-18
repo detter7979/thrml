@@ -6,6 +6,7 @@ import { Check, Copy, Gift, Mail, MessageSquare } from "lucide-react"
 import { ReferralsPageSkeleton } from "@/components/dashboard/dashboard-loading-skeletons"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { shareNatively } from "@/lib/native/capacitor"
 
 type EarningRow = {
   id: string
@@ -72,17 +73,11 @@ export function ReferralsClient() {
   async function shareNative() {
     const link = data?.referralLink
     if (!link) return
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Book wellness on thrml",
-          text: "Use my link for private saunas, cold plunges, and more.",
-          url: link,
-        })
-      } catch {
-        // dismissed share sheet
-      }
-    }
+    await shareNatively({
+      title: "Book wellness on thrml",
+      text: "Use my link for private saunas, cold plunges, and more.",
+      url: link,
+    })
   }
 
   const smsHref = data?.referralLink

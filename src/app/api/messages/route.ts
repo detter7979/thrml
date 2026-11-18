@@ -4,6 +4,7 @@ import { z } from "zod"
 import { requireAuth } from "@/lib/auth-check"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
+import { sendPushToUser } from "@/lib/push/send"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const messageSchema = z.object({
@@ -89,6 +90,20 @@ export async function POST(req: NextRequest) {
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
   await admin.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", conversationId)
+
+  // Phone notification for the other person (iOS app only; no-op otherwise).
+  const recipientId = conversation.guest_id === session.user.id ? conversation.host_id : conversation.guest_id
+  if (recipientId) {
+    const { data: sender } = await admin.from("profiles").select("full_name").eq("id", session.user.id).maybeSingle()
+    const senderFirstName = (sender?.full_name ?? "").trim().split(/\s+/)[0] || "Someone"
+    await sendPushToUser(recipientId, {
+      title: `New message from ${senderFirstName}`,
+      body: body.length > 140 ? `${body.slice(0, 137)}…` : body,
+      url: `/dashboard/messages/${conversationId}`,
+      threadId: conversationId,
+      preferenceKey: "new_message",
+    })
+  }
 
   return NextResponse.json({ message }, { status: 201 })
 }

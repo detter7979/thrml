@@ -18,6 +18,7 @@ import { trackMetaEvent } from "@/components/meta-pixel"
 import { AppTabBar } from "@/components/shared/AppTabBar"
 import { trackBecomeHostClick } from "@/lib/tracking/google-ads"
 import { createClient } from "@/lib/supabase/client"
+import { unregisterPushDevice } from "@/lib/native/capacitor"
 
 const PROFILE_NAME_OVERRIDE_KEY = "thrml.profileNameOverride"
 
@@ -224,6 +225,7 @@ export function Navbar() {
   }, [])
 
   async function handleSignOut() {
+    await unregisterPushDevice()
     const supabase = createClient()
     await supabase.auth.signOut()
     try {

@@ -241,7 +241,7 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
           </div>
 
           {/* Mobile bottom stack — CTAs above scroll cue */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col md:hidden">
+          <div className="absolute inset-x-0 bottom-0 flex flex-col pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:hidden">
             <div className={`${pageXClass} pointer-events-auto pb-[5svh]`}>
               <div className="mx-auto w-full max-w-6xl">
                 <div className="mx-auto flex w-full flex-col items-center">

@@ -1146,7 +1146,7 @@ export function ExploreClient() {
       className={
         viewMode === "list"
           ? "min-h-[calc(100svh-88px)] bg-[#F7F3EE]"
-          : "flex h-[calc(100svh-88px)] flex-col overflow-hidden bg-[#F7F3EE]"
+          : "flex h-[calc(100svh-88px-4.25rem)] flex-col overflow-hidden bg-[#F7F3EE] md:h-[calc(100svh-88px)]"
       }
     >
       <div className="sticky top-0 z-30 shrink-0 border-b border-[#F0E8E0] bg-[#FAF7F4]">
@@ -1516,7 +1516,7 @@ export function ExploreClient() {
           ) : null}
 
           {viewMode === "list" ? (
-            <div className="px-4 py-4 md:px-6">
+            <div className="px-4 pt-4 pb-24 md:px-6 md:pb-4">
               <div className="mb-3 flex items-center justify-between md:hidden">
                 <div>
                   <p className="text-sm text-[#6C5B4F]">{resultCountLabel}</p>
@@ -1564,7 +1564,7 @@ export function ExploreClient() {
                 <>
                   <div
                     ref={mobileMapCardsRef}
-                    className="no-scrollbar pointer-events-auto fixed right-0 bottom-0 left-0 z-40 flex snap-x snap-mandatory gap-3 overflow-x-auto bg-transparent p-4"
+                    className="no-scrollbar pointer-events-auto fixed right-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-0 z-40 flex snap-x snap-mandatory gap-3 overflow-x-auto bg-transparent p-4"
                     onScroll={(event) => {
                       const element = event.currentTarget
                       const cardWidth = 292

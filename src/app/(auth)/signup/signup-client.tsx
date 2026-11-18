@@ -11,6 +11,7 @@ import {
   authSocialButtonClassName,
 } from "@/components/auth/auth-field-styles"
 import { AuthShell } from "@/components/auth/AuthShell"
+import { SignupIntro } from "@/components/auth/signup-intro"
 import { GoogleIcon } from "@/components/auth/GoogleIcon"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -22,6 +23,7 @@ import { LEGAL_VERSIONS } from "@/lib/legal-config"
 import { MIN_PASSWORD_LENGTH } from "@/lib/security/password-policy"
 import { isHostFunnelPath } from "@/lib/host/host-funnel"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
+import { postSignupPath } from "@/lib/app-nav"
 import { rememberReturnTo } from "@/lib/auth/return-to"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -87,6 +89,7 @@ function SignupForm() {
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [introDone, setIntroDone] = useState(false)
 
   const passwordScore = useMemo(() => {
     let score = 0
@@ -102,8 +105,7 @@ function SignupForm() {
   const isBusy = loading || isGoogleLoading
 
   function getPostSignupDestination() {
-    if (requestedNext) return requestedNext
-    return intent === "host" ? "/dashboard" : "/"
+    return postSignupPath(intent, requestedNext)
   }
 
   useEffect(() => {
@@ -216,10 +218,9 @@ function SignupForm() {
     setError(null)
     setLoading(true)
 
-    rememberReturnTo(requestedNext)
-    const redirectTo = `${window.location.origin}/auth/callback${
-      requestedNext ? `?next=${encodeURIComponent(requestedNext)}` : ""
-    }`
+    const next = getPostSignupDestination()
+    rememberReturnTo(next)
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
     const signUpResult = await signUpWithPassword({
       email,
       password,
@@ -309,9 +310,7 @@ function SignupForm() {
       type: "signup",
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback${
-          requestedNext ? `?next=${encodeURIComponent(requestedNext)}` : ""
-        }`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(getPostSignupDestination())}`,
       },
     })
     if (resendError) {
@@ -333,7 +332,14 @@ function SignupForm() {
     setError("Email is not verified yet. Please click the link in your inbox.")
   }
 
+  if (!introDone) {
+    return (
+      <SignupIntro intent={intent} onIntent={setIntent} onContinue={() => setIntroDone(true)} />
+    )
+  }
+
   return (
+    <AuthShell title="Create your account" subtitle="Join thrml to book or list wellness spaces.">
     <div className="space-y-6">
       {step === 3 ? (
         <div className="space-y-4 rounded-2xl border border-[#E7DED3] bg-[#FCFAF7] p-5">
@@ -577,15 +583,14 @@ function SignupForm() {
         </p>
       ) : null}
     </div>
+    </AuthShell>
   )
 }
 
 export default function SignupClientPage() {
   return (
-    <AuthShell title="Create your account" subtitle="Join thrml to book or list wellness spaces.">
-      <Suspense fallback={<div className="text-sm text-[#746558]">Loading signup...</div>}>
-        <SignupForm />
-      </Suspense>
-    </AuthShell>
+    <Suspense fallback={<div className="text-sm text-[#746558]">Loading signup...</div>}>
+      <SignupForm />
+    </Suspense>
   )
 }

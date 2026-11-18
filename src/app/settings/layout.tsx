@@ -14,7 +14,7 @@ export default async function SettingsLayout({ children }: { children: ReactNode
   if (!user) redirect("/login?next=/settings/delete-account")
 
   return (
-    <div className="min-h-screen bg-warm-50">
+    <div className="min-h-screen bg-warm-50 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0">
       <Navbar />
       {/* At least a full screen tall, so the footer always starts below the fold (matches admin + dashboard). */}
       <main id="main-content" className="min-h-[100svh] min-w-0 overflow-x-hidden">

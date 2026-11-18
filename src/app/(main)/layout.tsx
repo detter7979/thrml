@@ -13,7 +13,7 @@ export default async function MainLayout({ children }: { children: ReactNode }) 
   const feePercents = await getPlatformFeePercentsCached()
 
   return (
-    <div className="min-h-screen bg-warm-50">
+    <div className="min-h-screen bg-warm-50 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0">
       <Navbar />
       <PlatformFeesProvider initialPercents={feePercents}>
         {/* At least a full screen tall, so the footer always starts below the fold (matches admin + dashboard). */}

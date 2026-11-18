@@ -4,13 +4,13 @@ import Link from "next/link"
 export const revalidate = 3600
 
 export const metadata: Metadata = {
-  title: "Our Story — Why We Built thrml",
+  title: "Our Story | Why We Built thrml",
   description:
     "thrml exists to make private wellness spaces — saunas, cold plunges, float tanks — accessible to everyone. No spa membership required.",
   alternates: { canonical: "https://usethrml.com/our-story" },
   openGraph: {
     type: "website",
-    title: "Our Story — Why We Built thrml",
+    title: "Our Story | Why We Built thrml",
     description: "thrml exists to make private wellness spaces accessible to everyone.",
     url: "https://usethrml.com/our-story",
     images: [{ url: "https://usethrml.com/opengraph-image", width: 1200, height: 630 }],

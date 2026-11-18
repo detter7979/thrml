@@ -6,7 +6,7 @@ import { ExploreClient } from "./explore-client"
 export const revalidate = 60
 
 export const metadata: Metadata = {
-  title: "Explore Private Wellness Spaces — Saunas, Cold Plunges & More",
+  title: "Explore Private Wellness Spaces | Saunas, Cold Plunges & More",
   description:
     "Browse and book private saunas, cold plunges, infrared rooms, float tanks and more in Seattle and beyond.",
   alternates: { canonical: "https://usethrml.com/explore" },

@@ -9,8 +9,8 @@ const SAUNAS_ONLY = isSaunasOnlyLaunch()
 
 export const SITE_COPY = SAUNAS_ONLY
   ? {
-      defaultTitle: "thrml — Book Private Saunas Near You",
-      socialTitle: "thrml — Book Private Home Saunas by the Hour",
+      defaultTitle: "thrml | Book Private Saunas Near You",
+      socialTitle: "thrml | Book Private Home Saunas by the Hour",
       description:
         "Book private home saunas by the hour, hosted by real people in Seattle. No memberships. No front desks.",
       socialDescription:
@@ -22,8 +22,8 @@ export const SITE_COPY = SAUNAS_ONLY
         "Book private home saunas by the hour, hosted by real people. No memberships. No front desks.",
     }
   : {
-      defaultTitle: "thrml — Book Private Wellness Spaces",
-      socialTitle: "thrml — Book Private Saunas, Cold Plunges & Wellness Spaces",
+      defaultTitle: "thrml | Book Private Wellness Spaces",
+      socialTitle: "thrml | Book Private Saunas, Cold Plunges & Wellness Spaces",
       description:
         "thrml is a peer-to-peer marketplace to book private saunas, cold plunges, float tanks, infrared therapy, and more — hosted by real people in Seattle.",
       socialDescription:

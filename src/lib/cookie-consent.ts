@@ -176,3 +176,17 @@ export function notifyConsentChanged(value: typeof COOKIE_CONSENT_ACCEPTED | typ
     window.dispatchEvent(new Event(COOKIE_CONSENT_ACCEPTED_EVENT))
   }
 }
+
+/** Records the person's choice (banner, settings, or the iOS tracking prompt) and applies it. */
+export function setConsentChoice(accepted: boolean) {
+  if (typeof window === "undefined") return
+  const value = accepted ? COOKIE_CONSENT_ACCEPTED : COOKIE_CONSENT_DECLINED
+  try {
+    localStorage.setItem(COOKIE_CONSENT_KEY, value)
+  } catch {
+    // storage unavailable: still apply for this session
+  }
+  notifyConsentChanged(value)
+  if (accepted) grantAnalyticsConsent()
+  else revokeAnalyticsConsent()
+}

@@ -4,14 +4,8 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 
-import {
-  COOKIE_CONSENT_ACCEPTED,
-  COOKIE_CONSENT_DECLINED,
-  COOKIE_CONSENT_KEY,
-  grantAnalyticsConsent,
-  notifyConsentChanged,
-  revokeAnalyticsConsent,
-} from "@/lib/cookie-consent"
+import { setConsentChoice } from "@/lib/cookie-consent"
+import { hasTrackingPrompt, requestTracking } from "@/lib/native/capacitor"
 
 type CookieConsentBannerProps = {
   visible: boolean
@@ -31,23 +25,26 @@ export function CookieConsentBanner({
     setMounted(true)
   }, [])
 
-  function handleAccept() {
-    localStorage.setItem(COOKIE_CONSENT_KEY, COOKIE_CONSENT_ACCEPTED)
-    notifyConsentChanged(COOKIE_CONSENT_ACCEPTED)
-    grantAnalyticsConsent()
+  async function handleAccept() {
+    // In the iOS app, tracking needs Apple's permission first; a "no" there means decline.
+    if (hasTrackingPrompt()) {
+      const status = await requestTracking()
+      setConsentChoice(status === "authorized")
+      onClose()
+      return
+    }
+    setConsentChoice(true)
     onClose()
   }
 
   function handleDecline() {
-    localStorage.setItem(COOKIE_CONSENT_KEY, COOKIE_CONSENT_DECLINED)
-    notifyConsentChanged(COOKIE_CONSENT_DECLINED)
-    revokeAnalyticsConsent()
+    setConsentChoice(false)
     onClose()
   }
 
   function handleSavePreferences() {
     if (advertisingEnabled) {
-      handleAccept()
+      void handleAccept()
     } else {
       handleDecline()
     }
@@ -118,7 +115,7 @@ export function CookieConsentBanner({
                 Decline
               </button>
               <button
-                onClick={handleAccept}
+                onClick={() => void handleAccept()}
                 className="rounded-full bg-[#A9502E] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-[#8F4326]"
               >
                 Accept

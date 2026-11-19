@@ -34,7 +34,9 @@ function plugins(): Record<string, unknown> | null {
   return cap?.Plugins ?? null
 }
 
-export function nativePlugin<T>(name: "Camera" | "Share" | "PushNotifications" | "App"): T | null {
+export function nativePlugin<T>(
+  name: "Camera" | "Share" | "PushNotifications" | "App" | "AppTrackingTransparency"
+): T | null {
   const plugin = plugins()?.[name]
   return plugin ? (plugin as T) : null
 }
@@ -151,5 +153,42 @@ export async function unregisterPushDevice() {
     })
   } catch {
     // best effort
+  }
+}
+
+/**
+ * App Tracking Transparency (capacitor-plugin-app-tracking-transparency). In the iOS app the
+ * system "Allow tracking?" prompt replaces the cookie banner's Accept: ad and analytics tags only
+ * run when the person allows tracking.
+ */
+export type TrackingStatus = "authorized" | "denied" | "notDetermined" | "restricted"
+type TrackingPlugin = {
+  getStatus: () => Promise<{ status: TrackingStatus }>
+  requestPermission: () => Promise<{ status: TrackingStatus }>
+}
+
+export function hasTrackingPrompt() {
+  return nativePlugin<TrackingPlugin>("AppTrackingTransparency") !== null
+}
+
+/** Current status without asking, or null outside the app. */
+export async function trackingStatus(): Promise<TrackingStatus | null> {
+  const att = nativePlugin<TrackingPlugin>("AppTrackingTransparency")
+  if (!att) return null
+  try {
+    return (await att.getStatus()).status
+  } catch {
+    return null
+  }
+}
+
+/** Shows the system prompt if iOS hasn't asked yet; otherwise returns the existing answer. */
+export async function requestTracking(): Promise<TrackingStatus | null> {
+  const att = nativePlugin<TrackingPlugin>("AppTrackingTransparency")
+  if (!att) return null
+  try {
+    return (await att.requestPermission()).status
+  } catch {
+    return null
   }
 }

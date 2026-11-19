@@ -2,16 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   thrml iOS app privacy manifest (draft). Copy into the App target in Xcode (ios/App/App/).
-  Assumes the app does NOT track (no ad pixels / ad consent inside the app). If ad tracking is
-  enabled in the app, set NSPrivacyTracking to true, list the tracking domains, and add the
-  App Tracking Transparency prompt. Review against the App Store Connect privacy answers.
+  The app tracks only after the person allows it in Apple's App Tracking Transparency prompt
+  (Meta pixel / Conversions API and Google Ads). iOS blocks the tracking domains below until
+  then. Keep this in step with App Store Connect → App Privacy.
 -->
 <plist version="1.0">
 <dict>
   <key>NSPrivacyTracking</key>
-  <false/>
+  <true/>
   <key>NSPrivacyTrackingDomains</key>
-  <array/>
+  <array>
+    <string>connect.facebook.net</string>
+    <string>www.facebook.com</string>
+    <string>capig.datah04.com</string>
+    <string>googleads.g.doubleclick.net</string>
+    <string>ad.doubleclick.net</string>
+    <string>td.doubleclick.net</string>
+    <string>www.googleadservices.com</string>
+  </array>
   <key>NSPrivacyCollectedDataTypes</key>
   <array>
     <dict>
@@ -71,8 +79,18 @@
     <dict>
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeProductInteraction</string>
       <key>NSPrivacyCollectedDataTypeLinked</key><false/>
-      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
-      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAnalytics</string></array>
+      <key>NSPrivacyCollectedDataTypeTracking</key><true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        <string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeAdvertisingData</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key><false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key><true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string></array>
     </dict>
   </array>
   <key>NSPrivacyAccessedAPITypes</key>

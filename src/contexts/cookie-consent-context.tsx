@@ -18,6 +18,7 @@ import {
   getCookieConsent,
   restoreAnalyticsConsentFromStorage,
 } from "@/lib/cookie-consent"
+import { hasTrackingPrompt } from "@/lib/native/capacitor"
 
 type CookieConsentContextValue = {
   openCookiePreferences: () => void
@@ -57,7 +58,8 @@ export function CookieConsentProvider({ children }: { children: ReactNode }) {
     function syncFromStorage() {
       const consent = getCookieConsent()
       if (!consent) {
-        setBannerVisible(true)
+        // In the iOS app, Apple's "Allow tracking?" prompt asks instead (NativeAppBridge).
+        setBannerVisible(!hasTrackingPrompt())
         return
       }
 

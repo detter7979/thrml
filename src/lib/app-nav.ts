@@ -117,12 +117,15 @@ export function onboardingComplete(): boolean {
   }
 }
 
+export const ONBOARDING_COMPLETE_EVENT = "thrml:onboarding-complete"
+
 export function markOnboardingComplete() {
   try {
     window.localStorage.setItem(ONBOARDING_KEY, "1")
   } catch {
     // The tour can show again next launch if storage is blocked.
   }
+  window.dispatchEvent(new Event(ONBOARDING_COMPLETE_EVENT))
 }
 
 export function readAppMode(canHost: boolean): AppMode {

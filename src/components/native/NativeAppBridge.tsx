@@ -3,12 +3,16 @@
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 
-import { isNativeShell, onboardingComplete } from "@/lib/app-nav"
+import { isNativeShell, ONBOARDING_COMPLETE_EVENT, onboardingComplete } from "@/lib/app-nav"
+import { getCookieConsent, COOKIE_CONSENT_ACCEPTED, setConsentChoice } from "@/lib/cookie-consent"
 import {
   appPathFromUrl,
+  hasTrackingPrompt,
   nativePlugin,
   rememberPushToken,
+  requestTracking,
   storedPushToken,
+  trackingStatus,
   type AppPlugin,
   type PushPlugin,
 } from "@/lib/native/capacitor"
@@ -29,8 +33,11 @@ async function saveToken(token: string) {
 /**
  * Wires the iOS app's native pieces into the website (renders nothing):
  * - usethrml.com links opened from Mail, Messages, etc. open the right page in the app
- * - push: asks once after someone is signed in and past onboarding, registers the device, and
- *   opens the right page when a notification is tapped
+ * - tracking: once onboarding is done, shows Apple's "Allow tracking?" prompt (instead of the cookie
+ *   banner) and keeps the site's ad/analytics consent in step with that answer, including later
+ *   changes in iOS Settings
+ * - push: asks once after someone is signed in and past onboarding (after the tracking prompt, so
+ *   two system prompts never stack), registers the device, and opens the right page on tap
  */
 export function NativeAppBridge() {
   const router = useRouter()
@@ -100,16 +107,39 @@ export function NativeAppBridge() {
       )
     }
 
-    void supabase.auth.getSession().then(({ data }) => {
+    /** Ask for tracking once (after onboarding) and mirror the answer into cookie consent. */
+    async function syncTracking() {
+      if (!hasTrackingPrompt() || !onboardingComplete()) return
+      const current = await trackingStatus()
+      const status = current === "notDetermined" ? await requestTracking() : current
+      if (!status || status === "notDetermined") return
+      const allowed = status === "authorized"
+      const stored = getCookieConsent()
+      // Apply when unset, or when iOS now says no but the site still has a yes. A "yes" in iOS
+      // doesn't override someone who declined in Cookie Settings.
+      if (stored === null || (!allowed && stored === COOKIE_CONSENT_ACCEPTED)) setConsentChoice(allowed)
+    }
+
+    const ready = syncTracking().catch(() => undefined)
+
+    void ready.then(() => supabase.auth.getSession()).then(({ data }) => {
       signedIn = Boolean(data.session)
       void enablePush(true)
     })
+
+    function onOnboardingComplete() {
+      void syncTracking()
+        .catch(() => undefined)
+        .then(() => enablePush(true))
+    }
+    window.addEventListener(ONBOARDING_COMPLETE_EVENT, onOnboardingComplete)
+    cleanups.push(() => window.removeEventListener(ONBOARDING_COMPLETE_EVENT, onOnboardingComplete))
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
       signedIn = Boolean(session)
       if (event === "SIGNED_IN") {
         const token = storedPushToken()
         if (token) void saveToken(token)
-        void enablePush(true)
+        void ready.then(() => enablePush(true))
       }
     })
     cleanups.push(() => subscription.subscription.unsubscribe())

@@ -8,11 +8,13 @@ older build or in a browser.
 ## 1. Plugins
 
 ```
-npm i @capacitor/push-notifications @capacitor/camera @capacitor/share @capacitor/app
+npm i @capacitor/push-notifications @capacitor/camera @capacitor/share @capacitor/app capacitor-plugin-app-tracking-transparency
 npx cap sync ios
 ```
 
-The site uses exactly these plugin names: `PushNotifications`, `Camera`, `Share`, `App`.
+The site uses exactly these plugin names: `PushNotifications`, `Camera`, `Share`, `App`,
+`AppTrackingTransparency` (the last one needs `getStatus()` and `requestPermission()` returning
+`{ status: "authorized" | "denied" | "notDetermined" | "restricted" }`).
 
 ## 2. Info.plist
 
@@ -21,6 +23,7 @@ The site uses exactly these plugin names: `PushNotifications`, `Camera`, `Share`
 | `NSCameraUsageDescription` | thrml uses your camera so you can take a profile photo or photos of your space. |
 | `NSPhotoLibraryUsageDescription` | thrml uses your photo library so you can choose a profile photo or photos of your space. |
 | `NSPhotoLibraryAddUsageDescription` | thrml saves photos you take for your profile to your library. |
+| `NSUserTrackingUsageDescription` | thrml uses this to measure which of our ads bring people to thrml. We never sell your data. |
 | `NSLocationWhenInUseUsageDescription` | thrml uses your location to show private saunas near you. *(only if the app asks for location)* |
 
 Without the camera key, iOS terminates the app the moment someone picks "Take Photo", which is
@@ -39,10 +42,10 @@ two `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)` /
 
 ## 4. Privacy manifest
 
-Add `docs/ios/PrivacyInfo.xcprivacy` to the App target (`ios/App/App/`). It assumes the app
-does **not** track: no Meta pixel or Google Ads cookies inside the app. If that changes, set
-`NSPrivacyTracking` to true, list the tracking domains, and add the App Tracking Transparency
-prompt. The answers must match App Store Connect → App Privacy.
+Add `docs/ios/PrivacyInfo.xcprivacy` to the App target (`ios/App/App/`). It declares tracking
+(Meta pixel / Conversions API, Google Ads) and the tracking domains, which iOS blocks until the
+person allows tracking. In App Store Connect → App Privacy, answer "Yes, used for tracking" for
+Product Interaction and Advertising Data to match.
 
 ## 5. Apple Developer + Vercel
 
@@ -69,6 +72,11 @@ prompt. The answers must match App Store Connect → App Privacy.
     `{ topic, title, body, url, dryRun }`. Only reaches people who opted into that email topic.
   - Everyone can turn phone notifications off (Profile → Notifications → Phone notifications), and
     each type follows the same switch as its email.
+- **Tracking**: in the app the cookie banner doesn't appear on first launch. Once onboarding is
+  done, Apple's "Allow tracking?" prompt shows; Allow turns on analytics and ad measurement, Ask
+  App Not to Track keeps them off. Changing it later in iOS Settings is picked up on next launch.
+  Cookie Settings in the app also routes Accept through the same prompt. The tracking prompt
+  always comes before the notifications prompt, never at the same time.
 - **Camera**: the avatar opens the iOS sheet with Take Photo / Choose from Library.
 - **Share sheet**: listing Share and the referral Share open the iOS share sheet with the
   usethrml.com link.
@@ -77,6 +85,8 @@ prompt. The answers must match App Store Connect → App Privacy.
 
 ## Test checklist
 
+- [ ] Fresh install → onboarding → "Allow tracking?" prompt → no cookie banner
+- [ ] Ask App Not to Track → no requests to facebook.net / doubleclick.net in Safari Web Inspector
 - [ ] Avatar → Take Photo and Choose from Library both upload
 - [ ] Sign in → permission prompt appears once → row in `push_devices`
 - [ ] Send a message from another account → notification → tap opens the conversation

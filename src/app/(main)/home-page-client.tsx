@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { CheckCircle2, ChevronDown, Loader2 } from "lucide-react"
 
@@ -11,6 +10,7 @@ const ListingGrid = dynamic(
   { ssr: true }
 )
 import { trackMetaEvent } from "@/components/meta-pixel"
+import { HeroVideo } from "@/components/marketing/hero-video"
 import { LaunchNotifyForm } from "@/components/marketing/launch-notify-form"
 import { Button } from "@/components/ui/button"
 import {
@@ -121,21 +121,6 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
   }, [filter, listings, serviceTypeMap])
 
   const skeletonCards = new Array(6).fill(null)
-  const blurDataURL =
-    "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL..."
-
-  const heroImages = {
-    mobile: {
-      url: "/onboarding-forest-sauna.jpg",
-      objectPosition: "64% center",
-      alt: "A barrel sauna on a stone patio in a cedar forest",
-    },
-    desktop: {
-      url: "/onboarding-forest-sauna.jpg",
-      objectPosition: "center center",
-      alt: "A barrel sauna on a stone patio in a cedar forest",
-    },
-  }
 
   async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -188,40 +173,16 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
     <div className="min-h-screen bg-warm-50">
       <section className="relative min-h-[100svh] bg-[#1A1410]">
         <div className="pointer-events-none absolute inset-0">
-          <Image
-            src={heroImages.mobile.url}
-            alt={heroImages.mobile.alt}
-            fill
-            className="object-cover md:hidden"
-            style={{ objectPosition: heroImages.mobile.objectPosition }}
-            sizes="100vw"
-            priority
-            fetchPriority="high"
-            loading="eager"
-            placeholder="blur"
-            blurDataURL={blurDataURL}
-          />
-          <Image
-            src={heroImages.desktop.url}
-            alt={heroImages.desktop.alt}
-            fill
-            className="hidden object-cover md:block"
-            style={{ objectPosition: heroImages.desktop.objectPosition }}
-            sizes="100vw"
-            priority
-            fetchPriority="high"
-            loading="eager"
-            placeholder="blur"
-            blurDataURL={blurDataURL}
-          />
+          <HeroVideo />
           <div
             className="absolute inset-0 hidden md:block"
             style={{
               background:
-                "linear-gradient(to right, rgba(26,20,16,0.78) 0%, rgba(26,20,16,0.78) 45%, rgba(26,20,16,0.42) 50%, rgba(26,20,16,0.1) 58%, rgba(26,20,16,0) 66%)",
+                "linear-gradient(to right, rgba(26,20,16,0.72) 0%, rgba(26,20,16,0.55) 28%, rgba(26,20,16,0.22) 46%, rgba(26,20,16,0) 60%)",
             }}
           />
-          <div className="absolute inset-x-0 top-0 h-[42%] bg-gradient-to-b from-black/55 via-black/20 to-transparent" />
+          <div className="absolute inset-0 bg-[#1A1410]/20 md:hidden" />
+          <div className="absolute inset-x-0 top-0 h-[45%] bg-gradient-to-b from-black/70 via-black/35 to-transparent md:h-[42%] md:from-black/55 md:via-black/20" />
           <div className="absolute inset-x-0 bottom-0 h-[52%] bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
         </div>
 
@@ -233,7 +194,7 @@ export function HomePageClient({ initialListings, preLaunch = false, launchLabel
                 <h1 className="font-serif text-[clamp(22px,5.85vw,44px)] font-medium leading-[1.0] tracking-tight text-[#F5EFE8] md:text-[68px] md:leading-[0.95]">
                   <span className="hero-anim-in hero-delay-150 block">Your Personal Sauna Awaits</span>
                 </h1>
-                <p className="hero-anim-in hero-delay-600 mx-auto mt-3 text-[16px] leading-[1.6] text-white/65 md:mx-0 md:mt-4 md:max-w-xl md:text-[18px] md:leading-[1.65]">
+                <p className="hero-anim-in hero-delay-600 mx-auto mt-3 text-[16px] leading-[1.6] text-white/85 [text-shadow:0_1px_12px_rgba(0,0,0,0.45)] md:text-white/65 md:[text-shadow:none] md:mx-0 md:mt-4 md:max-w-xl md:text-[18px] md:leading-[1.65]">
                   Private home saunas, booked by the hour. Browse a space near you - or list your own and earn.
                 </p>
               </div>

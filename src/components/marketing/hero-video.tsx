@@ -23,8 +23,19 @@ type Mode = "pending" | "play" | "still"
 
 const noopSubscribe = () => () => {}
 
-/** Snapshot of the client's setup, as a string so the snapshot stays stable. */
+let cachedSetup: string | null = null
+
+/**
+ * Snapshot of the client's setup, read once per page load (as a string so the
+ * snapshot stays stable): marking the clip as seen must not swap it mid-view.
+ */
 function clientSetup(): string {
+  if (cachedSetup) return cachedSetup
+  cachedSetup = computeSetup()
+  return cachedSetup
+}
+
+function computeSetup(): string {
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
   const portrait = window.matchMedia("(max-width: 767px)").matches
   return `${reduce || readSeen() ? "still" : "play"}:${portrait ? "portrait" : "landscape"}`
@@ -54,6 +65,7 @@ function markSeen() {
 export function HeroVideo() {
   const setup = useSyncExternalStore(noopSubscribe, clientSetup, () => "pending:portrait")
   const [failed, setFailed] = useState(false)
+  const [ended, setEnded] = useState(false)
   const [initialMode, orientation] = setup.split(":")
   const mode: Mode = failed ? "still" : (initialMode as Mode)
   const portrait = orientation === "portrait"
@@ -95,12 +107,21 @@ export function HeroVideo() {
           autoPlay
           preload="auto"
           disablePictureInPicture
-          onEnded={markSeen}
+          onEnded={() => {
+            markSeen()
+            setEnded(true)
+          }}
         >
           <source src={src.webm} type="video/webm" />
           <source src={src.mp4} type="video/mp4" />
         </video>
       ) : null}
+      {/* Once the clip has played (or for the still), dim it slightly so the headline reads clearly. */}
+      <div
+        className={`absolute inset-0 bg-[#1A1410] transition-opacity duration-[1200ms] ease-out ${
+          ended || mode === "still" ? "opacity-20" : "opacity-0"
+        }`}
+      />
     </div>
   )
 }

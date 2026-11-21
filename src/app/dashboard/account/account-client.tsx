@@ -29,6 +29,7 @@ import { buildFullName, splitFullName } from "@/lib/name-utils"
 import type { NotificationPreferenceKey, NotificationPreferences } from "@/lib/notification-preferences"
 import { createClient } from "@/lib/supabase/client"
 import { isNativeShell } from "@/lib/app-nav"
+import { openExternalPage } from "@/lib/native/capacitor"
 
 function formatPhoneNumber(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 10)
@@ -570,7 +571,7 @@ export function AccountClient({
       if (!response.ok || !url) {
         throw new Error(data.error ?? "Unable to continue Stripe onboarding.")
       }
-      window.location.href = url
+      await openExternalPage(url)
     } catch (error) {
       setStripeError(error instanceof Error ? error.message : "Unable to continue Stripe onboarding.")
       setIsContinuingStripe(false)

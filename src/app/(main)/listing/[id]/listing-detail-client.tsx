@@ -56,6 +56,7 @@ import {
 import { DurationSelector } from "@/components/booking/DurationSelector"
 import { RatingSummary } from "@/components/reviews/RatingSummary"
 import { ReviewCard } from "@/components/reviews/ReviewCard"
+import { ReportLink } from "@/components/moderation/ReportDialog"
 import { VerifiedHostBadge } from "@/components/host/verified-host-badge"
 import { SaveButton } from "@/components/listings/SaveButton"
 import { ShareButton } from "@/components/listings/ShareButton"
@@ -1853,6 +1854,12 @@ export function ListingDetailClient({
                 </p>
               )}
             </section>
+
+            {!isHostView ? (
+              <div className="flex justify-center border-t border-[#E5DDD6] pt-5 md:justify-start">
+                <ReportLink targetType="listing" targetId={id} label="Report this listing" className="text-sm" />
+              </div>
+            ) : null}
           </main>
 
           <aside className="hidden md:block">

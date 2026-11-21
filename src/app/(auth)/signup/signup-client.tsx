@@ -8,11 +8,10 @@ import { Suspense, type FormEvent, useEffect, useMemo, useState } from "react"
 import { AuthField } from "@/components/auth/AuthField"
 import {
   authPrimaryButtonClassName,
-  authSocialButtonClassName,
 } from "@/components/auth/auth-field-styles"
 import { AuthShell } from "@/components/auth/AuthShell"
 import { SignupIntro } from "@/components/auth/signup-intro"
-import { GoogleIcon } from "@/components/auth/GoogleIcon"
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -25,6 +24,7 @@ import { isHostFunnelPath } from "@/lib/host/host-funnel"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { modeForIntent, postSignupPath, writeAppMode } from "@/lib/app-nav"
 import { rememberReturnTo } from "@/lib/auth/return-to"
+import { OAUTH_PROVIDER_LABEL, startOAuthSignIn, type OAuthProvider } from "@/lib/auth/oauth"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -91,7 +91,7 @@ function SignupForm() {
   const [error, setError] = useState<string | null>(null)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null)
   const [introDone, setIntroDone] = useState(Boolean(intentFromQuery))
   // The intro starts with nothing selected; the account form keeps its own default above.
   const [introChoice, setIntroChoice] = useState<IntentOption | null>(null)
@@ -107,7 +107,7 @@ function SignupForm() {
   const fullName = `${firstName} ${lastName}`.trim()
   const strengthLabel = ["Weak", "Weak", "Okay", "Strong", "Very strong"][passwordScore]
   const baseCard = "rounded-xl border border-[#E7DED3] p-4 text-left transition"
-  const isBusy = loading || isGoogleLoading
+  const isBusy = loading || oauthLoading !== null
 
   function getPostSignupDestination() {
     return postSignupPath(intent, requestedNext)
@@ -163,14 +163,14 @@ function SignupForm() {
     return raw
   }
 
-  async function handleGoogleSignup() {
+  async function handleOAuthSignup(provider: OAuthProvider) {
     setError(null)
     if (!signupTermsAccepted) {
       setError("Please accept the Terms of Service and Privacy Policy.")
       return
     }
 
-    setIsGoogleLoading(true)
+    setOauthLoading(provider)
 
     document.cookie = "thrml_signup_terms=1; path=/; max-age=600; SameSite=Lax"
     if (signupNewsletterOptIn) {
@@ -181,27 +181,18 @@ function SignupForm() {
 
     const next = getPostSignupDestination()
     rememberReturnTo(next)
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-    const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      // Always show Google's account chooser so signing out and back in can switch accounts.
-      options: { redirectTo, queryParams: { prompt: "select_account" } },
-    })
-
-    if (oauthError) {
-      setError(toProviderErrorMessage("Google", oauthError.message))
-      setIsGoogleLoading(false)
+    const result = await startOAuthSignIn(supabase, provider, next, { onCancel: () => setOauthLoading(null) })
+    if (!result.ok) {
+      const label = OAUTH_PROVIDER_LABEL[provider]
+      setError(
+        result.error === "missing_url"
+          ? `Could not start ${label} sign-up. Please try again.`
+          : toProviderErrorMessage(label, result.error)
+      )
+      setOauthLoading(null)
       return
     }
-
-    if (data.url) {
-      trackGaEvent("sign_up", { method: "google" })
-      window.location.href = data.url
-      return
-    }
-
-    setError("Could not start Google sign-up. Please try again.")
-    setIsGoogleLoading(false)
+    trackGaEvent("sign_up", { method: provider })
   }
 
   async function handleStepOne(event: FormEvent<HTMLFormElement>) {
@@ -486,16 +477,11 @@ function SignupForm() {
 
           <AuthDivider />
 
-          <Button
-            type="button"
-            variant="outline"
-            className={authSocialButtonClassName}
-            onClick={handleGoogleSignup}
+          <SocialAuthButtons
+            onSelect={handleOAuthSignup}
+            loadingProvider={oauthLoading}
             disabled={!signupTermsAccepted || isBusy}
-          >
-            <GoogleIcon className="size-5 shrink-0" />
-            {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
-          </Button>
+          />
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
         </div>

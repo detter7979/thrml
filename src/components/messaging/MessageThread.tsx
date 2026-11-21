@@ -6,6 +6,7 @@ import { format, isToday, isYesterday } from "date-fns"
 import { ChevronLeft } from "lucide-react"
 
 import { DashboardSkeletonBlock } from "@/components/dashboard/dashboard-loading-skeletons"
+import { ConversationSafetyMenu } from "@/components/moderation/ConversationSafetyMenu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { createClient } from "@/lib/supabase/client"
 import { MessageInput } from "./MessageInput"
@@ -59,6 +60,10 @@ export function MessageThread({
     access_code: string | null
   } | null>(null)
   const [typing, setTyping] = useState(false)
+  const [blockState, setBlockState] = useState<{ blockedByMe: boolean; blockedEitherWay: boolean }>({
+    blockedByMe: false,
+    blockedEitherWay: false,
+  })
   const [loading, setLoading] = useState(true)
   const listRef = useRef<HTMLDivElement | null>(null)
   const supabase = useMemo(() => createClient(), [])
@@ -98,6 +103,21 @@ export function MessageThread({
       cancelled = true
     }
   }, [conversationId])
+
+  useEffect(() => {
+    const otherId = otherParty?.id
+    if (!otherId) return
+    let cancelled = false
+    void fetch(`/api/blocks?userId=${encodeURIComponent(otherId)}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { blockedByMe: boolean; blockedEitherWay: boolean } | null) => {
+        if (!cancelled && payload) setBlockState(payload)
+      })
+      .catch(() => null)
+    return () => {
+      cancelled = true
+    }
+  }, [otherParty?.id])
 
   useEffect(() => {
     if (!messages.length) return
@@ -203,14 +223,31 @@ export function MessageThread({
               </Link>
             </div>
           </div>
-          {canManageTemplates && conversation?.host_id === currentUserId ? (
-            <Link
-              href="/dashboard/host/templates"
-              className="shrink-0 rounded-full border border-[#E5DDD6] px-3 py-1.5 text-xs font-medium text-[#5A4B40] transition-colors hover:bg-[#FAF6F1]"
-            >
-              Message templates
-            </Link>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-2">
+            {canManageTemplates && conversation?.host_id === currentUserId ? (
+              <Link
+                href="/dashboard/host/templates"
+                className="shrink-0 rounded-full border border-[#E5DDD6] px-3 py-1.5 text-xs font-medium text-[#5A4B40] transition-colors hover:bg-[#FAF6F1]"
+              >
+                Message templates
+              </Link>
+            ) : null}
+            {otherParty?.id ? (
+              <ConversationSafetyMenu
+                otherUserId={otherParty.id}
+                otherFirstName={otherName.split(" ")[0] || "them"}
+                conversationId={conversationId}
+                blockedByMe={blockState.blockedByMe}
+                onBlockedChange={(blockedByMe) =>
+                  setBlockState((current) => ({
+                    blockedByMe,
+                    // If they also blocked me, it stays blocked after I unblock.
+                    blockedEitherWay: blockedByMe || (current.blockedEitherWay && !current.blockedByMe),
+                  }))
+                }
+              />
+            ) : null}
+          </div>
         </div>
         <p className="mt-3 rounded-md border border-[#E6DDD3] bg-[#FCF8F3] px-3 py-2 text-xs text-[#6C5B4F]">
           Thrml never asks you to pay outside the platform. Report any requests to do so.
@@ -278,16 +315,24 @@ export function MessageThread({
         {typing ? <p className="text-xs text-[#8C7B6E]">{otherName} is typing...</p> : null}
       </div>
 
-      <MessageInput
-        conversationId={conversationId}
-        currentUserId={currentUserId}
-        otherPartyName={otherName.split(" ")[0] || "there"}
-        isHost={conversation?.host_id === currentUserId}
-        bookingContext={booking}
-        onSend={(message) => {
-          setMessages((prev) => (prev.some((item) => item.id === message.id) ? prev : [...prev, message]))
-        }}
-      />
+      {blockState.blockedEitherWay ? (
+        <div className="border-t border-[#E7DED3] bg-white px-4 py-4 text-center text-sm text-[#7A6355]">
+          {blockState.blockedByMe
+            ? `You blocked ${otherName.split(" ")[0] || "this person"}. Unblock them from the ⋯ menu to message again.`
+            : "You can't send messages in this conversation."}
+        </div>
+      ) : (
+        <MessageInput
+          conversationId={conversationId}
+          currentUserId={currentUserId}
+          otherPartyName={otherName.split(" ")[0] || "there"}
+          isHost={conversation?.host_id === currentUserId}
+          bookingContext={booking}
+          onSend={(message) => {
+            setMessages((prev) => (prev.some((item) => item.id === message.id) ? prev : [...prev, message]))
+          }}
+        />
+      )}
     </section>
   )
 }

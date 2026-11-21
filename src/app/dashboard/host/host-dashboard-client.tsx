@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2, Loader2, Wallet } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { openExternalPage } from "@/lib/native/capacitor"
 
 type Transaction = {
   id: string
@@ -102,7 +103,7 @@ export function HostDashboardClient({
         throw new Error(data.error ?? "Unable to start Stripe onboarding.")
       }
 
-      window.location.href = data.onboardingUrl
+      await openExternalPage(data.onboardingUrl)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to start Stripe onboarding.")
       setIsConnecting(false)

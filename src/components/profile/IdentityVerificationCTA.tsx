@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { BadgeCheck, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { openExternalPage } from "@/lib/native/capacitor"
 
 export type IdentityUiStatus =
   | "not_started"
@@ -81,7 +82,7 @@ export function IdentityVerificationCTA({ status, verified, verifiedAt, compact 
         setError(data.error ?? "Could not start verification")
         return
       }
-      window.location.href = data.url
+      await openExternalPage(data.url)
     } catch {
       setError("Network error")
     } finally {

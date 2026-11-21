@@ -7,14 +7,14 @@ import { Suspense, type FormEvent, useState } from "react"
 import { AuthField } from "@/components/auth/AuthField"
 import {
   authPrimaryButtonClassName,
-  authSocialButtonClassName,
 } from "@/components/auth/auth-field-styles"
 import { AuthShell } from "@/components/auth/AuthShell"
-import { GoogleIcon } from "@/components/auth/GoogleIcon"
+import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons"
 import { Button } from "@/components/ui/button"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { rememberReturnTo } from "@/lib/auth/return-to"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
+import { OAUTH_PROVIDER_LABEL, startOAuthSignIn, type OAuthProvider } from "@/lib/auth/oauth"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -90,7 +90,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [isPasswordLoading, setIsPasswordLoading] = useState(false)
   const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null)
 
   function isTemporarilyLocked() {
     if (typeof window === "undefined") return false
@@ -232,35 +232,25 @@ function LoginForm() {
     return raw
   }
 
-  async function handleGoogleLogin() {
+  async function handleOAuthLogin(provider: OAuthProvider) {
     setError(null)
-    setIsGoogleLoading(true)
+    setOauthLoading(provider)
 
     const next = resolveNextPath()
     rememberReturnTo(next)
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-    const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      // Always show Google's account chooser so signing out and back in can switch accounts.
-      options: { redirectTo, queryParams: { prompt: "select_account" } },
-    })
-
-    if (oauthError) {
-      setError(toProviderErrorMessage("Google", oauthError.message))
-      setIsGoogleLoading(false)
-      return
+    const result = await startOAuthSignIn(supabase, provider, next, { onCancel: () => setOauthLoading(null) })
+    if (!result.ok) {
+      const label = OAUTH_PROVIDER_LABEL[provider]
+      setError(
+        result.error === "missing_url"
+          ? `Could not start ${label} sign-in. Please try again.`
+          : toProviderErrorMessage(label, result.error)
+      )
+      setOauthLoading(null)
     }
-
-    if (data.url) {
-      window.location.href = data.url
-      return
-    }
-
-    setError("Could not start Google sign-in. Please try again.")
-    setIsGoogleLoading(false)
   }
 
-  const isBusy = isPasswordLoading || isMagicLinkLoading || isGoogleLoading
+  const isBusy = isPasswordLoading || isMagicLinkLoading || oauthLoading !== null
 
   return (
     <div className="space-y-6">
@@ -380,16 +370,7 @@ function LoginForm() {
         <>
           <AuthDivider />
 
-          <Button
-            type="button"
-            variant="outline"
-            className={authSocialButtonClassName}
-            onClick={handleGoogleLogin}
-            disabled={isBusy}
-          >
-            <GoogleIcon className="size-5 shrink-0" />
-            {isGoogleLoading ? "Redirecting..." : "Continue with Google"}
-          </Button>
+          <SocialAuthButtons onSelect={handleOAuthLogin} loadingProvider={oauthLoading} disabled={isBusy} />
         </>
       ) : null}
 

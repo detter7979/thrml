@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 
+import { ReportLink } from "@/components/moderation/ReportDialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { isLikelyValidAvatarUrl } from "@/lib/avatar-url"
 
@@ -208,6 +209,10 @@ export function ReviewCard({ review, isHostView = false, onResponded, highlightP
           <p className="mt-1 text-[11px] text-[#9A8A7D]">{relativeDate(localRespondedAt)}</p>
         </div>
       ) : null}
+
+      <div className="mt-2 flex justify-end">
+        <ReportLink targetType="review" targetId={review.id} />
+      </div>
 
       {isHostView && !localHostResponse ? (
         <div className="mt-3">

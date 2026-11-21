@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { openExternalPage } from "@/lib/native/capacitor"
 
 export function StripeConnectBanner({
   compact = false,
@@ -26,7 +27,7 @@ export function StripeConnectBanner({
         throw new Error(data.error ?? "Something went wrong. Please try again.")
       }
 
-      window.location.href = onboardingUrl
+      await openExternalPage(onboardingUrl)
     } catch {
       window.alert("Something went wrong. Please try again.")
       setLoading(false)

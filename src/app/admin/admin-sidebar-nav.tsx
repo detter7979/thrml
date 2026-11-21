@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ClipboardList,
   Gift,
+  Flag,
   Home,
   Inbox,
   LineChart,
@@ -55,7 +56,10 @@ const SECTIONS: NavSection[] = [
   },
   {
     label: "Support & inbox",
-    items: [{ href: "/admin/inbox", label: "Inbox hub", icon: Inbox }],
+    items: [
+      { href: "/admin/inbox", label: "Inbox hub", icon: Inbox },
+      { href: "/admin/reports", label: "Reports", icon: Flag },
+    ],
   },
   {
     label: "System",

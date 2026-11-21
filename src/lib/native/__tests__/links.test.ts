@@ -31,3 +31,29 @@ describe("notification preferences", () => {
     expect(normalizeNotificationPreferences({ push_enabled: false, new_booking: false }).push_enabled).toBe(false)
   })
 })
+
+describe("sign-in return and outside links", () => {
+  it("turns the app's sign-in return link into the site's callback path", async () => {
+    const { nativeAuthReturnPath } = await import("@/lib/native/capacitor")
+    expect(nativeAuthReturnPath("com.usethrml.app://auth/callback?code=abc&next=%2Fexplore")).toBe(
+      "/auth/callback?code=abc&next=%2Fexplore"
+    )
+    expect(nativeAuthReturnPath("com.usethrml.app://other/path")).toBeNull()
+    expect(nativeAuthReturnPath("https://usethrml.com/auth/callback?code=abc")).toBeNull()
+    expect(nativeAuthReturnPath(undefined)).toBeNull()
+  })
+
+  it("treats only other http(s) sites as outside links", async () => {
+    const { isExternalWebUrl } = await import("@/lib/native/capacitor")
+    const origin = "https://usethrml.com"
+    expect(isExternalWebUrl("https://instagram.com/usethrml", origin)).toBe(true)
+    expect(isExternalWebUrl("https://maps.google.com/?q=Seattle", origin)).toBe(true)
+    expect(isExternalWebUrl("https://usethrml.com/faq", origin)).toBe(false)
+    expect(isExternalWebUrl("https://www.usethrml.com/faq", origin)).toBe(false)
+    expect(isExternalWebUrl("/explore", origin)).toBe(false)
+    expect(isExternalWebUrl("mailto:hello@usethrml.com", origin)).toBe(false)
+    expect(isExternalWebUrl("tel:+12065550100", origin)).toBe(false)
+    // A preview deployment serving the app from its own origin keeps its links in-app.
+    expect(isExternalWebUrl("https://thrml-git-x.vercel.app/explore", "https://thrml-git-x.vercel.app")).toBe(false)
+  })
+})

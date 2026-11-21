@@ -27,6 +27,10 @@ export type PushPlugin = PluginBase & {
   removeAllDeliveredNotifications?: () => Promise<void>
 }
 export type AppPlugin = PluginBase & { getInfo?: () => Promise<{ version?: string; build?: string }> }
+export type BrowserPlugin = PluginBase & {
+  open: (options: { url: string; presentationStyle?: "fullscreen" | "popover"; toolbarColor?: string }) => Promise<void>
+  close?: () => Promise<void>
+}
 
 function plugins(): Record<string, unknown> | null {
   if (typeof window === "undefined" || !isNativeShell()) return null
@@ -34,7 +38,7 @@ function plugins(): Record<string, unknown> | null {
   return cap?.Plugins ?? null
 }
 
-export function nativePlugin<T>(name: "Camera" | "Share" | "PushNotifications" | "App"): T | null {
+export function nativePlugin<T>(name: "Camera" | "Share" | "PushNotifications" | "App" | "Browser"): T | null {
   const plugin = plugins()?.[name]
   return plugin ? (plugin as T) : null
 }
@@ -119,6 +123,87 @@ export function appPathFromUrl(url: string | undefined | null): string | null {
     // not a URL
   }
   return null
+}
+
+/**
+ * Custom URL scheme the app registers. Sign-in providers send people back here, because Google
+ * refuses to sign in inside an app's embedded web view, so sign-in runs in a system browser sheet.
+ */
+export const NATIVE_URL_SCHEME = "com.usethrml.app"
+export const NATIVE_AUTH_CALLBACK = `${NATIVE_URL_SCHEME}://auth/callback`
+
+/**
+ * For a `com.usethrml.app://auth/callback?...` link, the site path that finishes the sign-in
+ * (`/auth/callback?...`). Null for any other link.
+ */
+export function nativeAuthReturnPath(url: string | undefined | null): string | null {
+  if (!url || !url.startsWith(`${NATIVE_URL_SCHEME}://`)) return null
+  try {
+    const parsed = new URL(url)
+    // Custom schemes parse "auth" as the host and "/callback" as the path.
+    if (`${parsed.host}${parsed.pathname}` !== "auth/callback") return null
+    return `/auth/callback${parsed.search}`
+  } catch {
+    return null
+  }
+}
+
+/** True for http(s) links that leave usethrml.com (and aren't the current app origin). */
+export function isExternalWebUrl(url: string, currentOrigin?: string): boolean {
+  try {
+    const parsed = new URL(url, currentOrigin ?? PUBLIC_ORIGIN)
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false
+    if (currentOrigin && parsed.origin === currentOrigin) return false
+    return !(parsed.hostname === "usethrml.com" || parsed.hostname.endsWith(".usethrml.com"))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Opens a web page in the in-app browser sheet (Safari view) in the app. Returns false when the
+ * Browser plugin isn't available so callers can fall back to a normal link.
+ */
+export async function openInAppBrowser(url: string): Promise<boolean> {
+  const browser = nativePlugin<BrowserPlugin>("Browser")
+  if (!browser) return false
+  try {
+    await browser.open({ url, presentationStyle: "popover", toolbarColor: "#F7F3EE" })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Sends the person to a page on another site (Stripe onboarding, ID verification). In the app it
+ * opens in the browser sheet and reloads this page when they close it, so statuses refresh; in a
+ * browser it navigates as before.
+ */
+export async function openExternalPage(url: string) {
+  const browser = nativePlugin<BrowserPlugin>("Browser")
+  if (browser) {
+    if (browser.addListener) {
+      const listener = await browser.addListener("browserFinished", (() => {
+        void Promise.resolve(listener).then((l) => l?.remove?.())
+        window.location.reload()
+      }) as never)
+    }
+    if (await openInAppBrowser(url)) return
+  }
+  window.location.href = url
+}
+
+export function hasInAppBrowser() {
+  return nativePlugin<BrowserPlugin>("Browser") !== null
+}
+
+export async function closeInAppBrowser() {
+  try {
+    await nativePlugin<BrowserPlugin>("Browser")?.close?.()
+  } catch {
+    // already closed
+  }
 }
 
 const PUSH_TOKEN_KEY = "thrml.pushToken"

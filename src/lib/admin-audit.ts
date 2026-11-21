@@ -10,6 +10,7 @@ export type AdminAuditAction =
   | "listing_approval"
   | "host_application_update"
   | "dispute_resolve"
+  | "report_resolve"
   | "settings_update"
   | "namer_sheet.write"
   | "namer_sheet.batch_update"

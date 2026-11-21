@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 
 import { requireAuth } from "@/lib/auth-check"
+import { isBlockedBetween } from "@/lib/moderation/server"
 import { rateLimit } from "@/lib/rate-limit"
 import { sanitizeText } from "@/lib/sanitize"
 import { sendPushToUser } from "@/lib/push/send"
@@ -73,6 +74,14 @@ export async function POST(req: NextRequest) {
   if (conversationError) return NextResponse.json({ error: conversationError.message }, { status: 500 })
   if (!conversation || (conversation.guest_id !== session.user.id && conversation.host_id !== session.user.id)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  const otherPartyId = conversation.guest_id === session.user.id ? conversation.host_id : conversation.guest_id
+  if (otherPartyId && (await isBlockedBetween(admin, session.user.id, otherPartyId))) {
+    return NextResponse.json(
+      { error: "You can't send messages in this conversation.", code: "blocked" },
+      { status: 403 }
+    )
   }
 
   const { data: message, error: insertError } = await admin

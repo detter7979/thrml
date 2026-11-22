@@ -9,6 +9,7 @@
   },
   "server": {
     "url": "https://usethrml.com",
+    "errorPath": "offline.html",
     "androidScheme": "https",
     "cleartext": false,
     "allowNavigation": [
@@ -16,8 +17,6 @@
       "*.usethrml.com",
       "*.stripe.com",
       "*.stripe.network",
-      "accounts.google.com",
-      "*.google.com",
       "*.googleapis.com",
       "*.supabase.co"
     ]

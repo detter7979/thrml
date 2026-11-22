@@ -1,10 +1,8 @@
 node_modules/
-ios/App/Pods/
+.build/
+xcuserdata/
+DerivedData/
+Pods/
+*.xcuserstate
 ios/App/build/
 ios/DerivedData/
-android/.gradle/
-android/app/build/
-android/build/
-android/local.properties
-*.xcuserstate
-*.xcuserdata/

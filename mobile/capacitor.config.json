@@ -1,0 +1,24 @@
+{
+  "appId": "com.usethrml.app",
+  "appName": "thrml",
+  "webDir": "www",
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  },
+  "server": {
+    "url": "https://usethrml.com",
+    "errorPath": "offline.html",
+    "androidScheme": "https",
+    "cleartext": false,
+    "allowNavigation": [
+      "usethrml.com",
+      "*.usethrml.com",
+      "*.stripe.com",
+      "*.stripe.network",
+      "*.googleapis.com",
+      "*.supabase.co"
+    ]
+  }
+}

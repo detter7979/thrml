@@ -1,0 +1,8 @@
+node_modules/
+.build/
+xcuserdata/
+DerivedData/
+Pods/
+*.xcuserstate
+ios/App/build/
+ios/DerivedData/

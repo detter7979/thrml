@@ -13,8 +13,8 @@ type Props = {
 }
 
 /**
- * "Continue with Apple / Google" buttons, grouped in one stack below the auth divider. Apple only
- * shows once Sign in with Apple is switched on (NEXT_PUBLIC_APPLE_SIGNIN_ENABLED).
+ * "Continue with Apple / Google" buttons, grouped in one stack below the auth divider. Apple can be
+ * hidden with NEXT_PUBLIC_APPLE_SIGNIN_ENABLED=false.
  */
 export function SocialAuthButtons({ onSelect, loadingProvider, disabled }: Props) {
   const providers = enabledOAuthProviders()

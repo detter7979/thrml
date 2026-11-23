@@ -24,7 +24,13 @@ import { isHostFunnelPath } from "@/lib/host/host-funnel"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
 import { modeForIntent, postSignupPath, writeAppMode } from "@/lib/app-nav"
 import { rememberReturnTo } from "@/lib/auth/return-to"
-import { OAUTH_PROVIDER_LABEL, startOAuthSignIn, type OAuthProvider } from "@/lib/auth/oauth"
+import {
+  OAUTH_PROVIDER_LABEL,
+  PROVIDER_NOT_READY,
+  providerNotReadyMessage,
+  startOAuthSignIn,
+  type OAuthProvider,
+} from "@/lib/auth/oauth"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -185,7 +191,9 @@ function SignupForm() {
     if (!result.ok) {
       const label = OAUTH_PROVIDER_LABEL[provider]
       setError(
-        result.error === "missing_url"
+        result.error === PROVIDER_NOT_READY
+          ? providerNotReadyMessage(provider)
+          : result.error === "missing_url"
           ? `Could not start ${label} sign-up. Please try again.`
           : toProviderErrorMessage(label, result.error)
       )

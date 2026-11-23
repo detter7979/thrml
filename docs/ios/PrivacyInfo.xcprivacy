@@ -1,36 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  thrml iOS app privacy manifest (draft). Copy into the App target in Xcode (ios/App/App/).
-  Assumes the app does NOT track (no ad pixels / ad consent inside the app). If ad tracking is
-  enabled in the app, set NSPrivacyTracking to true, list the tracking domains, and add the
-  App Tracking Transparency prompt. Review against the App Store Connect privacy answers.
+  thrml iOS app privacy manifest. Copy into the App target in Xcode (ios/App/App/).
+
+  The app tracks, but only after the person taps Allow on the App Tracking Transparency prompt:
+  the site then loads the Meta pixel and Google Ads / GA4 tags, and the server sends Meta
+  Conversions API events with hashed name, email, phone and account ID (all gated on advertising
+  consent, which in the app is the ATT answer). If they tap Ask App Not to Track, none of it
+  loads, and iOS also blocks the domains listed below.
+
+  Keep this in step with the App Store Connect privacy answers ("Data Used to Track You").
 -->
 <plist version="1.0">
 <dict>
   <key>NSPrivacyTracking</key>
-  <false/>
+  <true/>
   <key>NSPrivacyTrackingDomains</key>
-  <array/>
+  <array>
+    <string>connect.facebook.net</string>
+    <string>www.facebook.com</string>
+    <string>capig.datah04.com</string>
+    <string>www.googletagmanager.com</string>
+    <string>www.googleadservices.com</string>
+    <string>googleads.g.doubleclick.net</string>
+    <string>ad.doubleclick.net</string>
+    <string>td.doubleclick.net</string>
+    <string>stats.g.doubleclick.net</string>
+    <string>www.google-analytics.com</string>
+    <string>region1.google-analytics.com</string>
+  </array>
   <key>NSPrivacyCollectedDataTypes</key>
   <array>
     <dict>
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeName</string>
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
-      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
-      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+      <key>NSPrivacyCollectedDataTypeTracking</key><true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string><string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string></array>
     </dict>
     <dict>
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeEmailAddress</string>
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
-      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
-      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+      <key>NSPrivacyCollectedDataTypeTracking</key><true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string><string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string></array>
     </dict>
     <dict>
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypePhoneNumber</string>
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
-      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
-      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+      <key>NSPrivacyCollectedDataTypeTracking</key><true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string><string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string></array>
     </dict>
     <dict>
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypePhotosorVideos</string>
@@ -59,20 +76,20 @@
     <dict>
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeUserID</string>
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
-      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
-      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+      <key>NSPrivacyCollectedDataTypeTracking</key><true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string><string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string></array>
     </dict>
     <dict>
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeDeviceID</string>
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
-      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
-      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+      <key>NSPrivacyCollectedDataTypeTracking</key><true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string><string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string></array>
     </dict>
     <dict>
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeProductInteraction</string>
-      <key>NSPrivacyCollectedDataTypeLinked</key><false/>
-      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
-      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAnalytics</string></array>
+      <key>NSPrivacyCollectedDataTypeLinked</key><true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key><true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key><array><string>NSPrivacyCollectedDataTypePurposeAnalytics</string><string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string></array>
     </dict>
   </array>
   <key>NSPrivacyAccessedAPITypes</key>

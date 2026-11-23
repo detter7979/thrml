@@ -5,7 +5,7 @@
  */
 export const LEGAL_VERSIONS = {
   // Must match the active rows in legal_documents (the published text).
-  TERMS: "v1.2",
-  PRIVACY: "v1.3",
+  TERMS: "v1.3",
+  PRIVACY: "v1.4",
   HOST_AGREEMENT: "host-v1.1-2026-10",
 } as const

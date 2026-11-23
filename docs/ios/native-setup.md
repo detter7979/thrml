@@ -78,7 +78,7 @@ lands on the website in the sheet instead of back in the app.
 
 ## 6. Sign in with Apple (after the Apple Developer account is active)
 
-The button is built and hidden. To turn it on:
+The button is already visible. To make it work:
 
 1. Apple Developer → Identifiers → the app ID → enable **Sign in with Apple**.
 2. Create a **Services ID** (e.g. `com.usethrml.web`), enable Sign in with Apple, domain
@@ -87,7 +87,8 @@ The button is built and hidden. To turn it on:
 3. Keys → create a key with **Sign in with Apple**; download the `.p8`.
 4. Supabase → Authentication → Providers → Apple: Services ID as Client ID, Team ID, Key ID and the
    `.p8` contents. Save.
-5. Vercel (Production + Preview): `NEXT_PUBLIC_APPLE_SIGNIN_ENABLED=true`, then redeploy.
+5. Nothing else: the Apple button already shows on login and signup, and starts working as soon as
+   the Apple provider is saved in Supabase (until then it says it's almost ready).
 
 ## 7. Apple Developer + Vercel
 

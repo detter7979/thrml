@@ -14,7 +14,13 @@ import { Button } from "@/components/ui/button"
 import { trackGaEvent } from "@/lib/analytics/ga"
 import { rememberReturnTo } from "@/lib/auth/return-to"
 import { sanitizeNextPath } from "@/lib/sanitize-next-path"
-import { OAUTH_PROVIDER_LABEL, startOAuthSignIn, type OAuthProvider } from "@/lib/auth/oauth"
+import {
+  OAUTH_PROVIDER_LABEL,
+  PROVIDER_NOT_READY,
+  providerNotReadyMessage,
+  startOAuthSignIn,
+  type OAuthProvider,
+} from "@/lib/auth/oauth"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -242,7 +248,9 @@ function LoginForm() {
     if (!result.ok) {
       const label = OAUTH_PROVIDER_LABEL[provider]
       setError(
-        result.error === "missing_url"
+        result.error === PROVIDER_NOT_READY
+          ? providerNotReadyMessage(provider)
+          : result.error === "missing_url"
           ? `Could not start ${label} sign-in. Please try again.`
           : toProviderErrorMessage(label, result.error)
       )

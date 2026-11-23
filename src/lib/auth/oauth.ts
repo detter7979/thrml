@@ -17,13 +17,36 @@ export const OAUTH_PROVIDER_LABEL: Record<OAuthProvider, string> = {
 }
 
 /**
- * Sign in with Apple stays hidden until the Apple Developer account is set up and the Apple
- * provider is configured in Supabase. Set NEXT_PUBLIC_APPLE_SIGNIN_ENABLED=true to show it.
+ * Sign in with Apple shows alongside Google. Until the Apple provider is switched on in Supabase
+ * (after the Apple Developer account is set up), tapping it explains that it's almost ready
+ * instead of sending people to an error page; once it's on, it works with no deploy.
+ * Set NEXT_PUBLIC_APPLE_SIGNIN_ENABLED=false to hide the button entirely.
  */
-export const APPLE_SIGN_IN_ENABLED = process.env.NEXT_PUBLIC_APPLE_SIGNIN_ENABLED === "true"
+export const APPLE_SIGN_IN_ENABLED = process.env.NEXT_PUBLIC_APPLE_SIGNIN_ENABLED !== "false"
 
 export function enabledOAuthProviders(): OAuthProvider[] {
   return APPLE_SIGN_IN_ENABLED ? ["apple", "google"] : ["google"]
+}
+
+/** Error code when a provider isn't switched on in Supabase yet. */
+export const PROVIDER_NOT_READY = "provider_not_ready"
+
+let providerSettings: Promise<Record<string, boolean> | null> | null = null
+
+/** Which sign-in providers are switched on in Supabase Auth (cached per page load). */
+function loadProviderSettings() {
+  providerSettings ??= fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/settings`, {
+    headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "" },
+  })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((payload: { external?: Record<string, boolean> } | null) => payload?.external ?? null)
+    .catch(() => null)
+  return providerSettings
+}
+
+/** Friendly message for a provider that isn't switched on yet. */
+export function providerNotReadyMessage(provider: OAuthProvider) {
+  return `Sign in with ${OAUTH_PROVIDER_LABEL[provider]} is almost ready. Use Google or email for now.`
 }
 
 type StartResult = { ok: true } | { ok: false; error: string }
@@ -44,6 +67,12 @@ export async function startOAuthSignIn(
   next: string,
   options: { onCancel?: () => void } = {}
 ): Promise<StartResult> {
+  if (provider === "apple") {
+    const external = await loadProviderSettings()
+    // Only block when Supabase clearly says it's off; if the check fails, try anyway.
+    if (external && external.apple === false) return { ok: false, error: PROVIDER_NOT_READY }
+  }
+
   const nativeBrowser = nativePlugin<BrowserPlugin>("Browser")
   const query = `next=${encodeURIComponent(next)}`
   const redirectTo = nativeBrowser

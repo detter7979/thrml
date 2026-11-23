@@ -68,7 +68,7 @@ App Store Connect → App Privacy must match: "Data Used to Track You" = name, e
 device ID and product interaction (third-party advertising). Everything else is "Data Linked to
 You" for app functionality.
 
-App icon: `docs/ios/AppIcon-1024.png` (1024×1024, no transparency, square corners).
+App icon: `docs/ios/AppIcon-1024.png`: the "thrml" wordmark in cream on ember (same artwork as the site favicon), 1024×1024, no transparency, square corners.
 
 ## 5. Supabase redirect URL (needed before the next app build)
 

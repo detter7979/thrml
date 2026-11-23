@@ -59,10 +59,16 @@ two `application(_:didRegisterForRemoteNotificationsWithDeviceToken:)` /
 
 ## 4. Privacy manifest
 
-Add `docs/ios/PrivacyInfo.xcprivacy` to the App target (`ios/App/App/`). It assumes the app
-does **not** track: no Meta pixel or Google Ads cookies inside the app. If that changes, set
-`NSPrivacyTracking` to true, list the tracking domains, and add the App Tracking Transparency
-prompt. The answers must match App Store Connect → App Privacy.
+Add `docs/ios/PrivacyInfo.xcprivacy` to the App target (`ios/App/App/`). The app **tracks only
+after the person taps Allow** on the tracking prompt: the site then loads the Meta pixel and
+Google Ads / GA4 tags, and the server sends Meta Conversions API events with hashed name, email,
+phone and account ID. If they decline, none of it loads and iOS blocks the listed domains.
+
+App Store Connect → App Privacy must match: "Data Used to Track You" = name, email, phone, user ID,
+device ID and product interaction (third-party advertising). Everything else is "Data Linked to
+You" for app functionality.
+
+App icon: `docs/ios/AppIcon-1024.png`: the "thrml" wordmark in cream on ember (same artwork as the site favicon), 1024×1024, no transparency, square corners.
 
 ## 5. Supabase redirect URL (needed before the next app build)
 

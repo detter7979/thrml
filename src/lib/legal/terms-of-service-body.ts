@@ -1,6 +1,6 @@
 /**
  * Full Terms of Service text — shared by /terms and the /legal/terms fallback.
- * The published copy is the active `terms_of_service` row in legal_documents (v1.2).
+ * The published copy is the active `terms_of_service` row in legal_documents (v1.3).
  * To change the Terms: edit this text, insert a new legal_documents row with a new
  * version, and bump LEGAL_VERSIONS.TERMS so acceptances record the right version.
  */
@@ -142,6 +142,13 @@ Harass, threaten, or harm other users
 Attempt to reverse engineer, scrape, or interfere with the platform
 Create multiple accounts for deceptive purposes
 
+13A. Community Standards, Reporting and Blocking
+Zero tolerance. thrml has zero tolerance for objectionable content and abusive users. You may not post, upload or send content, including listings, photos, reviews, profile details and messages, that is sexually explicit, hateful, discriminatory, harassing, threatening, violent, defamatory, misleading or illegal, or that exposes someone's private information.
+Reporting. You can report any listing, review, message or user from within thrml. Reports are confidential: we don't tell the person who reported them.
+Our response. We review reports within 24 hours. If content breaks these Terms, we may remove it and warn, suspend or permanently ban the account that posted it, without notice or refund of fees already earned by thrml. We may also act on content we find ourselves, without a report.
+Blocking. You can block another user from a conversation. Once blocked, neither of you can message the other. Information needed for a booking that's already confirmed, such as access instructions, may still be sent. You can unblock someone at any time.
+Emergencies. Reporting in thrml is not an emergency service. If anyone is in danger, call 911 first.
+
 14. Limitation of Liability
 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, thrml LLC AND ITS OFFICERS, DIRECTORS, EMPLOYEES, AND AGENTS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING OUT OF OR RELATED TO YOUR USE OF THE PLATFORM, ANY BOOKING, OR ANY WELLNESS ACTIVITY, EVEN IF thrml LLC HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 thrml LLC's total aggregate liability to any user for any claim arising out of or related to these Terms or use of the platform shall not exceed the greater of (a) the total fees paid by you to thrml in the twelve months preceding the claim, or (b) one hundred US dollars ($100).
@@ -160,7 +167,7 @@ These Terms shall be governed by and construed in accordance with the laws of th
 thrml reserves the right to modify these Terms at any time. We will notify users of material changes via email or prominent notice on the platform. Continued use of the platform after changes are posted constitutes acceptance of the revised Terms.
 
 19. Termination
-thrml reserves the right to suspend or terminate any user account at its sole discretion, with or without notice, for violations of these Terms or conduct deemed harmful to the platform or its users.
+thrml reserves the right to suspend or terminate any user account at its sole discretion, with or without notice, for violations of these Terms or conduct deemed harmful to the platform or its users. We may suspend or terminate your account immediately if you break section 13 or 13A, including after a report by another user.
 
 20. Severability
 If any provision of these Terms is held invalid or unenforceable by a court of competent jurisdiction, that provision shall be modified to the minimum extent necessary to make it enforceable, or if it cannot be so modified, severed, and the remaining provisions shall continue in full force and effect.

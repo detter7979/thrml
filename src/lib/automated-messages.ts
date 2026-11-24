@@ -1,3 +1,4 @@
+import { isDueBeforeNextRun, sessionInstant } from "@/lib/session-time"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendThrmlLayoutEmail, THRML_APP_URL } from "@/lib/emails/transactional-send"
 
@@ -69,13 +70,13 @@ export const TEMPLATE_TYPES: Array<{
   {
     type: "pre_arrival",
     label: "Pre-arrival",
-    description: "Sent 24 hours before the session",
+    description: "Sent the day before the session",
     send_hours_before: 24,
   },
   {
     type: "check_in",
     label: "Check-in",
-    description: "Sent 1 hour before the session with access details",
+    description: "Sent the morning of the session with access details",
     send_hours_before: 1,
   },
   {
@@ -396,8 +397,7 @@ export async function sendAutomatedBookingExpiredMessage(params: {
 
 function getSessionStart(booking: BookingRow) {
   if (!booking.session_date || !booking.start_time) return null
-  const parsed = new Date(`${booking.session_date}T${booking.start_time}`)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return sessionInstant(booking.session_date, booking.start_time)
 }
 
 function getThresholdDate(booking: BookingRow, sendHoursBefore: number | null) {
@@ -503,9 +503,17 @@ export async function processScheduledMessages() {
       if (!template || !template.is_automated) continue
       if (alreadySent.has(templateType.type)) continue
 
-      const threshold = getThresholdDate(booking, template.send_hours_before)
-      if (!threshold) continue
-      if (threshold.getTime() > now.getTime()) continue
+      // Runs once a day: pre-session messages go out in the last run before their send time
+      // and never after the session has started; post-session messages once it has ended.
+      const sendHoursBefore = template.send_hours_before
+      const sessionStart = getSessionStart(booking)
+      if (!sessionStart) continue
+      if (sendHoursBefore !== null && sendHoursBefore > 0) {
+        if (!isDueBeforeNextRun({ startsAt: sessionStart, hoursBefore: sendHoursBefore, now })) continue
+      } else {
+        const threshold = getThresholdDate(booking, sendHoursBefore)
+        if (!threshold || threshold.getTime() > now.getTime()) continue
+      }
 
       const body = formatTemplate(template.content || DEFAULT_TEMPLATE_CONTENT[templateType.type], {
         guest_name: firstName(guest?.full_name),

@@ -31,8 +31,8 @@ export const ACCESS_TYPES = {
 
 export const CODE_SEND_TIMING = {
   on_confirm: "Immediately when booking confirms",
-  "24h_before": "24 hours before session",
-  "1h_before": "1 hour before session",
+  "24h_before": "The day before the session",
+  "1h_before": "The morning of the session",
 } as const
 
 export const INSTRUCTION_VARIABLES = [

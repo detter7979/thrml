@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import {
   sendGuest24HourReminder,
+  sendGuestBookingRequestExpiredEmail,
   sendGuestEntryInstructionsEmail,
   sendGuestOnsiteReminder,
   sendHostBookingRequestReminderEmail,
@@ -10,7 +11,13 @@ import {
 } from "@/lib/emails"
 import { sendPostSessionEmails } from "@/lib/emails/post-session"
 import { sendAccessCode } from "@/lib/access/send-access-code"
-import { sendAutomatedBookingHostConfirmationReminderMessage } from "@/lib/automated-messages"
+import {
+  sendAutomatedBookingExpiredMessage,
+  sendAutomatedBookingHostConfirmationReminderMessage,
+} from "@/lib/automated-messages"
+import { stripe } from "@/lib/stripe"
+import { isAccessDetailsDue } from "@/lib/access/access-timing"
+import { marketDateString, sessionInstant } from "@/lib/session-time"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type BookingRow = {
@@ -36,6 +43,7 @@ type ListingRow = {
   title: string | null
   access_type: string | null
   access_instructions: string | null
+  access_code_send_timing?: string | null
   onsite_contact_name: string | null
   onsite_contact_phone: string | null
   location_address?: string | null
@@ -66,15 +74,12 @@ type PendingHostBookingRow = {
 
 function parseSessionStart(booking: Pick<BookingRow, "session_date" | "start_time">) {
   if (!booking.session_date || !booking.start_time) return null
-  const parsed = new Date(`${booking.session_date}T${booking.start_time}`)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return sessionInstant(booking.session_date, booking.start_time)
 }
 
 function parseSessionEnd(booking: Pick<BookingRow, "session_date" | "end_time" | "start_time">) {
   if (!booking.session_date) return null
-  const endTime = booking.end_time || booking.start_time || "23:59"
-  const parsed = new Date(`${booking.session_date}T${endTime}`)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return sessionInstant(booking.session_date, booking.end_time || booking.start_time || "23:59")
 }
 
 function normalizeAccessType(value: string | null | undefined) {
@@ -127,10 +132,9 @@ export async function GET(request: NextRequest) {
 
   const supabase = createAdminClient()
   const now = new Date()
-  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-  const in25h = new Date(now.getTime() + 25 * 60 * 60 * 1000)
-  const in1h30 = new Date(now.getTime() + 1.5 * 60 * 60 * 1000)
-  const in24hCode = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+  // This job runs once a day, around midnight Seattle time. The "tomorrow" reminder goes to
+  // sessions on the next calendar day; access details follow each listing's timing.
+  const tomorrow = marketDateString(new Date(now.getTime() + 24 * 60 * 60 * 1000))
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
   const { data: bookingsRaw, error: bookingError } = await supabase
@@ -158,7 +162,7 @@ export async function GET(request: NextRequest) {
     listingIds.length
       ? supabase
           .from("listings")
-          .select("id, title, service_type, access_type, access_instructions, onsite_contact_name, onsite_contact_phone, location_address, city, state")
+          .select("id, title, service_type, access_type, access_instructions, access_code_send_timing, onsite_contact_name, onsite_contact_phone, location_address, city, state")
           .in("id", listingIds)
       : Promise.resolve({ data: [] as ListingRow[] }),
     profileIds.length
@@ -174,7 +178,7 @@ export async function GET(request: NextRequest) {
   for (const booking of bookings) {
     if (booking.reminder_24h_sent) continue
     const startsAt = parseSessionStart(booking)
-    if (!startsAt || startsAt < in24h || startsAt > in25h) continue
+    if (!startsAt || startsAt <= now || booking.session_date !== tomorrow) continue
 
     const listing = booking.listing_id ? listingMap.get(booking.listing_id) : null
     const guestEmail = emailMap.get(booking.guest_id) ?? null
@@ -220,10 +224,12 @@ export async function GET(request: NextRequest) {
   for (const booking of bookings) {
     if (booking.access_code_sent || booking.access_code_sent_at) continue
     const startsAt = parseSessionStart(booking)
-    if (!startsAt || startsAt < in1h30 || startsAt > in24hCode) continue
-
     const listing = booking.listing_id ? listingMap.get(booking.listing_id) : null
     if (!listing) continue
+    const accessTypeForTiming = normalizeAccessType(listing.access_type)
+    const timing =
+      accessTypeForTiming === "code" || accessTypeForTiming === "lockbox" ? listing.access_code_send_timing : null
+    if (!isAccessDetailsDue({ timing, startsAt, now })) continue
     const guestEmail = emailMap.get(booking.guest_id) ?? null
     const hostEmail = emailMap.get(booking.host_id) ?? null
     const guestName = profileMap.get(booking.guest_id)?.full_name ?? "there"
@@ -449,6 +455,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const requestsExpired = await expireUnansweredRequests(supabase, now)
+
   return NextResponse.json({
     ok: true,
     processed: {
@@ -456,6 +464,110 @@ export async function GET(request: NextRequest) {
       access_codes: accessCodes,
       post_session: postSession,
       host_confirmation_reminders: hostConfirmationReminders,
+      requests_expired: requestsExpired,
     },
   })
+}
+
+/**
+ * Requests the host didn't answer by the deadline (or before the session started): release the
+ * card hold, free the slot, and tell the guest. The confirm route already refuses late approvals.
+ */
+async function expireUnansweredRequests(supabase: ReturnType<typeof createAdminClient>, now: Date) {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(
+      "id, guest_id, host_id, listing_id, session_date, start_time, end_time, guest_count, total_charged, host_payout, confirmation_deadline, stripe_payment_intent_id"
+    )
+    .eq("status", "pending_host")
+
+  if (error) {
+    console.error("[cron/reminders] expire lookup failed", error.message)
+    return 0
+  }
+
+  let expired = 0
+  for (const booking of (data ?? []) as Array<PendingHostBookingRow & { stripe_payment_intent_id: string | null }>) {
+    const deadline = booking.confirmation_deadline ? new Date(booking.confirmation_deadline) : null
+    const startsAt = sessionInstant(booking.session_date, booking.start_time)
+    const deadlinePassed = Boolean(deadline && !Number.isNaN(deadline.getTime()) && deadline <= now)
+    const sessionStarted = Boolean(startsAt && startsAt <= now)
+    if (!deadlinePassed && !sessionStarted) continue
+
+    try {
+      if (booking.stripe_payment_intent_id) {
+        try {
+          await stripe.paymentIntents.cancel(booking.stripe_payment_intent_id)
+        } catch (cancelError) {
+          // Already canceled or expired at Stripe; the hold is gone either way.
+          console.warn("[cron/reminders] payment intent cancel skipped", {
+            bookingId: booking.id,
+            error: cancelError instanceof Error ? cancelError.message : String(cancelError),
+          })
+        }
+      }
+
+      const { data: updated } = await supabase
+        .from("bookings")
+        .update({
+          status: "cancelled",
+          cancelled_by: "expired",
+          cancelled_at: now.toISOString(),
+          cancellation_reason: "Host did not respond before the request deadline",
+          refund_amount: 0,
+          refund_status: "none",
+        })
+        .eq("id", booking.id)
+        .eq("status", "pending_host")
+        .select("id")
+        .maybeSingle()
+      if (!updated) continue
+
+      await supabase.from("booked_slots").delete().eq("booking_id", booking.id)
+
+      const [{ data: listing }, { data: guestProfile }, { data: hostProfile }, guestAuth] = await Promise.all([
+        booking.listing_id
+          ? supabase.from("listings").select("id, title, service_type").eq("id", booking.listing_id).maybeSingle()
+          : Promise.resolve({ data: null as { id: string; title: string | null; service_type: string | null } | null }),
+        supabase.from("profiles").select("full_name").eq("id", booking.guest_id).maybeSingle(),
+        supabase.from("profiles").select("full_name").eq("id", booking.host_id).maybeSingle(),
+        supabase.auth.admin.getUserById(booking.guest_id),
+      ])
+
+      await Promise.allSettled([
+        sendGuestBookingRequestExpiredEmail({
+          booking_id: booking.id,
+          listing_title: listing?.title ?? null,
+          listing_id: booking.listing_id,
+          service_type: listing?.service_type ?? "sauna",
+          session_date: booking.session_date,
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+          guest_count: booking.guest_count,
+          total_charged: booking.total_charged,
+          host_payout: booking.host_payout,
+          guest_id: booking.guest_id,
+          guest_name: guestProfile?.full_name ?? null,
+          guest_email: guestAuth.data.user?.email ?? null,
+          host_id: booking.host_id,
+          host_name: hostProfile?.full_name ?? null,
+          host_email: null,
+          confirmation_deadline: booking.confirmation_deadline,
+        }),
+        booking.listing_id
+          ? sendAutomatedBookingExpiredMessage({
+              bookingId: booking.id,
+              listingId: booking.listing_id,
+              guestId: booking.guest_id,
+              hostId: booking.host_id,
+              hostName: hostProfile?.full_name?.split(" ")[0] ?? "the host",
+            })
+          : Promise.resolve(null),
+      ])
+      expired += 1
+    } catch (expireError) {
+      console.error(`[cron/reminders] expiring request ${booking.id} failed`, expireError)
+    }
+  }
+  return expired
 }

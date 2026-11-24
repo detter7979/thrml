@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { sendPostSessionReviewRequestEmail, sendHostGuestReviewRequestEmail } from "@/lib/emails"
+import { sessionInstant } from "@/lib/session-time"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 type BookingRow = {
@@ -31,8 +32,7 @@ function isMissingColumnError(message: string) {
 function parseSessionEnd(booking: BookingRow) {
   if (!booking.session_date) return null
   const endTime = booking.end_time || booking.start_time || "23:59"
-  const date = new Date(`${booking.session_date}T${endTime}`)
-  return Number.isNaN(date.getTime()) ? null : date
+  return sessionInstant(booking.session_date, endTime)
 }
 
 function firstName(value: string | null | undefined) {

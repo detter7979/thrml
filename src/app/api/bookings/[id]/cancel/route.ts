@@ -3,11 +3,11 @@ import { z } from "zod"
 
 import {
   calculateHostPenalty,
+  computeRefund,
   formatMoney,
   hoursUntilSession,
   parseSessionStart,
 } from "@/lib/cancellations"
-import type { CancellationPolicy } from "@/lib/constants/cancellation-policies"
 import { getCancellationPolicy } from "@/lib/constants/cancellation-policies"
 import {
   sendGuestCancellationConfirmation,
@@ -28,11 +28,6 @@ const cancelSchema = z.object({
   cancelled_by: z.enum(["guest", "host"]),
   reason: z.string().trim().max(500).optional(),
 })
-
-type RefundPreview = {
-  refundAmount: number
-  policyApplied: string
-}
 
 function parseMissingColumn(errorMessage: string) {
   const match = errorMessage.match(/'([^']+)' column/i)
@@ -70,55 +65,6 @@ async function updateBookingCancellation(
   }
 
   return { data: null, error: { message: "Unable to update booking" } }
-}
-
-function normalizePolicyKey(policy: string | null | undefined): CancellationPolicy {
-  const value = String(policy ?? "").trim().toLowerCase()
-  if (value === "flexible" || value === "moderate" || value === "strict") return value
-  return "flexible"
-}
-
-function calculateRefundPreview(params: {
-  cancelledBy: "guest" | "host"
-  listingPolicy: string | null | undefined
-  sessionDate: string | null | undefined
-  startTime: string | null | undefined
-  totalCharged: number
-  serviceFee: number
-}): RefundPreview {
-  const { cancelledBy, listingPolicy, sessionDate, startTime, totalCharged, serviceFee } = params
-  const policyKey = normalizePolicyKey(listingPolicy)
-  const sessionStart = parseSessionStart(sessionDate, startTime)
-  const hoursUntil = sessionStart ? hoursUntilSession(sessionStart) : 0
-  const windowHours = { flexible: 24, moderate: 48, strict: 72 }[policyKey]
-  const refundableBase = Math.max(0, Number(totalCharged) - Number(serviceFee))
-
-  if (cancelledBy === "host") {
-    return {
-      refundAmount: refundableBase,
-      policyApplied: "host_full_refund",
-    }
-  }
-
-  const isEligibleForFullRefund = hoursUntil >= windowHours
-  if (isEligibleForFullRefund) {
-    return {
-      refundAmount: refundableBase,
-      policyApplied: `${policyKey}_full_refund`,
-    }
-  }
-
-  if (policyKey === "strict") {
-    return {
-      refundAmount: 0,
-      policyApplied: "strict_no_refund",
-    }
-  }
-
-  return {
-    refundAmount: Math.floor(refundableBase * 0.5),
-    policyApplied: `${policyKey}_partial_refund`,
-  }
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<Params> }) {
@@ -189,11 +135,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
   const guestEmail = guestAuthUser.data.user?.email ?? guestProfile?.email ?? null
   const hostEmail = hostAuthUser.data.user?.email ?? hostProfile?.email ?? null
 
-  const refundPreview = calculateRefundPreview({
+  const refundPreview = computeRefund({
     cancelledBy,
-    listingPolicy: typeof listing?.cancellation_policy === "string" ? listing.cancellation_policy : null,
-    sessionDate: booking.session_date ?? null,
-    startTime: booking.start_time ?? null,
+    policy: typeof listing?.cancellation_policy === "string" ? listing.cancellation_policy : null,
+    sessionStart: parseSessionStart(booking.session_date ?? null, booking.start_time ?? null),
+    refundAnchor: booking.refund_anchor_at ? new Date(booking.refund_anchor_at) : null,
     totalCharged: Number(booking.total_charged ?? 0),
     serviceFee: Number(booking.service_fee ?? 0),
   })

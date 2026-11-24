@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { isAccessDetailsDue } from "@/lib/access/access-timing"
 import { sendAccessCode } from "@/lib/access/send-access-code"
+import { nextRemindersRunAt, sessionInstant } from "@/lib/session-time"
 import { sendAutomatedBookingConfirmedByHostMessage } from "@/lib/automated-messages"
 import { requireAuth } from "@/lib/auth-check"
 import {
@@ -266,14 +268,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<Para
     console.error("[bookings/confirm] confirmation email failed", emailError)
   }
 
+  // Send now if the next daily run would be too late (e.g. a same-day booking).
+  const accessRecord = listingRecord as Record<string, unknown> | null
+  const accessType = String(accessRecord?.access_type ?? "code").toLowerCase()
+  const isCodeAccess = ["code", "lockbox", "smart_lock"].includes(accessType)
   const timing =
-    typeof (listingRecord as Record<string, unknown>).access_code_send_timing === "string"
-      ? ((listingRecord as Record<string, unknown>).access_code_send_timing as string)
+    isCodeAccess && typeof accessRecord?.access_code_send_timing === "string"
+      ? (accessRecord.access_code_send_timing as string)
       : null
-  if (timing === "on_confirm") {
-    void sendAccessCode(booking.id)
-  } else if (timing === "24h_before" || timing === "1h_before") {
-    console.log("[bookings/confirm] Access code queued for cron send", { bookingId: booking.id, timing })
+  if (
+    isAccessDetailsDue({
+      timing,
+      startsAt: sessionInstant(booking.session_date, booking.start_time),
+      nextRunAt: nextRemindersRunAt(),
+    })
+  ) {
+    const accessResult = await sendAccessCode(booking.id)
+    if (!accessResult.sent) {
+      console.warn("[bookings/confirm] access details not sent", { bookingId: booking.id, error: accessResult.error })
+    }
   }
 
   return NextResponse.json({ status: "confirmed" })

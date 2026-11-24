@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 
+import { isAccessDetailsDue } from "@/lib/access/access-timing"
 import { sendAccessCode } from "@/lib/access/send-access-code"
+import { nextRemindersRunAt, sessionInstant } from "@/lib/session-time"
 import {
   sendAutomatedBookingConfirmedMessage,
   sendAutomatedBookingRequestSentMessage,
@@ -512,14 +514,25 @@ export async function POST(req: NextRequest) {
             .eq("id", booking.id)
         }
 
+        // Send now if the next daily run would be too late (e.g. a same-day booking).
+        const accessRecord = listing as Record<string, unknown> | null
+        const accessType = String(accessRecord?.access_type ?? "code").toLowerCase()
+        const isCodeAccess = ["code", "lockbox", "smart_lock"].includes(accessType)
         const timing =
-          typeof (listing as Record<string, unknown> | null)?.access_code_send_timing === "string"
-            ? ((listing as Record<string, unknown>).access_code_send_timing as string)
+          isCodeAccess && typeof accessRecord?.access_code_send_timing === "string"
+            ? (accessRecord.access_code_send_timing as string)
             : null
-        if (timing === "on_confirm") {
-          void sendAccessCode(booking.id)
-        } else if (timing === "24h_before" || timing === "1h_before") {
-          console.log("[stripe/webhook] Access code queued for cron send", { bookingId: booking.id, timing })
+        if (
+          isAccessDetailsDue({
+            timing,
+            startsAt: sessionInstant(booking.session_date, booking.start_time),
+            nextRunAt: nextRemindersRunAt(),
+          })
+        ) {
+          const accessResult = await sendAccessCode(booking.id)
+          if (!accessResult.sent) {
+            console.warn("[stripe/webhook] access details not sent", { bookingId: booking.id, error: accessResult.error })
+          }
         }
       }
     }
@@ -547,9 +560,7 @@ export async function POST(req: NextRequest) {
           supabase.auth.admin.getUserById(booking.host_id),
         ])
 
-        const sessionEnd = booking.end_time
-          ? new Date(`${booking.session_date ?? ""}T${booking.end_time}`)
-          : null
+        const sessionEnd = booking.end_time ? sessionInstant(booking.session_date, booking.end_time) : null
         const now = new Date()
         if (sessionEnd && !Number.isNaN(sessionEnd.getTime()) && now >= sessionEnd) {
           await sendPostSessionEmails({
@@ -724,6 +735,7 @@ export async function POST(req: NextRequest) {
       .from("bookings")
       .update({ status: "cancelled" })
       .eq("stripe_payment_intent_id", pi.id)
+      .in("status", ["pending", "pending_host"])
 
     await supabase
       .from("booked_slots")
@@ -737,6 +749,7 @@ export async function POST(req: NextRequest) {
       .from("bookings")
       .update({ status: "cancelled" })
       .eq("stripe_payment_intent_id", pi.id)
+      .in("status", ["pending", "pending_host"])
 
     await supabase
       .from("booked_slots")

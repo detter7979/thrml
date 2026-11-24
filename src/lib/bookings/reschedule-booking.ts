@@ -133,6 +133,19 @@ export async function rescheduleBooking(params: RescheduleBookingParams): Promis
     post_session_email_sent: false,
   }
 
+  // Keep refunds measured from the earliest time the guest held, so moving a booking later
+  // and then cancelling can't turn a partial refund into a full one. Host-initiated moves
+  // don't change the guest's refund position.
+  if (requestedBy === "guest") {
+    const existingAnchor =
+      typeof booking.refund_anchor_at === "string" ? new Date(booking.refund_anchor_at) : null
+    const anchor =
+      existingAnchor && !Number.isNaN(existingAnchor.getTime()) && existingAnchor < currentStart
+        ? existingAnchor
+        : currentStart
+    updatePayload.refund_anchor_at = anchor.toISOString()
+  }
+
   if (status === "pending_host") {
     updatePayload.confirmation_deadline = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
   }

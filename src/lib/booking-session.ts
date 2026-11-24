@@ -1,3 +1,5 @@
+import { sessionInstant } from "@/lib/session-time"
+
 /** Shared session timing for bookings (dashboard grouping, auto-complete, reviews). */
 
 export type BookingSessionFields = {
@@ -16,8 +18,7 @@ export function parseBookingSessionEnd(booking: BookingSessionFields): Date | nu
       : typeof booking.start_time === "string" && booking.start_time
         ? booking.start_time
         : "23:59"
-  const parsed = new Date(`${sessionDate}T${endTime}`)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return sessionInstant(sessionDate, endTime)
 }
 
 /** True once the session window has fully ended (compare to full `now`, not calendar midnight). */

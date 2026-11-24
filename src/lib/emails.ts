@@ -536,17 +536,10 @@ export async function sendHost24HourReminder(args: {
   if (!args.hostEmail) return { sent: false, error: "Missing host email" }
   const accessType = normalizeAccessType(args.accessType)
   const startLabel = formatBookingWindow(args.sessionDate, args.startTime, args.endTime)
-  const twoHoursBeforeLabel =
-    args.sessionDate && args.startTime
-      ? new Date(new Date(`${args.sessionDate}T${args.startTime}`).getTime() - 2 * 60 * 60 * 1000).toLocaleTimeString(
-          "en-US",
-          { hour: "numeric", minute: "2-digit", timeZoneName: "short" }
-        )
-      : "2 hours before start"
   const accessLine =
     accessType === "host_onsite"
       ? `You're listed as on-site — please be ready to greet your guest at ${startLabel}.`
-      : `Access code will be sent to your guest automatically at ${twoHoursBeforeLabel}. No action needed.`
+      : "Your guest's access details are sent automatically before the session. No action needed."
 
   return sendThrmlLayoutEmail({
     to: args.hostEmail,

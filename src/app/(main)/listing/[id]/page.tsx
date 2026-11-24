@@ -421,7 +421,7 @@ export default async function ListingDetailPage({
     admin
       .from("reviews")
       .select(
-        "id, reviewer_id, rating_overall, rating_cleanliness, rating_accuracy, rating_communication, rating_value, comment, photo_urls, host_response, host_responded_at, created_at, metadata"
+        "id, reviewer_id, rating_overall, rating_cleanliness, rating_accuracy, rating_communication, rating_value, comment, photo_urls, host_response, host_responded_at, created_at"
       )
       .eq("listing_id", id)
       .eq("is_published", true)

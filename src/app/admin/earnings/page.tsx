@@ -27,7 +27,7 @@ export default async function AdminEarningsPage() {
           .in("id", listingIds)
       : Promise.resolve({ data: [] }),
     guestIds.length
-      ? admin.from("profiles").select("id, full_name, email").in("id", guestIds)
+      ? admin.from("profiles").select("id, full_name").in("id", guestIds)
       : Promise.resolve({ data: [] }),
     hostIds.length
       ? admin.from("profiles").select("id, full_name").in("id", hostIds)
@@ -68,12 +68,19 @@ export default async function AdminEarningsPage() {
   )
   type GuestMeta = { full_name: string | null; email: string | null }
 
+  const guestEmails = new Map<string, string | null>()
+  await Promise.all(
+    (guestRows ?? []).map(async (row) => {
+      const { data } = await admin.auth.admin.getUserById(String(row.id))
+      guestEmails.set(String(row.id), data.user?.email ?? null)
+    })
+  )
   const guestMap = new Map<string, GuestMeta>(
     (guestRows ?? []).map((row) => [
       String(row.id),
       {
         full_name: typeof row.full_name === "string" ? row.full_name : null,
-        email: typeof row.email === "string" ? row.email : null,
+        email: guestEmails.get(String(row.id)) ?? null,
       },
     ])
   )

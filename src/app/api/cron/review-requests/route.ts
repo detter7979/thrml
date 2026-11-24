@@ -112,12 +112,21 @@ export async function GET(req: NextRequest) {
       ? supabase.from("listings").select("id, title, service_type").in("id", listingIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     guestIds.length
-      ? supabase.from("profiles").select("id, full_name, email, auth_email").in("id", guestIds)
+      ? supabase.from("profiles").select("id, full_name").in("id", guestIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     hostIds.length
-      ? supabase.from("profiles").select("id, full_name, email, auth_email").in("id", hostIds)
+      ? supabase.from("profiles").select("id, full_name").in("id", hostIds)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
   ])
+
+  // Emails live on auth users, not profiles.
+  const emailById = new Map<string, string | null>()
+  await Promise.all(
+    Array.from(new Set([...guestIds, ...hostIds])).map(async (userId) => {
+      const { data } = await supabase.auth.admin.getUserById(userId)
+      emailById.set(userId, data.user?.email ?? null)
+    })
+  )
 
   const listingMap = new Map<string, { title: string; service_type: string }>()
   for (const row of (listings ?? []) as Record<string, unknown>[]) {
@@ -133,11 +142,9 @@ export async function GET(req: NextRequest) {
   for (const row of (guests ?? []) as Record<string, unknown>[]) {
     const id = typeof row.id === "string" ? row.id : null
     if (!id) continue
-    const authEmail = typeof row.auth_email === "string" ? row.auth_email : null
-    const profileEmail = typeof row.email === "string" ? row.email : null
     guestMap.set(id, {
       full_name: typeof row.full_name === "string" ? row.full_name : "",
-      email: authEmail ?? profileEmail,
+      email: emailById.get(id) ?? null,
     })
   }
 
@@ -145,11 +152,9 @@ export async function GET(req: NextRequest) {
   for (const row of (hosts ?? []) as Record<string, unknown>[]) {
     const id = typeof row.id === "string" ? row.id : null
     if (!id) continue
-    const authEmail = typeof row.auth_email === "string" ? row.auth_email : null
-    const profileEmail = typeof row.email === "string" ? row.email : null
     hostMap.set(id, {
       full_name: typeof row.full_name === "string" ? row.full_name : "",
-      email: authEmail ?? profileEmail,
+      email: emailById.get(id) ?? null,
     })
   }
 

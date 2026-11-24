@@ -125,15 +125,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<Param
       .select("id, title, service_type, cancellation_policy")
       .eq("id", booking.listing_id)
       .maybeSingle(),
-    admin.from("profiles").select("id, full_name, email").eq("id", booking.guest_id).maybeSingle(),
-    admin.from("profiles").select("id, full_name, email").eq("id", booking.host_id).maybeSingle(),
+    admin.from("profiles").select("id, full_name").eq("id", booking.guest_id).maybeSingle(),
+    admin.from("profiles").select("id, full_name").eq("id", booking.host_id).maybeSingle(),
   ])
   const [guestAuthUser, hostAuthUser] = await Promise.all([
     admin.auth.admin.getUserById(booking.guest_id),
     admin.auth.admin.getUserById(booking.host_id),
   ])
-  const guestEmail = guestAuthUser.data.user?.email ?? guestProfile?.email ?? null
-  const hostEmail = hostAuthUser.data.user?.email ?? hostProfile?.email ?? null
+  const guestEmail = guestAuthUser.data.user?.email ?? null
+  const hostEmail = hostAuthUser.data.user?.email ?? null
 
   const refundPreview = computeRefund({
     cancelledBy,

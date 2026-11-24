@@ -181,9 +181,9 @@ export async function POST(req: NextRequest) {
     .eq("id", parsed.data.bookingId)
     .eq("guest_id", user.id)
 
-  const [{ data: listing }, { data: hostProfile }, { data: guestProfile }] = await Promise.all([
+  const [{ data: listing }, hostAuth, { data: guestProfile }] = await Promise.all([
     admin.from("listings").select("id, title").eq("id", booking.listing_id).maybeSingle(),
-    admin.from("profiles").select("full_name, email").eq("id", booking.host_id).maybeSingle(),
+    booking.host_id ? admin.auth.admin.getUserById(booking.host_id) : Promise.resolve(null),
     admin.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
   ])
 
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
     try {
       await sendHostNewReviewNotification({
         hostId: booking.host_id ?? null,
-        hostEmail: hostProfile?.email ?? null,
+        hostEmail: hostAuth?.data.user?.email ?? null,
         guestFirstName: guestProfile?.full_name ?? null,
         listingTitle: listing?.title ?? "your listing",
         listingId: listing?.id ?? booking.listing_id ?? "",

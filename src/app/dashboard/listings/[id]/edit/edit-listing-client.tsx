@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Handshake, KeyRound, Lock, MoreHorizontal, Trash2, User } from "lucide-react"
 
 import { trackHostListingPublishedMeta } from "@/lib/analytics/host-listing-publish-meta"
-import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
+import { AMENITIES_BY_SERVICE_TYPE, getAmenityGroups } from "@/lib/constants/amenities"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import {
@@ -625,33 +625,38 @@ export function EditListingClient({
             </div>
             <div className="space-y-2">
               <Label>Amenities</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {validAmenities.map((amenity) => {
-                  const checked = form.amenities.includes(amenity)
-                  return (
-                    <label
-                      key={amenity}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                        checked ? "border-[#C75B3A] bg-[#FFF3EC]" : "border-[#E9DFD3] bg-white"
-                      }`}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        className="border-[#D9CBB8] data-[state=checked]:border-[#C75B3A] data-[state=checked]:bg-[#C75B3A] data-[state=checked]:text-white"
-                        onCheckedChange={() =>
-                          setForm((current) => {
-                            const nextAmenities = checked
-                              ? current.amenities.filter((item) => item !== amenity)
-                              : [...current.amenities, amenity]
-                            return { ...current, amenities: nextAmenities }
-                          })
-                        }
-                      />
-                      <span>{amenity}</span>
-                    </label>
-                  )
-                })}
-              </div>
+              {getAmenityGroups(form.serviceType).map((group) => (
+                <div key={group.label} className="space-y-2 pt-1">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {group.items.map((amenity) => {
+                      const checked = form.amenities.includes(amenity)
+                      return (
+                        <label
+                          key={amenity}
+                          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                            checked ? "border-[#C75B3A] bg-[#FFF3EC]" : "border-[#E9DFD3] bg-white"
+                          }`}
+                        >
+                          <Checkbox
+                            checked={checked}
+                            className="border-[#D9CBB8] data-[state=checked]:border-[#C75B3A] data-[state=checked]:bg-[#C75B3A] data-[state=checked]:text-white"
+                            onCheckedChange={() =>
+                              setForm((current) => {
+                                const nextAmenities = checked
+                                  ? current.amenities.filter((item) => item !== amenity)
+                                  : [...current.amenities, amenity]
+                                return { ...current, amenities: nextAmenities }
+                              })
+                            }
+                          />
+                          <span>{amenity}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
             <div className="space-y-2">
               <Label>Price solo</Label>

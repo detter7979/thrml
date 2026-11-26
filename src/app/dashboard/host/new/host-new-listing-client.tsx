@@ -26,11 +26,12 @@ import {
   CANCELLATION_POLICIES,
   getCancellationPolicy,
 } from "@/lib/constants/cancellation-policies"
-import { AMENITIES_BY_SERVICE_TYPE } from "@/lib/constants/amenities"
+import { AMENITIES_BY_SERVICE_TYPE, getAmenityGroups } from "@/lib/constants/amenities"
 import {
   ACCESS_METHOD_OPTIONS,
   DOOR_OPERATION_OPTIONS,
   HOST_AVAILABILITY_OPTIONS,
+  LEGACY_SAFETY_AMENITY_VALUES,
   SAFETY_AMENITY_OPTIONS,
   type AccessMethod,
   type DoorOperation,
@@ -58,7 +59,10 @@ const saunaTypes = ["Finnish", "Infrared", "Steam", "Barrel", "Wood-Fired"] as c
 const doorOperations = DOOR_OPERATION_OPTIONS.map((option) => option.value)
 const accessMethods = ACCESS_METHOD_OPTIONS.map((option) => option.value)
 const hostAvailabilities = HOST_AVAILABILITY_OPTIONS.map((option) => option.value)
-const safetyAmenityValues = SAFETY_AMENITY_OPTIONS.map((option) => option.value)
+const safetyAmenityValues: SafetyAmenity[] = [
+  ...SAFETY_AMENITY_OPTIONS.map((option) => option.value),
+  ...LEGACY_SAFETY_AMENITY_VALUES,
+]
 const cancellationPolicies = ["flexible", "moderate", "strict"] as const
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const
 
@@ -339,7 +343,6 @@ const STEP_FIELDS: Record<number, Path<ListingFormInput>[]> = {
     "emergencyContact",
     "controlsInReach",
     "hasVentilation",
-    "safetyAmenities",
   ],
   3: [
     "priceSolo",
@@ -356,7 +359,7 @@ const STEP_FIELDS: Record<number, Path<ListingFormInput>[]> = {
     "instantBook",
     "cancellationPolicy",
   ],
-  4: ["amenities"],
+  4: ["amenities", "safetyAmenities"],
   5: ["address", "lat", "lng", "availability"],
 }
 
@@ -423,7 +426,6 @@ export function HostNewListingClient({
   const [mapSuggestions, setMapSuggestions] = useState<GeocodeSuggestion[]>([])
   const [mapLoading, setMapLoading] = useState(false)
   const [mapError, setMapError] = useState<string | null>(null)
-  const [showMoreAmenities, setShowMoreAmenities] = useState(false)
   const [insuranceAttested, setInsuranceAttested] = useState(initialInsuranceAttested)
   const [insuranceAttestedAt, setInsuranceAttestedAt] = useState(insuranceAttestedAtProp)
   const [insuranceAttestationChecked, setInsuranceAttestationChecked] = useState(initialInsuranceAttested)
@@ -593,8 +595,7 @@ export function HostNewListingClient({
     () => AMENITIES_BY_SERVICE_TYPE[serviceType] ?? AMENITIES_BY_SERVICE_TYPE.general,
     [serviceType]
   )
-  const commonAmenities = amenityOptions.slice(0, 5)
-  const additionalAmenities = amenityOptions.slice(5)
+  const amenityGroups = useMemo(() => getAmenityGroups(serviceType), [serviceType])
   const canBuildGroupPricing = bookingModel !== "fixed_session" && Number(capacity ?? 1) > 1
   // Progress autosaves to a draft, so only warn when a save is still in flight or failed.
   const hasUnsavedWork =
@@ -807,10 +808,6 @@ export function HostNewListingClient({
     if (!price3) setValue("price3", Math.max(5, Math.round(solo * 0.7)), { shouldValidate: true })
     if (!price4plus) setValue("price4plus", Math.max(5, Math.round(solo * 0.6)), { shouldValidate: true })
   }, [canBuildGroupPricing, enableGroupTiers, price2, price3, price4plus, priceSolo, setValue])
-
-  useEffect(() => {
-    setShowMoreAmenities(false)
-  }, [serviceType])
 
   useEffect(() => {
     const validAmenities = new Set(amenityOptions)
@@ -1562,32 +1559,6 @@ export function HostNewListingClient({
                       </label>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>Available on-site (select all that apply)</Label>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {SAFETY_AMENITY_OPTIONS.map((option) => {
-                          const selectedSafetyAmenities = watch("safetyAmenities") ?? []
-                          const isSelected = selectedSafetyAmenities.includes(option.value)
-                          return (
-                            <label
-                              key={option.value}
-                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
-                                isSelected
-                                  ? "border-brand-500 bg-brand-100"
-                                  : "border-[#E5E0D8] bg-white text-muted-foreground"
-                              }`}
-                            >
-                              <Checkbox
-                                checked={isSelected}
-                                className="border-[#D9CBB8] data-[state=checked]:border-brand-500 data-[state=checked]:bg-brand-500 data-[state=checked]:text-white"
-                                onCheckedChange={() => toggleSafetyAmenity(option.value)}
-                              />
-                              <span>{option.label}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
                   </div>
                 </div>
               ) : null}
@@ -1639,63 +1610,50 @@ export function HostNewListingClient({
                     <p className="text-xs text-muted-foreground">
                       Tailored for {serviceTypeOptions.find((item) => item.id === serviceType)?.display_name ?? "this service"}.
                     </p>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Common</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {commonAmenities.map((amenity) => {
-                        const isSelected = selectedAmenities.includes(amenity)
-                        return (
-                          <button
-                            key={amenity}
-                            type="button"
-                            onClick={() => toggleAmenity(amenity)}
-                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                              isSelected ? "border-brand-500 bg-brand-100" : "border-[#E5E0D8] bg-white text-muted-foreground"
-                            }`}
-                          >
-                            <span className="min-w-0 flex-1">{amenity}</span>
-                            {isSelected ? <Check className="size-4 text-brand-500" /> : null}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {additionalAmenities.length ? (
-                      <div className="space-y-2 pt-2">
-                        <button
-                          type="button"
-                          className="text-xs font-medium text-brand-600"
-                          onClick={() => setShowMoreAmenities((value) => !value)}
-                        >
-                          {showMoreAmenities ? "Hide additional amenities -" : "Show more amenities +"}
-                        </button>
-                        {showMoreAmenities ? (
-                          <>
-                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              Additional
-                            </p>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              {additionalAmenities.map((amenity) => {
-                                const isSelected = selectedAmenities.includes(amenity)
-                                return (
-                                  <button
-                                    key={amenity}
-                                    type="button"
-                                    onClick={() => toggleAmenity(amenity)}
-                                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                                      isSelected
-                                        ? "border-brand-500 bg-brand-100"
-                                        : "border-[#E5E0D8] bg-white text-muted-foreground"
-                                    }`}
-                                  >
-                                    <span className="min-w-0 flex-1">{amenity}</span>
-                                    {isSelected ? <Check className="size-4 text-brand-500" /> : null}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </>
-                        ) : null}
+                    {amenityGroups.map((group) => (
+                      <div key={group.label} className="space-y-2 pt-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {group.items.map((amenity) => {
+                            const isSelected = selectedAmenities.includes(amenity)
+                            return (
+                              <button
+                                key={amenity}
+                                type="button"
+                                onClick={() => toggleAmenity(amenity)}
+                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                                  isSelected ? "border-brand-500 bg-brand-100" : "border-[#E5E0D8] bg-white text-muted-foreground"
+                                }`}
+                              >
+                                <span className="min-w-0 flex-1">{amenity}</span>
+                                {isSelected ? <Check className="size-4 text-brand-500" /> : null}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
-                    ) : null}
+                    ))}
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Safety on site</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {SAFETY_AMENITY_OPTIONS.map((option) => {
+                          const isSelected = (watch("safetyAmenities") ?? []).includes(option.value)
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => toggleSafetyAmenity(option.value)}
+                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                                isSelected ? "border-brand-500 bg-brand-100" : "border-[#E5E0D8] bg-white text-muted-foreground"
+                              }`}
+                            >
+                              <span className="min-w-0 flex-1">{option.label}</span>
+                              {isSelected ? <Check className="size-4 text-brand-500" /> : null}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
                     {errors.amenities ? (
                       <p className="text-sm text-destructive">{errors.amenities.message}</p>
                     ) : null}

@@ -2,27 +2,18 @@ export const AMENITIES_BY_SERVICE_TYPE: Record<string, string[]> = {
   sauna: [
     "Towels provided",
     "Robe provided",
-    "Cold shower",
-    "Cold outdoor shower",
+    "Changing room",
+    "Parking",
     "Outdoor shower",
     "Shower access",
-    "Parking",
-    "Birch whisk (vihta)",
-    "Eucalyptus steam",
+    "Cold shower",
     "Outdoor deck",
+    "Covered shelter",
     "Fire pit",
     "String lights",
-    "Covered shelter",
-    "Changing room",
-    "Private room",
-    "Ocean views",
-    "Canyon views",
-    "Reservoir views",
     "Herbal tea",
-    "Self-serve",
-    "Access code provided",
-    "Timer provided",
-    "Temperature gauge visible",
+    "Birch whisk (vihta)",
+    "Eucalyptus steam",
   ],
   cold_plunge: [
     "Towels provided",
@@ -145,4 +136,29 @@ export const AMENITIES_BY_SERVICE_TYPE: Record<string, string[]> = {
     "Access code provided",
     "Timer provided",
   ],
+}
+
+export type AmenityGroup = { label: string; items: string[] }
+
+/**
+ * How amenities are grouped in the listing editor. Sauna is grouped for launch; other service
+ * types show their list as a single group. Cold plunge isn't offered as a sauna amenity while
+ * it's being considered as a separate service or paid add-on.
+ */
+const AMENITY_GROUPS_BY_SERVICE_TYPE: Record<string, AmenityGroup[]> = {
+  sauna: [
+    { label: "The basics", items: ["Towels provided", "Robe provided", "Changing room", "Parking"] },
+    { label: "Cooling off", items: ["Outdoor shower", "Shower access", "Cold shower", "Outdoor deck", "Covered shelter"] },
+    {
+      label: "Extras",
+      items: ["Fire pit", "String lights", "Herbal tea", "Birch whisk (vihta)", "Eucalyptus steam"],
+    },
+  ],
+}
+
+export function getAmenityGroups(serviceType: string): AmenityGroup[] {
+  const grouped = AMENITY_GROUPS_BY_SERVICE_TYPE[serviceType]
+  if (grouped) return grouped
+  const items = AMENITIES_BY_SERVICE_TYPE[serviceType] ?? AMENITIES_BY_SERVICE_TYPE.general ?? []
+  return [{ label: "Amenities", items }]
 }

@@ -19,15 +19,20 @@ export const HOST_AVAILABILITY_OPTIONS = [
   { value: "not_reachable", label: "Not reachable during session" },
 ] as const
 
+/** Safety equipment hosts confirm in the listing editor (shown with the amenities). */
 export const SAFETY_AMENITY_OPTIONS = [
   { value: "drinking_water", label: "Drinking water" },
   { value: "first_aid_kit", label: "First-aid kit" },
-  { value: "shower_nearby", label: "Shower nearby" },
-  { value: "cold_plunge", label: "Cold plunge / cold shower" },
-  { value: "towels_provided", label: "Towels provided" },
+  { value: "timer_in_sauna", label: "Timer in the sauna" },
+  { value: "thermometer_visible", label: "Thermometer visible" },
 ] as const
+
+/** Older values that existing listings and drafts may still hold. Not offered for new selection. */
+export const LEGACY_SAFETY_AMENITY_VALUES = ["shower_nearby", "cold_plunge", "towels_provided"] as const
 
 export type DoorOperation = (typeof DOOR_OPERATION_OPTIONS)[number]["value"]
 export type AccessMethod = (typeof ACCESS_METHOD_OPTIONS)[number]["value"]
 export type HostAvailability = (typeof HOST_AVAILABILITY_OPTIONS)[number]["value"]
-export type SafetyAmenity = (typeof SAFETY_AMENITY_OPTIONS)[number]["value"]
+export type SafetyAmenity =
+  | (typeof SAFETY_AMENITY_OPTIONS)[number]["value"]
+  | (typeof LEGACY_SAFETY_AMENITY_VALUES)[number]

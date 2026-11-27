@@ -321,11 +321,11 @@ export async function buildWeeklyDigestEmail(args: {
   const intro =
     newThisWeekCount > 0
       ? usedMarketFilter && metro
-        ? `Here are real spaces hosts just listed in <strong>${escapeHtml(metro)}</strong> — book saunas, cold plunges, and more without a membership.`
+        ? `Here are real spaces hosts just listed in <strong>${escapeHtml(metro)}</strong> — book a private sauna without a membership.`
         : `Here are some of the newest spaces on Thrml this week — real listings you can book right now.`
       : usedMarketFilter && metro
         ? `Inventory changes fast. Here are active spaces in <strong>${escapeHtml(metro)}</strong> worth a look right now.`
-        : `Private recovery spaces are live on Thrml — saunas, cold plunges, float tanks, and more. Here are a few standout listings.`
+        : `Private saunas are live on Thrml. Here are a few standout listings.`
 
   const cardsHtml = listings.map((row) => renderListingCardHtml(args.supabase, row)).join("\n")
 

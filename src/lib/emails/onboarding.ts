@@ -58,7 +58,7 @@ export async function sendGuestWelcomeEmail(args: {
       kicker: "Welcome",
       title: `Welcome to Thrml, ${name}.`,
       paragraphs: [
-        "Private saunas, cold plunges, float tanks, and more — bookable by the hour, near you.",
+        "Private saunas near you, bookable by the hour. The whole space is yours for your session.",
         "Here's how it works:",
       ],
       listItems: [

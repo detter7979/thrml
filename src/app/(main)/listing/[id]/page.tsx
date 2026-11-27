@@ -97,7 +97,7 @@ async function fetchListingById(id: string) {
   const { data: listing } = await admin
     .from("listings")
     .select(
-      "id, title, description, city, state, location_city, location_state, service_type, price_solo, fixed_session_price, session_type, listing_photos(url, order_index)"
+      "id, title, description, city, state, location_city, location_state, service_type, price_solo, fixed_session_price, session_type, is_active, listing_photos(url, order_index)"
     )
     .eq("id", id)
     .eq("is_deleted", false)
@@ -114,6 +114,8 @@ export async function generateMetadata({
   const { id } = await params
   const listing = await fetchListingById(id)
   if (!listing) return { title: "Listing Not Found | thrml" }
+  // Listings that aren't live yet only open as a private preview; don't expose details or index them.
+  if (!listing.is_active) return { title: "Listing preview | thrml", robots: { index: false, follow: false } }
 
   const price =
     listing.session_type === "fixed_session"
@@ -338,7 +340,7 @@ export default async function ListingDetailPage({
     admin
       .from("listings")
       .select(
-        "id, host_id, title, description, service_type, sauna_type, is_active, location_city, location_state, city, state, country, capacity, price_solo, fixed_session_price, price_2, price_3, price_4plus, min_duration_override_minutes, max_duration_override_minutes, fixed_session_minutes, service_attributes, service_duration_min, service_duration_max, service_duration_unit, amenities, house_rules, cancellation_policy, availability, listing_photos(url, order_index), listing_blackout_dates(blackout_date)"
+        "id, host_id, title, description, service_type, sauna_type, is_active, approval_status, location_city, location_state, city, state, country, capacity, price_solo, fixed_session_price, price_2, price_3, price_4plus, min_duration_override_minutes, max_duration_override_minutes, fixed_session_minutes, service_attributes, service_duration_min, service_duration_max, service_duration_unit, amenities, house_rules, cancellation_policy, availability, listing_photos(url, order_index), listing_blackout_dates(blackout_date)"
       )
       .eq("id", id)
       .eq("is_deleted", false)
@@ -350,7 +352,7 @@ export default async function ListingDetailPage({
       .order("day_of_week", { ascending: true }),
   ])
 
-  if (error || !listing || !listing.is_active) {
+  if (error || !listing) {
     notFound()
   }
 
@@ -359,6 +361,23 @@ export default async function ListingDetailPage({
     data: { user },
   } = await supabase.auth.getUser()
   const isHost = Boolean(user?.id && listing.host_id && user.id === listing.host_id)
+
+  // Listings that aren't live (pending review, paused) are hidden from guests, but the
+  // listing's host and admins can open them as a preview, e.g. from the admin review queue.
+  let isPreview = false
+  if (!listing.is_active) {
+    let isAdminViewer = false
+    if (user?.id && !isHost) {
+      const { data: viewerProfile } = await admin
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", user.id)
+        .maybeSingle()
+      isAdminViewer = viewerProfile?.is_admin === true
+    }
+    if (!isHost && !isAdminViewer) notFound()
+    isPreview = true
+  }
 
   const serviceTypes = await getServiceTypes()
   const serviceTypeId =
@@ -594,10 +613,16 @@ export default async function ListingDetailPage({
       {mobileHeroUrl ? (
         <link rel="preload" as="image" href={mobileHeroUrl} media="(max-width: 767px)" fetchPriority="high" />
       ) : null}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema) }}
-      />
+      {isPreview ? (
+        <div className="sticky top-0 z-40 border-b border-[#E7D9C8] bg-[#FFF4E8] px-4 py-2 text-center text-sm text-[#7A4A23]">
+          Preview — this listing isn&apos;t live yet{listing.approval_status === "pending" ? " (pending review)" : ""}. Guests can&apos;t see or book it.
+        </div>
+      ) : (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(listingSchema) }}
+        />
+      )}
       <ListingDetailClient
         id={listing.id}
         title={listing.title ?? "thrml Wellness Listing"}
@@ -624,7 +649,7 @@ export default async function ListingDetailPage({
           typeof listing.service_duration_max === "number" ? Number(listing.service_duration_max) : null
         }
         serviceDurationUnit={listing.service_duration_unit === "hours" ? "hours" : "minutes"}
-        amenities={toStringArray(listing.amenities, ["Cold Plunge", "Towels", "Outdoor Deck"])}
+        amenities={toStringArray(listing.amenities, [])}
         houseRules={toStringArray(listing.house_rules, ["No smoking", "Respect quiet hours", "Leave on time"])}
         host={
           hostProfile

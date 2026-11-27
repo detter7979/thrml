@@ -344,6 +344,8 @@ function amenityIcon(amenity: string) {
     // Wellness Equipment
     "Birch whisk (vihta)": Leaf,
     "Eucalyptus steam": Wind,
+    "Aromatherapy (eucalyptus)": Flower2,
+    "Lounge seating": Armchair,
     "Full body mat": Bed,
     "Recliner/bed provided": Bed,
     "Zero gravity chairs": Armchair,

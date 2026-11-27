@@ -86,7 +86,7 @@ async function sendHostPoliciesEmail(profile: HostProfileRow): Promise<boolean> 
         "Before your first guest arrives, here's what hosting on Thrml means — for you and for them:",
       ],
       listItems: [
-        "Clean between every session — fresh towels if offered, sanitized surfaces, and clear water changeover for plunges and tubs.",
+        "Clean between every session — fresh towels if offered, wiped benches and handles, and a quick air-out.",
         "Accurate listings — photos, access details, and amenities should match exactly what guests find.",
         "Respect the schedule — honor confirmed bookings, and keep your calendar current to avoid cancellations.",
         "Safety first — post usage guidance, keep equipment maintained, and complete your insurance attestation.",
@@ -122,7 +122,7 @@ async function sendListingBestPracticesEmail(profile: HostProfileRow): Promise<b
         "Lead with your best photo — bright, steam-on or lit at dusk. Listings with 5+ photos book significantly more.",
         "Price for discovery — start slightly under comparable listings nearby, then raise as reviews come in.",
         "Write access instructions like a friend would — parking, entry, what to bring, where the light switch is.",
-        "Open real availability — evenings and weekend mornings are peak demand for saunas and plunges.",
+        "Open real availability — evenings and weekend mornings are when most guests want a sauna.",
         "Set your session buffer — leave enough time between bookings to reset the space properly.",
       ],
       cta: { label: "Create or polish your listing", href: `${APP_URL}/dashboard/listings/new` },
@@ -404,7 +404,7 @@ async function sendHostTipsEmail(args: {
         ? [
             "Wipe benches, handles, and controls with a sauna-safe cleaner after every session.",
             "Swap or restock towels, and stage them the same way every time — consistency reads as care.",
-            "For plunges and tubs: check water clarity and temperature before each guest window.",
+            "Check the heater and thermometer before each guest window so the sauna is up to temperature on arrival.",
             "Do a 30-second nose check — the space should smell like cedar or nothing at all.",
             "Photograph your 'reset state' once and match it before every booking.",
           ]

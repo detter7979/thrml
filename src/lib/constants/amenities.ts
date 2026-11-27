@@ -9,11 +9,11 @@ export const AMENITIES_BY_SERVICE_TYPE: Record<string, string[]> = {
     "Cold shower",
     "Outdoor deck",
     "Covered shelter",
+    "Bluetooth audio",
     "Fire pit",
     "String lights",
-    "Herbal tea",
-    "Birch whisk (vihta)",
-    "Eucalyptus steam",
+    "Lounge seating",
+    "Aromatherapy (eucalyptus)",
   ],
   cold_plunge: [
     "Towels provided",
@@ -151,7 +151,7 @@ const AMENITY_GROUPS_BY_SERVICE_TYPE: Record<string, AmenityGroup[]> = {
     { label: "Cooling off", items: ["Outdoor shower", "Shower access", "Cold shower", "Outdoor deck", "Covered shelter"] },
     {
       label: "Extras",
-      items: ["Fire pit", "String lights", "Herbal tea", "Birch whisk (vihta)", "Eucalyptus steam"],
+      items: ["Bluetooth audio", "Fire pit", "String lights", "Lounge seating", "Aromatherapy (eucalyptus)"],
     },
   ],
 }

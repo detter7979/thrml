@@ -179,7 +179,7 @@ export async function processSavedNoBookingReminders(): Promise<{ sent: number }
     const baseLayout: ThrmlEmailLayoutProps = {
       preview: "The spaces you saved are ready to book",
       kicker: "Your saved spaces",
-      title: "You had good taste. Now take the plunge.",
+      title: "Your saved saunas are ready when you are.",
       greeting: `Hi ${firstName(profile?.full_name as string | null)},`,
       paragraphs: [
         savedSummary.length > 1

@@ -47,8 +47,8 @@ export async function newsletterWelcomeVariantA({ email }: NewsletterWelcomeEmai
     kicker: "Newsletter",
     title: "You're in.",
     paragraphs: [
-      "Welcome to Thrml — the easiest way to find and book private saunas, cold plunges, float tanks, and other recovery spaces near you.",
-      "Most spaces start around $15/hour.",
+      "Welcome to Thrml — the easiest way to find and book private saunas near you.",
+      "Book by the hour, no membership required.",
       "Here's what to expect from us:",
     ],
     listItems: [

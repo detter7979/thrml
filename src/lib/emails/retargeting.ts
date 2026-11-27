@@ -87,8 +87,8 @@ export async function processHostRetargeting(options?: RetargetOptions): Promise
                 "It takes under 5 minutes — add your space, set a price, and go live today.",
               ]
             : [
-                "Wellness spaces on Thrml book consistently every weekend.",
-                "Hosts who listed their sauna or cold plunge in the last 30 days are already earning. Your space could be next.",
+                "Guests are looking for private saunas close to home — evenings and weekends especially.",
+                "Listing takes a few minutes, and your sauna is in front of guests as soon as it's approved.",
               ],
         cta: {
           label: daysSince <= 4 ? "Create your listing" : "List your space today",
@@ -168,12 +168,12 @@ export async function processGuestRetargeting(options?: RetargetOptions): Promis
         paragraphs:
           daysSince <= 4
             ? [
-                "New private sauna and cold plunge spaces just listed near you.",
-                "Most spaces start around $15/hour — no membership required.",
+                "New private saunas just listed near you — wood-fired, barrel and cabin-style, tucked into backyards around Seattle.",
+                "Book by the hour, just for you or your group. No membership required.",
               ]
             : [
-                "There are wellness spaces available to book this week — saunas, cold plunges, float tanks, and more.",
-                "Browse what's near you and book for as little as $15/hour.",
+                "There are private saunas open to book this week, a short drive from you.",
+                "Pick a time, bring a friend or two, and have the whole space to yourselves.",
               ],
         cta: {
           label: daysSince <= 4 ? "Find spaces near you" : "Browse new listings",
